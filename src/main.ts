@@ -431,7 +431,13 @@ $('#preview').onclick = async () => {
     preview.connect(gain);
     gain.connect(clock.context.destination);
     preview.start(0, 8, 12);
-    preview.onended = stopPreview;
+    const source = preview;
+    preview.onended = () => {
+      if (preview === source) {
+        preview = undefined;
+        $('#preview').textContent = '▷';
+      }
+    };
     $('#preview').textContent = 'Ⅱ';
   } finally {
     preparing = false;
@@ -497,6 +503,9 @@ Object.defineProperty(window, 'orvioDiagnostics', {
     events: engine?.events,
     metrics: active ? field?.stats() : latestMetrics,
     audioPeak: rendered?.peak,
+    audioActive: clock?.active ?? false,
+    previewActive: !!preview,
+    audioContextState: clock?.context.state,
     outputLatency: clock?.context.outputLatency,
     baseLatency: clock?.context.baseLatency,
   }),

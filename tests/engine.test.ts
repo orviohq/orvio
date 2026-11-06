@@ -91,3 +91,12 @@ describe('all 18 charts', () => {
         });
       }
 });
+
+describe('chart inputs remain serializable', () => {
+  it('supports cloned song metadata without object identity coupling', () => {
+    for (const s of SONGS)
+      expect(makeChart(structuredClone(s), 'high', 7)).toEqual(
+        makeChart(s, 'high', 7),
+      );
+  });
+});

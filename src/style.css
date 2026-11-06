@@ -978,3 +978,38 @@ dialog .segmented button {
   height: 64px;
   width: 64px;
 }
+@media (max-width: 480px) {
+  header {
+    gap: 10px;
+  }
+  .edition {
+    display: none;
+  }
+  header nav {
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  header nav a,
+  header nav button {
+    white-space: nowrap;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  .brand {
+    gap: 8px;
+  }
+  .brand img:not(.brand-symbol) {
+    width: 84px;
+  }
+  .brand .brand-symbol {
+    width: 24px;
+    height: 24px;
+  }
+  .selection button {
+    min-height: 44px;
+  }
+  .footer-strip button {
+    min-height: 44px;
+  }
+}

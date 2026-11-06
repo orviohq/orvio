@@ -14,7 +14,7 @@ A 1.0 backing resolution produced 53.7–56.9 fps despite 0.2ms P95 CPU submissi
 | Afterimage, 7-key easy          | 70/70 MAX100   | 1,000,000 | 60.0025     | 16.8ms    | 16.8ms  | 0 / 2322     |
 | Violet Drive, 5-key hard        | 332/332 MAX100 | 1,000,000 | 60.0024     | 16.8ms    | 16.8ms  | 0 / 2376     |
 
-These sessions send actual browser keydown/keyup events against the audible clock. They are automated keyboard playtests, **not human play** and not engine-call autoplay. One-millisecond-class scheduler error in this environment does not establish latency on a user's hardware. A cloud interactive session showed poor cadence and is not counted as a performance pass.
+These sessions send actual browser keydown/keyup events against the audible clock. They are automated keyboard playtests, **not human play** and not engine-call autoplay. One-millisecond-class scheduler error in this environment does not establish latency on a user's hardware. An early unfocused cloud interactive session showed poor cadence. After explicitly focusing the production tab, Intel UHD620 / Direct3D11 / Chrome157 on Windows measured 60.0020 fps, P95/max16.8ms, no >25ms frames over723 samples (13s idle-input gameplay). This is a second environment check, not a full keyboard-run substitute.
 
 ## Other checks
 

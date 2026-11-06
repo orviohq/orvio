@@ -66,5 +66,7 @@ test('wrong key, misses, late hit, bad hold, duplicate binding, positions and re
   expect((await diag(page)).resolved).toBe(0);
   await page.evaluate(() => window.dispatchEvent(new Event('blur')));
   expect((await diag(page)).active).toBeFalsy();
+  expect((await diag(page)).audioActive).toBeFalsy();
+  expect((await diag(page)).previewActive).toBeFalsy();
   await expect(page.locator('#lobby')).toBeVisible();
 });
