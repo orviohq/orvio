@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test';
 // Schedule a DOM keyboard event inside the page, avoiding remote automation RTT.
+// Use the live input clock, not the last animation-frame timestamp: a slow
+// render frame must not make a scheduled test key arrive after its target.
 // Real OS-style keyboard transport remains covered by the full play/menu tests.
 export async function atKey(
   page: Page,
@@ -11,7 +13,7 @@ export async function atKey(
     ({ at, code, down }) =>
       new Promise<void>((resolve) => {
         const tick = () => {
-          if ((window as any).orvioAudioTime < at) {
+          if ((window as any).orvioDiagnostics.clock < at) {
             setTimeout(tick, 1);
             return;
           }
