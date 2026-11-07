@@ -1,10 +1,7 @@
+import { atKey } from './input';
 import { test, expect } from '@playwright/test';
 const diag = (page: any) =>
   page.evaluate(() => (window as any).orvioDiagnostics);
-async function at(page: any, t: number) {
-  const now = (await diag(page)).clock;
-  if (t > now) await page.waitForTimeout((t - now) * 1000);
-}
 test('wrong key, misses, late hit, bad hold, duplicate binding, positions and reset', async ({
   page,
 }) => {
@@ -38,13 +35,11 @@ test('wrong key, misses, late hit, bad hold, duplicate binding, positions and re
   expect((await diag(page)).resolved).toBe(0);
   // Skip first note; hit a later non-hold 75ms late; release the first subsequent hold early.
   const late = notes.find((n: any) => n.id > 1 && !n.end);
-  await at(page, late.time + 0.075);
-  await page.keyboard.press(keys[late.lane]);
+  await atKey(page, late.time + 0.075, keys[late.lane], true);
+  await atKey(page, late.time + 0.077, keys[late.lane], false);
   const hold = notes.find((n: any) => n.time > late.time + 0.3 && n.end);
-  await at(page, hold.time);
-  await page.keyboard.down(keys[hold.lane]);
-  await page.waitForTimeout(120);
-  await page.keyboard.up(keys[hold.lane]);
+  await atKey(page, hold.time, keys[hold.lane], true);
+  await atKey(page, hold.time + 0.12, keys[hold.lane], false);
   await page.waitForTimeout(250);
   const d = await diag(page);
   expect(

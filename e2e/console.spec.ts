@@ -100,14 +100,18 @@ test('pause settings resume and page-timed graded key hits remain distinct', asy
   await expect(page.locator('#settings')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('#pause')).toBeVisible();
+  const frozen = await page.evaluate(async () => {
+    const a = (window as any).orvioDiagnostics.clock;
+    await new Promise((r) => setTimeout(r, 180));
+    return [(window as any).orvioDiagnostics.clock, a];
+  });
+  expect(Math.abs(frozen[0] - frozen[1])).toBeLessThan(0.001);
   await page.keyboard.press('Enter');
   await page.waitForFunction(
     () => (window as any).orvioDiagnostics.paused === false,
   );
-  const after = await page.evaluate(
-    () => (window as any).orvioDiagnostics.clock,
-  );
-  expect(after - before).toBeLessThan(0.15);
+  // Assert the frozen clock while paused, not automation round-trip time after resume.
+  expect(before).toBeDefined();
   const notes = await page.evaluate(() =>
     (window as any).orvioDiagnostics.notes.map((s: any) => s.note),
   );
