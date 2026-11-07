@@ -1,3 +1,20 @@
+import { AudioJobError } from './external-audio-api';
+import { externalError } from './external-errors';
+import {
+  localAudio,
+  localMetadata,
+  saveLocalAudio,
+  readLocalSession,
+  saveLocalSession,
+} from './external-local';
+import { externalLabels } from './external-labels';
+import { importYoutube } from './external-import';
+import { allPinnedSources } from './external-source-store';
+import {
+  externalSource,
+  externalAudio,
+  installExternalSource,
+} from './external-catalog';
 import { FULLSCREEN_WARNING } from './fullscreen-labels';
 import { saveSharedReplay, loadSharedReplay, ShareError } from './share-api';
 import { shareLabels } from './share-labels';
@@ -9,6 +26,7 @@ import {
   replayMatches,
   applyReplayOp,
   type ReplayData,
+  type RuntimeReplay,
   type ReplayOp,
 } from './replay';
 import { RESULT_LABELS } from './result-labels';
@@ -122,10 +140,12 @@ let rendered: Soundtrack | undefined;
 let preview: AudioBufferSourceNode | undefined;
 let previewGain: GainNode | undefined;
 let preparing = false;
-let lastResult: SharedResult | undefined;
-let sessionReplay: ReplayData | undefined,
-  savedReplay: ReplayData | undefined,
-  playReplay: ReplayData | undefined;
+type UiResult = Omit<SharedResult, 'song'> & { song: string };
+let lastResult: UiResult | undefined;
+let localSessionKey: string | undefined;
+let sessionReplay: RuntimeReplay | undefined,
+  savedReplay: RuntimeReplay | undefined,
+  playReplay: RuntimeReplay | undefined;
 let lastRecordedSpeed = settings.speed,
   lastRecordedFader = settings.fader;
 let replayCursor = 0,
@@ -189,7 +209,7 @@ function persist() {
 const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.12</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.15</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
 <section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div class="eyebrow">${label('selected')} <span id="selection-number">01 / 03</span></div><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
 <section class="library" aria-label="Track selection"><div class="section-title"><strong>${label('select')}</strong><span>ORIGINALS / 001</span></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">${label('easy')} <small>01</small></button><button data-diff="mid">${label('normal')} <small>02</small></button><button data-diff="high">${label('hard')} <small>03</small></button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div><div class="under-start"><span id="chart-info"></span><span>${label('keyboard')}</span></div></section>
 <section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
@@ -204,6 +224,94 @@ app.innerHTML = `
 <div id="song-loading" class="hidden" role="status" aria-live="polite"><img id="loading-wallpaper" alt=""><div class="loading-info"><span>ORVIO ORIGINALS</span><h1 id="loading-title"></h1><p id="loading-detail"></p><strong id="loading-status"></strong></div></div><dialog id="game-options"><form method="dialog"><div class="dialog-title"><h2>${label('gameOptions')}</h2><button class="close" aria-label="Close">×</button></div></form><label for="speed">${label('speed')} <output id="speed-value"></output></label><select id="speed"></select><label for="fader">${label('fader')}</label><select id="fader"><option value="off">OFF</option><option value="in">FADE IN</option><option value="in2">FADE IN 2</option><option value="out">FADE OUT</option><option value="out2">FADE OUT 2</option><option value="blink">BLINK</option><option value="blink2">BLINK 2</option><option value="fog">FOG</option><option value="pixel">PIXEL</option><option value="pixel2">PIXEL 2</option><option value="blind">BLIND</option></select><label for="shuffle">${label('shuffle')}</label><select id="shuffle"><option value="off">OFF</option><option value="mirror">MIRROR</option><option value="random">RANDOM</option></select><p class="hint" id="option-hint">${label('optionHint')}</p><button id="options-done" class="primary">${label('close')} ↵</button></dialog><dialog id="restart-options"><h2>${label('shuffleRestart')}</h2><p>${label('shuffleRestartHint')}</p><button id="confirm-shuffle-restart" class="primary">${label('restartApply')}</button><button id="cancel-shuffle-restart" class="quiet">${label('cancelChange')}</button></dialog><dialog id="results" tabindex="-1" aria-labelledby="result-song"><div class="result-system">ORVIO / SESSION REPORT</div><div class="result-heading"><img id="result-art" alt=""><div class="result-track"><h2 id="result-song"></h2><p id="result-metadata"></p><button id="result-preview" class="quiet" aria-pressed="false"></button></div><span id="result-rank"></span></div><p id="result-options"></p><div id="result-badge"></div><div class="result-score" id="result-score"></div><div class="result-stats"><div><span>${label('accuracy')}</span><strong id="result-rate"></strong></div><div><span>${label('maxCombo')}</span><strong id="result-combo"></strong></div><div><span>BREAK</span><strong id="result-break"></strong></div></div><div id="judgment-list"></div><p id="share-status" class="hint" role="status"></p><p id="replay-status" class="hint hidden" role="status"></p><button id="watch-replay" class="quiet hidden"></button><div class="result-actions"><button id="share-result" class="quiet"></button><button id="back" class="quiet">ESC ${label('back')}</button><button id="retry" class="primary">${label('retry')} ↵</button></div></dialog>
 
 <dialog id="about"><form method="dialog"><div class="dialog-title"><h2>${label('aboutTitle')}</h2><button class="close" aria-label="Close">×</button></div></form><p>${label('aboutBody')}</p><a href="https://github.com/orviohq/orvio" target="_blank" rel="noreferrer">${label('code')} ↗</a></dialog><div id="toast" role="status"></div>`;
+app.insertAdjacentHTML(
+  'beforeend',
+  '<dialog id="youtube-import"><form id="youtube-form"><div class="dialog-title"><h2 id="youtube-heading"></h2><button id="youtube-cancel" type="button" class="close">×</button></div><label for="youtube-url" id="youtube-label"></label><input id="youtube-url" type="url" required autocomplete="off" placeholder="https://www.youtube.com/watch?v=…"><p id="youtube-rights" class="hint"></p><p id="youtube-status" role="status" class="hint"></p><button id="youtube-submit" class="primary"></button></form></dialog>',
+);
+const addYoutube = document.createElement('button');
+addYoutube.id = 'add-youtube';
+addYoutube.className = 'quiet';
+$('#songs').before(addYoutube);
+const localReplayButton = document.createElement('button');
+localReplayButton.id = 'local-replay';
+localReplayButton.className = 'quiet hidden';
+addYoutube.after(localReplayButton);
+localReplayButton.onclick = () => void openLocalSession(SONGS[songIndex].id);
+async function openLocalSession(id: string) {
+  try {
+    const session = await readLocalSession(id);
+    if (!session) throw Error();
+    savedReplay = session.replay;
+    replayExpected = false;
+    replayIssue = false;
+    lastResult = session.result;
+    localSessionKey = session.key;
+    showResult(session.result);
+  } catch {
+    toast(externalLabels(settings.language).failed);
+  }
+}
+let selectionVersion = 0;
+let importController: AbortController | undefined;
+addYoutube.onclick = () => {
+  $('#youtube-status').textContent = '';
+  $<HTMLDialogElement>('#youtube-import').showModal();
+  $('#youtube-url').focus();
+};
+$('#youtube-import').addEventListener('cancel', () =>
+  importController?.abort(),
+);
+$('#youtube-cancel').onclick = () => {
+  importController?.abort();
+  $<HTMLDialogElement>('#youtube-import').close();
+};
+$('#youtube-form').onsubmit = async (e) => {
+  e.preventDefault();
+  importController?.abort();
+  importController = new AbortController();
+  const labels = externalLabels(settings.language);
+  $<HTMLButtonElement>('#youtube-submit').disabled = true;
+  $('#youtube-status').textContent = labels.preparing;
+  try {
+    const r = await importYoutube(
+      $<HTMLInputElement>('#youtube-url').value.trim(),
+      importController.signal,
+    );
+    if (importController.signal.aborted) return;
+    const title = r.title?.trim() || 'YouTube · ' + r.prepared.record.videoId;
+    await saveLocalAudio(
+      r.prepared.record,
+      title,
+      r.jobId,
+      r.prepared.bytes,
+      r.author,
+    );
+    const item = installExternalSource(
+      r.prepared.record,
+      title,
+      r.prepared.bytes,
+      r.jobId,
+      r.author,
+    );
+    let index = SONGS.findIndex((s) => s.id === item.song.id);
+    if (index < 0) {
+      SONGS.push(item.song);
+      index = SONGS.length - 1;
+    }
+    songCards();
+    selectSong(index, false);
+    $<HTMLDialogElement>('#youtube-import').close();
+    toast(labels.saved);
+  } catch (error) {
+    if (!(error instanceof DOMException && error.name === 'AbortError'))
+      $('#youtube-status').textContent = externalError(
+        error,
+        settings.language,
+      );
+  } finally {
+    $<HTMLButtonElement>('#youtube-submit').disabled = false;
+  }
+};
 guardFullscreenEscape();
 document.addEventListener('orvio:fullscreen-capture', () => {
   if (fullscreenEscapeStatus() !== 'locked')
@@ -211,6 +319,19 @@ document.addEventListener('orvio:fullscreen-capture', () => {
 });
 const scoreDisplay = new ScoreDisplay($('#score'));
 function localize() {
+  const external = externalLabels(settings.language);
+  $('#add-youtube').textContent = external.add;
+  $('#local-replay').textContent = external.replay;
+  $('#youtube-heading').textContent = external.add;
+  $('#youtube-label').textContent = external.url;
+  $('#youtube-submit').textContent = external.submit;
+  $('#youtube-rights').textContent =
+    externalError(new AudioJobError('too_long'), settings.language) +
+    ' ' +
+    external.rights +
+    ' ' +
+    external.saved;
+  $('#youtube-cancel').setAttribute('aria-label', external.cancel);
   queueMicrotask(() => document.dispatchEvent(new Event('orvio:select-sync')));
   document.documentElement.lang = settings.language;
   const shareStatus = document.querySelector<HTMLElement>('#share-status');
@@ -256,13 +377,33 @@ function selectedSong() {
   const song = SONGS[songIndex];
   document.documentElement.style.setProperty('--accent', song.color);
   $('#selected-art').className = 'selected-art cover-' + songIndex;
-  $('#selected-art').style.backgroundImage = `url(/wallpapers/${song.id}.png)`;
+  $('#selected-art').style.backgroundImage =
+    `url(/wallpapers/${externalSource(song.id) ? 'first-light' : song.id}.png)`;
   $('#selected-art .art-index').textContent = '0' + (songIndex + 1);
-  $('#selection-number').textContent = `0${songIndex + 1} / 03`;
+  $('#selection-number').textContent =
+    `0${songIndex + 1} / ${String(SONGS.length).padStart(2, '0')}`;
   $('#selected-title').textContent = song.title;
-  $('#selected-subtitle').textContent = t(('subtitle' + songIndex) as Word);
+  const originLabel = document.querySelector<HTMLElement>(
+    '#selected-art .art-mark',
+  );
+  if (originLabel)
+    originLabel.textContent = externalSource(song.id)
+      ? 'YOUTUBE'
+      : 'ORVIO / ORIGINALS';
+  $('#selected-subtitle').textContent = externalSource(song.id)
+    ? song.subtitle
+    : t(('subtitle' + songIndex) as Word);
   $('#selected-genre').textContent = song.genre;
   $('#selected-bpm').textContent = song.bpm + ' BPM';
+  const selection = ++selectionVersion;
+  localReplayButton.classList.add('hidden');
+  if (externalSource(song.id))
+    void readLocalSession(song.id)
+      .then((r) => {
+        if (selection === selectionVersion)
+          localReplayButton.classList.toggle('hidden', !r);
+      })
+      .catch(() => {});
 }
 function selectSong(index: number, audition = true) {
   if (preparing || active) return;
@@ -275,10 +416,20 @@ function selectSong(index: number, audition = true) {
   if (audition) void previewSong();
 }
 
+function escapeText(text: string) {
+  const span = document.createElement('span');
+  span.textContent = text;
+  return span.innerHTML;
+}
 function songCards() {
+  document.querySelector<HTMLElement>(
+    '.library .section-title>span',
+  )!.textContent = SONGS.some((s) => externalSource(s.id))
+    ? externalLabels(settings.language).library
+    : 'ORIGINALS / 001';
   $('#songs').innerHTML = SONGS.map(
     (s, i) =>
-      `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}"><span class="orb"></span><span class="cover-number">0${i + 1}</span></span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${s.title}</strong><span>${t(('subtitle' + i) as Word)}</span></span><span class="song-time">${Math.floor(duration(s) / 60)}:${Math.floor(
+      `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}"><span class="orb"></span><span class="cover-number">0${i + 1}</span></span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle) : t(('subtitle' + i) as Word)}</span></span><span class="song-time">${Math.floor(duration(s) / 60)}:${Math.floor(
         duration(s) % 60,
       )
         .toString()
@@ -330,7 +481,7 @@ function syncSettings() {
     b.setAttribute('aria-pressed', String(selected));
   });
   $('#chart-info').textContent =
-    `${makeChart(SONGS[songIndex], settings.difficulty, settings.lanes).length} ${t('notes')} · ${t('original')}`;
+    `${makeChart(SONGS[songIndex], settings.difficulty, settings.lanes).length} ${t('notes')} · ${externalSource(SONGS[songIndex].id) ? 'YouTube' : t('original')}`;
   const speed = $<HTMLSelectElement>('#speed');
   speed.innerHTML = Array.from({ length: 17 }, (_, i) => 1 + i / 2)
     .map((value) => `<option value="${value}">${value.toFixed(1)}×</option>`)
@@ -403,11 +554,24 @@ function stopPreview() {
   $('#preview-status').textContent = t('previewReady');
   document.body.classList.remove('previewing');
 }
+async function ensureExternalBytes(id: string) {
+  const external = externalSource(id);
+  if (external && !external.bytes) {
+    const saved = await localAudio(external.record);
+    if (!saved) throw Error('Matching source audio unavailable');
+    external.bytes = saved.bytes;
+  }
+}
 async function prepare() {
   if (!clock) clock = new AudioClock();
   await clock.context.resume();
   const song = SONGS[songIndex];
-  rendered = cache.get(song.id) ?? (await cachedAudio(song.id, clock.context));
+  await ensureExternalBytes(song.id);
+  rendered =
+    cache.get(song.id) ??
+    (externalSource(song.id)
+      ? { buffer: externalAudio(song.id, clock.context), peak: 1 }
+      : await cachedAudio(song.id, clock.context));
   const warm = !!rendered;
   if (!rendered) {
     $('#start').textContent = t('preparing');
@@ -434,8 +598,13 @@ async function start() {
   // Changing src may leave the last decoded image painted until the new decode.
   // Hide it before the overlay can be visible, then reveal only the new image.
   wallpaper.hidden = true;
-  wallpaper.src = `/wallpapers/${loadingSong.id}.png`;
+  wallpaper.src = `/wallpapers/${externalSource(loadingSong.id) ? 'first-light' : loadingSong.id}.png`;
   $('#loading-title').textContent = loadingSong.title;
+  $('#loading-title').previousElementSibling!.textContent = externalSource(
+    loadingSong.id,
+  )
+    ? 'YOUTUBE'
+    : 'ORVIO ORIGINALS';
   $('#loading-detail').textContent =
     `${loadingSong.genre} · ${loadingSong.bpm} BPM · ${settings.lanes} KEY`;
   $('#loading-status').textContent = t('preparing');
@@ -480,7 +649,7 @@ async function start() {
       ? undefined
       : {
           version: 1,
-          song: song.id as SharedResult['song'],
+          song: song.id,
           lanes: settings.lanes,
           difficulty: settings.difficulty,
           options: {
@@ -501,7 +670,7 @@ async function start() {
     sessionId = crypto.randomUUID();
     document.body.style.setProperty(
       '--play-wallpaper',
-      `url("/wallpapers/${song.id}.png")`,
+      `url("/wallpapers/${externalSource(song.id) ? 'first-light' : song.id}.png")`,
     );
     $('#game').dataset.song = song.id;
     field.bpm = song.bpm;
@@ -519,6 +688,11 @@ async function start() {
     $('#arena').dataset.position = settings.position;
     $('#now-title').textContent = song.title;
     $('#side-title').textContent = song.title;
+    $('#side-title').previousElementSibling!.textContent = externalSource(
+      song.id,
+    )
+      ? 'YOUTUBE'
+      : 'ORVIO ORIGINALS';
     $('#now-detail').textContent =
       `${playReplay ? REPLAY_LABELS[settings.language][1] + ' · ' : ''}${song.genre} · ${song.bpm} BPM`;
     $('#lane-detail').textContent =
@@ -743,7 +917,7 @@ function finish() {
   }
   latestMetrics = field.stats();
   lastResult = {
-    song: SONGS[songIndex].id as SharedResult['song'],
+    song: SONGS[songIndex].id,
     lanes: settings.lanes,
     difficulty: settings.difficulty,
     score: engine.score,
@@ -762,9 +936,25 @@ function finish() {
   const completed = lastResult;
   replayExpected = true;
   replayEncoding = (async () => {
-    if (savedReplay && replayMatches(savedReplay, completed)) {
+    if (externalSource(completed.song)) {
+      replayText = '';
+      replayExpected = false;
+      if (!savedReplay || !replayMatches(savedReplay, completed))
+        savedReplay = undefined;
+      if (savedReplay) {
+        try {
+          localSessionKey = await saveLocalSession(savedReplay, completed);
+        } catch {
+          toast(externalLabels(settings.language).failed);
+        }
+      }
+    } else if (
+      !externalSource(completed.song) &&
+      savedReplay &&
+      replayMatches(savedReplay, completed)
+    ) {
       try {
-        replayText = await encodeReplay(savedReplay);
+        replayText = await encodeReplay(savedReplay as ReplayData);
         replayExpectedLength = replayText.length;
       } catch {
         savedReplay = undefined;
@@ -787,8 +977,13 @@ function finish() {
     }
   });
 }
-function resultLink(result: SharedResult) {
-  const p = resultParams(result);
+function resultLink(result: UiResult) {
+  if (externalSource(result.song))
+    return new URL(
+      '/result/?local=' + encodeURIComponent(localSessionKey ?? result.song),
+      location.origin,
+    ).href;
+  const p = resultParams(result as SharedResult);
   if (replayExpected) {
     p.set('rp', '1');
     p.set('rn', String(replayExpectedLength));
@@ -797,7 +992,7 @@ function resultLink(result: SharedResult) {
     p.set('r', replayText);
   return new URL('/result/#' + p, location.origin).href;
 }
-function showResult(result: SharedResult) {
+function showResult(result: UiResult) {
   screen = 'select';
   delete $('#share-status').dataset.message;
   $('#share-status').textContent = '';
@@ -813,7 +1008,9 @@ function showResult(result: SharedResult) {
   $('#share-result').title = t('shareResult');
 
   stopPreview();
-  $('#result-song').textContent = SHARED_SONGS[result.song];
+  $('#result-song').textContent =
+    SONGS.find((s) => s.id === result.song)?.title ?? result.song;
+  $<HTMLButtonElement>('#share-result').hidden = !!externalSource(result.song);
   resultOptions(result);
   $('#result-rank').textContent =
     result.accuracy >= 97
@@ -857,9 +1054,10 @@ function syncResultPreview() {
     (preview ? '■ ' : '▶ ') + RESULT_LABELS[settings.language][preview ? 1 : 0];
   b.setAttribute('aria-pressed', String(!!preview));
 }
-function resultOptions(result: SharedResult) {
+function resultOptions(result: UiResult) {
   const song = SONGS.find((s) => s.id === result.song)!;
-  $<HTMLImageElement>('#result-art').src = `/wallpapers/${song.id}.png`;
+  $<HTMLImageElement>('#result-art').src =
+    `/wallpapers/${externalSource(song.id) ? 'first-light' : song.id}.png`;
   const count = makeChart(song, result.difficulty, result.lanes).length;
   $('#result-metadata').textContent =
     `${song.genre} · ${song.bpm} BPM · ${count} ${t('notes')}`;
@@ -895,6 +1093,7 @@ function exit() {
   $('#lobby').classList.remove('hidden');
   screen = 'select';
   if (!readingRoute) history.pushState(null, '', selectionPath());
+  selectedSong();
 }
 function keyTime(e: KeyboardEvent) {
   let stamp = e.timeStamp;
@@ -908,6 +1107,14 @@ document.addEventListener('pointerdown', (e) => {
   }
 });
 window.addEventListener('keydown', (e) => {
+  if ($<HTMLDialogElement>('#youtube-import').open) {
+    if (e.code === 'Escape') {
+      e.preventDefault();
+      importController?.abort();
+      $<HTMLDialogElement>('#youtube-import').close();
+    }
+    return;
+  }
   if (playReplay && active) {
     e.preventDefault();
     if (e.code === 'Escape' && !e.repeat) stopReplay();
@@ -1234,6 +1441,7 @@ for (const id of ['fader', 'shuffle'] as const)
 let shareBusy = false;
 const shortCache = new Map<string, { id: string; expiresAt: string }>();
 $('#share-result').onclick = async () => {
+  if (lastResult && externalSource(lastResult.song)) return;
   if (!lastResult || shareBusy) return;
   shareBusy = true;
   const button = $<HTMLButtonElement>('#share-result');
@@ -1362,12 +1570,15 @@ async function previewSong() {
   try {
     // resume is called during the selection key/click gesture, before rendering.
     await clock.context.resume();
+    await ensureExternalBytes(song.id);
     let track = cache.get(song.id);
     if (!track) {
-      track =
-        (await cachedAudio(song.id, clock.context)) ?? (await renderSong(song));
+      track = externalSource(song.id)
+        ? { buffer: externalAudio(song.id, clock.context), peak: 1 }
+        : ((await cachedAudio(song.id, clock.context)) ??
+          (await renderSong(song)));
       cache.set(song.id, track);
-      void saveAudio(song.id, track);
+      if (!externalSource(song.id)) void saveAudio(song.id, track);
     }
     if (
       request !== previewRequest ||
@@ -1502,6 +1713,7 @@ $('#reset').onclick = () => {
   syncSettings();
 };
 function playPath() {
+  if (externalSource(SONGS[songIndex].id)) return selectionPath();
   return `/play/${SONGS[songIndex].id}/${settings.lanes}/${settings.difficulty}/?speed=${settings.speed.toFixed(1)}&fader=${settings.fader}&shuffle=${settings.shuffle}&seed=${shuffleSeed}`;
 }
 function selectionPath() {
@@ -1666,12 +1878,58 @@ async function readInitialRoute() {
     document.documentElement.removeAttribute('data-result-pending');
   }
 }
-void readInitialRoute();
+const initialQuery = new URLSearchParams(location.search);
+const deferredLibraryRoute =
+  location.pathname.includes('/yt-') ||
+  initialQuery.get('song')?.startsWith('yt-') ||
+  initialQuery.has('local');
+if (!deferredLibraryRoute) void readInitialRoute();
+async function initializeLibrary() {
+  try {
+    for (const record of await allPinnedSources()) {
+      const saved = await localMetadata(record);
+      const item = installExternalSource(
+        record,
+        saved?.title ?? record.videoId,
+        undefined,
+        saved?.jobId,
+        saved?.author,
+      );
+      if (!SONGS.some((s) => s.id === item.song.id)) SONGS.push(item.song);
+    }
+  } catch {
+    toast(externalLabels(settings.language).failed);
+  }
+  if (deferredLibraryRoute) await readInitialRoute();
+  else if (screen === 'select' && !active) {
+    songCards();
+    selectedSong();
+  }
+  const local = new URLSearchParams(location.search).get('local');
+  if (local) {
+    try {
+      const session = await readLocalSession(local);
+      if (!session) throw Error();
+      savedReplay = session.replay;
+      lastResult = session.result;
+      replayExpected = false;
+      replayIssue = false;
+      songIndex = SONGS.findIndex((s) => s.id === session.replay.song);
+      localSessionKey = session.key;
+      settings.lanes = session.replay.lanes;
+      settings.difficulty = session.replay.difficulty;
+      showResult(session.result);
+    } catch {
+      toast(externalLabels(settings.language).failed);
+    }
+  }
+}
+void initializeLibrary();
 
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.2.12',
+    version: '0.2.15',
     active,
     paused,
     sessionId,

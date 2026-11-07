@@ -1,3 +1,4 @@
+import { NEXT_PATCH } from './patch-notes-next';
 import {
   EXTRA_PATCH_LABELS,
   EXTRA_PATCHES,
@@ -491,15 +492,18 @@ export const PATCH_LABELS: Record<
   Language,
   { title: string; back: string; scope: string }
 > = { ...BASE_PATCH_LABELS, ...EXTRA_PATCH_LABELS };
-export const PATCHES = BASE_PATCHES.map((p) => ({
-  ...p,
-  notes: {
-    ...p.notes,
-    ...Object.fromEntries(
-      Object.entries(EXTRA_PATCHES).map(([lang, versions]) => [
-        lang,
-        versions[p.version],
-      ]),
-    ),
-  } as Record<Language, string[]>,
-}));
+export const PATCHES = [
+  NEXT_PATCH,
+  ...BASE_PATCHES.map((p) => ({
+    ...p,
+    notes: {
+      ...p.notes,
+      ...Object.fromEntries(
+        Object.entries(EXTRA_PATCHES).map(([lang, versions]) => [
+          lang,
+          versions[p.version],
+        ]),
+      ),
+    } as Record<Language, string[]>,
+  })),
+];

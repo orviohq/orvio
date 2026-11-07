@@ -1,3 +1,4 @@
+import { externalNotes, externalDuration } from './external-catalog';
 export type Difficulty = 'low' | 'mid' | 'high';
 export type Lanes = 5 | 7;
 export interface Song {
@@ -69,6 +70,8 @@ export function makeChart(
   difficulty: Difficulty,
   lanes: Lanes,
 ): Note[] {
+  const saved = externalNotes(song.id, difficulty, lanes);
+  if (saved) return saved;
   const beat = 60 / song.bpm;
   const notes: Note[] = [];
   const divisions = difficulty === 'low' ? 1 : difficulty === 'mid' ? 2 : 4;
@@ -109,5 +112,5 @@ export function makeChart(
     .map((n, id) => ({ ...n, id }));
 }
 export function duration(song: Song) {
-  return (song.bars * 4 * 60) / song.bpm + 2;
+  return externalDuration(song.id) ?? (song.bars * 4 * 60) / song.bpm + 2;
 }

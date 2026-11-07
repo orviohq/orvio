@@ -11,7 +11,7 @@ const escape = (value: string) =>
 const svg = (paths: string) =>
   `<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 export function resultBadges(
-  r: SharedResult,
+  r: Omit<SharedResult, 'song'> & { song: string },
   labels: {
     keys: string;
     difficulty: string;

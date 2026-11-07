@@ -7,7 +7,7 @@ import {
   type Fader,
   type Shuffle,
 } from './game-options';
-import type { SharedResult } from './share';
+import { SHARED_SONGS, type SharedResult } from './share';
 // wall milliseconds, original audio seconds. Omit update calls only when they
 // changed no engine state. Preserve actual input order and exact float values.
 export type ReplayOp =
@@ -24,14 +24,24 @@ export interface ReplayData {
   ops: ReplayOp[];
   end: number;
 }
+export type RuntimeReplay = Omit<ReplayData, 'song'> & { song: string };
 const faders: readonly string[] = FADERS;
 const shuffles = ['off', 'mirror', 'random'];
 export function validateReplay(raw: unknown): ReplayData | null {
+  return validateRuntimeReplay(raw, (id) =>
+    Object.hasOwn(SHARED_SONGS, id),
+  ) as ReplayData | null;
+}
+export function validateRuntimeReplay(
+  raw: unknown,
+  allowed: (id: string) => boolean,
+): RuntimeReplay | null {
   if (!raw || typeof raw !== 'object') return null;
-  const r = raw as ReplayData;
+  const r = raw as RuntimeReplay;
   if (
     r.version !== 1 ||
-    !SONGS.some((s) => s.id === r.song) ||
+    typeof r.song !== 'string' ||
+    !allowed(r.song) ||
     ![5, 7].includes(r.lanes) ||
     !['low', 'mid', 'high'].includes(r.difficulty) ||
     !r.options ||
@@ -107,7 +117,7 @@ export function validateReplay(raw: unknown): ReplayData | null {
     end: r.end,
   };
 }
-export function replayEngine(r: ReplayData) {
+export function replayEngine(r: RuntimeReplay) {
   return new Engine(
     transformChart(
       makeChart(
@@ -126,7 +136,10 @@ export function applyReplayOp(engine: Engine, op: ReplayOp, sequence: number) {
     engine.input({ lane: op[3], time: op[2], down: !!op[4], sequence });
   else if (op[0] === 1) engine.update(op[2]);
 }
-export function replayMatches(r: ReplayData, result: SharedResult) {
+export function replayMatches(
+  r: RuntimeReplay,
+  result: Omit<SharedResult, 'song'> & { song: string },
+) {
   if (
     r.song !== result.song ||
     r.lanes !== result.lanes ||

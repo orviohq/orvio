@@ -1,0 +1,63 @@
+import type { Song, Note, Difficulty, Lanes } from './chart';
+import type { SourceRecord } from './external-source';
+import { parseWav } from './canonical-pcm.mjs';
+export interface ExternalSong {
+  song: Song;
+  record: SourceRecord;
+  jobId?: string;
+  bytes?: ArrayBuffer;
+}
+const sources = new Map<string, ExternalSong>();
+export function sourceId(r: SourceRecord) {
+  return `yt-${r.videoId}-${r.audioSha256.slice(0, 16)}`;
+}
+export function installExternalSource(
+  record: SourceRecord,
+  title: string,
+  bytes?: ArrayBuffer,
+  jobId?: string,
+  author?: string,
+): ExternalSong {
+  const song: Song = {
+    id: sourceId(record),
+    title,
+    subtitle: author || 'YouTube',
+    bpm: record.estimatedBpm,
+    root: 57,
+    scale: [0, 2, 4, 7, 9],
+    color: '#29d8ff',
+    genre: 'YOUTUBE',
+    bars: 0,
+  };
+  const item = { song, record, bytes, jobId };
+  sources.set(song.id, item);
+  return item;
+}
+export function externalSource(id: string) {
+  return sources.get(id);
+}
+export function externalNotes(
+  id: string,
+  difficulty: Difficulty,
+  lanes: Lanes,
+): Note[] | undefined {
+  const source = sources.get(id);
+  return source
+    ? structuredClone(source.record.charts[`${lanes}:${difficulty}`].notes)
+    : undefined;
+}
+export function externalDuration(id: string) {
+  const r = sources.get(id)?.record;
+  return r ? r.frames / r.sampleRate : undefined;
+}
+export function externalAudio(id: string, context: AudioContext): AudioBuffer {
+  const item = sources.get(id);
+  if (!item?.bytes) throw Error('Matching source audio unavailable');
+  const p = parseWav(item.bytes),
+    buffer = context.createBuffer(p.channels, p.frames, p.sampleRate);
+  for (let ch = 0; ch < p.channels; ch++) {
+    const out = buffer.getChannelData(ch);
+    for (let i = 0; i < p.frames; i++) out[i] = p.samples[i * p.channels + ch];
+  }
+  return buffer;
+}

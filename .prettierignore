@@ -4,3 +4,6 @@ package-lock.json
 public
 playwright-report
 test-results
+
+source-harness
+fixtures

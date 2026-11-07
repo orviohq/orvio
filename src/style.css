@@ -3022,3 +3022,36 @@ canvas {
 #results {
   scroll-padding-bottom: 18px;
 }
+#add-youtube {
+  margin-bottom: 12px;
+  width: 100%;
+  padding: 12px;
+}
+#youtube-import {
+  width: min(540px, calc(100vw - 32px));
+}
+#youtube-form > label {
+  display: block;
+  margin: 16px 0 8px;
+}
+#youtube-url {
+  width: 100%;
+  padding: 14px;
+  background: #162332;
+  border: 1px solid #41516a;
+  color: inherit;
+  border-radius: 4px;
+  font: inherit;
+}
+#youtube-form > .primary {
+  width: 100%;
+  margin-top: 12px;
+}
+#share-result[hidden] {
+  display: none;
+}
+#local-replay {
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 12px;
+}

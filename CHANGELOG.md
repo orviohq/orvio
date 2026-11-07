@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.2.15] - 2026-11-08
+
+### Added
+
+- YouTube link input in the original track selection screen, using the original game, controls, settings, effects and results. Supports videos up to 130 seconds and canonical WAV files up to 24,056,664 bytes, with six Easy/Normal/Hard 5-key/7-key charts.
+- Device-local source audio, frozen charts and source-bound replay sessions. Updates reuse saved note arrays. Matching audio is verified by its full-file SHA; changed audio cannot replace saved charts. Browser data removal or another device can lose the local library.
+- Original UI import and recovery text, plus player-facing patch notes, in all 13 languages. Local interface fonts include the new text.
+
+### Limits
+
+- YouTube replays are local only and do not have public share links. Original-song result sharing remains unchanged.
+- Same video across fresh devices is not guaranteed to produce the same chart. A different audio artifact is refused for an existing chart instead of regenerating it.
+- This release supports short videos, not arbitrary full-length songs. Only use audio you have permission to use.
+
 ## [0.2.14] - 2026-11-07
 
 - Prepare the playfield under the existing song-loading screen before audio begins, reducing first-frame hesitation in play and replays. Music/input timing, charts, judgments and scoring are unchanged.
