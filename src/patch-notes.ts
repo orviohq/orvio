@@ -45,6 +45,42 @@ const BASE_PATCHES: {
   notes: Record<Exclude<Language, ExtraLanguage>, string[]>;
 }[] = [
   {
+    version: '0.2.11',
+    date: '2026-11-07',
+    notes: {
+      en: [
+        'Result-only option icons, readable judgment colors, original song wallpaper, genre, BPM and chart note-head count. Explicit preview/play-stop is also available on shared results; hold tails remain judgments, not extra notes.',
+        'Actual lane press/release, original audio timing, pauses and effect changes are recorded locally. Shared fragments can replay the same performance through the same engine; exact judgment, score and combo matching is checked. No input, audio or identity is uploaded; old result links do not invent a replay.',
+        'The first Escape in fullscreen only leaves fullscreen. Held/repeated Escape cannot also close the result; a later separate press returns to song selection.',
+        'Removed the duplicate Escape hint and automatic action focus ring on result entry; Tab focus remains visible. Full action buttons and bottom spacing remain accessible on short screens.',
+      ],
+      ko: [
+        '결과 전용 옵션 아이콘과 판정별 색상, 곡 전용 월페이퍼, 장르·BPM·채보 노트 수를 표시합니다. 공유 결과에서도 미리듣기를 재생·정지할 수 있습니다. 홀드는 시작 노트 1개이며 끝은 별도 판정입니다.',
+        '실제 레인 누름·뗌과 원래 오디오 시각, 일시정지·효과 변경을 로컬에 기록합니다. 공유 fragment에서 같은 엔진으로 재생하고 모든 판정·점수·콤보의 일치를 확인합니다. 입력·오디오·신원은 업로드하지 않으며 예전 결과 링크에 리플레이를 만들지 않습니다.',
+        '전체화면의 첫 ESC는 전체화면만 종료합니다. 누른 채 반복되어도 결과창은 닫지 않으며 다음 별도 ESC에 곡 선택으로 돌아갑니다.',
+        '결과 진입 시 중복 ESC 안내와 자동 버튼 테두리를 없앴으며 Tab 이동 표시는 유지합니다. 작은 화면에서도 버튼 전체와 하단 여백에 접근할 수 있습니다.',
+      ],
+      zh: [
+        '结果显示专用选项图标、判定颜色、原创歌曲壁纸、风格、BPM和谱面音符起点数量。共享结果也可明确播放或停止试听；长按终点是判定而非额外音符。',
+        '本地记录真实按下和松开、原始音频时间、暂停及效果变更。共享片段用相同引擎回放并核对全部判定、分数及连击，不上传输入、音频或身份。旧结果链接不虚构回放。',
+        '全屏时首次Escape只退出全屏。按住或重复不会关闭结果；之后单独按一次才返回选曲。',
+        '移除结果页重复的ESC提示及进入时自动按钮焦点框，保留Tab焦点。短屏可滚动查看完整按钮和底部间距。',
+      ],
+      ja: [
+        '結果専用の設定アイコン、判定色、オリジナル曲壁紙、ジャンル、BPMと譜面ノーツ数を表示。共有結果でも明示的に試聴・停止でき、ホールド終点は追加ノーツでなく判定です。',
+        '実際の押下・離上と元の音声時刻、停止や効果変更をローカルに記録。同じエンジンで共有フラグメントを再生し、全判定・得点・コンボの一致を確認。入力・音声・個人情報を送信せず、旧リンクにリプレイを捏造しません。',
+        '全画面中の最初のEscapeは全画面だけを終了。押し続けや連打のリピートで結果を閉じず、次の独立した押下で選曲に戻ります。',
+        '結果画面の重複ESC案内と自動ボタン枠を削除し、Tabのフォーカスは維持。短い画面でもボタン全体と下余白にアクセスできます。',
+      ],
+      es: [
+        'Iconos de opciones, colores de juicios, fondo original, género, BPM y número de notas en el resultado. Escucha y parada también en resultados compartidos; el final de una nota larga es un juicio adicional, no otra nota.',
+        'Registro local de pulsaciones reales, tiempos de audio, pausas y efectos. La repetición compartida usa el mismo motor y comprueba cada juicio, puntuación y combo. Sin subir entrada, audio ni identidad; los enlaces antiguos no inventan repeticiones.',
+        'El primer Escape solo sale de pantalla completa. Mantenerlo pulsado no cierra el resultado; otra pulsación vuelve a la selección.',
+        'Sin indicación Escape duplicada ni marco automático al abrir el resultado; el foco Tab sigue visible. Botones completos y espacio inferior accesibles en pantallas bajas.',
+      ],
+    },
+  },
+  {
     version: '0.2.10',
     date: '2026-11-07',
     notes: {

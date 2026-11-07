@@ -38,8 +38,8 @@ test('settings, real keyboard input, results and replay', async ({ page }) => {
   expect(await page.locator('#result-score').innerText()).not.toBe('0');
   expect(errors).toEqual([]);
   await page.screenshot({ path: 'test-results/results.png' });
-  await expect(page.locator('#back')).toBeFocused();
-  await page.keyboard.press('Enter');
+  await expect(page.locator('#results')).toBeFocused();
+  await page.keyboard.press('Escape');
   await expect(page.locator('#lobby')).toBeVisible();
 });
 test('mobile layout is browse-only, no overflow', async ({ browser }) => {

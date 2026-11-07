@@ -7,9 +7,15 @@ test('shared v4 result retry really shows the recorded chart and options', async
   );
   await expect(page.locator('#results')).toBeVisible();
   await expect(page.locator('#result-song')).toHaveText('Afterimage');
-  await expect(page.locator('#result-options')).toContainText('7 KEY');
+  await expect(page.locator('.result-option-keys')).toHaveAttribute(
+    'aria-label',
+    'KEY 7',
+  );
   await expect(page.locator('#result-options')).toContainText('9.0');
-  await expect(page.locator('#result-options')).toContainText('RANDOM');
+  await expect(page.locator('.result-option-shuffle')).toHaveAttribute(
+    'aria-label',
+    /RANDOM/,
+  );
   await page.click('#retry');
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
   await expect(page.locator('#game')).toBeVisible();

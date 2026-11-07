@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.2.11] - 2026-11-07
+
+- Result-only option icons, judgment colors, original per-song art, BPM/genre/note-head count and explicit preview controls.
+- Local actual-input replay fragments with bounded decoding and exact same-engine judgment/score/combo validation. No input, audio or identity uploads.
+- First Escape only exits fullscreen; a held key cannot also dismiss results.
+- Removed duplicate result Escape hints and automatic action-button focus on entry; keyboard Tab focus remains visible. Compact laptop-height spacing and result scrolling keep full action buttons accessible.
+
 ## [0.2.10] - 2026-11-07
 
 ### Added

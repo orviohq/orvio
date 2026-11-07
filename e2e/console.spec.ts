@@ -1,4 +1,5 @@
 import { atKey } from './input';
+import { judge } from '../src/engine';
 import { test, expect } from '@playwright/test';
 test('keyboard-only track, difficulty, lanes, settings, locales, start and exit', async ({
   page,
@@ -64,7 +65,7 @@ test('five languages render with local fonts and no page overflow', async ({
   await page.keyboard.press('Escape');
   await page.screenshot({ path: 'test-results/console-es.png' });
 });
-test('page-timed DOM key input gives MAX and BREAK feedback with lane effects', async ({
+test('page-timed DOM input gives its measured grade and BREAK feedback with lane effects', async ({
   page,
 }) => {
   await page.goto('/select/');
@@ -76,8 +77,22 @@ test('page-timed DOM key input gives MAX and BREAK feedback with lane effects', 
   const n = notes[0];
   const keys = ['d', 'f', 'Space', 'j', 'k'];
   await atKey(page, n.time, keys[n.lane], true);
-  await expect(page.locator('#judge')).toHaveClass('perfect');
-  await page.screenshot({ path: 'test-results/perfect-hit.png' });
+  const hit = await page.evaluate(
+    (id) =>
+      (window as any).orvioDiagnostics.events.find(
+        (e: any) => e.noteId === id && !e.tail,
+      ),
+    n.id,
+  );
+  expect(hit).toBeTruthy();
+  expect(hit.value).toBe(judge(hit.delta));
+  expect(hit.value).toBeGreaterThan(0);
+  await expect(page.locator('#judge')).toHaveAttribute(
+    'data-grade',
+    String(hit.value),
+  );
+  await expect(page.locator('#judge')).toHaveText('MAX ' + hit.value + '%');
+  await page.screenshot({ path: 'test-results/measured-hit.png' });
   await page.keyboard.up(keys[n.lane]);
   await expect(page.locator('#judge.break')).toBeVisible({ timeout: 5000 });
   await page.screenshot({ path: 'test-results/break-hit.png' });

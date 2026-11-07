@@ -41,7 +41,7 @@ test('original song loading precedes scoring and sends no result before explicit
   const url = await page.evaluate(() => navigator.clipboard.readText());
   expect(url).toBe(resultURL);
   expect(url).toContain('score=0');
-  expect(new URLSearchParams(new URL(url).hash.slice(1)).size).toBe(12);
+  expect(new URLSearchParams(new URL(url).hash.slice(1)).size).toBe(13);
   expect(resultRequests).toEqual([]);
   await page.screenshot({ path: 'test-results/sharing.png' });
 });

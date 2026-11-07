@@ -52,6 +52,12 @@ export const EXTRA_PATCH_LABELS = {
 export type ExtraLanguage = keyof typeof EXTRA_PATCH_LABELS;
 export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
   fr: {
+    '0.2.11': [
+      'Icônes des options, couleurs des jugements, fond original, genre, BPM et nombre de notes dans le résultat. Écoute et arrêt disponibles aussi via le lien partagé ; la fin des notes longues reste un jugement.',
+      'Enregistrement local des appuis réels, temps audio, pauses et effets. Le replay partagé utilise le même moteur et vérifie chaque jugement, score et combo, sans envoyer entrées, audio ou identité. Aucun replay inventé pour les anciens liens.',
+      'Le premier Échap quitte uniquement le plein écran. Un appui maintenu ne ferme pas le résultat ; un nouvel appui revient au choix du morceau.',
+      'Suppression du rappel Échap en double et du cadre automatique au résultat ; le focus Tab reste visible. Boutons entiers et marge basse accessibles sur écran court.',
+    ],
     '0.2.10': [
       'PWA installable sur ordinateur et application statique locale hors ligne. Compatibilité selon navigateur ; mise à jour après fermeture des anciennes fenêtres.',
       'Musique préparée conservée sur l’appareil avec version de synthèse. Démarrage explicite puis réutilisation rapide du cache, même hors ligne. Suppression ou quota atteint : nouvelle synthèse, sans envoi audio ou jeu.',
@@ -104,6 +110,12 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   de: {
+    '0.2.11': [
+      'Optionssymbole, Wertungsfarben, eigener Titelhintergrund, Genre, BPM und Notenanzahl im Ergebnis. Vorhören und Stoppen auch bei geteilten Ergebnissen; Haltenoten-Enden zählen als Wertungen.',
+      'Echte Tastendrücke, Audiozeiten, Pausen und Effekte werden lokal aufgezeichnet. Geteilte Wiederholungen verwenden dieselbe Engine und prüfen jede Wertung, Punkte und Combo. Kein Upload von Eingaben, Audio oder Identität; alte Links erhalten keine erfundene Wiederholung.',
+      'Das erste Escape verlässt nur den Vollbildmodus. Gedrückthalten schließt das Ergebnis nicht; ein neuer Druck führt zur Titelauswahl.',
+      'Doppelten Escape-Hinweis und automatischen Tastenrahmen beim Ergebnis entfernt; Tab-Fokus bleibt sichtbar. Ganze Tasten und unterer Abstand sind auch auf kurzen Bildschirmen erreichbar.',
+    ],
     '0.2.10': [
       'Installierbare Desktop-PWA und lokale statische Offline-App. Unterstützung je Browser; Updates warten auf das Schließen alter Fenster.',
       'Vorbereitete Musik mit Syntheseversion auf dem Gerät gespeichert. Nach ausdrücklichem Start schnelle Wiederverwendung, auch offline. Löschung oder volles Kontingent führt zur Neuberechnung, ohne Audio- oder Spieldaten hochzuladen.',
@@ -156,6 +168,12 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   pt: {
+    '0.2.11': [
+      'Ícones de opções, cores de julgamentos, imagem original, gênero, BPM e quantidade de notas no resultado. Prévia e parada também em resultados compartilhados; finais de notas longas são julgamentos.',
+      'Gravação local de entradas reais, tempos de áudio, pausas e efeitos. O replay compartilhado usa o mesmo motor e confere cada julgamento, pontuação e combo. Sem enviar entradas, áudio ou identidade; links antigos não recebem replay inventado.',
+      'O primeiro Escape apenas sai da tela cheia. Segurar a tecla não fecha o resultado; um novo toque volta à seleção.',
+      'Sem aviso Escape duplicado nem moldura automática ao abrir o resultado; foco Tab visível. Botões completos e margem inferior acessíveis em telas baixas.',
+    ],
     '0.2.10': [
       'PWA instalável no computador e aplicação estática local offline. Suporte depende do navegador; atualização espera fechar janelas antigas.',
       'Música preparada guardada no dispositivo com versão de síntese. Após início explícito, reutilização rápida mesmo offline. Cache apagada ou quota cheia: nova síntese, sem envio de áudio ou jogo.',
@@ -208,6 +226,12 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   it: {
+    '0.2.11': [
+      'Icone delle opzioni, colori dei giudizi, sfondo originale, genere, BPM e numero di note nel risultato. Anteprima e arresto anche nei risultati condivisi; le code delle note lunghe restano giudizi.',
+      'Registrazione locale di pressioni reali, tempi audio, pause ed effetti. Il replay condiviso usa lo stesso motore e verifica ogni giudizio, punteggio e combo. Nessun invio di input, audio o identità; nessun replay inventato per i vecchi link.',
+      'Il primo Escape esce solo dallo schermo intero. Tenere premuto non chiude il risultato; un nuovo tocco torna alla selezione.',
+      'Rimosso il suggerimento Escape doppio e il bordo automatico dei pulsanti; il focus Tab resta visibile. Pulsanti completi e margine inferiore accessibili su schermi bassi.',
+    ],
     '0.2.10': [
       'PWA installabile su desktop e app statica locale offline. Supporto secondo browser; aggiornamento dopo la chiusura delle vecchie finestre.',
       'Musica preparata salvata sul dispositivo con versione di sintesi. Dopo avvio esplicito, riuso rapido anche offline. Cache eliminata o quota piena: nuova sintesi, senza inviare audio o gioco.',
@@ -260,6 +284,12 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   ru: {
+    '0.2.11': [
+      'Значки настроек, цвета оценок, фон композиции, жанр, BPM и число нот в результате. Прослушивание и остановка доступны по общей ссылке; конец удержания считается оценкой, а не новой нотой.',
+      'Локальная запись реальных нажатий, аудиовремени, пауз и эффектов. Повтор по ссылке использует тот же движок и проверяет каждую оценку, счёт и комбо. Ввод, звук и личность не загружаются; старые ссылки не получают выдуманный повтор.',
+      'Первый Escape только выключает полный экран. Удержание не закрывает результат; отдельное следующее нажатие возвращает к выбору.',
+      'Убраны повторная подсказка Escape и автоматическая рамка кнопки; фокус Tab сохранён. Кнопки целиком и нижний отступ доступны на низких экранах.',
+    ],
     '0.2.10': [
       'Устанавливаемая настольная PWA и локальная статическая офлайн-версия. Поддержка зависит от браузера; обновление ждёт закрытия старых окон.',
       'Подготовленная музыка сохраняется на устройстве с версией синтеза. После явного запуска быстро используется кеш, в том числе офлайн. Удаление или переполнение хранилища вызывает повторный синтез без отправки аудио или игры.',
@@ -312,6 +342,12 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   id: {
+    '0.2.11': [
+      'Ikon opsi, warna penilaian, gambar lagu asli, genre, BPM dan jumlah nada pada hasil. Pratinjau dan berhenti juga tersedia pada hasil bersama; akhir nada tahan dihitung sebagai penilaian.',
+      'Masukan nyata, waktu audio, jeda dan efek direkam lokal. Putar ulang bersama memakai mesin yang sama dan memeriksa setiap penilaian, skor dan kombo. Tidak mengunggah input, audio atau identitas; tautan lama tidak diberi rekaman palsu.',
+      'Escape pertama hanya keluar layar penuh. Menahan tombol tidak menutup hasil; tekanan baru kembali ke pilihan lagu.',
+      'Petunjuk Escape ganda dan bingkai tombol otomatis dihapus; fokus Tab tetap terlihat. Tombol utuh dan jarak bawah dapat dijangkau pada layar pendek.',
+    ],
     '0.2.10': [
       'PWA desktop yang dapat dipasang dan aplikasi statis lokal offline. Dukungan bergantung browser; pembaruan menunggu jendela lama ditutup.',
       'Musik siap disimpan di perangkat dengan versi sintesis. Setelah mulai secara eksplisit, cache dipakai cepat bahkan offline. Cache dihapus atau kuota penuh: sintesis ulang tanpa unggah audio atau permainan.',
@@ -364,6 +400,12 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   tr: {
+    '0.2.11': [
+      'Sonuçta seçenek simgeleri, değerlendirme renkleri, özgün şarkı görseli, tür, BPM ve nota sayısı. Paylaşılan sonuçlarda da ön dinleme ve durdurma; tutma sonları ayrı nota değil değerlendirmedir.',
+      'Gerçek tuş basımları, ses zamanları, duraklamalar ve efektler yerel kaydedilir. Paylaşılan tekrar aynı motorla her değerlendirmeyi, puanı ve komboyu doğrular. Girdi, ses veya kimlik yüklenmez; eski bağlantılara sahte tekrar eklenmez.',
+      'İlk Escape yalnız tam ekrandan çıkar. Basılı tutmak sonucu kapatmaz; sonraki ayrı basış şarkı seçimine döner.',
+      'Yinelenen Escape ipucu ve otomatik düğme çerçevesi kaldırıldı; Tab odağı görünür kalır. Kısa ekranlarda tüm düğmeler ve alt boşluk erişilebilir.',
+    ],
     '0.2.10': [
       'Masaüstüne kurulabilen PWA ve yerel statik çevrimdışı uygulama. Destek tarayıcıya bağlıdır; güncelleme eski pencerelerin kapanmasını bekler.',
       'Hazırlanan müzik sentez sürümüyle cihazda saklanır. Açık başlatma sonrası önbellekten hızlı ve çevrimdışı kullanım. Silinme veya kota sorunu yeniden sentez yapar; ses veya oyun yüklenmez.',
@@ -416,6 +458,12 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   vi: {
+    '0.2.11': [
+      'Biểu tượng tùy chọn, màu chấm điểm, hình nền gốc, thể loại, BPM và số nốt ở kết quả. Có thể nghe thử và dừng ở kết quả chia sẻ; cuối nốt giữ là lượt chấm, không phải nốt mới.',
+      'Ghi cục bộ thao tác nhấn thật, thời gian âm thanh, tạm dừng và hiệu ứng. Phát lại chia sẻ dùng cùng bộ máy và đối chiếu từng lượt chấm, điểm và chuỗi. Không tải lên đầu vào, âm thanh hay danh tính; liên kết cũ không có bản phát lại giả.',
+      'Escape đầu chỉ thoát toàn màn hình. Giữ phím không đóng kết quả; lần nhấn riêng tiếp theo trở về chọn bài.',
+      'Bỏ gợi ý Escape trùng và viền nút tự động khi mở kết quả; vẫn giữ tiêu điểm Tab. Màn hình thấp vẫn truy cập được nút đầy đủ và khoảng trống dưới.',
+    ],
     '0.2.10': [
       'PWA cài trên máy tính và ứng dụng tĩnh cục bộ ngoại tuyến. Hỗ trợ tùy trình duyệt; cập nhật chờ đóng cửa sổ cũ.',
       'Nhạc đã chuẩn bị được lưu trên thiết bị theo phiên bản tổng hợp. Sau thao tác bắt đầu, dùng lại cache nhanh cả khi ngoại tuyến. Xóa cache hoặc hết chỗ sẽ tổng hợp lại, không tải âm thanh hay lượt chơi lên.',

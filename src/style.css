@@ -2649,3 +2649,290 @@ canvas {
     margin-top: 4px;
   }
 }
+
+/* Result-only option badges: a compact report strip, not gameplay controls. */
+#result-options {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 4px 0 18px;
+}
+.result-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 62px;
+  min-height: 42px;
+  padding: 6px 12px;
+  border: 1px solid #3b4a5a;
+  border-radius: 5px;
+  background: #16232f;
+  color: #b9d5e3;
+}
+.result-option svg {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.result-option b {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.result-option-keys {
+  color: #79e3ff;
+  border-color: #387083;
+}
+.result-option-difficulty {
+  color: #ffe074;
+}
+.result-option-speed {
+  color: #8de2e8;
+}
+.result-option-shuffle {
+  color: #c7b7ff;
+}
+.result-option-fader {
+  color: #a8c4ed;
+}
+#result-rate {
+  color: #6ce5ed;
+}
+#result-combo {
+  color: #ffe074;
+}
+#result-break {
+  color: #ff6479;
+}
+#results .result-stats span {
+  font-size: 14px;
+  color: #bbc8d4;
+}
+#judgment-list div {
+  font-size: 14px;
+  border-left: 3px solid var(--grade-color);
+  padding-left: 9px;
+  color: var(--grade-color);
+}
+#judgment-list b {
+  color: var(--grade-color);
+  font-size: 17px;
+  font-weight: 600;
+}
+@media (max-width: 540px) {
+  #result-options {
+    gap: 6px;
+  }
+  .result-option {
+    min-width: 38px;
+    min-height: 36px;
+    padding: 4px 8px;
+    gap: 4px;
+  }
+  .result-option svg {
+    width: 24px;
+    height: 24px;
+  }
+  .result-option b {
+    font-size: 14px;
+  }
+  #judgment-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px 16px;
+  }
+  #judgment-list div {
+    font-size: 13px;
+  }
+  #judgment-list b {
+    font-size: 16px;
+  }
+  #results .result-stats span {
+    font-size: 12px;
+  }
+}
+#results {
+  padding: 24px 32px;
+}
+#results .result-heading h2 {
+  margin: 12px 0;
+}
+#results .result-heading > span {
+  font-size: 72px;
+}
+#results .result-score {
+  font-size: 76px;
+  line-height: 1.12;
+  margin: 8px 0 18px;
+}
+#results .result-stats {
+  padding: 14px 0;
+}
+#results .result-stats div {
+  gap: 6px;
+}
+#results #judgment-list {
+  margin: 18px 0;
+}
+#results .result-actions {
+  margin-top: 16px;
+}
+@media (max-width: 540px) {
+  #results {
+    padding: 20px 24px;
+  }
+  #results .result-heading > span {
+    font-size: 66px;
+  }
+  #results .result-score {
+    font-size: 54px;
+    margin: 8px 0 16px;
+  }
+  #result-options {
+    gap: 5px;
+  }
+  .result-option {
+    min-width: 0;
+    padding: 4px 6px;
+    gap: 3px;
+  }
+  .result-option svg {
+    width: 24px;
+    height: 24px;
+  }
+  .result-option b {
+    font-size: 14px;
+  }
+  #results .result-actions {
+    margin-top: 12px;
+  }
+}
+
+.selected-art {
+  background-size: cover;
+  background-position: center;
+}
+.selected-art .art-grid,
+.selected-art .art-orbit,
+.selected-art .art-core {
+  display: none;
+}
+#results .result-heading {
+  gap: 18px;
+  align-items: center;
+}
+#result-art {
+  width: 128px;
+  aspect-ratio: 16/10;
+  object-fit: cover;
+  border: 1px solid #344859;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.result-track {
+  flex: 1;
+  min-width: 0;
+}
+#results .result-track h2 {
+  font-size: 25px;
+  margin: 0 0 7px;
+}
+#result-metadata {
+  font-size: 12px;
+  line-height: 1.55;
+  color: #c5d2df;
+  margin: 0 0 5px;
+}
+#result-preview {
+  font-size: 12px;
+  padding: 7px 0;
+  color: #8bdcea;
+}
+@media (max-width: 540px) {
+  #results .result-heading {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  #result-art {
+    width: 84px;
+  }
+  .result-track {
+    min-width: 130px;
+  }
+  #results .result-track h2 {
+    font-size: 22px;
+  }
+  #result-metadata {
+    font-size: 11px;
+  }
+  #results .result-heading > span {
+    font-size: 48px;
+  }
+  #results .result-score {
+    font-size: 50px;
+  }
+}
+#watch-replay {
+  display: block;
+  min-height: 42px;
+  margin: 0 0 12px;
+  padding: 8px 14px;
+  border: 1px solid #386777;
+  color: #8ce4ef;
+  font-size: 14px;
+}
+#watch-replay.hidden {
+  display: none;
+}
+.replay-view #now-detail {
+  color: #7ce6e9;
+}
+.replay-view #play-options {
+  opacity: 0.65;
+}
+#result-metadata {
+  font-size: 13px;
+}
+#result-preview {
+  font-size: 13px;
+}
+@media (max-width: 540px) {
+  #result-metadata {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+}
+
+/* Opening a result focuses the neutral report, not an action button.
+   Tab still shows the normal focus ring on each control. */
+#results:focus {
+  outline: none;
+}
+
+/* Keep the full action row and a quiet bottom margin visible at laptop height.
+   Shorter/narrower screens retain the result dialog's own scrolling. */
+#results .result-actions {
+  padding-bottom: 8px;
+}
+@media (min-width: 700px) and (max-height: 760px) {
+  #results {
+    padding: 18px 28px 24px;
+  }
+  #results .result-score {
+    font-size: 64px;
+    margin: 5px 0 10px;
+  }
+  #results .result-stats {
+    padding: 10px 0;
+  }
+  #results #judgment-list {
+    margin: 12px 0;
+  }
+  #results .result-actions {
+    margin-top: 10px;
+  }
+  #watch-replay {
+    margin-bottom: 6px;
+  }
+}
