@@ -52,6 +52,11 @@ export const EXTRA_PATCH_LABELS = {
 export type ExtraLanguage = keyof typeof EXTRA_PATCH_LABELS;
 export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
   fr: {
+    '0.2.8': [
+      'Même écran de résultat après le jeu et via le lien partagé. Libellés agrandis, sans champ de lien, texte de confidentialité ni mesures de performance. Notification de copie visible.',
+      'Réglages sans défilement, avec onglets sur les écrans étroits et courts. Ancien fond masqué jusqu’au décodage du nouveau.',
+      'Résultats traités uniquement dans le navigateur via le fragment URL. Fonctions serveur et aperçus personnalisés supprimés, anciens liens compatibles. Horloge visuelle lissée et dimensions en cache sans changer notes, vitesse ni jugement. Perception rapide sur écran physique non vérifiée.',
+    ],
     '0.2.7': [
       "Ajout du français, allemand, portugais, italien, russe, indonésien, turc et vietnamien : 13 langues pour les menus, réglages, résultats et tout l'historique des versions.",
       'La détection du navigateur, le choix manuel, les polices locales et les mises en page sont étendus aux nouvelles langues. Les titres de morceaux et les noms techniques des effets restent inchangés.',
@@ -89,6 +94,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   de: {
+    '0.2.8': [
+      'Gleiche Ergebnisansicht nach dem Spiel und im geteilten Link. Größere Wertungsbeschriftung, kein Linkfeld, Datenschutztext oder Leistungswerte. Kopiermeldung über dem Dialog.',
+      'Einstellungen ohne Scrollen, mit Tabs auf schmalen niedrigen Bildschirmen. Alter Hintergrund bleibt bis zur Dekodierung des neuen verborgen.',
+      'Ergebnisse nur im Browser aus dem URL-Fragment. Serverfunktionen und persönliche Vorschauen entfernt; alte Links bleiben lesbar. Geglättete Bildzeit und zwischengespeicherte Größe ändern keine Noten, Geschwindigkeit oder Wertung. Wahrnehmung bei hoher Geschwindigkeit auf echten Displays nicht bestätigt.',
+    ],
     '0.2.7': [
       'Französisch, Deutsch, Portugiesisch, Italienisch, Russisch, Indonesisch, Türkisch und Vietnamesisch ergänzt: 13 Sprachen für Menüs, Einstellungen, Ergebnisse und die vollständige Versionsgeschichte.',
       'Browsererkennung, manuelle Auswahl, lokale Schriftarten und Layouts unterstützen die neuen Sprachen. Titelnamen und technische Effektnamen bleiben unverändert.',
@@ -126,6 +136,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   pt: {
+    '0.2.8': [
+      'Mesmo ecrã de resultados após jogar e abrir o link. Rótulos maiores, sem campo de link, texto de privacidade ou dados de desempenho. Aviso de cópia acima do diálogo.',
+      'Definições sem rolagem, com separadores em ecrãs estreitos e baixos. Fundo anterior oculto até descodificar o novo.',
+      'Resultados apenas no navegador pelo fragmento do URL. Funções de servidor e prévias pessoais removidas; links antigos compatíveis. Relógio visual suavizado e tamanho em cache sem mudar notas, velocidade ou avaliação. Perceção em alta velocidade num ecrã físico ainda não verificada.',
+    ],
     '0.2.7': [
       'Adicionados francês, alemão, português, italiano, russo, indonésio, turco e vietnamita: 13 idiomas para menus, configurações, resultados e todo o histórico de versões.',
       'Detecção do navegador, escolha manual, fontes locais e layouts ampliados. Títulos das músicas e nomes técnicos dos efeitos permanecem iguais.',
@@ -163,6 +178,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   it: {
+    '0.2.8': [
+      'Stessa schermata risultati dopo il gioco e dal link condiviso. Etichette più grandi, senza campo link, testo privacy o dati prestazioni. Notifica di copia sopra la finestra.',
+      'Impostazioni senza scorrimento, con schede sugli schermi stretti e bassi. Sfondo precedente nascosto fino alla decodifica del nuovo.',
+      'Risultati elaborati solo nel browser tramite frammento URL. Rimosse funzioni server e anteprime personali; vecchi link compatibili. Orologio visivo più stabile e dimensioni in cache senza cambiare note, velocità o giudizi. Percezione ad alta velocità su schermi fisici non verificata.',
+    ],
     '0.2.7': [
       'Aggiunti francese, tedesco, portoghese, italiano, russo, indonesiano, turco e vietnamita: 13 lingue per menu, impostazioni, risultati e tutta la cronologia delle versioni.',
       'Rilevamento browser, scelta manuale, caratteri locali e layout estesi alle nuove lingue. Titoli dei brani e nomi tecnici degli effetti rimangono invariati.',
@@ -200,6 +220,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   ru: {
+    '0.2.8': [
+      'Одинаковый экран результата после игры и по ссылке. Подписи оценок увеличены; поле ссылки, текст о приватности и показатели производительности убраны. Уведомление о копировании поверх окна.',
+      'Настройки без прокрутки, с вкладками на узких низких экранах. Старый фон скрыт до декодирования нового.',
+      'Результаты обрабатываются только браузером из фрагмента URL. Серверные функции и личные превью удалены; старые ссылки читаются локально. Сглаживание времени отображения и кеш размеров не меняют ноты, скорость или оценку. Восприятие быстрых нот на физическом экране ещё не проверено.',
+    ],
     '0.2.7': [
       'Добавлены французский, немецкий, португальский, итальянский, русский, индонезийский, турецкий и вьетнамский: 13 языков для меню, настроек, результатов и всей истории версий.',
       'Распознавание языка браузера, ручной выбор, локальные шрифты и макеты расширены на новые языки. Названия композиций и технические имена эффектов не меняются.',
@@ -237,6 +262,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   id: {
+    '0.2.8': [
+      'Layar hasil yang sama setelah bermain dan dari tautan. Label penilaian diperbesar, tanpa kolom tautan, teks privasi atau data performa. Notifikasi salin tampil di atas dialog.',
+      'Pengaturan tanpa gulir, dengan tab di layar sempit dan pendek. Latar lama disembunyikan sampai gambar baru selesai didekode.',
+      'Hasil diproses hanya di browser dari fragmen URL. Fungsi server dan pratinjau skor pribadi dihapus; tautan lama tetap dibaca lokal. Jam visual diperhalus dan ukuran disimpan tanpa mengubah not, kecepatan atau penilaian. Persepsi not cepat di layar fisik belum terverifikasi.',
+    ],
     '0.2.7': [
       'Menambahkan bahasa Prancis, Jerman, Portugis, Italia, Rusia, Indonesia, Turki, dan Vietnam: 13 bahasa untuk menu, pengaturan, hasil, dan seluruh riwayat versi.',
       'Deteksi bahasa browser, pilihan manual, font lokal, dan tata letak mendukung bahasa baru. Judul lagu serta nama teknis efek tetap sama.',
@@ -274,6 +304,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   tr: {
+    '0.2.8': [
+      'Oyun sonu ve paylaşılan bağlantıda aynı sonuç ekranı. Daha büyük değerlendirme yazıları; bağlantı alanı, gizlilik metni ve performans verileri kaldırıldı. Kopyalama bildirimi pencerenin üzerinde.',
+      'Ayarlar kaydırmasız; dar ve kısa ekranlarda sekmeler var. Yeni görüntü çözülene kadar eski arka plan gizlenir.',
+      'Sonuçlar URL parçasından yalnızca tarayıcıda işlenir. Sunucu işlevleri ve kişisel önizlemeler kaldırıldı; eski bağlantılar yerelde açılır. Görsel saat yumuşatma ve boyut önbelleği notaları, hızı veya değerlendirmeyi değiştirmez. Fiziksel ekranda yüksek hız algısı doğrulanmadı.',
+    ],
     '0.2.7': [
       'Fransızca, Almanca, Portekizce, İtalyanca, Rusça, Endonezce, Türkçe ve Vietnamca eklendi: menüler, ayarlar, sonuçlar ve tüm sürüm geçmişi için 13 dil.',
       'Tarayıcı algılama, elle seçim, yerel yazı tipleri ve düzenler yeni dillere genişletildi. Şarkı adları ve teknik efekt adları değişmez.',
@@ -311,6 +346,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   vi: {
+    '0.2.8': [
+      'Cùng màn hình kết quả sau khi chơi và khi mở liên kết. Nhãn đánh giá lớn hơn; bỏ ô liên kết, giải thích riêng tư và số liệu hiệu năng. Thông báo sao chép hiện trên hộp thoại.',
+      'Cài đặt không cuộn, dùng thẻ trên màn hình hẹp và thấp. Ẩn nền cũ đến khi giải mã xong ảnh mới.',
+      'Kết quả chỉ xử lý trong trình duyệt từ phần fragment URL. Bỏ hàm máy chủ và ảnh xem trước điểm cá nhân; liên kết cũ vẫn đọc cục bộ. Làm mượt đồng hồ hình ảnh và lưu kích thước không đổi nốt, tốc độ hay đánh giá. Chưa xác nhận cảm nhận nốt nhanh trên màn hình thực.',
+    ],
     '0.2.7': [
       'Thêm tiếng Pháp, Đức, Bồ Đào Nha, Ý, Nga, Indonesia, Thổ Nhĩ Kỳ và Việt: 13 ngôn ngữ cho menu, cài đặt, kết quả và toàn bộ lịch sử phiên bản.',
       'Mở rộng nhận diện trình duyệt, chọn thủ công, phông cục bộ và bố cục cho ngôn ngữ mới. Tên bài hát và tên kỹ thuật của hiệu ứng giữ nguyên.',

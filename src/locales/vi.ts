@@ -7,7 +7,7 @@ export const vi = {
   sharePrivacy:
     'Liên kết chỉ chứa bài hát và điểm, không chứa danh tính. Kết quả cục bộ chưa xác minh.',
   resultCopied: 'Đã sao chép liên kết kết quả',
-  shareFailed: 'Không thể sao chép. Hãy sao chép liên kết đang hiển thị.',
+  shareFailed: 'Không thể sao chép. Hãy sao chép liên kết trên thanh địa chỉ.',
   liveOptionHint:
     'Tốc độ và hiển thị áp dụng cho lượt chơi này. Đổi thứ tự làn cần chơi lại bài hát từ đầu.',
   shuffleRestart: 'Chơi lại để đổi thứ tự làn?',

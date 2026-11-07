@@ -31,7 +31,7 @@ const en = {
   sharePrivacy:
     'Result links contain song and score, never identity. Local play, unverified.',
   resultCopied: 'Result link copied',
-  shareFailed: 'Sharing failed. Try again.',
+  shareFailed: 'Could not copy. Copy the address bar link.',
   liveOptionHint:
     'Speed and visibility apply to this play. Changing shuffle requires restarting the song.',
   shuffleRestart: 'Restart to change shuffle?',
@@ -131,8 +131,8 @@ const ko: Words = {
   shareResult: '결과 공유',
   sharePrivacy:
     '결과 링크에는 곡과 점수만 포함되며 신원은 없습니다. 검증되지 않은 로컬 기록입니다.',
-  resultCopied: '결과 링크를 복사했습니다',
-  shareFailed: '공유하지 못했습니다. 다시 시도하세요.',
+  resultCopied: '링크를 복사했어요',
+  shareFailed: '복사하지 못했어요. 주소창의 링크를 복사해 주세요.',
   liveOptionHint:
     '속도와 노트 표시는 현재 곡에 적용됩니다. 노트 섞기는 곡을 처음부터 다시 시작해야 합니다.',
   shuffleRestart: '노트 섞기를 바꾸고 다시 시작할까요?',
@@ -231,7 +231,7 @@ const zh: Words = {
   shareResult: '分享成绩',
   sharePrivacy: '成绩链接只含歌曲和成绩，不含身份。本地成绩未经验证。',
   resultCopied: '成绩链接已复制',
-  shareFailed: '分享失败，请重试。',
+  shareFailed: '无法复制。请复制地址栏中的链接。',
   liveOptionHint: '速度和显示在当前歌曲生效。更改轨道顺序需要重新开始。',
   shuffleRestart: '重新开始以更改轨道顺序？',
   shuffleRestartHint: '当前分数将重置。新顺序从歌曲开头生效，保留长按和输入。',
@@ -328,7 +328,8 @@ const ja: Words = {
   sharePrivacy:
     '結果リンクに曲とスコアのみ含み、個人情報はありません。ローカル未検証結果です。',
   resultCopied: '結果リンクをコピーしました',
-  shareFailed: '共有できませんでした。再試行してください。',
+  shareFailed:
+    'コピーできませんでした。アドレスバーのリンクをコピーしてください。',
   liveOptionHint:
     '速度と表示は現在の曲に適用。配置変更は曲の再スタートが必要です。',
   shuffleRestart: '配置を変更して再スタート？',
@@ -429,7 +430,7 @@ const es: Words = {
   sharePrivacy:
     'El enlace contiene canción y puntuación, nunca identidad. Resultado local no verificado.',
   resultCopied: 'Enlace copiado',
-  shareFailed: 'No se pudo compartir. Inténtalo de nuevo.',
+  shareFailed: 'No se pudo copiar. Copia el enlace de la barra de direcciones.',
   liveOptionHint:
     'La velocidad y visibilidad cambian en esta partida. Cambiar carriles requiere reiniciar.',
   shuffleRestart: '¿Reiniciar para cambiar carriles?',

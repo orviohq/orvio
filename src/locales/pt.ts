@@ -7,7 +7,7 @@ export const pt = {
   sharePrivacy:
     'O link inclui música e pontuação, nunca identidade. Resultado local não verificado.',
   resultCopied: 'Link do resultado copiado',
-  shareFailed: 'Não foi possível copiar. Copie o link exibido.',
+  shareFailed: 'Não foi possível copiar. Copie o link da barra de endereço.',
   liveOptionHint:
     'Velocidade e visibilidade são aplicadas nesta partida. Mudar a ordem das pistas exige reiniciar a música.',
   shuffleRestart: 'Reiniciar para mudar as pistas?',

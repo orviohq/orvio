@@ -2,13 +2,13 @@
 
 # Find your flow
 
-A local-first, open-source keyboard rhythm game. Three original synth tracks, eighteen charts, five or seven lanes. No sign-in, analytics or paid APIs. Gameplay is local; optional result sharing uses small same-site Pages Functions.
+A local-first, open-source keyboard rhythm game. Three original synth tracks, eighteen charts, five or seven lanes. No sign-in, analytics or paid APIs. All gameplay, settings and result processing run in the browser. Hosting serves static files only.
 
 **Prototype:** https://orvio-play.pages.dev/
 
 ## Play
 
-Arrow keys choose a track and difficulty, 5/7 choose lane count, Enter starts, F2 opens settings. Tab/Shift+Tab and Enter operate every menu. Escape pauses during play; resume, settings and track selection are available without a mouse. Track selection starts an audio preview after the selection gesture. English, Korean, Chinese, Japanese and Spanish are saved locally.
+Arrow keys choose a track and difficulty, 5/7 choose lane count, Enter starts, F2 opens settings. Tab/Shift+Tab and Enter operate every menu. Escape pauses during play; resume, settings and track selection are available without a mouse. Track selection starts an audio preview after the selection gesture. All 13 supported languages and settings are saved locally.
 
 Choose a track, difficulty (하 / 중 / 상) and 5 KEY or 7 KEY. Press Enter or Play. Hold long notes until the tail reaches the line, then release. Escape and loss of focus pause the audio and play loop.
 
@@ -65,10 +65,8 @@ Astro generates static HTML. The existing TypeScript/PixiJS/Web Audio client run
 
 ## Result sharing
 
-The result screen places the share URL in the address bar without making a result request. The share icon copies it immediately; a visible read-only field also allows manual copy. Opening or reloading that URL requests a same-site HTML result and PNG social image. Only a fixed built-in song ID, key mode, difficulty, score, accuracy and combo are included. No identity, account, timestamp, device data or local settings are sent. Shared URLs are public to anyone who receives them. Results are self-reported local play, not authenticated leaderboard records.
+Result sharing runs entirely in the browser. See Local result links below.
 
-Cloudflare Pages Functions handle only `/result/*` and `/result.png`; all gameplay routes remain static. Local result testing: `npx wrangler pages dev dist --port 4176`. The PNG renderer has no runtime font download, external image URL or third-party API dependency.
+## Local result links (0.2.8)
 
-Website patch notes are available from Home or track selection in each supported language. Browser language is the default (first supported preference, English fallback); settings allow an explicit saved override or a return to browser-following. Old language settings without an explicit mode migrate to browser-following. New/reset speed is 1.5, selected in 0.5 steps; legacy exact speeds remain visibly labeled until changed.
-
-Supported UI and website patch-note languages: English, Korean, Chinese, Japanese, Spanish, French, German, Portuguese, Italian, Russian, Indonesian, Turkish and Vietnamese. Shared HTML follows supported browser language preferences. Social PNG labels retain the fixed English format; result values and the seven-field URL are language-independent. Song titles and named effect modes remain original identifiers.
+New result links carry only bounded song, chart and score/judgment values after `#`. The browser renders the same result dialog used at game end; no result request is sent. No server function, result database, analytics, identity or device data is used. Sharing copies the link and shows visible success or failure feedback. Failed copy can be recovered through the address bar. Older query links are parsed locally and immediately replaced with fragment links, but their first navigation necessarily sends the old query to static hosting. Personalized OG score previews are no longer served; crawlers see the generic Orvio image. Existing v1/v2 links do not contain judgment counts and show `--` for missing values. Replay recording is not part of this release.

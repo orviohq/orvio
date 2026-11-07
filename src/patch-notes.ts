@@ -45,6 +45,37 @@ const BASE_PATCHES: {
   notes: Record<Exclude<Language, ExtraLanguage>, string[]>;
 }[] = [
   {
+    version: '0.2.8',
+    date: '2026-11-07',
+    notes: {
+      en: [
+        'Game-end and shared links now use the same result screen. Larger judgment labels, no link input, privacy paragraph or performance readout. Copy feedback stays above the result dialog.',
+        'Settings fit without scrolling, using tabs on narrow short screens. Loading hides the old wallpaper until the new track image is decoded.',
+        'Results are interpreted entirely in the browser from the URL fragment. Removed result server functions and personalized social previews; old result links still open locally. Display-only clock smoothing and cached sizing reduce frame jitter without changing chart, speed or judgment. Physical-display high-speed perception remains unverified.',
+      ],
+      ko: [
+        '게임 직후와 공유 링크에 같은 결과 화면을 표시합니다. 판정 글자를 키우고 링크 입력란·개인정보 설명·성능 수치를 없앴습니다. 복사 토스트는 결과 창 위에 보입니다.',
+        '설정은 스크롤 없이 배치하고 좁고 짧은 화면에서는 탭으로 나눕니다. 새 곡 배경을 디코드할 때까지 이전 이미지를 숨깁니다.',
+        '결과는 URL의 # 뒤에 담아 브라우저 안에서만 처리합니다. 결과 서버 함수와 개인 점수 미리보기를 없앴고 이전 결과 링크도 로컬에서 엽니다. 시각 시계 보정·크기 캐시로 프레임 흔들림을 줄이며 채보·속도·판정은 유지합니다. 실제 화면의 고속 노트 잔상 해소는 아직 확인되지 않았습니다.',
+      ],
+      zh: [
+        '游戏结束与分享链接使用同一成绩界面。判定文字加大，移除链接输入框、隐私说明和性能数据，复制提示显示在成绩窗口上方。',
+        '设置无需滚动；窄而矮的屏幕使用标签页。新歌曲背景解码完成前隐藏旧图。',
+        '成绩数据仅在浏览器中解析网址片段。移除成绩服务器函数和个人分数预览，旧链接仍在本地打开。显示时钟平滑和尺寸缓存不改变谱面、速度或判定。实体屏幕高速残影尚未验证解决。',
+      ],
+      ja: [
+        'プレイ直後と共有リンクで同じ結果画面を表示。判定文字を拡大し、リンク欄・個人情報説明・性能値を削除。コピー通知は結果画面の上に表示。',
+        '設定はスクロール不要。狭く低い画面ではタブを使用。新しい曲の背景をデコードするまで前の画像を非表示。',
+        '結果はURLフラグメントからブラウザー内だけで処理。結果サーバー関数と個人スコアのプレビューを廃止し、旧リンクもローカル表示。描画時計の平滑化とサイズキャッシュは譜面・速度・判定を変更しません。実画面の高速残像解消は未確認。',
+      ],
+      es: [
+        'Misma pantalla de resultados al terminar y abrir un enlace. Etiquetas más grandes, sin campo de enlace, texto de privacidad ni datos de rendimiento. Aviso de copia visible sobre el diálogo.',
+        'Ajustes sin desplazamiento, con pestañas en pantallas estrechas y bajas. Se oculta el fondo anterior hasta decodificar el nuevo.',
+        'Resultados locales mediante el fragmento de URL. Eliminadas las funciones de servidor y vistas previas con puntuación; enlaces anteriores compatibles. Reloj visual suavizado y tamaño en caché sin cambiar notas, velocidad ni juicio. No se ha verificado la percepción a alta velocidad en pantallas físicas.',
+      ],
+    },
+  },
+  {
     version: '0.2.7',
     date: '2026-11-07',
     notes: {

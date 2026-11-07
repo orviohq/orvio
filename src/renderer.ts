@@ -1,3 +1,4 @@
+import { VisualClock } from './visual-clock';
 import { fadeAlpha, type Fader } from './game-options';
 import { noteLayout } from './note-layout';
 import { Application, Graphics, Container, Sprite, Texture } from 'pixi.js';
@@ -20,6 +21,10 @@ export class Playfield {
   private noteColor = 0x29d8ff;
   private lastLanes = 0;
   private host!: HTMLElement;
+  private hostWidth = 440;
+  private hostHeight = 620;
+  private resizeObserver?: ResizeObserver;
+  private visualClock = new VisualClock();
   private burstTexture!: Texture;
   reducedMotion = false;
   fader: Fader = 'off';
@@ -32,6 +37,16 @@ export class Playfield {
   flashes = new Map<number, { at: number; ok: boolean }>();
   async init(host: HTMLElement) {
     this.host = host;
+    this.hostWidth = host.clientWidth;
+    this.hostHeight = host.clientHeight;
+    this.resizeObserver = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+      if (rect) {
+        this.hostWidth = rect.width;
+        this.hostHeight = rect.height;
+      }
+    });
+    this.resizeObserver.observe(host);
     await this.app.init({
       width: host.clientWidth,
       height: host.clientHeight,
@@ -91,6 +106,7 @@ export class Playfield {
     this.frames = [];
     this.work = [];
     this.lastFrame = 0;
+    this.visualClock.reset();
     for (const s of engine.states) {
       const head = this.rect(s.note.lane % 2 ? 0xebfaff : color);
       const visual: NoteVisual = { head };
@@ -157,13 +173,14 @@ export class Playfield {
     now: number,
   ) {
     const begin = performance.now();
+    time = this.visualClock.sample(now, time);
     // Whole physical pixels per lane. Never clip the final lane at a fractional
     // canvas/backing-store boundary, including after a window resize.
     const targetWidth = Math.max(
       lanes,
-      Math.floor(this.host.clientWidth / lanes) * lanes,
+      Math.floor(this.hostWidth / lanes) * lanes,
     );
-    const targetHeight = Math.max(1, this.host.clientHeight);
+    const targetHeight = Math.max(1, Math.round(this.hostHeight));
     if (
       this.app.screen.width !== targetWidth ||
       this.app.screen.height !== targetHeight

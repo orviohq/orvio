@@ -9,7 +9,7 @@ test('legacy calibration removed and held body stays visible past head culling',
   await page.goto('/select/');
   await page.click('#open-settings');
   await expect(page.locator('#offset')).toHaveCount(0);
-  await expect(page.locator('#settings')).toContainText('자동으로');
+  await expect(page.locator('#settings [data-i18n="auto"]')).toHaveCount(0);
   expect(
     await page.evaluate(
       () => 'offset' in JSON.parse(localStorage.getItem('orvio.settings.v1')!),

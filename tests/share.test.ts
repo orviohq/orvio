@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readResult, resultParams } from '../src/share';
 import { resultPNG } from '../server/png';
-import { onRequest } from '../functions/result/index';
+import { readFileSync, existsSync } from 'node:fs';
 const r = {
   song: 'first-light' as const,
   lanes: 7 as const,
@@ -24,51 +24,47 @@ describe('privacy-safe result sharing', () => {
       ['acc', '101'],
       ['combo', '-1'],
       ['diff', 'extreme'],
-      ['v', '3'],
+      ['v', '4'],
     ]) {
       const bad = resultParams(r);
       bad.set(k, v);
       expect(readResult(bad)).toBeNull();
     }
   });
-  it('serves crawlable HTML and stable valid PNG bytes without network', async () => {
-    const params = resultParams(r);
-    const page = await onRequest({
-      request: new Request('https://example.invalid/result/?' + params),
-    });
-    const html = await page.text();
-    expect(html).toContain('og:image');
-    expect(html).toContain('twitter:card');
-    expect(html).toContain('987,654');
-    expect(html).toContain('unverified');
-    expect(html).not.toContain('<script');
+  it('retains deterministic offline PNG rendering without server routes', async () => {
+    expect(existsSync('functions/result/index.ts')).toBe(false);
+    expect(existsSync('functions/result.png.ts')).toBe(false);
+    expect(readFileSync('src/pages/result.astro', 'utf8')).toContain('<Game');
     const a = await resultPNG(r),
       b = await resultPNG(r);
     expect(a).toEqual(b);
     expect([...a.slice(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
     expect(a.length).toBeLessThan(100000);
-    const invalid = await onRequest({
-      request: new Request('https://example.invalid/result/?score=oops'),
-    });
-    expect(invalid.status).toBe(400);
-    const post = await onRequest({
-      request: new Request('https://example.invalid/result/', {
-        method: 'POST',
-      }),
-    });
-    expect(post.status).toBe(405);
   });
 });
 
-it('shared HTML follows supported browser languages without adding URL fields', async () => {
-  for (const language of ['fr', 'de', 'pt', 'it', 'ru', 'id', 'tr', 'vi']) {
-    const response = await onRequest({
-      request: new Request(
-        'https://example.invalid/result/?' + resultParams(r),
-        { headers: { 'accept-language': language } },
-      ),
-    });
-    expect(await response.text()).toContain(`lang="${language}"`);
-    expect(response.headers.get('vary')).toBe('Accept-Language');
+it('v3 carries bounded consistent anonymous judgments, not performance or identity', () => {
+  const full = {
+    song: 'first-light' as const,
+    lanes: 5 as const,
+    difficulty: 'low' as const,
+    score: 500000,
+    accuracy: 50,
+    combo: 1,
+    judgments: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+  };
+  const params = resultParams(full);
+  expect(params.size).toBe(8);
+  expect(params.get('v')).toBe('3');
+  expect(readResult(params)).toEqual(full);
+  for (const value of [
+    '1,2',
+    '-1,0,0,0,0,0,0,0,0,0,0,1',
+    '10001,0,0,0,0,0,0,0,0,0,0,1',
+    '1,0,0,0,0,0,0,0,0,0,0,0',
+  ]) {
+    const bad = new URLSearchParams(params);
+    bad.set('j', value);
+    expect(readResult(bad)).toBeNull();
   }
 });

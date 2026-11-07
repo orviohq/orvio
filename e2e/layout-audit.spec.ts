@@ -86,7 +86,7 @@ test('all releases and languages on website with safe small-screen layout', asyn
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/patch-notes/?lang=' + lang);
     await expect(page.locator('[data-language]:visible article')).toHaveCount(
-      9,
+      10,
     );
     expect(
       await page.evaluate(

@@ -7,7 +7,7 @@ export const it = {
   sharePrivacy:
     'Il link contiene brano e punteggio, mai dati identificativi. Risultato locale non verificato.',
   resultCopied: 'Link del risultato copiato',
-  shareFailed: 'Copia non riuscita. Copia il link visualizzato.',
+  shareFailed: 'Copia non riuscita. Copia il link dalla barra degli indirizzi.',
   liveOptionHint:
     'Velocità e visibilità si applicano a questa partita. Cambiare le corsie richiede di ricominciare il brano.',
   shuffleRestart: 'Ricominciare per cambiare le corsie?',

@@ -7,7 +7,7 @@ export const tr = {
   sharePrivacy:
     'Bağlantı yalnızca şarkı ve puan içerir, kimlik bilgisi içermez. Yerel, doğrulanmamış sonuç.',
   resultCopied: 'Sonuç bağlantısı kopyalandı',
-  shareFailed: 'Kopyalanamadı. Görünen bağlantıyı kopyalayın.',
+  shareFailed: 'Kopyalanamadı. Adres çubuğundaki bağlantıyı kopyalayın.',
   liveOptionHint:
     'Hız ve görünürlük bu oyuna uygulanır. Şerit sırasını değiştirmek için şarkı yeniden başlamalıdır.',
   shuffleRestart: 'Şeritleri değiştirmek için yeniden başlatılsın mı?',

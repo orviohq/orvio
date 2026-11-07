@@ -7,7 +7,7 @@ export const id = {
   sharePrivacy:
     'Tautan hanya memuat lagu dan skor, bukan identitas. Hasil lokal belum diverifikasi.',
   resultCopied: 'Tautan hasil disalin',
-  shareFailed: 'Gagal menyalin. Salin tautan yang ditampilkan.',
+  shareFailed: 'Gagal menyalin. Salin tautan dari bilah alamat.',
   liveOptionHint:
     'Kecepatan dan tampilan berlaku untuk permainan ini. Mengubah susunan jalur harus mengulang lagu.',
   shuffleRestart: 'Ulangi untuk mengubah susunan jalur?',

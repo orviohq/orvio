@@ -7,7 +7,7 @@ export const fr = {
   sharePrivacy:
     'Le lien contient le morceau et le score, jamais votre identité. Résultat local non vérifié.',
   resultCopied: 'Lien du résultat copié',
-  shareFailed: 'Copie impossible. Copiez le lien affiché.',
+  shareFailed: 'Copie impossible. Copiez le lien dans la barre d’adresse.',
   liveOptionHint:
     'La vitesse et la visibilité changent pendant cette partie. Modifier les pistes exige de recommencer le morceau.',
   shuffleRestart: 'Recommencer pour modifier les pistes ?',

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-11-07
+
+### Changed
+
+- Game-end and shared links now use the same result screen. Larger judgment labels, no link input, privacy paragraph or performance readout. Copy feedback stays above the result dialog.
+- Settings fit without scrolling, using tabs on narrow short screens. Loading hides the old wallpaper until the new track image is decoded.
+- Results are interpreted entirely in the browser from the URL fragment. Removed result server functions and personalized social previews; old result links still open locally. Display-only clock smoothing and cached sizing reduce frame jitter without changing chart, speed or judgment. Physical-display high-speed perception remains unverified.
+- Loading background is hidden before source replacement and revealed after decoding. Copy success and failure feedback are inside the active modal; failures point to the address bar. Settings retain keyboard controls and all 13 languages.
+
 ## [0.2.7] - 2026-11-07
 
 ### Added

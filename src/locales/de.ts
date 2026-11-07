@@ -7,7 +7,8 @@ export const de = {
   sharePrivacy:
     'Der Link enthält nur Titel und Ergebnis, keine Identität. Lokales, ungeprüftes Ergebnis.',
   resultCopied: 'Ergebnislink kopiert',
-  shareFailed: 'Kopieren fehlgeschlagen. Kopiere den angezeigten Link.',
+  shareFailed:
+    'Kopieren fehlgeschlagen. Kopiere den Link aus der Adressleiste.',
   liveOptionHint:
     'Tempo und Sichtbarkeit gelten für dieses Spiel. Eine andere Spurfolge erfordert einen Neustart.',
   shuffleRestart: 'Für neue Spurfolge neu starten?',
