@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-11-07
+
+### Changed
+
+- Continuous high-speed note exposure fills only the gap to the previous frame while retaining one sharp head; holds, paused scenes and low speed remain unchanged. This does not confirm the reported physical-display symptom is resolved.
+- Result screens show song, key mode, difficulty and recorded speed/shuffle/fade options. Shared-result retry restores the chart and options instead of the home view; old links omit unavailable options. Removed duplicate completion text.
+- Short landscape settings are more compact. Integration tests compare decoded pixels rather than PNG bytes and sample the audio clock without copying the entire chart; judgment thresholds are unchanged.
+
 ## [0.2.8] - 2026-11-07
 
 ### Changed

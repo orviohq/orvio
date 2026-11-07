@@ -11,7 +11,7 @@ export async function atKey(
     ({ at, code, down }) =>
       new Promise<void>((resolve) => {
         const tick = () => {
-          if ((window as any).orvioDiagnostics.clock < at) {
+          if ((window as any).orvioAudioTime < at) {
             setTimeout(tick, 1);
             return;
           }

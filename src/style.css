@@ -2611,3 +2611,41 @@ canvas {
   -webkit-user-select: none;
   -webkit-user-drag: none;
 }
+#result-options {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #b2b8c4;
+  margin: 0 0 14px;
+  overflow-wrap: anywhere;
+}
+@media (min-width: 700px) and (max-height: 540px) {
+  #settings {
+    padding: 16px 24px;
+  }
+  #settings .dialog-title {
+    margin-bottom: 4px;
+  }
+  #settings .dialog-title h2 {
+    font-size: 22px;
+    margin: 0;
+  }
+  #settings .dialog-title .eyebrow {
+    display: none;
+  }
+  #settings label {
+    margin-top: 9px;
+  }
+  #settings .position-preview {
+    height: 26px;
+  }
+  #settings #position button {
+    padding: 4px;
+  }
+  #settings > .toggle {
+    margin-top: 6px;
+  }
+  #settings #reset {
+    padding: 8px;
+    margin-top: 4px;
+  }
+}

@@ -24,7 +24,7 @@ describe('privacy-safe result sharing', () => {
       ['acc', '101'],
       ['combo', '-1'],
       ['diff', 'extreme'],
-      ['v', '4'],
+      ['v', '5'],
     ]) {
       const bad = resultParams(r);
       bad.set(k, v);
@@ -66,5 +66,34 @@ it('v3 carries bounded consistent anonymous judgments, not performance or identi
     const bad = new URLSearchParams(params);
     bad.set('j', value);
     expect(readResult(bad)).toBeNull();
+  }
+});
+it('v4 preserves only bounded gameplay options, no device or input binding data', () => {
+  const full = {
+    song: 'first-light' as const,
+    lanes: 5 as const,
+    difficulty: 'low' as const,
+    score: 500000,
+    accuracy: 50,
+    combo: 1,
+    judgments: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    options: {
+      speed: 9,
+      fader: 'out2' as const,
+      shuffle: 'random' as const,
+      seed: 123,
+    },
+  };
+  expect(readResult(resultParams(full))).toEqual(full);
+  for (const [key, value] of [
+    ['speed', 'NaN'],
+    ['speed', '10'],
+    ['fade', 'bad'],
+    ['shuffle', 'bad'],
+    ['seed', '-1'],
+  ]) {
+    const params = resultParams(full);
+    params.set(key, value);
+    expect(readResult(params)).toBeNull();
   }
 });

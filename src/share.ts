@@ -11,9 +11,15 @@ export interface SharedResult {
   accuracy: number;
   combo: number;
   judgments?: number[];
+  options?: {
+    speed: number;
+    fader: 'off' | 'in' | 'in2' | 'out' | 'out2';
+    shuffle: 'off' | 'mirror' | 'random';
+    seed: number;
+  };
 }
 export function readResult(params: URLSearchParams): SharedResult | null {
-  if (!['1', '2', '3'].includes(params.get('v') || '')) return null;
+  if (!['1', '2', '3', '4'].includes(params.get('v') || '')) return null;
   const song = params.get('song') as SharedResult['song'];
   const lanes = Number(params.get('keys'));
   const difficulty = params.get('diff') as SharedResult['difficulty'];
@@ -37,7 +43,7 @@ export function readResult(params: URLSearchParams): SharedResult | null {
   )
     return null;
   let judgments: number[] | undefined;
-  if (params.get('v') === '3') {
+  if (['3', '4'].includes(params.get('v') || '')) {
     const raw = params.get('j') || '';
     if (!/^\d+(,\d+){11}$/.test(raw)) return null;
     judgments = raw.split(',').map(Number);
@@ -60,7 +66,34 @@ export function readResult(params: URLSearchParams): SharedResult | null {
     )
       return null;
   }
+  let options: SharedResult['options'];
+  if (params.get('v') === '4') {
+    const speed = Number(params.get('speed')),
+      fader = params.get('fade'),
+      shuffle = params.get('shuffle'),
+      seed = Number(params.get('seed'));
+    if (
+      !params.has('speed') ||
+      !params.has('seed') ||
+      !Number.isFinite(speed) ||
+      speed < 1 ||
+      speed > 9 ||
+      !['off', 'in', 'in2', 'out', 'out2'].includes(fader || '') ||
+      !['off', 'mirror', 'random'].includes(shuffle || '') ||
+      !Number.isInteger(seed) ||
+      seed < 0 ||
+      seed > 4294967295
+    )
+      return null;
+    options = {
+      speed,
+      fader: fader as NonNullable<SharedResult['options']>['fader'],
+      shuffle: shuffle as NonNullable<SharedResult['options']>['shuffle'],
+      seed,
+    };
+  }
   return {
+    ...(options ? { options } : {}),
     ...(judgments ? { judgments } : {}),
     song,
     lanes: lanes as 5 | 7,
@@ -72,7 +105,7 @@ export function readResult(params: URLSearchParams): SharedResult | null {
 }
 export function resultParams(result: SharedResult) {
   return new URLSearchParams({
-    v: result.judgments ? '3' : '2',
+    v: result.options && result.judgments ? '4' : result.judgments ? '3' : '2',
     song: result.song,
     keys: String(result.lanes),
     diff: result.difficulty,
@@ -80,5 +113,13 @@ export function resultParams(result: SharedResult) {
     acc: result.accuracy.toFixed(2),
     combo: String(result.combo),
     ...(result.judgments ? { j: result.judgments.join(',') } : {}),
+    ...(result.options
+      ? {
+          speed: String(result.options.speed),
+          fade: result.options.fader,
+          shuffle: result.options.shuffle,
+          seed: String(result.options.seed),
+        }
+      : {}),
   });
 }

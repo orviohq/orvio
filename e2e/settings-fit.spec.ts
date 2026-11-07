@@ -6,6 +6,8 @@ test('settings fit without scroll, all languages and short-screen tabs remain us
   for (const [width, height] of [
     [320, 568],
     [390, 844],
+    [768, 480],
+    [1280, 480],
     [768, 600],
     [1280, 720],
   ]) {

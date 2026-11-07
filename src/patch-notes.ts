@@ -45,6 +45,37 @@ const BASE_PATCHES: {
   notes: Record<Exclude<Language, ExtraLanguage>, string[]>;
 }[] = [
   {
+    version: '0.2.9',
+    date: '2026-11-07',
+    notes: {
+      en: [
+        'Continuous high-speed note exposure fills only the gap to the previous frame while retaining one sharp head; holds, paused scenes and low speed remain unchanged. This does not confirm the reported physical-display symptom is resolved.',
+        'Result screens show song, key mode, difficulty and recorded speed/shuffle/fade options. Shared-result retry restores the chart and options instead of the home view; old links omit unavailable options. Removed duplicate completion text.',
+        'Short landscape settings are more compact. Integration tests compare decoded pixels rather than PNG bytes and sample the audio clock without copying the entire chart; judgment thresholds are unchanged.',
+      ],
+      ko: [
+        '고속 노트는 선명한 머리 하나를 유지하며 직전 프레임 사이의 빈 이동 구간만 이어 표시합니다. 홀드·정지·저속은 그대로이며 실제 화면에서 보고된 현상이 해결됐다는 확인은 아닙니다.',
+        '결과에 곡·키 모드·난이도·기록된 속도/섞기/효과를 표시합니다. 공유 결과의 다시 플레이가 첫 화면 대신 해당 채보와 옵션으로 시작합니다. 이전 링크에 없는 옵션은 표시하지 않습니다. 완료 문구 중복을 없앴습니다.',
+        '짧은 가로 화면의 설정 배치를 줄였습니다. 통합 시험은 PNG 파일 대신 디코드 픽셀을 비교하고 전체 채보 복사 없이 시계만 읽습니다. 판정 기준은 그대로입니다.',
+      ],
+      zh: [
+        '高速音符仅连接上一帧的移动间隙，保留单个清晰音符头；长按、暂停及低速不变。尚未确认实体屏幕报告的问题已解决。',
+        '成绩显示歌曲、键数、难度及记录的速度、随机和显示效果。分享成绩的重试恢复对应谱面与设置，不再显示首页；旧链接缺少的设置不作虚构。删除重复完成文字。',
+        '压缩矮横屏设置布局。集成测试比较解码像素而非PNG字节，读取时钟时不复制整个谱面，判定标准不变。',
+      ],
+      ja: [
+        '高速ノートは鮮明な頭を一つ保ち、直前フレームとの移動の隙間だけを接続。ホールド・停止・低速は維持。実画面での症状解決は未確認。',
+        '結果に曲・キー数・難易度・記録された速度/シャッフル/表示効果を表示。共有結果の再プレイはホームではなく同じ譜面と設定を復元。旧リンクの欠落値は作りません。完了文の重複を削除。',
+        '低い横画面の設定を省スペース化。テストはPNGバイトでなく復号ピクセルを比較し、譜面全体を複製せず時計を参照。判定基準は維持。',
+      ],
+      es: [
+        'Las notas rápidas conectan solo el espacio hasta el cuadro anterior, con una sola cabeza nítida; sin cambios en notas mantenidas, pausa o baja velocidad. El síntoma en pantallas físicas aún no está confirmado como resuelto.',
+        'Resultados con canción, teclas, dificultad y velocidad/mezcla/efecto registrados. Reintentar desde un enlace restaura la partida, no el inicio. Enlaces antiguos no inventan opciones ausentes. Eliminado texto duplicado.',
+        'Ajustes compactos en horizontal bajo. Pruebas por píxeles decodificados y reloj ligero; umbrales de juicio sin cambios.',
+      ],
+    },
+  },
+  {
     version: '0.2.8',
     date: '2026-11-07',
     notes: {

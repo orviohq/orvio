@@ -27,7 +27,7 @@ test('original song loading precedes scoring and sends no result before explicit
     }),
   );
   const resultURL = page.url();
-  expect(resultURL).toContain('/result/#v=3&song=first-light');
+  expect(resultURL).toContain('/result/#v=4&song=first-light');
   await expect(page.locator('#result-url')).toHaveCount(0);
   await page.evaluate(() =>
     Object.defineProperty(navigator, 'share', {
@@ -41,7 +41,7 @@ test('original song loading precedes scoring and sends no result before explicit
   const url = await page.evaluate(() => navigator.clipboard.readText());
   expect(url).toBe(resultURL);
   expect(url).toContain('score=0');
-  expect(new URLSearchParams(new URL(url).hash.slice(1)).size).toBe(8);
+  expect(new URLSearchParams(new URL(url).hash.slice(1)).size).toBe(12);
   expect(resultRequests).toEqual([]);
   await page.screenshot({ path: 'test-results/sharing.png' });
 });

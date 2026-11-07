@@ -52,6 +52,11 @@ export const EXTRA_PATCH_LABELS = {
 export type ExtraLanguage = keyof typeof EXTRA_PATCH_LABELS;
 export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
   fr: {
+    '0.2.9': [
+      'Les notes rapides relient seulement le trajet du cadre précédent avec une seule tête nette. Maintiens, pause et basse vitesse inchangés. La résolution du symptôme sur écran physique reste non confirmée.',
+      'Résultat avec morceau, touches, difficulté et options enregistrées. Rejouer un lien restaure la partition et les options, pas l’accueil. Aucune option absente inventée pour les anciens liens. Texte doublé supprimé.',
+      'Réglages compacts en paysage bas. Tests sur pixels décodés et horloge légère, seuils de jugement inchangés.',
+    ],
     '0.2.8': [
       'Même écran de résultat après le jeu et via le lien partagé. Libellés agrandis, sans champ de lien, texte de confidentialité ni mesures de performance. Notification de copie visible.',
       'Réglages sans défilement, avec onglets sur les écrans étroits et courts. Ancien fond masqué jusqu’au décodage du nouveau.',
@@ -94,6 +99,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   de: {
+    '0.2.9': [
+      'Schnelle Noten verbinden nur die Bewegungslücke zum vorigen Bild mit einem scharfen Kopf. Halten, Pause und langsame Noten unverändert. Lösung des realen Displayproblems noch nicht bestätigt.',
+      'Ergebnis zeigt Titel, Tasten, Schwierigkeit und gespeicherte Optionen. Erneutes Spielen geteilter Ergebnisse stellt Chart und Optionen wieder her statt der Startseite. Fehlende alte Werte werden nicht erfunden. Doppelter Text entfernt.',
+      'Kompaktere Einstellungen im niedrigen Querformat. Tests vergleichen dekodierte Pixel und lesen eine leichte Uhr; Wertungsgrenzen bleiben gleich.',
+    ],
     '0.2.8': [
       'Gleiche Ergebnisansicht nach dem Spiel und im geteilten Link. Größere Wertungsbeschriftung, kein Linkfeld, Datenschutztext oder Leistungswerte. Kopiermeldung über dem Dialog.',
       'Einstellungen ohne Scrollen, mit Tabs auf schmalen niedrigen Bildschirmen. Alter Hintergrund bleibt bis zur Dekodierung des neuen verborgen.',
@@ -136,6 +146,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   pt: {
+    '0.2.9': [
+      'Notas rápidas ligam apenas o intervalo até ao quadro anterior, com uma só cabeça nítida. Notas longas, pausa e baixa velocidade sem mudanças. Problema no ecrã físico ainda não confirmado como resolvido.',
+      'Resultado com música, teclas, dificuldade e opções registadas. Repetir o link restaura o mapa e as opções, não o início. Links antigos não inventam valores ausentes. Texto duplicado removido.',
+      'Ajustes compactos em paisagem baixa. Testes por píxeis descodificados e relógio leve; limites de avaliação iguais.',
+    ],
     '0.2.8': [
       'Mesmo ecrã de resultados após jogar e abrir o link. Rótulos maiores, sem campo de link, texto de privacidade ou dados de desempenho. Aviso de cópia acima do diálogo.',
       'Definições sem rolagem, com separadores em ecrãs estreitos e baixos. Fundo anterior oculto até descodificar o novo.',
@@ -178,6 +193,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   it: {
+    '0.2.9': [
+      'Le note veloci collegano solo il tratto dal fotogramma precedente con una sola testa nitida. Note lunghe, pausa e bassa velocità invariate. Risoluzione del problema sullo schermo fisico non confermata.',
+      'Risultato con brano, tasti, difficoltà e opzioni registrate. Rigiocare dal link ripristina mappa e opzioni invece della home. Nessun valore mancante inventato nei vecchi link. Testo duplicato rimosso.',
+      'Impostazioni compatte in orizzontale basso. Test sui pixel decodificati e orologio leggero; soglie invariate.',
+    ],
     '0.2.8': [
       'Stessa schermata risultati dopo il gioco e dal link condiviso. Etichette più grandi, senza campo link, testo privacy o dati prestazioni. Notifica di copia sopra la finestra.',
       'Impostazioni senza scorrimento, con schede sugli schermi stretti e bassi. Sfondo precedente nascosto fino alla decodifica del nuovo.',
@@ -220,6 +240,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   ru: {
+    '0.2.9': [
+      'Быстрые ноты соединяют только промежуток до предыдущего кадра, сохраняя одну чёткую головку. Удержание, пауза и низкая скорость без изменений. Исправление восприятия на физическом экране не подтверждено.',
+      'Результат показывает трек, клавиши, сложность и записанные настройки. Повтор из ссылки восстанавливает карту и настройки вместо главного экрана. Старые отсутствующие значения не выдумываются. Повтор текста убран.',
+      'Компактные настройки в низком альбомном окне. Тесты сравнивают декодированные пиксели и читают лёгкие часы; пороги оценки прежние.',
+    ],
     '0.2.8': [
       'Одинаковый экран результата после игры и по ссылке. Подписи оценок увеличены; поле ссылки, текст о приватности и показатели производительности убраны. Уведомление о копировании поверх окна.',
       'Настройки без прокрутки, с вкладками на узких низких экранах. Старый фон скрыт до декодирования нового.',
@@ -262,6 +287,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   id: {
+    '0.2.9': [
+      'Not cepat hanya menyambung celah ke bingkai sebelumnya dengan satu kepala tajam. Tahan, jeda dan kecepatan rendah tetap sama. Perbaikan gejala layar fisik belum terkonfirmasi.',
+      'Hasil menampilkan lagu, tombol, kesulitan dan opsi tercatat. Main ulang dari tautan memulihkan peta dan opsi, bukan beranda. Tautan lama tidak mengarang nilai yang hilang. Teks ganda dihapus.',
+      'Pengaturan ringkas di layar mendatar pendek. Uji membandingkan piksel terdekode dan jam ringan; batas penilaian tetap.',
+    ],
     '0.2.8': [
       'Layar hasil yang sama setelah bermain dan dari tautan. Label penilaian diperbesar, tanpa kolom tautan, teks privasi atau data performa. Notifikasi salin tampil di atas dialog.',
       'Pengaturan tanpa gulir, dengan tab di layar sempit dan pendek. Latar lama disembunyikan sampai gambar baru selesai didekode.',
@@ -304,6 +334,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   tr: {
+    '0.2.9': [
+      'Hızlı notalar tek keskin başla yalnızca önceki kareye kadar olan boşluğu birleştirir. Basılı nota, duraklama ve düşük hız değişmez. Fiziksel ekran sorununun çözümü henüz doğrulanmadı.',
+      'Sonuçta parça, tuş, zorluk ve kaydedilen seçenekler gösterilir. Bağlantıdan tekrar oyun harita ve seçenekleri geri getirir, ana sayfayı değil. Eski eksik değerler uydurulmaz. Yinelenen metin kaldırıldı.',
+      'Kısa yatay ayarlar sıkılaştırıldı. Testler çözülmüş pikselleri karşılaştırır ve hafif saati okur; değerlendirme eşikleri aynı.',
+    ],
     '0.2.8': [
       'Oyun sonu ve paylaşılan bağlantıda aynı sonuç ekranı. Daha büyük değerlendirme yazıları; bağlantı alanı, gizlilik metni ve performans verileri kaldırıldı. Kopyalama bildirimi pencerenin üzerinde.',
       'Ayarlar kaydırmasız; dar ve kısa ekranlarda sekmeler var. Yeni görüntü çözülene kadar eski arka plan gizlenir.',
@@ -346,6 +381,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   vi: {
+    '0.2.9': [
+      'Nốt nhanh chỉ nối khoảng cách tới khung trước với một đầu rõ nét. Giữ nốt, tạm dừng và tốc độ thấp không đổi. Chưa xác nhận giải quyết triệu chứng trên màn hình thực.',
+      'Kết quả có bài hát, phím, độ khó và tùy chọn đã ghi. Chơi lại từ liên kết khôi phục bản nốt và tùy chọn thay vì trang đầu. Không bịa tùy chọn còn thiếu ở liên kết cũ. Bỏ chữ hoàn thành trùng.',
+      'Cài đặt gọn hơn ở màn hình ngang thấp. Kiểm thử so sánh điểm ảnh giải mã và đọc đồng hồ nhẹ; ngưỡng đánh giá không đổi.',
+    ],
     '0.2.8': [
       'Cùng màn hình kết quả sau khi chơi và khi mở liên kết. Nhãn đánh giá lớn hơn; bỏ ô liên kết, giải thích riêng tư và số liệu hiệu năng. Thông báo sao chép hiện trên hộp thoại.',
       'Cài đặt không cuộn, dùng thẻ trên màn hình hẹp và thấp. Ẩn nền cũ đến khi giải mã xong ảnh mới.',
