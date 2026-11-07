@@ -1259,7 +1259,7 @@ $('#share-result').onclick = async () => {
     status.textContent = labels.expiry;
     toast(t('resultCopied'));
   } catch (error) {
-    toast(t('shareFailed'));
+    toast(shareLabels(settings.language).failed);
     status.dataset.message =
       error instanceof ShareError && error.status === 429 ? 'quota' : 'failed';
     status.textContent = shareLabels(settings.language)[

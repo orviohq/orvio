@@ -82,4 +82,6 @@ test('Escape cancels real share verification before any payload upload', async (
   await expect(page.locator('#share-result')).toBeEnabled();
   expect(requests).toEqual([]);
   await expect(page.locator('#share-status')).toContainText('공유하지 못');
+  await expect(page.locator('#toast')).toContainText('공유하지 못');
+  await expect(page.locator('#toast')).not.toContainText('주소창');
 });
