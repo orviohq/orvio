@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-11-07
+
+### Added
+
+- French, German, Portuguese, Italian, Russian, Indonesian, Turkish and Vietnamese UI translations, bringing the supported total to 13. Includes menus, settings, results and every release in the website patch notes, with browser language matching and explicit manual overrides.
+- Local font coverage and layout regression checks for all supported languages. Song titles and technical effect names remain unchanged.
+- Shared HTML follows supported browser-language preferences with an explicit Vary header. The seven result URL fields and fixed-English social PNG stay unchanged.
+- Small-screen result buttons use two rows to avoid overlap with long translated labels.
+
 ## [0.2.6] - 2026-11-07
 
 ### Changed

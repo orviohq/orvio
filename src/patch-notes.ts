@@ -1,6 +1,11 @@
+import {
+  EXTRA_PATCH_LABELS,
+  EXTRA_PATCHES,
+  type ExtraLanguage,
+} from './locales/patches';
 import type { Language } from './i18n';
-export const PATCH_LABELS: Record<
-  Language,
+const BASE_PATCH_LABELS: Record<
+  Exclude<Language, ExtraLanguage>,
   { title: string; back: string; scope: string }
 > = {
   en: {
@@ -34,11 +39,37 @@ export const PATCH_LABELS: Record<
       'Notas del prototipo. Los tiempos de DJMAX son aproximados y el rendimiento depende del dispositivo. Las partituras automáticas de YouTube aún no están disponibles.',
   },
 };
-export const PATCHES: {
+const BASE_PATCHES: {
   version: string;
   date: string;
-  notes: Record<Language, string[]>;
+  notes: Record<Exclude<Language, ExtraLanguage>, string[]>;
 }[] = [
+  {
+    version: '0.2.7',
+    date: '2026-11-07',
+    notes: {
+      en: [
+        'Added French, German, Portuguese, Italian, Russian, Indonesian, Turkish and Vietnamese. All 13 languages cover menus, settings, results and every release in the website patch notes.',
+        'Browser language matching, manual overrides, local font coverage and layouts now include the new languages. Song titles and technical effect names remain unchanged.',
+      ],
+      ko: [
+        '프랑스어·독일어·포르투갈어·이탈리아어·러시아어·인도네시아어·터키어·베트남어를 추가했습니다. 13개 언어로 메뉴·설정·결과·웹사이트 전 버전 패치노트를 제공합니다.',
+        '브라우저 언어 자동 적용·직접 선택·로컬 글꼴과 레이아웃을 새 언어까지 확장했습니다. 곡 제목과 기술적인 효과 이름은 유지합니다.',
+      ],
+      zh: [
+        '新增法语、德语、葡萄牙语、意大利语、俄语、印尼语、土耳其语、越南语。13种语言覆盖菜单、设置、成绩及网页全部版本记录。',
+        '浏览器语言匹配、手动选择、本地字体和布局扩展到新语言。歌曲标题和效果技术名称保持原样。',
+      ],
+      ja: [
+        'フランス語・ドイツ語・ポルトガル語・イタリア語・ロシア語・インドネシア語・トルコ語・ベトナム語を追加。13言語でメニュー・設定・結果・全リリースのWebパッチノートに対応。',
+        'ブラウザー言語判定、手動選択、ローカルフォントとレイアウトを新言語まで拡張。曲名と技術的な効果名は維持。',
+      ],
+      es: [
+        'Añadidos francés, alemán, portugués, italiano, ruso, indonesio, turco y vietnamita: 13 idiomas para menús, ajustes, resultados e historial web completo.',
+        'Detección del navegador, selección manual, fuentes locales y diseños ampliados. Se mantienen los títulos de canciones y nombres técnicos de efectos.',
+      ],
+    },
+  },
   {
     version: '0.2.6',
     date: '2026-11-07',
@@ -253,3 +284,20 @@ export const PATCHES: {
     },
   },
 ];
+
+export const PATCH_LABELS: Record<
+  Language,
+  { title: string; back: string; scope: string }
+> = { ...BASE_PATCH_LABELS, ...EXTRA_PATCH_LABELS };
+export const PATCHES = BASE_PATCHES.map((p) => ({
+  ...p,
+  notes: {
+    ...p.notes,
+    ...Object.fromEntries(
+      Object.entries(EXTRA_PATCHES).map(([lang, versions]) => [
+        lang,
+        versions[p.version],
+      ]),
+    ),
+  } as Record<Language, string[]>,
+}));

@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
-test('five-language layout states, fixed binding capture size, symbols and miniature position controls', async ({
+import { LANGUAGES } from '../src/i18n';
+test('thirteen-language layout states, fixed binding capture size, symbols and miniature position controls', async ({
   page,
 }) => {
   for (const width of [320, 390, 768, 1280])
-    for (const language of ['ko', 'en', 'zh', 'ja', 'es']) {
+    for (const language of Object.keys(LANGUAGES)) {
       await page.setViewportSize({ width, height: 900 });
       await page.addInitScript(
         (l) =>
@@ -58,8 +59,10 @@ test('five-language layout states, fixed binding capture size, symbols and minia
           .locator('#settings')
           .evaluate((e) => e.scrollWidth <= e.clientWidth + 1),
       ).toBe(true);
-      if (language === 'ko' && [390, 1280].includes(width))
-        await page.screenshot({ path: `test-results/settings-${width}.png` });
+      if ([390, 1280].includes(width))
+        await page.screenshot({
+          path: `test-results/settings-${language}-${width}.png`,
+        });
       await page.keyboard.press('Escape');
       await page.keyboard.press('F3');
       await expect(page.locator('#game-options')).toBeVisible();
@@ -79,11 +82,11 @@ test('five-language layout states, fixed binding capture size, symbols and minia
 test('all releases and languages on website with safe small-screen layout', async ({
   page,
 }) => {
-  for (const lang of ['ko', 'en', 'zh', 'ja', 'es']) {
+  for (const lang of Object.keys(LANGUAGES)) {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/patch-notes/?lang=' + lang);
     await expect(page.locator('[data-language]:visible article')).toHaveCount(
-      8,
+      9,
     );
     expect(
       await page.evaluate(
@@ -91,7 +94,6 @@ test('all releases and languages on website with safe small-screen layout', asyn
       ),
     ).toBe(true);
     await expect(page.locator('#patch-language')).toHaveValue(lang);
-    if (lang === 'ko')
-      await page.screenshot({ path: 'test-results/patch-notes.png' });
+    await page.screenshot({ path: `test-results/patch-notes-${lang}.png` });
   }
 });

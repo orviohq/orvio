@@ -9,10 +9,7 @@ import { LANGUAGES, type Language } from '../i18n';
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#14131a" />
-    <meta
-      name="description"
-      content="Orvio release history in English, Korean, Chinese, Japanese and Spanish."
-    />
+    <meta name="description" content="Orvio release history in 13 languages." />
     <title>Patch notes · orvio</title>
     <link rel="icon" href="/favicon.png" />
   </head>
@@ -57,7 +54,8 @@ import { LANGUAGES, type Language } from '../i18n';
       const select =
         document.querySelector<HTMLSelectElement>('#patch-language')!;
       function show(lang: string) {
-        if (!(lang in LANGUAGES)) lang = 'ko';
+        if (!(lang in LANGUAGES))
+          lang = resolvedLanguage({}, navigator.languages);
         select.value = lang;
         document.documentElement.lang = lang;
         document
@@ -189,22 +187,6 @@ import { LANGUAGES, type Language } from '../i18n';
     }
     header {
       margin-bottom: 36px;
-    }
-    @font-face {
-      font-family: NotoSC;
-      src: url('/chinese.ttf');
-      font-display: swap;
-    }
-    @font-face {
-      font-family: NotoJP;
-      src: url('/japanese.ttf');
-      font-display: swap;
-    }
-    [lang='zh'] {
-      font-family: Outfit, NotoSC, system-ui, sans-serif;
-    }
-    [lang='ja'] {
-      font-family: Outfit, NotoJP, system-ui, sans-serif;
     }
     body {
       font-size: 15px;

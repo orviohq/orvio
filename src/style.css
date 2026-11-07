@@ -2367,3 +2367,39 @@ dialog input[type='checkbox'] {
 #bind-hint > span {
   grid-area: 1/1;
 }
+@media (max-width: 540px) {
+  .result-actions {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+  }
+  .result-actions #share-result {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .result-actions #back {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    padding: 10px 8px;
+    word-break: normal;
+    overflow-wrap: anywhere;
+  }
+  .result-actions #retry {
+    grid-column: 1/-1;
+    grid-row: 2;
+    width: 100%;
+    min-width: 0;
+  }
+  .start-row {
+    align-items: stretch;
+  }
+  .start-row > button {
+    min-width: 0;
+  }
+  .start-row > button.quiet {
+    max-width: 48%;
+    overflow-wrap: anywhere;
+  }
+}

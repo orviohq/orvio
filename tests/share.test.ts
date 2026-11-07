@@ -40,7 +40,7 @@ describe('privacy-safe result sharing', () => {
     expect(html).toContain('og:image');
     expect(html).toContain('twitter:card');
     expect(html).toContain('987,654');
-    expect(html).toContain('not verified');
+    expect(html).toContain('unverified');
     expect(html).not.toContain('<script');
     const a = await resultPNG(r),
       b = await resultPNG(r);
@@ -58,4 +58,17 @@ describe('privacy-safe result sharing', () => {
     });
     expect(post.status).toBe(405);
   });
+});
+
+it('shared HTML follows supported browser languages without adding URL fields', async () => {
+  for (const language of ['fr', 'de', 'pt', 'it', 'ru', 'id', 'tr', 'vi']) {
+    const response = await onRequest({
+      request: new Request(
+        'https://example.invalid/result/?' + resultParams(r),
+        { headers: { 'accept-language': language } },
+      ),
+    });
+    expect(await response.text()).toContain(`lang="${language}"`);
+    expect(response.headers.get('vary')).toBe('Accept-Language');
+  }
 });

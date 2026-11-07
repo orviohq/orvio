@@ -3,7 +3,7 @@ import { PATCHES, PATCH_LABELS } from '../src/patch-notes';
 import { LANGUAGES } from '../src/i18n';
 import { keyLabel } from '../src/key-label';
 import { readFileSync } from 'node:fs';
-test('all release versions have all five nonempty translations and latest matches package', () => {
+test('all release versions have all thirteen nonempty translations and latest matches package', () => {
   const versions = [
     ...readFileSync('CHANGELOG.md', 'utf8').matchAll(
       /^## \[(\d+\.\d+\.\d+)\]/gm,

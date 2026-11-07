@@ -3,7 +3,15 @@ test('browser language defaults, unsupported fallback, manual override and auto 
   browser,
 }) => {
   for (const [locale, expected] of [
-    ['fr-FR', 'en'],
+    ['ar-SA', 'en'],
+    ['fr-FR', 'fr'],
+    ['de-DE', 'de'],
+    ['pt-BR', 'pt'],
+    ['it-IT', 'it'],
+    ['ru-RU', 'ru'],
+    ['id-ID', 'id'],
+    ['tr-TR', 'tr'],
+    ['vi-VN', 'vi'],
     ['en-GB', 'en'],
     ['ko-KR', 'ko'],
     ['zh-TW', 'zh'],

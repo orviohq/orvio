@@ -1,9 +1,25 @@
+import { fr } from './locales/fr';
+import { de } from './locales/de';
+import { pt } from './locales/pt';
+import { it } from './locales/it';
+import { ru } from './locales/ru';
+import { id } from './locales/id';
+import { tr } from './locales/tr';
+import { vi } from './locales/vi';
 export const LANGUAGES = {
   en: 'English',
   ko: '한국어',
   zh: '中文',
   ja: '日本語',
   es: 'Español',
+  fr: 'Français',
+  de: 'Deutsch',
+  pt: 'Português',
+  it: 'Italiano',
+  ru: 'Русский',
+  id: 'Bahasa Indonesia',
+  tr: 'Türkçe',
+  vi: 'Tiếng Việt',
 } as const;
 export type Language = keyof typeof LANGUAGES;
 const en = {
@@ -505,7 +521,21 @@ const es: Words = {
   mute: 'SILENCIAR',
   unmute: 'ACTIVAR SONIDO',
 };
-export const translations = { en, ko, zh, ja, es };
+export const translations: Record<Language, Words> = {
+  en,
+  ko,
+  zh,
+  ja,
+  es,
+  fr,
+  de,
+  pt,
+  it,
+  ru,
+  id,
+  tr,
+  vi,
+};
 export type Word = keyof Words;
 export function translate(language: Language, word: Word): string {
   return translations[language][word];
