@@ -13,8 +13,11 @@ export class Playfield {
   private hit = new Graphics();
   private keys: Sprite[] = [];
   private flashesSprites: Sprite[] = [];
+  private hitBeams: Sprite[] = [];
+  private hitSparks: Sprite[][] = [];
   private noteSprites: NoteVisual[] = [];
   private lastLanes = 0;
+  reducedMotion = false;
   width = 440;
   height = 620;
   frames: number[] = [];
@@ -47,17 +50,21 @@ export class Playfield {
     this.flashesSprites.forEach((s) => s.destroy());
     this.keys = [];
     this.flashesSprites = [];
+    this.hitBeams.forEach((s) => s.destroy());
+    this.hitSparks.flat().forEach((s) => s.destroy());
+    this.hitBeams = [];
+    this.hitSparks = [];
     this.noteSprites = [];
     this.frames = [];
     this.work = [];
     this.lastFrame = 0;
     for (const s of engine.states) {
-      const head = this.rect(s.note.lane % 2 ? 0xf5e5ff : color);
+      const head = this.rect(s.note.lane % 2 ? 0xebfaff : color);
       const visual: NoteVisual = { head };
       if (s.note.end) {
         visual.body = this.rect(color);
         visual.body.alpha = 0.36;
-        visual.tail = this.rect(0xe7d9ff);
+        visual.tail = this.rect(0xe5faff);
         this.notes.addChild(visual.body, visual.tail);
       }
       this.notes.addChild(head);
@@ -68,9 +75,18 @@ export class Playfield {
       k.alpha = 0.18;
       this.app.stage.addChild(k);
       this.keys.push(k);
-      const f = this.rect(0xe7d9ff);
+      const f = this.rect(0xe5faff);
       this.app.stage.addChild(f);
       this.flashesSprites.push(f);
+      const beam = this.rect(0xbdefff);
+      this.app.stage.addChild(beam);
+      this.hitBeams.push(beam);
+      const sparks = Array.from({ length: 6 }, () => {
+        const spark = this.rect(0xfff0ce);
+        this.app.stage.addChild(spark);
+        return spark;
+      });
+      this.hitSparks.push(sparks);
     }
     this.drawGrid(lanes);
   }
@@ -83,22 +99,22 @@ export class Playfield {
     this.grid.clear();
     this.grid
       .rect(0, 0, this.width, this.height)
-      .fill({ color: 0x0e0e16, alpha: 0.85 });
+      .fill({ color: 0x070f19, alpha: 0.85 });
     for (let i = 0; i < lanes; i++) {
       if (i % 2 === 1)
         this.grid
           .rect(i * w, 0, w, this.height)
-          .fill({ color: 0x20202c, alpha: 0.45 });
+          .fill({ color: 0x172638, alpha: 0.45 });
       this.grid
         .moveTo(i * w, 0)
         .lineTo(i * w, this.height)
         .stroke({ color: 0xffffff, alpha: 0.07, width: 1 });
     }
     this.hit.clear();
-    this.hit.rect(0, y - 1, this.width, 3).fill(0xe8deff);
+    this.hit.rect(0, y - 1, this.width, 3).fill(0xbdefff);
     this.hit
       .rect(0, y + 2, this.width, 18)
-      .fill({ color: 0xbda9ff, alpha: 0.08 });
+      .fill({ color: 0x29d8ff, alpha: 0.08 });
   }
   draw(
     engine: Engine,
@@ -137,8 +153,31 @@ export class Playfield {
         f.width = width;
         f.height = 10;
         f.alpha = (1 - age / 200) * 0.7;
-        f.tint = flash!.ok ? 0xe7d9ff : 0xff927f;
+        f.tint = flash!.ok ? 0xe5faff : 0xff334d;
       }
+      const life = Math.min(1, age / 260);
+      const hit = !!flash?.ok && age < 260 && !this.reducedMotion;
+      const beam = this.hitBeams[lane];
+      beam.visible = hit;
+      if (hit) {
+        beam.x = lane * width + width * 0.28;
+        beam.y = target - 70 * (1 - life) - 5;
+        beam.width = width * 0.44 * (1 - life) + 2;
+        beam.height = 70 * (1 - life) + 5;
+        beam.alpha = (1 - life) * 0.55;
+      }
+      this.hitSparks[lane].forEach((spark, index) => {
+        spark.visible = hit;
+        if (!hit) return;
+        const angle = (index / 5) * Math.PI;
+        spark.x =
+          lane * width + width / 2 + Math.cos(angle) * width * 0.42 * life;
+        spark.y = target - 8 - Math.sin(angle) * 65 * life - life * 16;
+        spark.width = 3 * (1 - life) + 1;
+        spark.height = 8 * (1 - life) + 2;
+        spark.rotation = (index - 2.5) * 0.32;
+        spark.alpha = 1 - life;
+      });
     }
     engine.states.forEach((s, i) => {
       const v = this.noteSprites[i];

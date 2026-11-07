@@ -1,11 +1,11 @@
 # Production operations
 
-The `production` Actions workflow tests https://orvio-4n8.pages.dev/ hourly
+The `production` Actions workflow tests https://orvio-play.pages.dev/ hourly
 (at minute 17), after a main-branch push, and on manual dispatch. GitHub can
 queue or delay scheduled runs; this is not a real-time availability guarantee.
 The browser suite checks song inventory, keyboard input through a complete
 chart and its result, key remapping, saved settings, field positions, negative
-judgments, focus abort, and mobile browse-only layout. It uses no production
+judgments, focus pause, and mobile browse-only layout. It uses no production
 account and changes only an isolated browser's local storage.
 
 The production config has no local web server. Failed tests are retried once.
@@ -35,3 +35,5 @@ Hosting-provider outages may not be repairable from this repository. Escalate
 those failures rather than claim a successful repair. Monitoring does not prove
 subjective audio quality, human playability on every device, universal 60fps,
 or exact DJMAX timing parity.
+
+The original https://orvio-4n8.pages.dev/ remains available as a legacy mirror. The primary URL is https://orvio-play.pages.dev/. Both deployments are kept aligned.

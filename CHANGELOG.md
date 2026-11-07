@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-07
+
 ### Fixed
 
 - Keep long-note heads on the judgment line and their bodies visible until release.
@@ -13,6 +15,11 @@
 
 ### Added
 
+- Full-screen track console, gold perfect hits, red breaks, graded judgment feedback and lane-local beam/spark effects.
+- Selection-gesture audio preview, keyboard-only menus and pause/settings/resume.
+- English, Korean, Chinese, Japanese and Spanish UI with local fonts and saved preference.
+- Clean primary URL with the original deployment retained.
+- Astro static home, selection and 18 unique chart-ready routes; copy-link, refresh and safe browser-history navigation.
 - Hourly production browser checks, retained failure evidence and recovery runbook.
 
 ## [0.1.0] - 2026-11-07

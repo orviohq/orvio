@@ -6,3 +6,6 @@
 - `public/outfit.ttf`: Outfit variable font, Google Fonts distribution, SIL OFL 1.1. https://raw.githubusercontent.com/google/fonts/main/ofl/outfit/OFL.txt . Notice: `public/OFL-Outfit.txt`.
 - `public/korean.ttf`: subset of Noto Sans KR regular for interface characters. Google Fonts distribution via https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600&display=swap . Original font: https://fonts.gstatic.com/s/notosanskr/v40/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzuoyeLQ.ttf . SIL OFL: https://raw.githubusercontent.com/google/fonts/main/ofl/notosanskr/OFL.txt . Notice: `public/OFL-NotoSansKR.txt`. The subset does not use a reserved font name in its CSS alias.
 - PixiJS, Vite and other dependency licenses remain in package distributions/lockfile. No DJMAX assets or endorsement implied.
+
+- `public/chinese.ttf` and `public/japanese.ttf`: locally subset Noto Sans SC / JP from the Google Fonts repository, SIL OFL1.1, regional glyphs. Sources https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf and https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf . Notices `OFL-NotoSansSC.txt` / `OFL-NotoSansJP.txt`.
+- Arcade backgrounds, hit beams and particles are original CSS/PixiJS graphics, not copied game assets.

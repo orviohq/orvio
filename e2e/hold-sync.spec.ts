@@ -5,10 +5,10 @@ test('legacy calibration removed and held body stays visible past head culling',
   await page.addInitScript(() =>
     localStorage.setItem('orvio.settings.v1', JSON.stringify({ offset: 150 })),
   );
-  await page.goto('/');
+  await page.goto('/select/');
   await page.click('#open-settings');
   await expect(page.locator('#offset')).toHaveCount(0);
-  await expect(page.locator('#settings')).toContainText('자동 동기화');
+  await expect(page.locator('#settings')).toContainText('자동으로');
   expect(
     await page.evaluate(
       () => 'offset' in JSON.parse(localStorage.getItem('orvio.settings.v1')!),
@@ -68,4 +68,5 @@ test('legacy calibration removed and held body stays visible past head culling',
   expect(tail.value).toBe(100);
   expect(Math.abs(tail.delta)).toBeLessThan(45);
   await page.keyboard.press('Escape');
+  await page.click('#pause-exit');
 });

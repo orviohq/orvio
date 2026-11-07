@@ -6,7 +6,7 @@ export default defineConfig({
   retries: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'https://orvio-4n8.pages.dev/',
+    baseURL: 'https://orvio-play.pages.dev/',
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
     launchOptions: {

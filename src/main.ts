@@ -1,3 +1,4 @@
+import { LANGUAGES, translate, type Language, type Word } from './i18n';
 import './style.css';
 import {
   SONGS,
@@ -16,6 +17,8 @@ const defaults = {
   7: ['KeyS', 'KeyD', 'KeyF', 'Space', 'KeyJ', 'KeyK', 'KeyL'],
 };
 interface Settings {
+  language: Language;
+  reducedMotion: boolean;
   lanes: Lanes;
   difficulty: Difficulty;
   position: 'left' | 'center' | 'right';
@@ -36,6 +39,8 @@ function getSettings(): Settings {
     unknown
   >;
   return {
+    language: 'ko',
+    reducedMotion: false,
     lanes: 5,
     difficulty: 'low',
     position: 'center',
@@ -46,17 +51,24 @@ function getSettings(): Settings {
   };
 }
 let settings = getSettings();
+if (!(settings.language in LANGUAGES)) settings.language = 'ko';
+const t = (word: Word) => translate(settings.language, word);
+const label = (word: Word) => `<span data-i18n="${word}">${t(word)}</span>`;
 let songIndex = 0;
+let screen: 'home' | 'select' | 'ready' | 'play' = 'select';
+let readingRoute = false;
 let engine: Engine | null = null;
 let clock: AudioClock;
 let field: Playfield;
 let active = false;
+let paused = false;
 let sequence = 0;
 let frame = 0;
 let seenEvents = 0;
 let binding = -1;
 let rendered: Soundtrack | undefined;
 let preview: AudioBufferSourceNode | undefined;
+let previewGain: GainNode | undefined;
 let preparing = false;
 let sessionId = '';
 let latestMetrics: unknown;
@@ -73,18 +85,56 @@ function keyLabel(code: string) {
 }
 const app = $('#app');
 app.innerHTML = `
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">PLAY LAB <i></i> 0.1</span><nav><button id="open-settings" class="quiet">설정 <span>↗</span></button><a href="https://github.com/orviohq/orvio" target="_blank" rel="noreferrer">GitHub ↗</a></nav></header>
-<main id="lobby"><section class="intro"><div class="eyebrow">A LITTLE RHYTHM. A DIFFERENT WORLD.</div><h1>한 박자,<br><em>다른 세계.</em></h1><p>손끝으로 찾는 나만의 흐름.<br>헤드폰을 쓰고, 첫 노트를 만나보세요.</p><div class="mobile-note">모바일에서는 곡과 설정을 둘러볼 수 있어요.<br>플레이는 키보드가 연결된 데스크톱에서.</div><div class="tiny-note">3 ORIGINAL TRACKS · 5 / 7 KEYS · NO ACCOUNT</div></section>
-<section class="library" aria-label="곡 선택"><div class="section-title"><span>SELECT YOUR FREQUENCY</span><span>01 — 03</span></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="난이도"><button data-diff="low">하 <small>EASY</small></button><button data-diff="mid">중 <small>NORMAL</small></button><button data-diff="high">상 <small>HARD</small></button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="preview" class="round" aria-label="선택곡 미리듣기">▷</button><button id="start" class="primary">플레이 <span>↗</span></button></div><div class="under-start"><span id="chart-info"></span><span>ENTER TO PLAY</span></div></section>
-<section class="footer-strip"><span><i></i> LOCAL-FIRST RHYTHM ENGINE</span><p>귀로 듣고, 손으로 느끼세요.</p><button id="about-button" class="quiet">프로토타입 노트 ↗</button></section></main>
-<section id="game" class="hidden" aria-label="리듬 게임"><div class="game-top"><button id="exit" class="quiet">← 나가기 <small>ESC</small></button><div class="song-now"><strong id="now-title"></strong><span id="now-detail"></span></div><div class="perf"><span id="fps">-- FPS</span><i></i></div></div><div id="progress"><div></div></div><div id="arena" data-position="center"><aside class="score-block"><span class="eyebrow">SCORE</span><strong id="score">0000000</strong><div><b id="rate">100.00</b><span>% ACCURACY</span></div><p id="live-note">헤드폰을 쓰고, 흐름을 따라가세요.</p></aside><div id="highway-wrap"><div id="highway"></div><div id="judge" aria-live="off"></div><div id="combo"></div><div id="keycaps"></div><div id="countdown"></div></div><aside class="track-block"><div class="orb-mini"></div><span class="eyebrow">FIND YOUR FLOW</span><h2 id="side-title"></h2><p>음악의 시간 위로<br>노트가 흐릅니다.</p><div id="lane-detail"></div></aside></div><div class="game-footer"><span>HOLD NOTES: 누르고 있다가 끝에서 놓으세요</span><span id="clock-info">AUDIO CLOCK · OUTPUT ALIGNED</span></div></section>
-<dialog id="settings"><form method="dialog"><div class="dialog-title"><div><span class="eyebrow">MAKE IT YOURS</span><h2>플레이 설정</h2></div><button class="close" aria-label="닫기">×</button></div></form><label>노트 영역 위치</label><div class="segmented" id="position"><button data-pos="left">왼쪽</button><button data-pos="center">중앙</button><button data-pos="right">오른쪽</button></div><label for="speed">스크롤 속도 <output id="speed-value"></output></label><input id="speed" type="range" min="0.8" max="3" step="0.1"><p class="hint">음악 출력 시계에 맞춰 노트와 입력을 자동 동기화해요. 기기의 소리 출력 지연은 브라우저가 제공하는 정보로 반영해요.</p><label for="volume">음악 볼륨</label><input id="volume" type="range" min="0" max="1" step="0.05"><label>키 배치 <span id="binding-mode"></span></label><div id="bindings"></div><p class="hint" id="bind-hint">버튼을 선택하고 원하는 키를 누르세요. 중복 키는 사용할 수 없어요.</p><button id="reset" class="quiet">기본값으로 되돌리기</button><p class="local-note">설정은 이 브라우저에만 저장돼요. 서버 전송 없음.</p></dialog>
-<dialog id="results"><span class="eyebrow">YOU FOUND YOUR FLOW</span><div class="result-heading"><h2 id="result-song"></h2><span id="result-rank"></span></div><div id="result-badge"></div><div class="result-score" id="result-score"></div><div class="result-stats"><div><span>ACCURACY</span><strong id="result-rate"></strong></div><div><span>MAX COMBO</span><strong id="result-combo"></strong></div><div><span>BREAK</span><strong id="result-break"></strong></div></div><div id="judgment-list"></div><p id="result-perf" class="hint"></p><div class="result-actions"><button id="back" class="quiet">곡 선택</button><button id="retry" class="primary">한 번 더 ↗</button></div></dialog>
-<dialog id="about"><form method="dialog"><div class="dialog-title"><h2>Prototype notes</h2><button class="close" aria-label="닫기">×</button></div></form><p>orvio 0.1 · 오픈소스 키보드 리듬게임</p><p>세 곡은 이 프로젝트를 위해 만든 오리지널 신스 트랙입니다. 5키 / 7키와 곡별 상·중·하, 롱노트를 지원해요.</p><p>판정 표기는 DJMAX RESPECT V의 MAX 100%~10%, MAX 1%, BREAK를 참고합니다. 1,000,000점 만점·정확도 기반 점수를 사용합니다.</p><p>전체 판정 시간표와 내부 반올림은 공식 공개자료에서 확인되지 않았어요. 이 버전의 세부 시간창·롱노트 처리는 프로토타입 규칙이며 DJMAX와 완전히 같다는 의미는 아닙니다.</p><p>브라우저의 주사율·기기·오디오 경로에 따라 지연과 프레임은 달라집니다. 무지연·모든 환경의 60fps 보장은 하지 않아요. 탭이 숨겨지면 플레이를 중단합니다.</p><a href="https://github.com/orviohq/orvio" target="_blank" rel="noreferrer">코드 · 테스트 · 판정 근거 ↗</a></dialog><div id="toast" role="status"></div>`;
+<div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<section id="home-screen"><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><a href="/select/">${label('back')}</a><button class="quiet share-link">↗ COPY LINK</button></section><main id="lobby"><section class="intro"><div class="eyebrow">${label('selected')} <span id="selection-number">01 / 03</span></div><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
+<section class="library" aria-label="Track selection"><div class="section-title"><strong>${label('select')}</strong><span>ORIGINALS / 001</span></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">${label('easy')} <small>01</small></button><button data-diff="mid">${label('normal')} <small>02</small></button><button data-diff="high">${label('hard')} <small>03</small></button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div><div class="under-start"><button class="quiet share-link">↗ COPY LINK</button><span id="chart-info"></span><span>${label('keyboard')}</span></div></section>
+<section class="footer-strip"><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
+<section id="game" class="hidden" aria-label="Rhythm game"><div class="game-top"><button id="exit" class="quiet">ESC ${label('exit')}</button><div class="song-now"><strong id="now-title"></strong><span id="now-detail"></span></div><div class="perf"><span id="fps">-- FPS</span><i></i></div></div><div id="progress"><div></div></div><div id="arena" data-position="center"><aside class="score-block"><span class="eyebrow">${label('score')}</span><strong id="score">0000000</strong><div><b id="rate">100.00</b><span>% ${label('accuracy')}</span></div><div class="session-signal"><b>LIVE</b><span>OUTPUT SYNC</span></div></aside><div id="highway-wrap"><div id="highway"></div><div id="impact" aria-hidden="true"></div><div id="judge" aria-live="off"></div><div id="combo"></div><div id="keycaps"></div><div id="countdown"></div></div><aside class="track-block"><div class="orb-mini"></div><span class="eyebrow">ORVIO ORIGINALS</span><h2 id="side-title"></h2><div id="lane-detail"></div><p>${label('hold')}</p></aside></div><div class="game-footer"><span>${label('hold')}</span><span id="clock-info">${t('synced')}</span></div></section>
+<dialog id="pause"><div class="eyebrow">ORVIO / SESSION</div><h2>${label('pause')}</h2><button id="resume" class="primary">${label('resume')} ↵</button><button id="pause-settings" class="quiet">F2 ${label('options')}</button><button id="pause-exit" class="quiet">${label('back')}</button></dialog><dialog id="settings"><form method="dialog"><div class="dialog-title"><div><span class="eyebrow">SYSTEM / OPTIONS</span><h2>${label('options')}</h2></div><button class="close" aria-label="Close">×</button></div></form><label for="language">${label('language')}</label><select id="language">${Object.entries(
+  LANGUAGES,
+)
+  .map(([k, v]) => `<option value="${k}">${v}</option>`)
+  .join(
+    '',
+  )}</select><label>${label('position')}</label><div class="segmented" id="position"><button data-pos="left">${label('left')}</button><button data-pos="center">${label('center')}</button><button data-pos="right">${label('right')}</button></div><label for="speed">${label('speed')} <output id="speed-value"></output></label><input id="speed" type="range" min="0.8" max="3" step="0.1"><p class="hint">${label('auto')}</p><label for="volume">${label('volume')}</label><input id="volume" type="range" min="0" max="1" step="0.05"><label>${label('bindings')} <span id="binding-mode"></span></label><div id="bindings"></div><p class="hint" id="bind-hint">${label('bindHint')}</p><label class="toggle"><span>${label('reduced')}</span><input id="reduced-motion" type="checkbox"></label><button id="reset" class="quiet">${label('reset')}</button><p class="local-note">${label('local')} · TAB / SHIFT TAB / ESC</p></dialog>
+<dialog id="results"><div class="result-system">ORVIO / SESSION REPORT</div><span class="eyebrow">${label('session')}</span><div class="result-heading"><h2 id="result-song"></h2><span id="result-rank"></span></div><div id="result-badge"></div><div class="result-score" id="result-score"></div><div class="result-stats"><div><span>${label('accuracy')}</span><strong id="result-rate"></strong></div><div><span>${label('maxCombo')}</span><strong id="result-combo"></strong></div><div><span>BREAK</span><strong id="result-break"></strong></div></div><div id="judgment-list"></div><p id="result-perf" class="hint"></p><div class="result-actions"><button id="back" class="quiet">ESC ${label('back')}</button><button id="retry" class="primary">${label('retry')} ↵</button></div><p class="hint">${label('resultHint')}</p></dialog>
+<dialog id="about"><form method="dialog"><div class="dialog-title"><h2>${label('aboutTitle')}</h2><button class="close" aria-label="Close">×</button></div></form><p>${label('aboutBody')}</p><a href="https://github.com/orviohq/orvio" target="_blank" rel="noreferrer">${label('code')} ↗</a></dialog><div id="toast" role="status"></div>`;
+function localize() {
+  document.documentElement.lang = settings.language;
+  document.body.classList.toggle('reduced-motion', settings.reducedMotion);
+  document
+    .querySelectorAll<HTMLElement>('[data-i18n]')
+    .forEach((el) => (el.textContent = t(el.dataset.i18n as Word)));
+  $<HTMLSelectElement>('#language').value = settings.language;
+  $<HTMLInputElement>('#reduced-motion').checked = settings.reducedMotion;
+}
+function selectedSong() {
+  const song = SONGS[songIndex];
+  document.documentElement.style.setProperty('--accent', song.color);
+  $('#selected-art').className = 'selected-art cover-' + songIndex;
+  $('#selected-art .art-index').textContent = '0' + (songIndex + 1);
+  $('#selection-number').textContent = `0${songIndex + 1} / 03`;
+  $('#selected-title').textContent = song.title;
+  $('#selected-subtitle').textContent = t(('subtitle' + songIndex) as Word);
+  $('#selected-genre').textContent = song.genre;
+  $('#selected-bpm').textContent = song.bpm + ' BPM';
+}
+function selectSong(index: number, audition = true) {
+  if (preparing || active) return;
+  songIndex = (index + SONGS.length) % SONGS.length;
+  stopPreview();
+  rendered = cache.get(SONGS[songIndex].id);
+  songCards();
+  syncSettings();
+  selectedSong();
+  if (audition) void previewSong();
+}
+
 function songCards() {
   $('#songs').innerHTML = SONGS.map(
     (s, i) =>
-      `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}"><span class="orb"></span><span class="cover-number">0${i + 1}</span></span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${s.title}</strong><span>${s.subtitle}</span></span><span class="song-time">${Math.floor(duration(s) / 60)}:${Math.floor(
+      `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}"><span class="orb"></span><span class="cover-number">0${i + 1}</span></span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${s.title}</strong><span>${t(('subtitle' + i) as Word)}</span></span><span class="song-time">${Math.floor(duration(s) / 60)}:${Math.floor(
         duration(s) % 60,
       )
         .toString()
@@ -93,15 +143,14 @@ function songCards() {
   document.querySelectorAll<HTMLButtonElement>('[data-song]').forEach(
     (b) =>
       (b.onclick = () => {
-        songIndex = Number(b.dataset.song);
-        stopPreview();
-        rendered = cache.get(SONGS[songIndex].id);
-        songCards();
-        syncSettings();
+        selectSong(Number(b.dataset.song));
       }),
   );
 }
 function syncSettings() {
+  clock?.setVolume(settings.volume);
+  if (previewGain) previewGain.gain.value = settings.volume * 0.5;
+  if (field) field.reducedMotion = settings.reducedMotion;
   document
     .querySelectorAll('[data-diff]')
     .forEach((b) =>
@@ -127,7 +176,7 @@ function syncSettings() {
       ),
     );
   $('#chart-info').textContent =
-    `${makeChart(SONGS[songIndex], settings.difficulty, settings.lanes).length} NOTES · ORIGINAL SYNTH`;
+    `${makeChart(SONGS[songIndex], settings.difficulty, settings.lanes).length} ${t('notes')} · ${t('original')}`;
   for (const id of ['speed', 'volume'] as const)
     $<HTMLInputElement>('#' + id).value = String(settings[id]);
   $('#speed-value').textContent = settings.speed.toFixed(1) + '×';
@@ -143,10 +192,12 @@ function syncSettings() {
       (b.onclick = () => {
         binding = Number(b.dataset.bind);
         b.classList.add('listening');
-        b.textContent = '…';
+        b.textContent = t('listening');
       }),
   );
   persist();
+  if (!readingRoute && screen === 'select')
+    history.replaceState(null, '', selectionPath());
 }
 function toast(s: string) {
   $('#toast').textContent = s;
@@ -154,13 +205,15 @@ function toast(s: string) {
   setTimeout(() => $('#toast').classList.remove('visible'), 3000);
 }
 function stopPreview() {
+  previewRequest++;
   try {
     preview?.stop();
   } catch {
     /* Preview ended. */
   }
   preview = undefined;
-  $('#preview').textContent = '▷';
+  $('#preview-status').textContent = t('previewReady');
+  document.body.classList.remove('previewing');
 }
 async function prepare() {
   if (!clock) clock = new AudioClock();
@@ -168,21 +221,29 @@ async function prepare() {
   const song = SONGS[songIndex];
   rendered = cache.get(song.id);
   if (!rendered) {
-    $('#start').textContent = '사운드 준비 중…';
+    $('#start').textContent = t('preparing');
     rendered = await renderSong(song);
     cache.set(song.id, rendered);
   }
-  $('#start').innerHTML = '플레이 <span>↗</span>';
+  $('#start').innerHTML = `${t('start')} <span>ENTER ↵</span>`;
   return rendered;
 }
 async function start() {
+  if (screen === 'home') {
+    location.href = '/select/';
+    return;
+  }
   if (preparing || active) return;
   if (matchMedia('(pointer: coarse)').matches && innerWidth < 900) {
-    toast('플레이는 키보드가 연결된 데스크톱에서 열어주세요.');
+    toast(t('unsupported'));
     return;
   }
   preparing = true;
+  if (location.pathname !== playPath()) history.pushState(null, '', playPath());
+  screen = 'play';
+  $('#ready-screen').classList.add('hidden');
   stopPreview();
+  document.body.classList.add('playing');
   $('#start').setAttribute('disabled', '');
   try {
     const track = await prepare();
@@ -197,6 +258,7 @@ async function start() {
     seenEvents = 0;
     sequence = 0;
     sessionId = crypto.randomUUID();
+    field.reducedMotion = settings.reducedMotion;
     field.pressed.clear();
     field.flashes.clear();
     field.setup(
@@ -217,13 +279,13 @@ async function start() {
       .join('');
     $('#judge').textContent = '';
     $('#combo').textContent = '';
-    $('#clock-info').textContent = 'AUDIO CLOCK · OUTPUT ALIGNED';
+    $('#clock-info').textContent = t('synced');
     clock.setVolume(settings.volume);
     await clock.play(track.buffer);
     active = true;
     frame = requestAnimationFrame(loop);
   } catch (e) {
-    toast('시작하지 못했어요. 오디오 권한을 확인하고 다시 눌러주세요.');
+    toast(t('startError'));
     console.error(e);
     exit();
   } finally {
@@ -234,16 +296,53 @@ async function start() {
 function judgment(e: JudgmentEvent) {
   const j = $('#judge');
   j.textContent = e.value ? 'MAX ' + e.value + '%' : 'BREAK';
-  j.className = e.value === 0 ? 'break' : e.value === 100 ? 'perfect' : '';
+  j.className =
+    e.value === 0
+      ? 'break'
+      : e.value === 100
+        ? 'perfect'
+        : e.value >= 80
+          ? 'strong'
+          : e.value >= 50
+            ? 'fair'
+            : e.value >= 20
+              ? 'weak'
+              : 'barely';
+  j.dataset.grade = String(e.value);
+  if (e.value > 0 && e.value < 100) {
+    const hue = 8 + e.value * 1.7;
+    j.style.color = `hsl(${hue} 95% ${58 + e.value * 0.12}%)`;
+    j.style.fontSize = `${20 + e.value * 0.13}px`;
+    j.style.textShadow =
+      e.value >= 50
+        ? `0 0 ${e.value * 0.18}px hsl(${hue} 95% 60% / .6)`
+        : 'none';
+  } else {
+    j.style.color = '';
+    j.style.fontSize = '';
+    j.style.textShadow = '';
+  }
   j.style.animation = 'none';
   void j.offsetWidth;
-  j.style.animation = 'judge-in .25s ease-out';
+  j.style.animation = settings.reducedMotion
+    ? 'none'
+    : e.value === 100
+      ? 'perfect-hit .42s ease-out'
+      : e.value === 0
+        ? 'break-hit .5s ease-out'
+        : 'judge-in .25s ease-out';
+  const impact = $('#impact');
+  impact.className = '';
+  void impact.offsetWidth;
+  impact.className =
+    e.value === 100 ? 'perfect-impact' : e.value === 0 ? 'break-impact' : '';
+  $('#highway-wrap').classList.toggle('danger', e.value === 0);
   field.flashes.set(e.lane, { at: performance.now(), ok: e.value > 0 });
   if (e.value === 100) clock.click();
 }
 let hudAt = 0;
 function loop(now: number) {
-  if (!active || !engine) return;
+  if (!active || !engine || paused) return;
   const time = clock.now();
   engine.update(time);
   for (; seenEvents < engine.events.length; seenEvents++)
@@ -280,6 +379,7 @@ function loop(now: number) {
 function finish() {
   if (!engine) return;
   active = false;
+  paused = false;
   cancelAnimationFrame(frame);
   clock.stop();
   field.pressed.clear();
@@ -290,10 +390,10 @@ function finish() {
   $('#result-rank').textContent = engine.rank;
   $('#result-badge').textContent =
     engine.sum === engine.total * 100
-      ? 'PERFECT PLAY'
+      ? t('perfectPlay')
       : engine.breaks === 0
-        ? 'MAX COMBO'
-        : 'SESSION COMPLETE';
+        ? t('maxCombo')
+        : t('session');
   $('#result-score').textContent = engine.score.toLocaleString('en-US');
   $('#result-rate').textContent = (engine.sum / engine.total).toFixed(2) + '%';
   $('#result-combo').textContent = String(engine.maxCombo);
@@ -307,16 +407,20 @@ function finish() {
     )
     .join('');
   $('#result-perf').textContent =
-    `이 세션 ${stats.averageFps.toFixed(1)} FPS 평균 · P95 ${stats.p95FrameMs.toFixed(1)} ms · ${stats.samples} frames · ${stats.renderer}`;
+    `${t('performance')} ${stats.averageFps.toFixed(1)} FPS · P95 ${stats.p95FrameMs.toFixed(1)} ms · ${stats.samples} frames · ${stats.renderer}`;
   $<HTMLDialogElement>('#results').showModal();
 }
 function exit() {
   active = false;
+  paused = false;
   cancelAnimationFrame(frame);
   clock?.stop();
   field?.pressed.clear();
+  document.body.classList.remove('playing');
   $('#game').classList.add('hidden');
   $('#lobby').classList.remove('hidden');
+  screen = 'select';
+  if (!readingRoute) history.pushState(null, '', selectionPath());
 }
 function keyTime(e: KeyboardEvent) {
   let stamp = e.timeStamp;
@@ -326,6 +430,11 @@ function keyTime(e: KeyboardEvent) {
 window.addEventListener('keydown', (e) => {
   if (binding >= 0) {
     e.preventDefault();
+    if (e.code === 'Escape') {
+      binding = -1;
+      syncSettings();
+      return;
+    }
     if (
       [
         'Escape',
@@ -339,7 +448,7 @@ window.addEventListener('keydown', (e) => {
         'AltRight',
       ].includes(e.code)
     ) {
-      toast('다른 키를 선택해주세요.');
+      toast(t('otherKey'));
       return;
     }
     if (
@@ -347,7 +456,7 @@ window.addEventListener('keydown', (e) => {
         (k, i) => k === e.code && i !== binding,
       )
     ) {
-      toast('이미 사용 중인 키예요.');
+      toast(t('duplicate'));
       return;
     }
     settings.keys[settings.lanes][binding] = e.code;
@@ -355,18 +464,107 @@ window.addEventListener('keydown', (e) => {
     syncSettings();
     return;
   }
-  if (e.code === 'Escape' && active) {
-    exit();
-    toast('플레이를 중단했어요. 다시 시작하면 점수가 초기화돼요.');
+  if (paused && $<HTMLDialogElement>('#settings').open && e.code === 'Escape') {
+    e.preventDefault();
+    $<HTMLDialogElement>('#settings').close();
     return;
   }
-  if (
-    e.code === 'Enter' &&
-    !active &&
-    !document.querySelector('dialog[open]')
-  ) {
+  if (e.code === 'Escape' && active) {
     e.preventDefault();
-    void start();
+    if (paused) {
+      if (!$<HTMLDialogElement>('#settings').open) void resumeGame();
+    } else void pauseGame();
+    return;
+  }
+  if (!active) {
+    if (screen === 'home' || screen === 'ready') {
+      if (
+        e.code === 'Enter' &&
+        !e.repeat &&
+        !(e.target as HTMLElement)?.matches('button,a')
+      ) {
+        e.preventDefault();
+        screen === 'home'
+          ? $('#home-start').click()
+          : $('#ready-start').click();
+      }
+      return;
+    }
+    const dialog = document.querySelector<HTMLDialogElement>('dialog[open]');
+    if (dialog) {
+      if (e.code === 'Escape') {
+        e.preventDefault();
+        dialog.close();
+        if (dialog.id === 'results') exit();
+        return;
+      }
+      if (
+        dialog.id === 'results' &&
+        e.code === 'Enter' &&
+        !(e.target as HTMLElement)?.matches('button,input,select,a')
+      ) {
+        e.preventDefault();
+        $('#retry').click();
+      }
+      return;
+    }
+    if (
+      (e.target as HTMLElement)?.matches('button,input,select,a') &&
+      e.code === 'Enter'
+    )
+      return;
+    if (e.code === 'ArrowDown' || e.code === 'ArrowUp') {
+      e.preventDefault();
+      selectSong(songIndex + (e.code === 'ArrowDown' ? 1 : -1));
+      return;
+    }
+    if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
+      e.preventDefault();
+      const levels: Difficulty[] = ['low', 'mid', 'high'];
+      settings.difficulty =
+        levels[
+          (levels.indexOf(settings.difficulty) +
+            (e.code === 'ArrowRight' ? 1 : 2)) %
+            3
+        ];
+      syncSettings();
+      return;
+    }
+    if (e.code === 'Digit5' || e.code === 'Digit7') {
+      settings.lanes = e.code === 'Digit5' ? 5 : 7;
+      syncSettings();
+      return;
+    }
+    if (e.code === 'F2') {
+      e.preventDefault();
+      $('#open-settings').click();
+      return;
+    }
+    if (e.code === 'F1') {
+      e.preventDefault();
+      $('#about-button').click();
+      return;
+    }
+    if (e.code === 'Enter' && !e.repeat) {
+      e.preventDefault();
+      void start();
+      return;
+    }
+    return;
+  }
+  if (paused) {
+    if (
+      e.code === 'Enter' &&
+      $<HTMLDialogElement>('#pause').open &&
+      !(e.target as HTMLElement)?.matches('button,input,select,a')
+    ) {
+      e.preventDefault();
+      void resumeGame();
+    }
+    if (e.code === 'F2' && $<HTMLDialogElement>('#pause').open) {
+      e.preventDefault();
+      $('#pause-settings').click();
+    }
     return;
   }
   if (!active || !engine || e.repeat) return;
@@ -382,33 +580,78 @@ window.addEventListener('keyup', (e) => {
   if (lane < 0) return;
   e.preventDefault();
   field.pressed.delete(lane);
-  engine.input({ lane, time: keyTime(e), down: false, sequence: sequence++ });
+  engine.input({
+    lane,
+    time: paused ? clock.now() : keyTime(e),
+    down: false,
+    sequence: sequence++,
+  });
 });
 window.addEventListener('blur', () => {
-  if (active) {
-    exit();
-    toast('포커스가 바뀌어 안전하게 중단했어요.');
+  stopPreview();
+  if (active && !paused) {
+    void pauseGame();
   }
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && active) {
-    exit();
+  if (document.hidden) stopPreview();
+  if (document.hidden && active && !paused) {
+    void pauseGame();
   }
+});
+async function pauseGame() {
+  if (!active || paused) return;
+  paused = true;
+  cancelAnimationFrame(frame);
+  await clock.pause();
+  $<HTMLDialogElement>('#pause').showModal();
+}
+async function resumeGame() {
+  $<HTMLDialogElement>('#pause').close();
+  await clock.resume();
+  paused = false;
+  frame = requestAnimationFrame(loop);
+}
+$('#resume').onclick = () => void resumeGame();
+$('#pause-settings').onclick = () => {
+  $<HTMLDialogElement>('#pause').close();
+  $<HTMLDialogElement>('#settings').showModal();
+};
+$('#pause-exit').onclick = () => {
+  $<HTMLDialogElement>('#pause').close();
+  exit();
+  void previewSong();
+};
+$('#pause').addEventListener('cancel', (e) => {
+  e.preventDefault();
+  void resumeGame();
 });
 $('#settings').addEventListener('close', () => {
   binding = -1;
   syncSettings();
+  if (paused) {
+    $('#arena').dataset.position = settings.position;
+    $('#keycaps').innerHTML = settings.keys[settings.lanes]
+      .map((k) => `<span>${keyLabel(k)}</span>`)
+      .join('');
+  }
+  if (paused) $<HTMLDialogElement>('#pause').showModal();
 });
 $('#start').onclick = () => void start();
-$('#exit').onclick = exit;
+$('#exit').onclick = () => void pauseGame();
 $('#retry').onclick = () => {
   $<HTMLDialogElement>('#results').close();
   exit();
   void start();
 };
+$('#results').addEventListener('cancel', () => {
+  exit();
+  void previewSong();
+});
 $('#back').onclick = () => {
   $<HTMLDialogElement>('#results').close();
   exit();
+  void previewSong();
 };
 $('#open-settings').onclick = () => {
   if (active) return;
@@ -416,33 +659,61 @@ $('#open-settings').onclick = () => {
   syncSettings();
 };
 $('#about-button').onclick = () => $<HTMLDialogElement>('#about').showModal();
-$('#preview').onclick = async () => {
-  if (preview) {
-    stopPreview();
-    return;
-  }
-  if (preparing) return;
-  preparing = true;
+let previewRequest = 0;
+async function previewSong() {
+  const request = ++previewRequest;
+  const song = SONGS[songIndex];
+  if (!clock) clock = new AudioClock();
   try {
-    const t = await prepare();
+    // resume is called during the selection key/click gesture, before rendering.
+    await clock.context.resume();
+    let track = cache.get(song.id);
+    if (!track) {
+      track = await renderSong(song);
+      cache.set(song.id, track);
+    }
+    if (
+      request !== previewRequest ||
+      active ||
+      preparing ||
+      SONGS[songIndex] !== song
+    )
+      return;
     preview = clock.context.createBufferSource();
-    preview.buffer = t.buffer;
+    preview.buffer = track.buffer;
     const gain = clock.context.createGain();
+    previewGain = gain;
     gain.gain.value = settings.volume * 0.5;
     preview.connect(gain);
     gain.connect(clock.context.destination);
-    preview.start(0, 8, 12);
-    const source = preview;
-    preview.onended = () => {
-      if (preview === source) {
-        preview = undefined;
-        $('#preview').textContent = '▷';
-      }
-    };
-    $('#preview').textContent = 'Ⅱ';
-  } finally {
-    preparing = false;
+    preview.loop = true;
+    preview.loopStart = 8;
+    preview.loopEnd = Math.min(24, track.buffer.duration);
+    preview.start(0, 8);
+    document.body.classList.add('previewing');
+    $('#preview-status').textContent = t('nowPlaying');
+  } catch {
+    if (request === previewRequest) toast(t('previewBlocked'));
   }
+}
+$('#language').onchange = (e) => {
+  settings.language = (e.target as HTMLSelectElement).value as Language;
+  localize();
+  songCards();
+  selectedSong();
+  syncSettings();
+  $('#preview-status').textContent = t(preview ? 'nowPlaying' : 'previewReady');
+};
+$('#reduced-motion').onchange = (e) => {
+  settings.reducedMotion = (e.target as HTMLInputElement).checked;
+  localize();
+  persist();
+  if (!readingRoute && screen === 'select')
+    history.replaceState(null, '', selectionPath());
+};
+$('#fullscreen').onclick = () => {
+  if (document.fullscreenElement) void document.exitFullscreen();
+  else void document.documentElement.requestFullscreen().catch(() => {});
 };
 document.querySelectorAll<HTMLButtonElement>('[data-diff]').forEach(
   (b) =>
@@ -472,6 +743,8 @@ for (const id of ['speed', 'volume'] as const)
   };
 $('#reset').onclick = () => {
   settings = {
+    language: settings.language,
+    reducedMotion: settings.reducedMotion,
     lanes: settings.lanes,
     difficulty: settings.difficulty,
     position: 'center',
@@ -481,16 +754,79 @@ $('#reset').onclick = () => {
   };
   syncSettings();
 };
-songCards();
-syncSettings();
+function playPath() {
+  return `/play/${SONGS[songIndex].id}/${settings.lanes}/${settings.difficulty}/`;
+}
+function selectionPath() {
+  return `/select/?song=${SONGS[songIndex].id}&lanes=${settings.lanes}&difficulty=${settings.difficulty}`;
+}
+function readRoute() {
+  readingRoute = true;
+  document
+    .querySelectorAll<HTMLDialogElement>('dialog[open]')
+    .forEach((d) => d.close());
+  if (active || paused) exit();
+  const parts = location.pathname.split('/').filter(Boolean);
+  const q = new URLSearchParams(location.search);
+  const id = parts[0] === 'play' ? parts[1] : q.get('song');
+  const idx = SONGS.findIndex((s) => s.id === id);
+  if (idx >= 0) songIndex = idx;
+  const lanes = parts[0] === 'play' ? parts[2] : q.get('lanes');
+  const difficulty = parts[0] === 'play' ? parts[3] : q.get('difficulty');
+  if (lanes === '5' || lanes === '7') settings.lanes = Number(lanes) as Lanes;
+  if (difficulty === 'low' || difficulty === 'mid' || difficulty === 'high')
+    settings.difficulty = difficulty;
+  screen =
+    parts[0] === 'play' ? 'ready' : parts[0] === 'select' ? 'select' : 'home';
+  document.body.classList.toggle('home-screen', screen === 'home');
+  document.body.classList.toggle('ready-screen', screen === 'ready');
+  $('#home-screen').classList.toggle('hidden', screen !== 'home');
+  $('#ready-screen').classList.toggle('hidden', screen !== 'ready');
+  $('#lobby').classList.toggle('hidden', screen !== 'select');
+  $('#game').classList.add('hidden');
+  $('#ready-title').textContent = SONGS[songIndex].title;
+  $('#ready-detail').textContent =
+    `${settings.lanes} KEY / ${settings.difficulty.toUpperCase()} / ENTER`;
+  localize();
+  songCards();
+  selectedSong();
+  syncSettings();
+  readingRoute = false;
+}
+$('#home-start').onclick = () => {
+  location.href = '/select/';
+};
+$('#ready-start').onclick = () => {
+  document.body.classList.remove('ready-screen');
+  void start();
+};
+document.querySelectorAll<HTMLButtonElement>('.share-link').forEach(
+  (button) =>
+    (button.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(
+          location.origin +
+            (screen === 'select' ? playPath() : location.pathname),
+        );
+        button.textContent = '✓ LINK COPIED';
+      } catch {
+        toast(location.origin + playPath());
+      }
+    }),
+);
+window.addEventListener('popstate', readRoute);
+readRoute();
+
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.1.0',
+    version: '0.2.0',
     active,
+    paused,
     sessionId,
     song: SONGS[songIndex].id,
     settings: {
+      language: settings.language,
       lanes: settings.lanes,
       difficulty: settings.difficulty,
     },

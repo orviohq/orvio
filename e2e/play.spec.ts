@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 test('settings, real keyboard input, results and replay', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/');
+  await page.goto('/select/');
   await expect(page.locator('.song-card')).toHaveCount(3);
   await page.click('[data-lanes="7"]');
   await page.click('#open-settings');
@@ -37,7 +37,9 @@ test('settings, real keyboard input, results and replay', async ({ page }) => {
   await expect(page.locator('#results')).toBeVisible({ timeout: 8000 });
   expect(await page.locator('#result-score').innerText()).not.toBe('0');
   expect(errors).toEqual([]);
-  await page.click('#back');
+  await page.screenshot({ path: 'test-results/results.png' });
+  await expect(page.locator('#back')).toBeFocused();
+  await page.keyboard.press('Enter');
   await expect(page.locator('#lobby')).toBeVisible();
 });
 test('mobile layout is browse-only, no overflow', async ({ browser }) => {
@@ -47,7 +49,7 @@ test('mobile layout is browse-only, no overflow', async ({ browser }) => {
     hasTouch: true,
   });
   const page = await context.newPage();
-  await page.goto('/');
+  await page.goto('/select/');
   await expect(page.locator('.mobile-note')).toBeVisible();
   expect(
     await page.evaluate(

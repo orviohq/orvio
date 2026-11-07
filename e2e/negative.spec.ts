@@ -8,7 +8,7 @@ async function at(page: any, t: number) {
 test('wrong key, misses, late hit, bad hold, duplicate binding, positions and reset', async ({
   page,
 }) => {
-  await page.goto('/');
+  await page.goto('/select/');
   await page.click('#open-settings');
   await page.click('[data-bind="0"]');
   await page.keyboard.press('f');
@@ -23,6 +23,7 @@ test('wrong key, misses, late hit, bad hold, duplicate binding, positions and re
     await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
     await expect(page.locator('#arena')).toHaveAttribute('data-position', pos);
     await page.keyboard.press('Escape');
+    await page.click('#pause-exit');
     expect((await diag(page)).active).toBeFalsy();
     await page.click('#open-settings');
   }
@@ -58,15 +59,19 @@ test('wrong key, misses, late hit, bad hold, duplicate binding, positions and re
     d.events.some((e: any) => e.noteId === hold.id && e.tail && e.value === 0),
   ).toBeTruthy();
   await page.keyboard.press('Escape');
-  await page.click('#preview');
-  await page.click('#preview');
+  await page.click('#pause-exit');
+  await page.click('[data-song="1"]');
+  await page.waitForFunction(
+    () => (window as any).orvioDiagnostics.previewActive,
+  );
   await page.click('#start');
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
   expect((await diag(page)).score).toBe(0);
   expect((await diag(page)).resolved).toBe(0);
   await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  expect((await diag(page)).paused).toBeTruthy();
+  await page.click('#pause-exit');
   expect((await diag(page)).active).toBeFalsy();
-  expect((await diag(page)).audioActive).toBeFalsy();
   expect((await diag(page)).previewActive).toBeFalsy();
   await expect(page.locator('#lobby')).toBeVisible();
 });

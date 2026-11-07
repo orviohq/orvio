@@ -161,6 +161,7 @@ export class AudioClock {
   private anchor = 0;
   private started = false;
   private volume: GainNode;
+  private frozenTime: number | undefined;
   constructor() {
     this.volume = this.context.createGain();
     this.volume.gain.value = 0.7;
@@ -177,6 +178,7 @@ export class AudioClock {
     this.started = true;
   }
   now(performanceTime = performance.now()): number {
+    if (this.frozenTime !== undefined) return this.frozenTime;
     return outputTime(
       performanceTime,
       performance.now(),
@@ -188,6 +190,14 @@ export class AudioClock {
     );
   }
 
+  async pause() {
+    this.frozenTime = this.now();
+    await this.context.suspend();
+  }
+  async resume() {
+    await this.context.resume();
+    this.frozenTime = undefined;
+  }
   get active() {
     return this.started;
   }
@@ -198,6 +208,7 @@ export class AudioClock {
       /* Already ended. */
     }
     this.source = undefined;
+    this.frozenTime = undefined;
     this.started = false;
   }
   setVolume(v: number) {

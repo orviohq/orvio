@@ -10,10 +10,10 @@
     />
     <link rel="icon" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <title>orvio · find your flow</title>
+    <title>{Astro.props.title || "orvio · find your flow"}</title>
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <script src="../main.ts"></script>
   </body>
 </html>

@@ -4,11 +4,13 @@
 
 A local-first, open-source keyboard rhythm game. Three original synth tracks, eighteen charts, five or seven lanes. No sign-in, analytics, paid APIs, or remote runtime dependencies.
 
-**Prototype:** https://orvio-4n8.pages.dev/
+**Prototype:** https://orvio-play.pages.dev/
 
 ## Play
 
-Choose a track, difficulty (하 / 중 / 상) and 5 KEY or 7 KEY. Press Enter or Play. Hold long notes until the tail reaches the line, then release. Escape aborts without saving a score. Losing focus aborts rather than scoring hidden-tab input.
+Arrow keys choose a track and difficulty, 5/7 choose lane count, Enter starts, F2 opens settings. Tab/Shift+Tab and Enter operate every menu. Escape pauses during play; resume, settings and track selection are available without a mouse. Track selection starts an audio preview after the selection gesture. English, Korean, Chinese, Japanese and Spanish are saved locally.
+
+Choose a track, difficulty (하 / 중 / 상) and 5 KEY or 7 KEY. Press Enter or Play. Hold long notes until the tail reaches the line, then release. Escape and loss of focus pause the audio and play loop.
 
 - 5 keys: D F Space J K
 - 7 keys: S D F Space J K L
@@ -39,7 +41,7 @@ The judgment labels follow the RESPECT family: MAX 100%, 90%, 80%, 70%, 60%, 50%
 
 ## Architecture
 
-- TypeScript + Vite. PixiJS WebGL uses preallocated sprites; no scene reconstruction during frames.
+- TypeScript + Astro static pages (Vite build pipeline). PixiJS WebGL uses preallocated sprites; no scene reconstruction during frames.
 - OfflineAudioContext renders complete stereo tracks before play. Beat times and chart times share exact BPM arithmetic. AudioBufferSourceNode schedules the song independently of rendering.
 - Input timestamps use `getOutputTimestamp()` to map the browser event clock to the audible output clock; supported-browser fallback subtracts both reported graph and output latency and maps the original event timestamp. No manual input calibration is used. Physical device/display latency can remain.
 - Pure deterministic engine consumes sequenced lane/time/down input events. Rendering cannot award points. This separates future replay/network transport from local judgment.
@@ -50,3 +52,12 @@ The judgment labels follow the RESPECT family: MAX 100%, 90%, 80%, 70%, 60%, 50%
 Tests, formatting, strict type checking and production build run in CI. Hourly production browser checks and an independent failure/missing-run watch cover the deployed site. See the [operations and recovery runbook](docs/operations.md). Versioned releases use SemVer and `CHANGELOG.md`. See [contributing](CONTRIBUTING.md), [security](SECURITY.md), [performance](docs/performance.md), and [asset provenance](docs/assets.md).
 
 Code and original procedural music are MIT licensed. Outfit and the subset of Noto Sans KR retain their respective SIL OFL notices in `public/`. The logo is original project artwork, with no trademark-clearance claim. No DJMAX music, graphics, charts or code are included.
+
+## Routes and sharing
+
+- `/`: single start-button home.
+- `/select/`: track selection. Optional `song`, `lanes` and `difficulty` query parameters preserve the selection.
+- `/play/{song}/{5|7}/{low|mid|high}/`: directly shareable play-ready page. All 18 built-in chart routes are generated at build time. Enter or the start button begins playback; opening a link never starts the score clock.
+- Copy Link on selection copies the currently selected chart. The address bar also shares the selection page. Back/forward returns to a safe ready/selection screen, never a running game.
+
+Astro generates static HTML. The existing TypeScript/PixiJS/Web Audio client runs the game. No server adapter or account is required.
