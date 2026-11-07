@@ -1,6 +1,8 @@
 # Game options
 
-F3 opens game options before play, from selection or a direct-chart ready screen. F2 holds system settings. Options are stored locally and in address-bar URLs. They apply at the next start, never halfway through a hold.
+F3 opens game options from selection, a direct-chart ready screen, or gameplay. The gameplay panel displays the applied values and also opens options. F2 holds system settings. Options are stored locally and in address-bar URLs.
+
+Opening options during play pauses audio and the score clock. Speed and visibility apply to the current chart on close without replacing note states, held notes or score. Shuffle changes require explicit confirmation to restart from the beginning. Cancel keeps the previous shuffle, seed, chart and score while retaining speed and visibility changes. The gameplay readout keeps showing the applied shuffle while a new choice is pending.
 
 ## Reference and limits
 
