@@ -10,7 +10,10 @@ export async function saveSharedReplay(fragment: string, token?: string) {
   const response = await fetch(SHARE_API + '/v1/replays', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fragment, ...(token ? { token } : {}) }),
+    body: JSON.stringify({
+      fragment,
+      ...(token ? { turnstileToken: token } : {}),
+    }),
     signal: AbortSignal.timeout(12000),
   });
   if (!response.ok) throw new ShareError(response.status);

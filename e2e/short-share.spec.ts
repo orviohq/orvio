@@ -30,6 +30,7 @@ test('quota never overwrites clipboard with long link, expired/malformed short r
   context,
 }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await mockShare(context);
   await context.route('https://orvio-share.pn-26f.workers.dev/**', (r) =>
     r.fulfill({
       status: r.request().method() === 'POST' ? 429 : 404,
@@ -56,4 +57,29 @@ test('quota never overwrites clipboard with long link, expired/malformed short r
   );
   await page.goto('/result/?s=bad000000000000000000000');
   await expect(page.locator('.share-error')).toContainText('손상');
+});
+
+test('Escape cancels real share verification before any payload upload', async ({
+  page,
+  context,
+}) => {
+  const requests: string[] = [];
+  await context.route('https://challenges.cloudflare.com/turnstile/**', (r) =>
+    r.fulfill({
+      contentType: 'application/javascript',
+      body: "window.turnstile={render:()=> 'pending',remove:()=>{}}",
+    }),
+  );
+  await context.route('https://orvio-share.pn-26f.workers.dev/**', (r) => {
+    requests.push(r.request().url());
+    return r.fulfill({ status: 503, json: { error: 'closed' } });
+  });
+  await page.goto('/result/#' + fragment);
+  await page.click('#share-result');
+  await expect(page.locator('.share-verification')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.share-verification')).toHaveCount(0);
+  await expect(page.locator('#share-result')).toBeEnabled();
+  expect(requests).toEqual([]);
+  await expect(page.locator('#share-status')).toContainText('공유하지 못');
 });

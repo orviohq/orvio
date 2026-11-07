@@ -1,3 +1,5 @@
+import { FULLSCREEN_WARNING } from './fullscreen-labels';
+import { verifyShare } from './share-verification';
 import { saveSharedReplay, loadSharedReplay, ShareError } from './share-api';
 import { shareLabels } from './share-labels';
 import { ScoreDisplay } from './score-display';
@@ -204,10 +206,21 @@ app.innerHTML = `
 
 <dialog id="about"><form method="dialog"><div class="dialog-title"><h2>${label('aboutTitle')}</h2><button class="close" aria-label="Close">×</button></div></form><p>${label('aboutBody')}</p><a href="https://github.com/orviohq/orvio" target="_blank" rel="noreferrer">${label('code')} ↗</a></dialog><div id="toast" role="status"></div>`;
 guardFullscreenEscape();
+document.addEventListener('orvio:fullscreen-capture', () => {
+  if (fullscreenEscapeStatus() !== 'locked')
+    toast(FULLSCREEN_WARNING[settings.language]);
+});
 const scoreDisplay = new ScoreDisplay($('#score'));
 function localize() {
   queueMicrotask(() => document.dispatchEvent(new Event('orvio:select-sync')));
   document.documentElement.lang = settings.language;
+  const shareStatus = document.querySelector<HTMLElement>('#share-status');
+  if (shareStatus) {
+    const message = shareStatus.dataset.message as
+      keyof ReturnType<typeof shareLabels> | undefined;
+    if (message)
+      shareStatus.textContent = shareLabels(settings.language)[message];
+  }
   document.body.classList.toggle('reduced-motion', settings.reducedMotion);
   document
     .querySelectorAll<HTMLElement>('[data-i18n]')
@@ -785,6 +798,8 @@ function resultLink(result: SharedResult) {
   return new URL('/result/#' + p, location.origin).href;
 }
 function showResult(result: SharedResult) {
+  screen = 'select';
+  $('#share-status').dataset.message = 'expiry';
   $('#share-status').textContent = shareLabels(settings.language).expiry;
   lastResult = result;
   const sharedURL = resultLink(result);
@@ -1223,6 +1238,7 @@ $('#share-result').onclick = async () => {
   button.disabled = true;
   const labels = shareLabels(settings.language),
     status = $('#share-status');
+  status.dataset.message = 'busy';
   status.textContent = labels.busy;
   try {
     await replayEncoding;
@@ -1231,19 +1247,24 @@ $('#share-result').onclick = async () => {
     const fragment = new URL(resultLink(lastResult)).hash.slice(1);
     let shared = shortCache.get(fragment);
     if (!shared || Date.parse(shared.expiresAt) <= Date.now())
-      shared = await saveSharedReplay(fragment);
+      shared = await saveSharedReplay(
+        fragment,
+        await verifyShare(labels.busy, t('close')),
+      );
     shortCache.set(fragment, shared);
     const url = new URL('/result/', location.origin);
     url.searchParams.set('s', shared.id);
     await navigator.clipboard.writeText(url.href);
+    status.dataset.message = 'expiry';
     status.textContent = labels.expiry;
     toast(t('resultCopied'));
   } catch (error) {
     toast(t('shareFailed'));
-    status.textContent =
-      error instanceof ShareError && error.status === 429
-        ? labels.quota
-        : labels.failed;
+    status.dataset.message =
+      error instanceof ShareError && error.status === 429 ? 'quota' : 'failed';
+    status.textContent = shareLabels(settings.language)[
+      status.dataset.message as 'quota' | 'failed'
+    ];
   } finally {
     shareBusy = false;
     button.disabled = false;

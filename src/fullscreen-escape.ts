@@ -26,6 +26,7 @@ export async function requestGameFullscreen() {
   } catch {
     escapeCapture = 'denied';
   }
+  document.dispatchEvent(new Event('orvio:fullscreen-capture'));
 }
 export function guardFullscreenEscape() {
   let held = false;

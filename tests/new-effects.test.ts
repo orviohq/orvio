@@ -2,7 +2,7 @@ import { test, expect } from 'vitest';
 import { blinkAlpha, fadeAlpha, FADERS } from '../src/game-options';
 import { readResult, resultParams } from '../src/share';
 import { validateReplay } from '../src/replay';
-test('beat-locked blink and blind are display only, all nine options survive result/replay validation', () => {
+test('beat-locked blink and blind are display only, all eleven options survive result/replay validation', () => {
   expect(blinkAlpha(0, 120)).toBe(1);
   expect(blinkAlpha(0.3, 120)).toBe(0);
   expect(blinkAlpha(0.5, 120)).toBe(1);

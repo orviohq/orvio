@@ -63,6 +63,7 @@ test('denied keyboard capture does not block starting or misreport a lock', asyn
       page.evaluate(() => (window as any).orvioDiagnostics.fullscreenEscape),
     )
     .toBe('denied');
+  await expect(page.locator('#toast')).toContainText('ESC 전체화면');
   await page.click('#start');
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
   expect(

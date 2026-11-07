@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { shareLabels } from '../src/share-labels';
 import { LANGUAGES, translations, type Language } from '../src/i18n';
 const languages = Object.keys(LANGUAGES) as Language[];
 async function language(page: any, l: Language) {
@@ -85,6 +86,9 @@ test('all thirteen playing, pause, shuffle restart and actual result layouts', a
     await page.setViewportSize({ width, height: 900 });
     for (const l of languages) {
       await language(page, l);
+      await expect(page.locator('#share-status')).toHaveText(
+        shareLabels(l).expiry,
+      );
       await expect(page.locator('#share-result')).toHaveAccessibleName(
         translations[l].shareResult,
       );

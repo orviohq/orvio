@@ -53,6 +53,13 @@ test('real renderer blink, gear blink, fog, blind and pixel retain original char
         );
         await page.keyboard.press(keys[x.lane]);
       }
+      await expect.poll(async () => (await fx()).pixelStep).toBeGreaterThan(1);
+      await page.screenshot({
+        path: 'test-results/pixel-active-' + fader + '.png',
+      });
+      await expect
+        .poll(async () => (await fx()).pixelStep, { timeout: 5000 })
+        .toBe(1);
     }
     expect(
       await page.evaluate(() =>
