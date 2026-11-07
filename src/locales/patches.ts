@@ -44,6 +44,9 @@ export const EXTRA_PATCH_LABELS = {
 export type ExtraLanguage = keyof typeof EXTRA_PATCH_LABELS;
 export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
   fr: {
+    '0.2.14': [
+      'Le terrain de jeu est préparé pendant le chargement du morceau pour réduire la pause de la première image au début du jeu et des replays. La synchronisation de la musique et des touches, les partitions, les jugements et les scores restent inchangés.',
+    ],
     '0.2.13': [
       'Partager copie un lien court sans fenêtre de vérification ni message d’attente. Le lien ouvre directement le résultat avec son propre aperçu.',
       'Suppression de la traînée translucide des notes rapides, sans changer vitesse, partitions ni jugements. Notes de version plus lisibles, texte sélectionnable et copiable, polices locales complétées.',
@@ -111,6 +114,9 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   de: {
+    '0.2.14': [
+      'Das Spielfeld wird während des Ladens vorbereitet, um den Ruckler im ersten Bild beim Spielstart und bei Replays zu verringern. Musik- und Eingabetiming, Notenfolgen, Wertungen und Punkte bleiben unverändert.',
+    ],
     '0.2.13': [
       'Teilen kopiert einen kurzen Ergebnislink ohne Prüfungsfenster oder Wartetext. Links öffnen direkt das Ergebnis mit einer eigenen Vorschaukarte.',
       'Die durchscheinende Spur schneller Noten wurde entfernt. Geschwindigkeit, Charts und Wertungen bleiben gleich. Klarere Versionshinweise mit auswählbarem und kopierbarem Text sowie ergänzten lokalen Schriftzeichen.',
@@ -178,6 +184,9 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   pt: {
+    '0.2.14': [
+      'O campo de jogo é preparado durante o carregamento da música para reduzir a pausa do primeiro quadro no início do jogo e das repetições. Os tempos da música e das teclas, os mapas, os julgamentos e a pontuação não mudam.',
+    ],
     '0.2.13': [
       'Partilhar copia um link curto sem janela de verificação nem mensagem de espera. Os links abrem diretamente o resultado com uma prévia própria.',
       'Removido o rasto translúcido das notas rápidas, sem alterar velocidade, mapas ou avaliações. Notas da versão mais claras, com seleção e cópia de texto e fontes locais atualizadas.',
@@ -245,6 +254,9 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   it: {
+    '0.2.14': [
+      "Il campo di gioco viene preparato durante il caricamento del brano per ridurre la pausa del primo fotogramma all'inizio del gioco e dei replay. Tempi della musica e dei tasti, mappe, giudizi e punteggi restano invariati.",
+    ],
     '0.2.13': [
       'Condividi copia un link breve senza finestra di verifica o messaggio di attesa. I link aprono direttamente il risultato con una propria anteprima.',
       'Rimossa la scia traslucida delle note veloci, senza modificare velocità, tracciati o giudizi. Note di versione più chiare, testo selezionabile e copiabile e caratteri locali aggiornati.',
@@ -312,6 +324,9 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   ru: {
+    '0.2.14': [
+      'Игровое поле подготавливается во время загрузки песни, чтобы уменьшить задержку первого кадра при начале игры и повтора. Синхронизация музыки и нажатий, карты, оценки и очки не изменены.',
+    ],
     '0.2.13': [
       'Поделиться копирует короткую ссылку без окна проверки и сообщения об ожидании. Ссылка сразу открывает результат с отдельной карточкой предпросмотра.',
       'Убран полупрозрачный след быстрых нот. Скорость, карты и оценки не изменены. Текст истории версий стал понятнее; его можно выделять и копировать. Дополнены локальные шрифты.',
@@ -379,6 +394,9 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   id: {
+    '0.2.14': [
+      'Arena disiapkan saat lagu dimuat untuk mengurangi jeda bingkai pertama ketika permainan dan replay dimulai. Waktu musik dan input, peta nada, penilaian, serta skor tidak berubah.',
+    ],
     '0.2.13': [
       'Bagikan menyalin tautan hasil pendek tanpa jendela verifikasi atau pesan tunggu. Tautan langsung membuka hasil dengan kartu pratinjau khusus.',
       'Jejak transparan di belakang not cepat dihapus. Kecepatan, peta not, dan penilaian tidak berubah. Catatan versi lebih jelas, teks dapat dipilih dan disalin, serta karakter font lokal dilengkapi.',
@@ -446,6 +464,9 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   tr: {
+    '0.2.14': [
+      'Oyun ve tekrarların başlangıcındaki ilk kare takılmasını azaltmak için oyun alanı şarkı yüklenirken hazırlanır. Müzik ve tuş zamanlaması, nota düzeni, değerlendirmeler ve puanlar değişmez.',
+    ],
     '0.2.13': [
       'Paylaş, doğrulama penceresi veya bekleme mesajı olmadan kısa sonuç bağlantısını kopyalar. Bağlantı doğrudan sonucu açar ve özel önizleme kartı gösterir.',
       'Hızlı notaların arkasındaki yarı saydam iz kaldırıldı. Hız, nota haritaları ve değerlendirme değişmedi. Sürüm notları daha anlaşılır; metin seçilip kopyalanabilir ve yerel yazı tipleri tamamlandı.',
@@ -513,6 +534,9 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   vi: {
+    '0.2.14': [
+      'Chuẩn bị sân chơi trong màn hình tải bài hát để giảm khựng ở khung hình đầu khi bắt đầu chơi và xem lại. Thời điểm nhạc và phím bấm, bản nốt, đánh giá và điểm số không đổi.',
+    ],
     '0.2.13': [
       'Chia sẻ sao chép liên kết kết quả ngắn mà không hiện cửa sổ xác minh hay thông báo chờ. Liên kết mở thẳng kết quả và có thẻ xem trước riêng.',
       'Bỏ vệt mờ sau các nốt nhanh. Tốc độ, bản nốt và đánh giá không đổi. Ghi chú phiên bản dễ đọc hơn, có thể chọn và sao chép văn bản, đồng thời bổ sung ký tự phông chữ cục bộ.',

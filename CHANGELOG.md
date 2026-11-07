@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.2.14] - 2026-11-07
+
+- Prepare the playfield under the existing song-loading screen before audio begins, reducing first-frame hesitation in play and replays. Music/input timing, charts, judgments and scoring are unchanged.
+
 ## [0.2.13] - 2026-11-07
 
 - One-click short-link copying without an app verification window or waiting message.

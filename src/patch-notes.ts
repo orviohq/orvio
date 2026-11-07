@@ -40,6 +40,27 @@ const BASE_PATCHES: {
   notes: Record<Exclude<Language, ExtraLanguage>, string[]>;
 }[] = [
   {
+    version: '0.2.14',
+    date: '2026-11-07',
+    notes: {
+      en: [
+        'Prepare the playfield during the song loading screen to reduce the first-frame pause at the start of play and replays. Music and input timing, charts, judgments and scores are unchanged.',
+      ],
+      ko: [
+        '곡 로딩 화면에서 플레이 화면을 미리 준비해 플레이와 리플레이 시작 직후의 첫 프레임 멈칫을 줄였습니다. 음악·입력 타이밍, 채보, 판정과 점수는 그대로입니다.',
+      ],
+      zh: [
+        '在歌曲加载画面中预先准备游戏画面，减少游玩和回放开始时首帧的停顿。音乐与输入时序、谱面、判定和分数保持不变。',
+      ],
+      ja: [
+        '曲の読み込み中にプレイ画面を準備し、プレイとリプレイ開始直後の最初のフレームの引っかかりを軽減しました。音楽と入力のタイミング、譜面、判定、スコアは変わりません。',
+      ],
+      es: [
+        'El campo de juego se prepara durante la carga de la canción para reducir la pausa del primer fotograma al jugar o ver una repetición. No cambian la sincronización de música y entradas, los mapas, los juicios ni la puntuación.',
+      ],
+    },
+  },
+  {
     version: '0.2.13',
     date: '2026-11-07',
     notes: {
