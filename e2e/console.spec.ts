@@ -123,9 +123,32 @@ test('pause settings resume and page-timed graded key hits remain distinct', asy
     const n = notes.filter((n: any) => !n.end)[index + 2];
     await atKey(page, n.time + delay, keys[n.lane], true);
     await atKey(page, n.time + delay + 0.002, keys[n.lane], false);
-    const color = await page
-      .locator('#judge')
-      .evaluate((e) => getComputedStyle(e).color);
+    // Engine input is synchronous; the visible HUD is updated by the next RAF.
+    // Read only once the HUD displays this note's actual event, not the previous
+    // label's color. Preserve the three-distinct-colors requirement below.
+    const color = await page.evaluate(
+      (noteId) =>
+        new Promise<string>((resolve, reject) => {
+          const deadline = performance.now() + 3000;
+          function sample() {
+            const event = (window as any).orvioDiagnostics.events.find(
+              (e: any) => e.noteId === noteId && !e.tail,
+            );
+            const hud = document.querySelector<HTMLElement>('#judge')!;
+            if (event && hud.dataset.grade === String(event.value)) {
+              resolve(getComputedStyle(hud).color);
+              return;
+            }
+            if (performance.now() > deadline) {
+              reject(new Error('HUD did not display the target note judgment'));
+              return;
+            }
+            requestAnimationFrame(sample);
+          }
+          sample();
+        }),
+      n.id,
+    );
     colors.add(color);
     await page.screenshot({ path: `test-results/grade-${index}.png` });
   }
