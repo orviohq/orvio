@@ -1,4 +1,5 @@
 import { mockShare } from './share-mock';
+import { shareLabels } from '../src/share-labels';
 import { test, expect } from '@playwright/test';
 import { LANGUAGES, translations, type Language } from '../src/i18n';
 const data =
@@ -44,7 +45,7 @@ test('local fragments never reach requests; copy succeeds or visibly fails in th
     };
   });
   await page.click('#share-result');
-  await expect(page.locator('#toast')).toHaveText(translations.vi.shareFailed);
+  await expect(page.locator('#toast')).toHaveText(shareLabels('vi').failed);
   await expect(page.locator('#toast')).toBeVisible();
   await page.screenshot({ path: 'test-results/copy-failure.png' });
   await page.goto('/result/?' + data);
