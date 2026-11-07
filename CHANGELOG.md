@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.2.18] - 2026-11-08
+
+### Fixed
+
+- Keep key highlights on their physical lanes after a second or later play, including custom punctuation bindings and switching between 5-key and 7-key modes.
+- Each play or replay owns a fresh playfield renderer. Old canvas, WebGL context and generated textures are released; loading-screen warmup is retained.
+
+### Scope
+
+- Input mappings, audio timing, charts, judgments, scoring, settings, local replays and the previous countdown fix are unchanged. Difficulty ratings, chart generation and FEVER remain separate work.
+
 ## [0.2.17] - 2026-11-08
 
 ### Fixed

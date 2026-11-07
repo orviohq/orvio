@@ -44,7 +44,10 @@ export class Playfield {
     this.disposed = true;
     this.resizeObserver?.disconnect();
     if (this.initialized) {
+      const ownedTextures = [this.burstTexture, this.fog?.texture];
       this.app.destroy(true, { children: true });
+      // Release our generated textures, never the shared Texture.WHITE.
+      ownedTextures.forEach((texture) => texture?.destroy(true));
       this.initialized = false;
     }
   }
