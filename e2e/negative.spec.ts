@@ -72,6 +72,9 @@ test('wrong key, misses, late hit, bad hold, duplicate binding, positions and re
   expect((await diag(page)).paused).toBeTruthy();
   await page.click('#pause-exit');
   expect((await diag(page)).active).toBeFalsy();
-  expect((await diag(page)).previewActive).toBeFalsy();
+  // Returning to selection intentionally resumes the selected-track preview.
+  await page.waitForFunction(
+    () => (window as any).orvioDiagnostics.previewActive,
+  );
   await expect(page.locator('#lobby')).toBeVisible();
 });
