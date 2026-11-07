@@ -1,3 +1,4 @@
+import { atKey } from './input';
 import { test, expect } from '@playwright/test';
 test('keyboard-only track, difficulty, lanes, settings, locales, start and exit', async ({
   page,
@@ -61,7 +62,7 @@ test('five languages render with local fonts and no page overflow', async ({
   await page.keyboard.press('Escape');
   await page.screenshot({ path: 'test-results/console-es.png' });
 });
-test('real note input gives MAX and BREAK feedback with lane effects', async ({
+test('page-timed DOM key input gives MAX and BREAK feedback with lane effects', async ({
   page,
 }) => {
   await page.goto('/select/');
@@ -72,12 +73,7 @@ test('real note input gives MAX and BREAK feedback with lane effects', async ({
   );
   const n = notes[0];
   const keys = ['d', 'f', 'Space', 'j', 'k'];
-  await page.waitForFunction(
-    (t) => (window as any).orvioDiagnostics.clock >= t,
-    n.time,
-    { polling: 'raf' },
-  );
-  await page.keyboard.down(keys[n.lane]);
+  await atKey(page, n.time, keys[n.lane], true);
   await expect(page.locator('#judge')).toHaveClass('perfect');
   await page.screenshot({ path: 'test-results/perfect-hit.png' });
   await page.keyboard.up(keys[n.lane]);
@@ -89,7 +85,7 @@ test('real note input gives MAX and BREAK feedback with lane effects', async ({
   await page.keyboard.press('Escape');
 });
 
-test('pause settings resume and graded hits remain distinct with real keys', async ({
+test('pause settings resume and page-timed graded key hits remain distinct', async ({
   page,
 }) => {
   await page.goto('/select/');
@@ -117,14 +113,10 @@ test('pause settings resume and graded hits remain distinct with real keys', asy
   );
   const keys = ['d', 'f', 'Space', 'j', 'k'];
   const colors = new Set<string>();
-  for (const [index, delay] of [0.055, 0.095, 0.112, 0.137].entries()) {
+  for (const [index, delay] of [0, 0.055, 0.085, 0.12].entries()) {
     const n = notes.filter((n: any) => !n.end)[index + 2];
-    await page.waitForFunction(
-      (t) => (window as any).orvioDiagnostics.clock >= t,
-      n.time + delay,
-      { polling: 'raf' },
-    );
-    await page.keyboard.press(keys[n.lane]);
+    await atKey(page, n.time + delay, keys[n.lane], true);
+    await atKey(page, n.time + delay + 0.002, keys[n.lane], false);
     const color = await page
       .locator('#judge')
       .evaluate((e) => getComputedStyle(e).color);

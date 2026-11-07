@@ -1,3 +1,4 @@
+import { atKey } from './input';
 import { test, expect } from '@playwright/test';
 test('legacy calibration removed and held body stays visible past head culling', async ({
   page,
@@ -23,12 +24,7 @@ test('legacy calibration removed and held body stays visible past head culling',
       (window as any).orvioDiagnostics.notes.find((s: any) => s.note.end).note,
   );
   const keys = ['d', 'f', 'Space', 'j', 'k'];
-  await page.waitForFunction(
-    (t) => (window as any).orvioDiagnostics.clock >= t,
-    n.time,
-    { polling: 'raf' },
-  );
-  await page.keyboard.down(keys[n.lane]);
+  await atKey(page, n.time, keys[n.lane], true);
   await page.waitForFunction(
     (t) => (window as any).orvioDiagnostics.clock >= t,
     n.time + 0.5,
@@ -52,12 +48,7 @@ test('legacy calibration removed and held body stays visible past head culling',
   ).toBeLessThan(45);
   // Do not take a screenshot between head and tail: capture latency can exceed
   // the remaining hold on a loaded runner and delay the real key-up event.
-  await page.waitForFunction(
-    (t) => (window as any).orvioDiagnostics.clock >= t,
-    n.end,
-    { polling: 'raf' },
-  );
-  await page.keyboard.up(keys[n.lane]);
+  await atKey(page, n.end, keys[n.lane], false);
   const tail = await page.evaluate(
     (id) =>
       (window as any).orvioDiagnostics.events.find(
