@@ -8,12 +8,18 @@ export function noteLayout(
 ) {
   const y = target - (s.note.time - time) * px;
   const endY = target - ((s.note.end ?? s.note.time) - time) * px;
-  const headY = s.held ? target : y;
+  const failed = !!s.note.end && (s.head === 0 || s.tail === 0);
+  // Failed holds keep a muted remaining body until the tail passes the line.
+  // This is visual lifetime only; resolved score/input state stays unchanged.
+  const remainingFailed = failed && time < s.note.end!;
+  const headY = s.held || remainingFailed ? target : y;
   // A held note's original head can be below the viewport. Its remaining body
   // still spans the tail to the judgment line and must not be culled with it.
-  const visible = !s.done && headY > -30 && endY < height + 30;
+  const visible =
+    (!s.done || remainingFailed) && headY > -30 && endY < height + 30;
   return {
     visible,
+    failed,
     headY,
     endY,
     showHead: visible && (s.head === undefined || s.held),

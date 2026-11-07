@@ -2023,3 +2023,20 @@ dialog input[type='checkbox'] {
 .art-core {
   background: var(--accent);
 }
+
+#highway canvas {
+  margin-inline: auto;
+}
+#highway-wrap .perfect-impact {
+  display: none;
+}
+@keyframes perfect-hit {
+  from {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

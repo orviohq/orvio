@@ -16,7 +16,10 @@ export class Playfield {
   private hitBeams: Sprite[] = [];
   private hitSparks: Sprite[][] = [];
   private noteSprites: NoteVisual[] = [];
+  private noteColor = 0x29d8ff;
   private lastLanes = 0;
+  private host!: HTMLElement;
+  private burstTexture!: Texture;
   reducedMotion = false;
   width = 440;
   height = 620;
@@ -26,16 +29,39 @@ export class Playfield {
   pressed = new Set<number>();
   flashes = new Map<number, { at: number; ok: boolean }>();
   async init(host: HTMLElement) {
+    this.host = host;
     await this.app.init({
-      resizeTo: host,
+      width: host.clientWidth,
+      height: host.clientHeight,
       backgroundAlpha: 0,
       antialias: false,
       preference: 'webgl',
       autoStart: false,
-      resolution: 0.75,
+      resolution: 1,
       autoDensity: true,
       powerPreference: 'high-performance',
     });
+    // Original raster burst, generated locally once. No copied game texture.
+    const c = document.createElement('canvas');
+    c.width = 128;
+    c.height = 128;
+    const ctx = c.getContext('2d')!;
+    for (let i = 0; i < 48; i++) {
+      const angle = i * 2.3999632297;
+      const radius = 8 + (i % 9) * 4;
+      const x = 64 + Math.cos(angle) * radius,
+        y = 86 - Math.abs(Math.sin(angle)) * radius * 1.8;
+      ctx.fillStyle =
+        i % 3 === 0 ? '#fff7d8' : i % 3 === 1 ? '#b4f7ff' : '#32cbef';
+      ctx.globalAlpha = 0.3 + (i % 7) / 10;
+      ctx.fillRect(x, y, 1 + (i % 3), 3 + (i % 8));
+    }
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = '#eaffff';
+    ctx.fillRect(20, 88, 88, 3);
+    ctx.globalAlpha = 0.35;
+    ctx.fillRect(32, 84, 64, 10);
+    this.burstTexture = Texture.from(c);
     host.appendChild(this.app.canvas);
     this.app.stage.addChild(this.grid, this.notes, this.hit);
   }
@@ -45,6 +71,7 @@ export class Playfield {
     return s;
   }
   setup(engine: Engine, lanes: number, color: number) {
+    this.noteColor = color;
     this.notes.removeChildren().forEach((c) => c.destroy());
     this.keys.forEach((s) => s.destroy());
     this.flashesSprites.forEach((s) => s.destroy());
@@ -78,7 +105,7 @@ export class Playfield {
       const f = this.rect(0xe5faff);
       this.app.stage.addChild(f);
       this.flashesSprites.push(f);
-      const beam = this.rect(0xbdefff);
+      const beam = new Sprite(this.burstTexture);
       this.app.stage.addChild(beam);
       this.hitBeams.push(beam);
       const sparks = Array.from({ length: 6 }, () => {
@@ -124,6 +151,18 @@ export class Playfield {
     now: number,
   ) {
     const begin = performance.now();
+    // Whole physical pixels per lane. Never clip the final lane at a fractional
+    // canvas/backing-store boundary, including after a window resize.
+    const targetWidth = Math.max(
+      lanes,
+      Math.floor(this.host.clientWidth / lanes) * lanes,
+    );
+    const targetHeight = Math.max(1, this.host.clientHeight);
+    if (
+      this.app.screen.width !== targetWidth ||
+      this.app.screen.height !== targetHeight
+    )
+      this.app.renderer.resize(targetWidth, targetHeight);
     if (
       this.app.screen.width !== this.width ||
       this.app.screen.height !== this.height ||
@@ -155,19 +194,19 @@ export class Playfield {
         f.alpha = (1 - age / 200) * 0.7;
         f.tint = flash!.ok ? 0xe5faff : 0xff334d;
       }
-      const life = Math.min(1, age / 260);
-      const hit = !!flash?.ok && age < 260 && !this.reducedMotion;
+      const life = Math.min(1, age / 170);
+      const hit = !!flash?.ok && age < 170 && !this.reducedMotion;
       const beam = this.hitBeams[lane];
       beam.visible = hit;
       if (hit) {
-        beam.x = lane * width + width * 0.28;
-        beam.y = target - 70 * (1 - life) - 5;
-        beam.width = width * 0.44 * (1 - life) + 2;
-        beam.height = 70 * (1 - life) + 5;
-        beam.alpha = (1 - life) * 0.55;
+        beam.x = lane * width + width * 0.05;
+        beam.y = target - 76 + life * 10;
+        beam.width = width * 0.9;
+        beam.height = 96;
+        beam.alpha = (1 - life) * 0.8;
       }
       this.hitSparks[lane].forEach((spark, index) => {
-        spark.visible = hit;
+        spark.visible = false;
         if (!hit) return;
         const angle = (index / 5) * Math.PI;
         spark.x =
@@ -197,6 +236,10 @@ export class Playfield {
         v.body.visible = visible;
         v.tail.visible = visible;
         if (visible) {
+          v.body.tint = layout.failed ? 0x66747e : this.noteColor;
+          v.body.alpha = layout.failed ? 0.2 : 0.36;
+          v.tail.tint = layout.failed ? 0x88949b : 0xe5faff;
+          v.tail.alpha = layout.failed ? 0.45 : 1;
           v.body.x = x + nw * 0.23;
           v.body.y = endY;
           v.body.width = nw * 0.54;

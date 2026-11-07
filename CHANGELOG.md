@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-07
+
+### Fixed
+
+- Snap the canvas to whole pixels per lane, preventing fractional right-edge clipping after resize.
+- Replace tall geometric hit beams with a short original raster burst.
+- Remove MAX100 field-wide overlay flashes and brightness pulses.
+- Keep a failed hold's remaining body/tail muted until it reaches the judgment line, without changing resolved scoring or allowing re-entry.
+
 ## [0.2.0] - 2026-11-07
 
 ### Fixed

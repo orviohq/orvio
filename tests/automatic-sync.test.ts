@@ -42,10 +42,27 @@ describe('long note visual lifetime', () => {
     e.input({ lane: 0, time: 2, down: false, sequence: 1 });
     expect(noteLayout(e.states[0], 528, 2, 500, 620).visible).toBe(false);
   });
-  it('hides a broken hold only after release resolves it', () => {
+  it('keeps a broken hold muted until its tail passes without restoring score', () => {
     const e = new Engine([{ id: 0, lane: 0, time: 1, end: 2 }]);
     e.input({ lane: 0, time: 1, down: true, sequence: 0 });
     e.input({ lane: 0, time: 1.2, down: false, sequence: 1 });
-    expect(noteLayout(e.states[0], 528, 1.2, 500, 620).visible).toBe(false);
+    const score = e.score;
+    expect(noteLayout(e.states[0], 528, 1.2, 500, 620).visible).toBe(true);
+    expect(noteLayout(e.states[0], 528, 1.2, 500, 620).failed).toBe(true);
+    expect(noteLayout(e.states[0], 528, 2.1, 500, 620).visible).toBe(false);
+    e.input({ lane: 0, time: 1.3, down: true, sequence: 2 });
+    expect(e.score).toBe(score);
+    expect(e.states[0].done).toBe(true);
+  });
+  it('keeps missed-head hold visible through its remaining tail only', () => {
+    const e = new Engine([{ id: 0, lane: 0, time: 1, end: 3 }]);
+    e.update(1.2);
+    expect(e.states[0].done).toBe(true);
+    expect(e.breaks).toBe(2);
+    const p = noteLayout(e.states[0], 528, 2, 500, 620);
+    expect(p.visible).toBe(true);
+    expect(p.failed).toBe(true);
+    expect(p.bodyHeight).toBe(500);
+    expect(noteLayout(e.states[0], 528, 3.01, 500, 620).visible).toBe(false);
   });
 });
