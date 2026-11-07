@@ -17,7 +17,7 @@ export const de = {
   restartApply: 'NEU STARTEN UND ANWENDEN',
   cancelChange: 'ÄNDERUNG ABBRECHEN',
   gameOptions: 'SPIELOPTIONEN',
-  fader: 'Notensichtbarkeit',
+  fader: 'Noteneffekte',
   shuffle: 'Spurfolge',
   optionHint:
     'Gilt ab dem nächsten Spiel. RANDOM verwendet dieselbe Spurfolge im ganzen Chart und erhält Haltenoten und Akkorde.',
@@ -34,7 +34,7 @@ export const de = {
   left: 'Links',
   center: 'Mitte',
   right: 'Rechts',
-  speed: 'Scrolltempo',
+  speed: 'Notentempo',
   volume: 'Musiklautstärke',
   bindings: 'Tastenbelegung',
   reset: 'Steuerung zurücksetzen',

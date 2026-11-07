@@ -1,7 +1,12 @@
 import { packReplay, unpackReplay } from './replay-binary';
 import { SONGS, makeChart, type Difficulty, type Lanes } from './chart';
 import { Engine } from './engine';
-import { transformChart, type Fader, type Shuffle } from './game-options';
+import {
+  FADERS,
+  transformChart,
+  type Fader,
+  type Shuffle,
+} from './game-options';
 import type { SharedResult } from './share';
 // wall milliseconds, original audio seconds. Omit update calls only when they
 // changed no engine state. Preserve actual input order and exact float values.
@@ -19,7 +24,7 @@ export interface ReplayData {
   ops: ReplayOp[];
   end: number;
 }
-const faders = ['off', 'in', 'in2', 'out', 'out2'];
+const faders: readonly string[] = FADERS;
 const shuffles = ['off', 'mirror', 'random'];
 export function validateReplay(raw: unknown): ReplayData | null {
   if (!raw || typeof raw !== 'object') return null;

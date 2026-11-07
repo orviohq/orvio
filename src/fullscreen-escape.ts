@@ -1,26 +1,47 @@
-// Capture before dialog cancel and the game's bubble-phase shortcuts. A held
-// Escape cannot both leave fullscreen and dismiss the result below it.
+type KeyboardCapture = {
+  lock?: (keys: string[]) => Promise<void>;
+  unlock?: () => void;
+};
+let escapeCapture: 'unavailable' | 'pending' | 'locked' | 'denied' =
+  'unavailable';
+export function fullscreenEscapeStatus() {
+  return escapeCapture;
+}
+export async function requestGameFullscreen() {
+  try {
+    await document.documentElement.requestFullscreen({
+      keyboardLock: 'browser',
+    } as FullscreenOptions);
+    const keyboard = (navigator as Navigator & { keyboard?: KeyboardCapture })
+      .keyboard;
+    if (keyboard?.lock) {
+      escapeCapture = 'pending';
+      try {
+        await keyboard.lock(['Escape']);
+        escapeCapture = 'locked';
+      } catch {
+        escapeCapture = 'denied';
+      }
+    }
+  } catch {
+    escapeCapture = 'denied';
+  }
+}
 export function guardFullscreenEscape() {
-  let wasFullscreen = !!document.fullscreenElement;
-  let held = false,
-    suppressCancel = false;
-  document.addEventListener('fullscreenchange', () => {
-    const full = !!document.fullscreenElement;
-    if (wasFullscreen && !full) suppressCancel = true;
-    wasFullscreen = full;
-  });
+  let held = false;
   window.addEventListener(
     'keydown',
     (e) => {
       if (e.code !== 'Escape') return;
-      if (document.fullscreenElement || held || e.repeat) {
+      if (held || e.repeat) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        held = true;
-        suppressCancel = true;
-        if (document.fullscreenElement)
-          void document.exitFullscreen().catch(() => {});
-      } else suppressCancel = false;
+        return;
+      }
+      held = true;
+      // Keyboard Lock grants the app the short press; never call exitFullscreen.
+      // Browsers retain their long-press/system exit and may deny this capture.
+      if (document.fullscreenElement) e.preventDefault();
     },
     true,
   );
@@ -34,11 +55,18 @@ export function guardFullscreenEscape() {
   document.addEventListener(
     'cancel',
     (e) => {
-      if (document.fullscreenElement || held || suppressCancel) {
+      if (held) {
         e.preventDefault();
-        e.stopImmediatePropagation();
       }
     },
     true,
   );
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) {
+      escapeCapture = 'unavailable';
+      (
+        navigator as Navigator & { keyboard?: KeyboardCapture }
+      ).keyboard?.unlock?.();
+    }
+  });
 }

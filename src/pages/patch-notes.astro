@@ -98,6 +98,8 @@ import { LANGUAGES, type Language } from '../i18n';
       show(params.get('lang') || resolvedLanguage(saved, navigator.languages));
       select.onchange = () => show(select.value);
       enhanceSelects();
+      document.addEventListener('selectstart', (e) => e.preventDefault(), true);
+      document.addEventListener('dragstart', (e) => e.preventDefault(), true);
     </script>
     <script>
       import { registerApp } from '../pwa';
@@ -106,6 +108,13 @@ import { LANGUAGES, type Language } from '../i18n';
   </body>
 </html>
 <style>
+  :global(*),
+  :global(*::before),
+  :global(*::after) {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -webkit-user-drag: none !important;
+  }
   @font-face {
     font-family: Outfit;
     src: url('/outfit.ttf');

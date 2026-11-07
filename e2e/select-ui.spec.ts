@@ -21,9 +21,9 @@ test('all dropdowns use the same custom list with keyboard, focus and bounded po
   await page.keyboard.press('F3');
   for (const id of ['speed', 'fader', 'shuffle']) {
     await expect(page.locator('#' + id)).toHaveAttribute('aria-hidden', 'true');
-    await page.click('#' + id + '-trigger');
-    await expect(page.locator('#' + id + '-menu')).toBeVisible();
-    await page.keyboard.press('Escape');
+    const group = page.locator('.icon-options-' + id);
+    await expect(group).toHaveAttribute('role', 'radiogroup');
+    await expect(group.locator('[role=radio]')).not.toHaveCount(0);
   }
   await page.screenshot({ path: 'test-results/custom-options.png' });
   await page.keyboard.press('Escape');
@@ -92,20 +92,13 @@ test('translated dropdowns remain in viewport and synchronize programmatic value
       await page.keyboard.press('Escape');
       await page.keyboard.press('F3');
       for (const id of ['speed', 'fader', 'shuffle']) {
-        await page.click('#' + id + '-trigger');
-        expect(
-          await page.locator('#' + id + '-menu').evaluate((e) => {
-            const r = e.getBoundingClientRect();
-            return (
-              r.top >= 0 &&
-              r.left >= 0 &&
-              r.bottom <= innerHeight &&
-              r.right <= innerWidth
-            );
-          }),
-          `${lang} ${id} ${width}`,
-        ).toBe(true);
-        await page.keyboard.press('Escape');
+        const options = page.locator('.icon-options-' + id + ' [role=radio]');
+        for (let i = 0; i < (await options.count()); i++) {
+          await options.nth(i).scrollIntoViewIfNeeded();
+          const rect = await options.nth(i).boundingBox();
+          expect(rect!.x).toBeGreaterThanOrEqual(0);
+          expect(rect!.x + rect!.width).toBeLessThanOrEqual(width);
+        }
       }
       await page.keyboard.press('Escape');
     }

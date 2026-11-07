@@ -16,7 +16,7 @@ export const vi = {
   restartApply: 'CHƠI LẠI VÀ ÁP DỤNG',
   cancelChange: 'HỦY THAY ĐỔI',
   gameOptions: 'TÙY CHỌN TRÒ CHƠI',
-  fader: 'Hiển thị nốt',
+  fader: 'Hiệu ứng nốt',
   shuffle: 'Thứ tự làn',
   optionHint:
     'Áp dụng ở lượt chơi tiếp theo. RANDOM dùng một thứ tự làn cho cả bài, giữ nguyên nốt giữ và hợp âm.',
@@ -33,7 +33,7 @@ export const vi = {
   left: 'Trái',
   center: 'Giữa',
   right: 'Phải',
-  speed: 'Tốc độ cuộn',
+  speed: 'Tốc độ nốt',
   volume: 'Âm lượng nhạc',
   bindings: 'Gán phím',
   reset: 'Đặt lại điều khiển',

@@ -16,7 +16,7 @@ export const id = {
   restartApply: 'ULANGI DAN TERAPKAN',
   cancelChange: 'BATALKAN PERUBAHAN',
   gameOptions: 'OPSI PERMAINAN',
-  fader: 'Tampilan not',
+  fader: 'Efek not',
   shuffle: 'Susunan jalur',
   optionHint:
     'Berlaku pada permainan berikutnya. RANDOM memakai satu susunan jalur untuk seluruh lagu, mempertahankan not tahan dan akor.',
@@ -33,7 +33,7 @@ export const id = {
   left: 'Kiri',
   center: 'Tengah',
   right: 'Kanan',
-  speed: 'Kecepatan gulir',
+  speed: 'Kecepatan not',
   volume: 'Volume musik',
   bindings: 'Pengaturan tombol',
   reset: 'Reset kontrol',

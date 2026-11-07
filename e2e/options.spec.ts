@@ -12,12 +12,12 @@ test('options separate from system settings, saved URL, keyboard, defaults and s
   await expect(page.locator('#game-options')).toBeVisible();
   await expect(page.locator('#speed')).toHaveJSProperty('tagName', 'SELECT');
   await expect(page.locator('#speed option')).toHaveCount(17);
-  await page.locator('#speed').focus();
-  await page.keyboard.press('ArrowDown');
+  await page.locator('.icon-options-speed [aria-checked=true]').focus();
+  await page.keyboard.press('ArrowRight');
   await expect(page.locator('#speed')).toHaveValue('2');
-  await page.locator('#speed').selectOption('2.5');
-  await page.locator('#fader').selectOption('in2');
-  await page.locator('#shuffle').selectOption('random');
+  await page.locator('.icon-options-speed [data-value="2.5"]').click();
+  await page.locator('.icon-options-fader [data-value="in2"]').click();
+  await page.locator('.icon-options-shuffle [data-value="random"]').click();
   await page.screenshot({ path: 'test-results/game-options.png' });
   await page.keyboard.press('Escape');
   const link = page.url();

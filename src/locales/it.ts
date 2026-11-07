@@ -16,7 +16,7 @@ export const it = {
   restartApply: 'RICOMINCIA E APPLICA',
   cancelChange: 'ANNULLA MODIFICA',
   gameOptions: 'OPZIONI DI GIOCO',
-  fader: 'Visibilità delle note',
+  fader: 'Effetti delle note',
   shuffle: 'Ordine delle corsie',
   optionHint:
     'Si applica alla prossima partita. RANDOM usa la stessa permutazione per tutto il brano, mantenendo note lunghe e accordi.',
@@ -33,7 +33,7 @@ export const it = {
   left: 'Sinistra',
   center: 'Centro',
   right: 'Destra',
-  speed: 'Velocità di scorrimento',
+  speed: 'Velocità delle note',
   volume: 'Volume della musica',
   bindings: 'Assegna tasti',
   reset: 'Ripristina comandi',

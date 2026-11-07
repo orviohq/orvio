@@ -1,3 +1,4 @@
+import { optionIcon } from './option-icons';
 import type { SharedResult } from './share';
 const escape = (value: string) =>
   value.replace(
@@ -64,8 +65,16 @@ export function resultBadges(
   ).join('');
   out += badge(
     'fader',
-    svg('<path d="M5 3v26M27 3v26" opacity=".2"/>' + fade),
-    o.fader === 'off' ? 'OFF' : o.fader.endsWith('2') ? 'II' : 'I',
+    ['blink', 'blink2', 'fog', 'pixel', 'pixel2', 'blind'].includes(o.fader)
+      ? optionIcon('fader', o.fader)
+      : svg('<path d="M5 3v26M27 3v26" opacity=".2"/>' + fade),
+    o.fader === 'off'
+      ? 'OFF'
+      : ['blink', 'blink2', 'fog', 'pixel', 'pixel2', 'blind'].includes(o.fader)
+        ? o.fader.toUpperCase().replace('2', ' II')
+        : o.fader.endsWith('2')
+          ? 'II'
+          : 'I',
     labels.fader + ' ' + o.fader.toUpperCase(),
   );
   return out;

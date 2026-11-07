@@ -1,3 +1,4 @@
+import { iconOptions } from './icon-options';
 // Shared local, dependency-free select surface. The source select remains the
 // value model for forms; all user interaction uses the accessible custom list.
 export function enhanceSelects() {
@@ -5,6 +6,10 @@ export function enhanceSelects() {
     .querySelectorAll<HTMLSelectElement>('select:not([data-enhanced])')
     .forEach((select) => {
       select.dataset.enhanced = 'true';
+      if (select.closest('#game-options')) {
+        iconOptions(select);
+        return;
+      }
       select.tabIndex = -1;
       select.setAttribute('aria-hidden', 'true');
       const wrap = document.createElement('div');

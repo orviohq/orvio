@@ -1,3 +1,4 @@
+import { mockShare } from './share-mock';
 import { test, expect } from '@playwright/test';
 import { LANGUAGES, translations, type Language } from '../src/i18n';
 const data =
@@ -6,6 +7,7 @@ test('local fragments never reach requests; copy succeeds or visibly fails in th
   page,
   context,
 }) => {
+  const shared = await mockShare(context);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const requests: string[] = [];
   page.on('request', (r) => requests.push(r.url()));

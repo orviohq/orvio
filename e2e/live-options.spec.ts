@@ -22,8 +22,8 @@ test('game option readout, pause edit, cancel shuffle and explicit restart keep 
   expect(
     await page.evaluate(() => (window as any).orvioDiagnostics.clock),
   ).toBeCloseTo(frozen, 2);
-  await page.locator('#speed').selectOption('2.5');
-  await page.locator('#fader').selectOption('out');
+  await page.locator('.icon-options-speed [data-value="2.5"]').click();
+  await page.locator('.icon-options-fader [data-value="out"]').click();
   await page.keyboard.press('Escape');
   await expect(page.locator('#pause')).toBeVisible();
   await expect(page.locator('#play-options')).toContainText('2.5×');
@@ -37,7 +37,7 @@ test('game option readout, pause edit, cancel shuffle and explicit restart keep 
     ),
   ).toEqual(before.notes);
   await page.click('#play-options');
-  await page.locator('#shuffle').selectOption('mirror');
+  await page.locator('.icon-options-shuffle [data-value="mirror"]').click();
   await page.keyboard.press('Escape');
   await expect(page.locator('#restart-options')).toBeVisible();
   await page.click('#cancel-shuffle-restart');
@@ -49,7 +49,7 @@ test('game option readout, pause edit, cancel shuffle and explicit restart keep 
   ).toBe('off');
   await page.keyboard.press('F3');
   await expect(page.locator('#game-options')).toBeVisible();
-  await page.locator('#shuffle').selectOption('mirror');
+  await page.locator('.icon-options-shuffle [data-value="mirror"]').click();
   await page.keyboard.press('Escape');
   await expect(page.locator('#restart-options')).toBeVisible();
   await page.click('#confirm-shuffle-restart');
@@ -87,8 +87,8 @@ test('held note survives speed and effect changes without a new chart or remappi
     note.id,
   );
   expect(state.held).toBe(true);
-  await page.locator('#speed').selectOption('3');
-  await page.locator('#fader').selectOption('in2');
+  await page.locator('.icon-options-speed [data-value="3"]').click();
+  await page.locator('.icon-options-fader [data-value="in2"]').click();
   await page.click('#options-done');
   await expect(page.locator('#pause')).toBeVisible();
   expect(

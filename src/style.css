@@ -2936,3 +2936,76 @@ canvas {
     margin-bottom: 6px;
   }
 }
+/* The original song remains behind the opaque, high-contrast note gear. */
+.playing #game {
+  background-image:
+    linear-gradient(90deg, rgba(5, 12, 21, 0.5), rgba(5, 12, 21, 0.38)),
+    var(--play-wallpaper);
+  background-size: cover;
+  background-position: center;
+}
+#game-options {
+  width: min(850px, calc(100vw - 28px));
+  max-height: calc(100dvh - 28px);
+  overflow: auto;
+}
+.icon-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(102px, 1fr));
+  gap: 8px;
+}
+.icon-options button {
+  min-height: 66px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: #162637;
+  border: 1px solid #384d62;
+  color: #bacddd;
+  font-size: 12px;
+}
+.icon-options svg {
+  width: 26px;
+  height: 26px;
+}
+.icon-options button[aria-checked='true'] {
+  border-color: #62e6ff;
+  background: #174254;
+  color: #baf7ff;
+  box-shadow: inset 0 -3px #62e6ff;
+}
+.icon-options-speed {
+  grid-template-columns: repeat(auto-fit, minmax(62px, 1fr));
+}
+.icon-options-speed button {
+  min-height: 50px;
+}
+.icon-options-speed svg {
+  width: 18px;
+  height: 18px;
+}
+@media (max-width: 540px) {
+  .icon-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .icon-options-speed {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* Apply to each descendant explicitly: dialogs/top-layer text must not inherit auto. */
+*,
+*::before,
+*::after {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
+}
+#score {
+  display: block;
+  transform-origin: left center;
+  font-variant-numeric: tabular-nums;
+}

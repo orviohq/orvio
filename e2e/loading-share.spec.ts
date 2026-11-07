@@ -1,8 +1,10 @@
+import { mockShare } from './share-mock';
 import { test, expect } from '@playwright/test';
 test('original song loading precedes scoring and sends no result before explicit share', async ({
   page,
   context,
 }) => {
+  const shared = await mockShare(context);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const resultRequests: string[] = [];
   page.on('request', (r) => {
@@ -38,10 +40,14 @@ test('original song loading precedes scoring and sends no result before explicit
     }),
   );
   await page.click('#share-result');
+  await expect(page.locator('#toast')).toHaveText('링크를 복사했어요');
   const url = await page.evaluate(() => navigator.clipboard.readText());
-  expect(url).toBe(resultURL);
-  expect(url).toContain('score=0');
-  expect(new URLSearchParams(new URL(url).hash.slice(1)).size).toBe(15);
+  expect(url).toContain('/result/?s=');
+  expect(url.length).toBeLessThan(100);
+  expect(shared.requests).toHaveLength(1);
+  expect(shared.requests[0].body.fragment).toBe(
+    new URL(resultURL).hash.slice(1),
+  );
   expect(resultRequests).toEqual([]);
   await page.screenshot({ path: 'test-results/sharing.png' });
 });

@@ -45,6 +45,38 @@ const BASE_PATCHES: {
   notes: Record<Exclude<Language, ExtraLanguage>, string[]>;
 }[] = [
   {
+    version: '0.2.12',
+    date: '2026-11-07',
+    notes: {
+      en: [
+        'Icon radio controls for note speed, effects and shuffle; BLINK, BLINK 2, FOG, PIXEL, PIXEL 2 and BLIND are display-only approximations. Original song wallpaper remains visible for at least 1.2 seconds on warm starts and appears behind gameplay. Score increases animate without changing the score or judgment.',
+        'Short Escape keeps fullscreen and returns results to song selection when Keyboard Lock is allowed. Browser refusal or missing support can still exit fullscreen. All text, including dialogs, blocks mouse selection and dragging. Patch notes open in a new tab.',
+        'Replay timing uses lossless binary packing and missing or damaged recordings stay visibly unavailable. Only an explicit share click uploads the result/replay for a short link. Links normally expire in one year and may be removed earlier when storage is full. Free limits can stop sharing; no automatic paid fallback.',
+      ],
+      ko: [
+        '노트 속도·노트 효과·섞기를 아이콘 선택형으로 바꾸고 BLINK·BLINK 2·FOG·PIXEL·PIXEL 2·BLIND 시각 효과를 추가했습니다. 원작과 완전히 같은 구현은 아닙니다. 캐시가 있어도 월페이퍼를 1.2초 이상 표시하며 플레이 배경에도 적용합니다. 점수 상승 표시는 실제 점수와 판정을 바꾸지 않고 움직입니다.',
+        'Keyboard Lock이 허용된 브라우저에서는 짧은 ESC로 전체화면을 유지한 채 결과에서 곡 선택으로 돌아갑니다. 미지원·권한 거절 시에는 브라우저가 전체화면을 종료할 수 있습니다. 결과·설정·팝업을 포함한 텍스트 선택과 드래그를 차단하고 패치노트는 새 탭에서 엽니다.',
+        '리플레이 시각을 무손실 이진 압축하고 누락·손상을 계속 표시합니다. 공유 버튼을 누를 때만 결과와 리플레이를 저장해 짧은 링크를 만듭니다. 기본 1년 만료이며 공간 부족 시 오래된 기록이 더 일찍 삭제될 수 있습니다. 무료 한도에서는 공유가 멈출 수 있으며 유료 우회는 하지 않습니다.',
+      ],
+      zh: [
+        '音符速度、效果和随机选项改为图标单选。新增BLINK、BLINK 2、FOG、PIXEL、PIXEL 2、BLIND近似视觉效果；热缓存也显示歌曲壁纸至少1.2秒，游戏中保留壁纸。分数动画不改变判定。',
+        '允许Keyboard Lock时，短按ESC从结果返回选曲且保持全屏；不支持或拒绝权限时浏览器仍可能退出全屏。禁止对话框等所有文本选择和拖动，更新日志在新标签页打开。',
+        '无损二进制回放和明确损坏警告。仅点击分享时上传结果和回放生成短链接，通常一年到期，空间不足可能提前删除旧记录。免费限额可能暂停分享，不自动付费。',
+      ],
+      ja: [
+        'ノーツ速度・効果・シャッフルをアイコン選択に変更。BLINK、BLINK 2、FOG、PIXEL、PIXEL 2、BLINDを近似実装。キャッシュ後も壁紙を1.2秒以上表示し、プレイ背景にも使用。得点アニメーションは判定を変更しません。',
+        'Keyboard Lock許可時は短いESCで全画面を維持して結果から選曲へ移動。非対応・権限拒否では全画面が終了する場合があります。ダイアログを含む文字選択とドラッグを防止。更新履歴は新しいタブで開きます。',
+        'リプレイ時刻の無損失バイナリ圧縮と破損警告。共有操作時のみ結果と記録を送信して短いリンクを作成。通常1年で失効し、容量不足では古い記録が先に削除される場合があります。無料枠で共有が停止する場合もあり、自動課金はしません。',
+      ],
+      es: [
+        'Controles por iconos, efectos BLINK, BLINK 2, FOG, PIXEL, PIXEL 2 y BLIND aproximados, fondo de canción y carga visible al menos 1,2 segundos. La animación de puntuación no cambia los juicios.',
+        'Escape corto conserva pantalla completa si Keyboard Lock está permitido; el navegador puede salir si falta soporte o permiso. Sin selección ni arrastre de texto en diálogos. Notas en otra pestaña.',
+        'Repeticiones binarias sin pérdida y aviso de daños. Solo compartir envía resultado y repetición para un enlace corto. Caducidad normal de un año, posible borrado anticipado por espacio. Los límites gratuitos pueden detener el servicio, sin pago automático.',
+      ],
+    },
+  },
+
+  {
     version: '0.2.11',
     date: '2026-11-07',
     notes: {

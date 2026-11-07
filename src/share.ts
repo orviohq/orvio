@@ -1,3 +1,4 @@
+import { FADERS, type Fader } from './game-options';
 export const SHARED_SONGS = {
   'first-light': 'First Light',
   afterimage: 'Afterimage',
@@ -13,7 +14,7 @@ export interface SharedResult {
   judgments?: number[];
   options?: {
     speed: number;
-    fader: 'off' | 'in' | 'in2' | 'out' | 'out2';
+    fader: Fader;
     shuffle: 'off' | 'mirror' | 'random';
     seed: number;
   };
@@ -78,7 +79,7 @@ export function readResult(params: URLSearchParams): SharedResult | null {
       !Number.isFinite(speed) ||
       speed < 1 ||
       speed > 9 ||
-      !['off', 'in', 'in2', 'out', 'out2'].includes(fader || '') ||
+      !(FADERS as readonly string[]).includes(fader || '') ||
       !['off', 'mirror', 'random'].includes(shuffle || '') ||
       !Number.isInteger(seed) ||
       seed < 0 ||

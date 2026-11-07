@@ -52,6 +52,11 @@ export const EXTRA_PATCH_LABELS = {
 export type ExtraLanguage = keyof typeof EXTRA_PATCH_LABELS;
 export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
   fr: {
+    '0.2.12': [
+      'Options par icônes, effets BLINK/FOG/PIXEL/BLIND approximatifs, fond de chanson et chargement visible au moins 1,2 s. Animation du score sans modifier les jugements.',
+      'Échap conserve le plein écran si Keyboard Lock est autorisé. Sans prise en charge ou permission, le navigateur peut le quitter. Sélection et glissement du texte bloqués dans les dialogues ; notes dans un nouvel onglet.',
+      'Replay binaire sans perte, avertissement si endommagé. Seul le clic Partager envoie le résultat et le replay. Liens valables normalement un an, suppression anticipée possible faute de place. Limites gratuites, aucun paiement automatique.',
+    ],
     '0.2.11': [
       'Icônes des options, couleurs des jugements, fond original, genre, BPM et nombre de notes dans le résultat. Écoute et arrêt disponibles aussi via le lien partagé ; la fin des notes longues reste un jugement.',
       'Enregistrement local des appuis réels, temps audio, pauses et effets. Le replay partagé utilise le même moteur et vérifie chaque jugement, score et combo, sans envoyer entrées, audio ou identité. Aucun replay inventé pour les anciens liens.',
@@ -110,6 +115,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   de: {
+    '0.2.12': [
+      'Symbolauswahl, angenäherte BLINK/FOG/PIXEL/BLIND-Effekte, Songhintergrund und mindestens 1,2 Sekunden Ladebild. Punkteanimation ändert keine Wertung.',
+      'Kurzes Escape behält Vollbild bei erlaubtem Keyboard Lock. Ohne Unterstützung oder Erlaubnis kann der Browser Vollbild verlassen. Keine Textauswahl oder Ziehen in Dialogen; Versionshinweise in neuem Tab.',
+      'Verlustfreie binäre Replays mit Fehlerhinweis. Nur Teilen lädt Ergebnis und Replay hoch. Links laufen normalerweise nach einem Jahr ab, alte Einträge können bei Platzmangel früher entfernt werden. Kostenlose Grenzen, keine automatische Zahlung.',
+    ],
     '0.2.11': [
       'Optionssymbole, Wertungsfarben, eigener Titelhintergrund, Genre, BPM und Notenanzahl im Ergebnis. Vorhören und Stoppen auch bei geteilten Ergebnissen; Haltenoten-Enden zählen als Wertungen.',
       'Echte Tastendrücke, Audiozeiten, Pausen und Effekte werden lokal aufgezeichnet. Geteilte Wiederholungen verwenden dieselbe Engine und prüfen jede Wertung, Punkte und Combo. Kein Upload von Eingaben, Audio oder Identität; alte Links erhalten keine erfundene Wiederholung.',
@@ -168,6 +178,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   pt: {
+    '0.2.12': [
+      'Opções por ícones, efeitos BLINK/FOG/PIXEL/BLIND aproximados e fundo visível pelo menos 1,2 s. A animação da pontuação não altera os julgamentos.',
+      'Escape mantém o ecrã inteiro com Keyboard Lock autorizado. Sem suporte ou permissão, o navegador pode sair. Seleção e arrasto de texto bloqueados nos diálogos; notas noutro separador.',
+      'Replay binário sem perdas com aviso de danos. Apenas Partilhar envia o resultado e replay. Ligações duram normalmente um ano e podem ser removidas antes por falta de espaço. Limites gratuitos, sem pagamento automático.',
+    ],
     '0.2.11': [
       'Ícones de opções, cores de julgamentos, imagem original, gênero, BPM e quantidade de notas no resultado. Prévia e parada também em resultados compartilhados; finais de notas longas são julgamentos.',
       'Gravação local de entradas reais, tempos de áudio, pausas e efeitos. O replay compartilhado usa o mesmo motor e confere cada julgamento, pontuação e combo. Sem enviar entradas, áudio ou identidade; links antigos não recebem replay inventado.',
@@ -226,6 +241,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   it: {
+    '0.2.12': [
+      'Opzioni a icone, effetti BLINK/FOG/PIXEL/BLIND approssimati e sfondo visibile per almeno 1,2 s. Animazione del punteggio senza cambiare i giudizi.',
+      'Escape breve mantiene lo schermo intero con Keyboard Lock consentito. Senza supporto o permesso il browser può uscire. Selezione e trascinamento del testo bloccati nei dialoghi; note in una nuova scheda.',
+      'Replay binario senza perdita con avvisi di danni. Solo Condividi invia risultato e replay. Link normalmente validi un anno, rimozione anticipata possibile per spazio. Limiti gratuiti, nessun pagamento automatico.',
+    ],
     '0.2.11': [
       'Icone delle opzioni, colori dei giudizi, sfondo originale, genere, BPM e numero di note nel risultato. Anteprima e arresto anche nei risultati condivisi; le code delle note lunghe restano giudizi.',
       'Registrazione locale di pressioni reali, tempi audio, pause ed effetti. Il replay condiviso usa lo stesso motore e verifica ogni giudizio, punteggio e combo. Nessun invio di input, audio o identità; nessun replay inventato per i vecchi link.',
@@ -284,6 +304,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   ru: {
+    '0.2.12': [
+      'Настройки значками, приближённые эффекты BLINK/FOG/PIXEL/BLIND, фон песни и загрузка не короче 1,2 с. Анимация счёта не меняет оценку.',
+      'Короткий Escape сохраняет полный экран при разрешённом Keyboard Lock. Без поддержки или разрешения браузер может выйти. Выделение и перетаскивание текста запрещены и в диалогах; история в новой вкладке.',
+      'Двоичный повтор без потерь и предупреждение о повреждении. Только кнопка отправки загружает результат и повтор. Ссылки обычно действуют год, старые записи могут удаляться раньше при нехватке места. Бесплатные лимиты, без автоматической оплаты.',
+    ],
     '0.2.11': [
       'Значки настроек, цвета оценок, фон композиции, жанр, BPM и число нот в результате. Прослушивание и остановка доступны по общей ссылке; конец удержания считается оценкой, а не новой нотой.',
       'Локальная запись реальных нажатий, аудиовремени, пауз и эффектов. Повтор по ссылке использует тот же движок и проверяет каждую оценку, счёт и комбо. Ввод, звук и личность не загружаются; старые ссылки не получают выдуманный повтор.',
@@ -342,6 +367,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   id: {
+    '0.2.12': [
+      'Opsi ikon, efek BLINK/FOG/PIXEL/BLIND perkiraan, latar lagu dan pemuatan minimal 1,2 detik. Animasi skor tidak mengubah penilaian.',
+      'Escape singkat menjaga layar penuh jika Keyboard Lock diizinkan. Tanpa dukungan atau izin, browser dapat keluar. Pemilihan dan seret teks diblokir termasuk dialog; catatan di tab baru.',
+      'Replay biner tanpa kehilangan data dan peringatan kerusakan. Hanya tombol Bagikan yang mengunggah hasil dan replay. Tautan biasanya kedaluwarsa setahun; data lama dapat dihapus lebih awal jika ruang penuh. Batas gratis, tanpa pembayaran otomatis.',
+    ],
     '0.2.11': [
       'Ikon opsi, warna penilaian, gambar lagu asli, genre, BPM dan jumlah nada pada hasil. Pratinjau dan berhenti juga tersedia pada hasil bersama; akhir nada tahan dihitung sebagai penilaian.',
       'Masukan nyata, waktu audio, jeda dan efek direkam lokal. Putar ulang bersama memakai mesin yang sama dan memeriksa setiap penilaian, skor dan kombo. Tidak mengunggah input, audio atau identitas; tautan lama tidak diberi rekaman palsu.',
@@ -400,6 +430,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   tr: {
+    '0.2.12': [
+      'Simge seçenekleri, yaklaşık BLINK/FOG/PIXEL/BLIND efektleri, şarkı arka planı ve en az 1,2 saniye yükleme. Puan animasyonu değerlendirmeyi değiştirmez.',
+      'Keyboard Lock izniyle kısa Escape tam ekranı korur. Destek veya izin yoksa tarayıcı çıkabilir. Diyaloglarda da metin seçimi ve sürükleme engellenir; notlar yeni sekmede açılır.',
+      'Kayıpsız ikili tekrar ve bozulma uyarısı. Yalnızca Paylaş düğmesi sonucu ve tekrarı yükler. Bağlantılar normalde bir yıl geçerlidir; yer yoksa eski kayıtlar erken silinebilir. Ücretsiz sınırlar, otomatik ödeme yok.',
+    ],
     '0.2.11': [
       'Sonuçta seçenek simgeleri, değerlendirme renkleri, özgün şarkı görseli, tür, BPM ve nota sayısı. Paylaşılan sonuçlarda da ön dinleme ve durdurma; tutma sonları ayrı nota değil değerlendirmedir.',
       'Gerçek tuş basımları, ses zamanları, duraklamalar ve efektler yerel kaydedilir. Paylaşılan tekrar aynı motorla her değerlendirmeyi, puanı ve komboyu doğrular. Girdi, ses veya kimlik yüklenmez; eski bağlantılara sahte tekrar eklenmez.',
@@ -458,6 +493,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   vi: {
+    '0.2.12': [
+      'Tùy chọn biểu tượng, hiệu ứng BLINK/FOG/PIXEL/BLIND gần đúng, hình nền bài hát và tải ít nhất 1,2 giây. Hoạt ảnh điểm không đổi phán định.',
+      'Escape ngắn giữ toàn màn hình khi được phép Keyboard Lock. Thiếu hỗ trợ hoặc quyền, trình duyệt vẫn có thể thoát. Chặn chọn và kéo văn bản kể cả hộp thoại; ghi chú mở tab mới.',
+      'Phát lại nhị phân không mất dữ liệu và cảnh báo hỏng. Chỉ nút Chia sẻ mới gửi kết quả và bản phát lại. Liên kết thường hết hạn sau một năm; bản cũ có thể bị xóa sớm khi đầy bộ nhớ. Giới hạn miễn phí, không tự trả phí.',
+    ],
     '0.2.11': [
       'Biểu tượng tùy chọn, màu chấm điểm, hình nền gốc, thể loại, BPM và số nốt ở kết quả. Có thể nghe thử và dừng ở kết quả chia sẻ; cuối nốt giữ là lượt chấm, không phải nốt mới.',
       'Ghi cục bộ thao tác nhấn thật, thời gian âm thanh, tạm dừng và hiệu ứng. Phát lại chia sẻ dùng cùng bộ máy và đối chiếu từng lượt chấm, điểm và chuỗi. Không tải lên đầu vào, âm thanh hay danh tính; liên kết cũ không có bản phát lại giả.',

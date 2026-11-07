@@ -30,8 +30,8 @@ test('real keyboard performance shares a local input replay with exact judgments
   await page.keyboard.press('Escape');
   await page.waitForTimeout(220);
   await page.keyboard.press('F3');
-  await page.selectOption('#speed', '9');
-  await page.selectOption('#fader', 'out2');
+  await page.locator('.icon-options-speed [data-value="9"]').click();
+  await page.locator('.icon-options-fader [data-value="out2"]').click();
   await page.keyboard.press('Escape');
   await page.click('#resume');
   await expect(page.locator('#results')).toBeVisible({ timeout: 50000 });

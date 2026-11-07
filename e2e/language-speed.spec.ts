@@ -46,7 +46,7 @@ test('legacy non-grid speed remains exact and labeled until user selects a half-
   await page.keyboard.press('F3');
   await expect(page.locator('#speed')).toHaveValue('1.6');
   await expect(page.locator('#speed option:checked')).toContainText('기존 값');
-  await page.selectOption('#speed', '2');
+  await page.locator('.icon-options-speed [data-value="2"]').click();
   await expect(page.locator('#speed option[value="1.6"]')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/speed=2.0/);

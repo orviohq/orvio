@@ -16,7 +16,7 @@ export const fr = {
   restartApply: 'RECOMMENCER ET APPLIQUER',
   cancelChange: 'ANNULER LE CHANGEMENT',
   gameOptions: 'OPTIONS DE JEU',
-  fader: 'Visibilité des notes',
+  fader: 'Effets des notes',
   shuffle: 'Ordre des pistes',
   optionHint:
     'Appliqué à la prochaine partie. RANDOM conserve un seul ordre des pistes pour tout le morceau, sans modifier les notes tenues ni les accords.',
@@ -33,7 +33,7 @@ export const fr = {
   left: 'Gauche',
   center: 'Centre',
   right: 'Droite',
-  speed: 'Vitesse de défilement',
+  speed: 'Vitesse des notes',
   volume: 'Volume de la musique',
   bindings: 'Touches',
   reset: 'Réinitialiser les commandes',

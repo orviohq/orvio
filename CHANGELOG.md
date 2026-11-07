@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.2.12] - 2026-11-07
+
+- Icon radio controls for note speed, note effects and shuffle; approximate BLINK/BLINK 2/FOG/PIXEL/PIXEL 2/BLIND display effects.
+- At least 1.2 seconds of decoded song wallpaper even on warm starts; original song wallpaper behind gameplay.
+- Score-only number rise, short glow and bounded bounce, disabled by reduced-motion settings.
+- Short Escape retains fullscreen when Keyboard Lock is allowed. Unsupported or denied capture can still leave fullscreen by browser policy.
+- Fixed dialog descendant text selection and dragging. Patch notes open in a new tab.
+- Lossless binary replay timing, persistent missing/corrupt replay warnings, startup HUD reset and cold/warm clock regression checks. The reported startup hesitation has not been reproduced on every device.
+- Explicit result-share click creates a short replay link; no automatic uploads. Default expiry is one year, with early removal of oldest records under space pressure. Free quota or network failure is visible and never silently copies a long fallback or enables paid services.
+
 ## [0.2.11] - 2026-11-07
 
 - Result-only option icons, judgment colors, original per-song art, BPM/genre/note-head count and explicit preview controls.

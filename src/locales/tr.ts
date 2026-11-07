@@ -16,7 +16,7 @@ export const tr = {
   restartApply: 'YENİDEN BAŞLAT VE UYGULA',
   cancelChange: 'DEĞİŞİKLİĞİ İPTAL ET',
   gameOptions: 'OYUN SEÇENEKLERİ',
-  fader: 'Nota görünürlüğü',
+  fader: 'Nota efektleri',
   shuffle: 'Şerit sırası',
   optionHint:
     'Sonraki oyunda uygulanır. RANDOM tüm şarkıda tek bir şerit sırası kullanır; uzun notalar ve akorlar korunur.',
@@ -33,7 +33,7 @@ export const tr = {
   left: 'Sol',
   center: 'Orta',
   right: 'Sağ',
-  speed: 'Kaydırma hızı',
+  speed: 'Nota hızı',
   volume: 'Müzik sesi',
   bindings: 'Tuş atamaları',
   reset: 'Kontrolleri sıfırla',

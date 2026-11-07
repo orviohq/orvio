@@ -41,7 +41,7 @@ const en = {
   cancelChange: 'CANCEL SHUFFLE CHANGE',
 
   gameOptions: 'GAME OPTIONS',
-  fader: 'Note visibility',
+  fader: 'Note effects',
   shuffle: 'Lane shuffle',
   optionHint:
     'Applied to the next play. Random uses one lane permutation for the entire chart, keeping holds and chords intact.',
@@ -59,7 +59,7 @@ const en = {
   left: 'Left',
   center: 'Center',
   right: 'Right',
-  speed: 'Scroll speed',
+  speed: 'Note speed',
   volume: 'Music volume',
   bindings: 'Key bindings',
   reset: 'Reset controls',
@@ -142,7 +142,7 @@ const ko: Words = {
   cancelChange: '노트 섞기 변경 취소',
 
   gameOptions: '게임 옵션',
-  fader: '노트 표시',
+  fader: '노트 효과',
   shuffle: '노트 섞기',
   optionHint:
     '다음 플레이에 적용됩니다. RANDOM은 채보 전체에 같은 레인 순서를 적용해 롱노트와 동시입력을 보존합니다.',
@@ -160,7 +160,7 @@ const ko: Words = {
   left: '왼쪽',
   center: '중앙',
   right: '오른쪽',
-  speed: '스크롤 속도',
+  speed: '노트 속도',
   volume: '음악 볼륨',
   bindings: '키 배치',
   reset: '조작 설정 초기화',
@@ -239,7 +239,7 @@ const zh: Words = {
   cancelChange: '取消轨道更改',
 
   gameOptions: '游戏选项',
-  fader: '音符显示',
+  fader: '音符效果',
   shuffle: '轨道随机',
   optionHint:
     '下一次游戏生效。RANDOM 整曲使用相同轨道顺序，保留长按和同时音符。',
@@ -257,7 +257,7 @@ const zh: Words = {
   left: '左',
   center: '中',
   right: '右',
-  speed: '下落速度',
+  speed: '音符速度',
   volume: '音乐音量',
   bindings: '按键设置',
   reset: '重置操作',
@@ -339,7 +339,7 @@ const ja: Words = {
   cancelChange: '配置変更を取り消す',
 
   gameOptions: 'ゲームオプション',
-  fader: 'ノート表示',
+  fader: 'ノート効果',
   shuffle: 'ノート配置',
   optionHint:
     '次のプレイに適用。RANDOM は曲全体で同じレーン順を使い、ロングノートと同時押しを保ちます。',
@@ -357,7 +357,7 @@ const ja: Words = {
   left: '左',
   center: '中央',
   right: '右',
-  speed: 'スクロール速度',
+  speed: 'ノート速度',
   volume: '音楽の音量',
   bindings: 'キー設定',
   reset: '操作設定をリセット',
@@ -440,7 +440,7 @@ const es: Words = {
   cancelChange: 'CANCELAR CAMBIO',
 
   gameOptions: 'OPCIONES DE JUEGO',
-  fader: 'Visibilidad de notas',
+  fader: 'Efectos de notas',
   shuffle: 'Mezcla de carriles',
   optionHint:
     'Se aplica en la próxima partida. RANDOM mantiene el mismo orden de carriles en toda la canción, incluidas notas largas y acordes.',

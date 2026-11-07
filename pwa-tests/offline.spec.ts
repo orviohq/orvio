@@ -52,7 +52,8 @@ test('desktop installability, exact local song cache and offline warm start', as
   const begin = Date.now();
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => (window as any).orvioDiagnostics?.active);
-  expect(Date.now() - begin).toBeLessThan(900);
+  expect(Date.now() - begin).toBeGreaterThanOrEqual(1180);
+  expect(Date.now() - begin).toBeLessThan(2500);
   await expect(page.locator('#home-screen')).toBeHidden();
   const keys = await page.evaluate(() => caches.keys());
   expect(keys.filter((k) => k.startsWith('orvio-static-')).length).toBe(1);

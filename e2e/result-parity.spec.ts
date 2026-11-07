@@ -1,9 +1,11 @@
+import { mockShare } from './share-mock';
 import { test, expect } from '@playwright/test';
 test('finished and reopened result are the same view, copy works without a link field', async ({
   page,
   context,
 }) => {
   test.setTimeout(85000);
+  const shared = await mockShare(context);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/play/first-light/5/low/');
   await page.keyboard.press('Enter');
@@ -14,7 +16,10 @@ test('finished and reopened result are the same view, copy works without a link 
   await page.evaluate(() => document.fonts.ready);
   const original = await page.locator('#results').screenshot();
   await page.click('#share-result');
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(url);
+  await expect(page.locator('#toast')).toHaveText('링크를 복사했어요');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
+    '/result/?s=',
+  );
   await expect(page.locator('#results #toast')).toBeVisible();
   await expect(page.locator('#toast')).toHaveText('링크를 복사했어요');
   await page.waitForFunction(

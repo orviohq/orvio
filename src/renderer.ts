@@ -1,6 +1,6 @@
 import { motionExposure } from './motion-exposure';
 import { VisualClock } from './visual-clock';
-import { fadeAlpha, type Fader } from './game-options';
+import { blinkAlpha, fadeAlpha, type Fader } from './game-options';
 import { noteLayout } from './note-layout';
 import { Application, Graphics, Container, Sprite, Texture } from 'pixi.js';
 import type { Engine } from './engine';
@@ -31,6 +31,9 @@ export class Playfield {
   private exposureTexture!: Texture;
   reducedMotion = false;
   fader: Fader = 'off';
+  bpm = 120;
+  private fog!: Sprite;
+  private pixelStep = 1;
   width = 440;
   height = 620;
   frames: number[] = [];
@@ -96,7 +99,19 @@ export class Playfield {
     this.exposureTexture = Texture.from(shutter);
     host.appendChild(this.app.canvas);
 
-    this.app.stage.addChild(this.grid, this.notes, this.hit);
+    const fogCanvas = document.createElement('canvas');
+    fogCanvas.width = 4;
+    fogCanvas.height = 128;
+    const fogBrush = fogCanvas.getContext('2d')!,
+      mist = fogBrush.createLinearGradient(0, 0, 0, 128);
+    mist.addColorStop(0, 'rgba(193,211,224,0)');
+    mist.addColorStop(0.55, 'rgba(193,211,224,.95)');
+    mist.addColorStop(1, 'rgba(193,211,224,.65)');
+    fogBrush.fillStyle = mist;
+    fogBrush.fillRect(0, 0, 4, 128);
+    this.fog = new Sprite(Texture.from(fogCanvas));
+    this.fog.visible = false;
+    this.app.stage.addChild(this.grid, this.notes, this.hit, this.fog);
   }
   private rect(color: number) {
     const s = new Sprite(Texture.WHITE);
@@ -189,6 +204,18 @@ export class Playfield {
     now: number,
   ) {
     const begin = performance.now();
+    const step = this.fader.startsWith('pixel')
+      ? Math.min(
+          this.fader === 'pixel2' ? 16 : 8,
+          1 + Math.ceil(engine.combo / 4),
+        )
+      : 1;
+    if (step !== this.pixelStep) {
+      this.pixelStep = step;
+      this.app.renderer.resolution = 1 / step;
+      this.app.renderer.resize(this.width, this.height);
+      this.app.canvas.style.imageRendering = step > 1 ? 'pixelated' : 'auto';
+    }
     time = this.visualClock.sample(now, time);
     // Whole physical pixels per lane. Never clip the final lane at a fractional
     // canvas/backing-store boundary, including after a window resize.
@@ -212,6 +239,18 @@ export class Playfield {
       this.lastFrame && now > this.lastFrame ? now - this.lastFrame : 0;
     if (frameMs) this.frames.push(frameMs);
     this.lastFrame = now;
+    const blink = blinkAlpha(time, this.bpm);
+    this.notes.alpha =
+      this.fader === 'blind' ? 0 : this.fader === 'blink' ? blink : 1;
+    this.app.canvas.style.opacity =
+      this.fader === 'blink2' ? String(blink) : '1';
+    this.fog.visible = this.fader === 'fog';
+    if (this.fog.visible) {
+      this.fog.x = 0;
+      this.fog.y = this.height * 0.5;
+      this.fog.width = this.width;
+      this.fog.height = this.height * 0.5;
+    }
     const width = this.width / lanes;
     const target = this.height - 92;
     const px = target / travel;
@@ -331,6 +370,13 @@ export class Playfield {
     const cpu = this.work.slice(60).sort((a, b) => a - b);
     const sum = a.reduce((x, y) => x + y, 0);
     return {
+      effects: {
+        fader: this.fader,
+        noteAlpha: this.notes.alpha,
+        gearAlpha: Number(this.app.canvas.style.opacity || 1),
+        fog: this.fog.visible,
+        pixelStep: this.pixelStep,
+      },
       samples: a.length,
       averageFps: a.length ? 1000 / (sum / a.length) : 0,
       p95FrameMs: a[Math.floor(a.length * 0.95)] ?? 0,

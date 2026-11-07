@@ -71,7 +71,7 @@ test('all thirteen playing, pause, shuffle restart and actual result layouts', a
     );
   }
   await page.keyboard.press('F3');
-  await page.selectOption('#shuffle', 'mirror');
+  await page.locator('.icon-options-shuffle [data-value="mirror"]').click();
   await page.click('#options-done');
   for (const l of languages) {
     await language(page, l);

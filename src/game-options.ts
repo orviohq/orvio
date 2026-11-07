@@ -1,5 +1,23 @@
 import type { Note } from './chart';
-export type Fader = 'off' | 'in' | 'in2' | 'out' | 'out2';
+export const FADERS = [
+  'off',
+  'in',
+  'in2',
+  'out',
+  'out2',
+  'blink',
+  'blink2',
+  'fog',
+  'pixel',
+  'pixel2',
+  'blind',
+] as const;
+export type Fader = (typeof FADERS)[number];
+// Beat-locked visibility, separate from input/engine time.
+export function blinkAlpha(seconds: number, bpm: number) {
+  const phase = ((Math.max(0, seconds) * bpm) / 60) % 1;
+  return phase < 0.5 ? 1 : 0;
+}
 export type Shuffle = 'off' | 'mirror' | 'random';
 export function laneOrder(
   lanes: number,
@@ -38,7 +56,8 @@ export function transformChart(
   return notes.map((n) => ({ ...n, lane: order[n.lane] }));
 }
 export function fadeAlpha(fader: Fader, progress: number) {
-  if (fader === 'off') return 1;
+  if (fader === 'blind') return 0;
+  if (!['in', 'in2', 'out', 'out2'].includes(fader)) return 1;
   const edge =
     fader === 'in'
       ? 0.5
