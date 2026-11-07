@@ -65,6 +65,8 @@ Astro generates static HTML. The existing TypeScript/PixiJS/Web Audio client run
 
 ## Result sharing
 
-Results stay in memory until Share is pressed. Share opens the device share sheet or copies a result URL. Opening that URL requests a same-site HTML result and PNG social image. Only a fixed built-in song ID, key mode, difficulty, score, accuracy and combo are included. No identity, account, timestamp, device data or local settings are sent. Shared URLs are public to anyone who receives them. Results are self-reported local play, not authenticated leaderboard records.
+The result screen places the share URL in the address bar without making a result request. The share icon copies it immediately; a visible read-only field also allows manual copy. Opening or reloading that URL requests a same-site HTML result and PNG social image. Only a fixed built-in song ID, key mode, difficulty, score, accuracy and combo are included. No identity, account, timestamp, device data or local settings are sent. Shared URLs are public to anyone who receives them. Results are self-reported local play, not authenticated leaderboard records.
 
 Cloudflare Pages Functions handle only `/result/*` and `/result.png`; all gameplay routes remain static. Local result testing: `npx wrangler pages dev dist --port 4176`. The PNG renderer has no runtime font download, external image URL or third-party API dependency.
+
+Website patch notes are available from Home or track selection in each supported language. Browser language is the default (first supported preference, English fallback); settings allow an explicit saved override or a return to browser-following. Old language settings without an explicit mode migrate to browser-following. New/reset speed is 1.5, selected in 0.5 steps; legacy exact speeds remain visibly labeled until changed.

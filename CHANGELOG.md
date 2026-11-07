@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-11-07
+
+### Changed
+
+- Results immediately expose the same bounded URL used for sharing, without sending a result request. The icon copies it directly instead of opening a native share sheet; a read-only link supports manual copy. Reload/direct entry renders the same song/score/accuracy/combo through the server preview.
+- Explicitly clear each opaque WebGL frame and pixel-align note sprites. Software frame duplication probes cover 5/7 lanes, 1.5/5/9 speed and every fade mode. Display-specific high-speed motion perception remains unverified on physical devices, not a claimed fix.
+
+- Replace the speed slider with a native keyboard-accessible selector from 1.0 to 9.0 in 0.5 steps; new/reset speed is 1.5. Old saved/URL speeds remain exact and explicitly labeled as previous values until changed.
+- Default to the first supported browser language, with English fallback. System settings offer browser-following or an explicit saved override; old settings without an explicit mode migrate to browser-following. Patch notes inherit the same selection.
+
+- Replaced long gameplay option text with three original icon tiles and applied values under the note gear. Scroll speed has a larger numeric value; shuffle and fade states use distinct lane/visibility glyphs and dim inactive states.
+- Hover labels, keyboard-focus labels and an accessible full option name explain the tiles. F3, click, paused changes and explicit shuffle restart remain unchanged.
+- Reserved a separate 64px options strip below the playfield so the tiles do not cover keys, note heads or the judgment line.
+- Result Share is an accessible icon button. Social PNG glyphs use output-size antialiasing instead of scaled binary masks. New v2 URLs avoid stale v1 preview caches; old links remain supported.
+- Position settings display miniature left/center/right layouts and explicit selected states, preserving saved values.
+- Key labels use actual symbols, including ␣ , . /, without changing physical bindings. Capture uses a fixed-size status dot and separate full instruction, preventing key-button resizing.
+- Website patch notes cover all releases in English, Korean, Chinese, Japanese and Spanish, with home/selection links and a consistency test against package/changelog versions.
+
 ## [0.2.5] - 2026-11-07
 
 ### Added

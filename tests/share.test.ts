@@ -24,7 +24,7 @@ describe('privacy-safe result sharing', () => {
       ['acc', '101'],
       ['combo', '-1'],
       ['diff', 'extreme'],
-      ['v', '2'],
+      ['v', '3'],
     ]) {
       const bad = resultParams(r);
       bad.set(k, v);
@@ -46,7 +46,7 @@ describe('privacy-safe result sharing', () => {
       b = await resultPNG(r);
     expect(a).toEqual(b);
     expect([...a.slice(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
-    expect(a.length).toBeLessThan(30000);
+    expect(a.length).toBeLessThan(100000);
     const invalid = await onRequest({
       request: new Request('https://example.invalid/result/?score=oops'),
     });

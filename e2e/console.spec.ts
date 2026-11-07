@@ -24,6 +24,7 @@ test('keyboard-only track, difficulty, lanes, settings, locales, start and exit'
   await page.keyboard.press('Tab');
   await expect(page.locator('#language')).toBeFocused();
   await page.keyboard.press('Home');
+  await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await page.keyboard.press('Tab');

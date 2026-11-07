@@ -26,9 +26,20 @@ test('original song loading precedes scoring and sends no result before explicit
       configurable: true,
     }),
   );
+  const resultURL = page.url();
+  expect(resultURL).toContain('/result/?v=2&song=first-light');
+  await expect(page.locator('#result-url')).toHaveValue(resultURL);
+  await page.evaluate(() =>
+    Object.defineProperty(navigator, 'share', {
+      value: () => {
+        throw new Error('native share must not open');
+      },
+      configurable: true,
+    }),
+  );
   await page.click('#share-result');
   const url = await page.evaluate(() => navigator.clipboard.readText());
-  expect(url).toContain('/result/?v=1&song=first-light');
+  expect(url).toBe(resultURL);
   expect(url).toContain('score=0');
   expect(new URL(url).searchParams.size).toBe(7);
   expect(resultRequests).toEqual([]);

@@ -12,7 +12,7 @@ export interface SharedResult {
   combo: number;
 }
 export function readResult(params: URLSearchParams): SharedResult | null {
-  if (params.get('v') !== '1') return null;
+  if (!['1', '2'].includes(params.get('v') || '')) return null;
   const song = params.get('song') as SharedResult['song'];
   const lanes = Number(params.get('keys'));
   const difficulty = params.get('diff') as SharedResult['difficulty'];
@@ -46,7 +46,7 @@ export function readResult(params: URLSearchParams): SharedResult | null {
 }
 export function resultParams(result: SharedResult) {
   return new URLSearchParams({
-    v: '1',
+    v: '2',
     song: result.song,
     keys: String(result.lanes),
     diff: result.difficulty,

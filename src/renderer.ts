@@ -35,7 +35,9 @@ export class Playfield {
     await this.app.init({
       width: host.clientWidth,
       height: host.clientHeight,
-      backgroundAlpha: 0,
+      background: 0x070f19,
+      backgroundAlpha: 1,
+      clearBeforeRender: true,
       antialias: false,
       preference: 'webgl',
       autoStart: false,
@@ -71,6 +73,7 @@ export class Playfield {
   private rect(color: number) {
     const s = new Sprite(Texture.WHITE);
     s.tint = color;
+    s.roundPixels = true;
     return s;
   }
   setup(engine: Engine, lanes: number, color: number) {
@@ -272,7 +275,8 @@ export class Playfield {
         }
       }
     });
-    this.app.renderer.render(this.app.stage);
+    // A frame replaces the previous image; never accumulate transparent frames.
+    this.app.renderer.render({ container: this.app.stage, clear: true });
     this.work.push(performance.now() - begin);
   }
   stats() {

@@ -7,9 +7,13 @@ export const LANGUAGES = {
 } as const;
 export type Language = keyof typeof LANGUAGES;
 const en = {
+  patchNotes: 'Patch notes',
+  browserLanguage: 'Browser language',
+  resultLink: 'Result link',
+  legacySpeed: 'Previous value',
   shareResult: 'Share result',
   sharePrivacy:
-    'Only Share sends a link. Includes song and score, never identity. Local play, unverified.',
+    'Result links contain song and score, never identity. Local play, unverified.',
   resultCopied: 'Result link copied',
   shareFailed: 'Sharing failed. Try again.',
   liveOptionHint:
@@ -104,9 +108,13 @@ const en = {
 };
 type Words = typeof en;
 const ko: Words = {
+  patchNotes: '패치노트',
+  browserLanguage: '브라우저 언어',
+  resultLink: '결과 링크',
+  legacySpeed: '기존 값',
   shareResult: '결과 공유',
   sharePrivacy:
-    '공유를 눌러야 링크가 만들어집니다. 곡과 점수만 포함하며 신원 정보는 없습니다. 검증되지 않은 로컬 결과입니다.',
+    '결과 링크에는 곡과 점수만 포함되며 신원은 없습니다. 검증되지 않은 로컬 기록입니다.',
   resultCopied: '결과 링크를 복사했습니다',
   shareFailed: '공유하지 못했습니다. 다시 시도하세요.',
   liveOptionHint:
@@ -200,9 +208,12 @@ const ko: Words = {
   unmute: '음소거 해제',
 };
 const zh: Words = {
+  patchNotes: '更新日志',
+  browserLanguage: '浏览器语言',
+  resultLink: '成绩链接',
+  legacySpeed: '原有值',
   shareResult: '分享成绩',
-  sharePrivacy:
-    '仅分享时创建链接。仅包含歌曲和分数，无身份信息。本地成绩未经验证。',
+  sharePrivacy: '成绩链接只含歌曲和成绩，不含身份。本地成绩未经验证。',
   resultCopied: '成绩链接已复制',
   shareFailed: '分享失败，请重试。',
   liveOptionHint: '速度和显示在当前歌曲生效。更改轨道顺序需要重新开始。',
@@ -293,9 +304,13 @@ const zh: Words = {
   unmute: '取消静音',
 };
 const ja: Words = {
+  patchNotes: 'パッチノート',
+  browserLanguage: 'ブラウザーの言語',
+  resultLink: '結果リンク',
+  legacySpeed: '以前の値',
   shareResult: '結果を共有',
   sharePrivacy:
-    '共有時のみリンクを作成します。曲とスコアのみで個人情報は含みません。未検証のローカル結果です。',
+    '結果リンクに曲とスコアのみ含み、個人情報はありません。ローカル未検証結果です。',
   resultCopied: '結果リンクをコピーしました',
   shareFailed: '共有できませんでした。再試行してください。',
   liveOptionHint:
@@ -390,9 +405,13 @@ const ja: Words = {
   unmute: 'ミュート解除',
 };
 const es: Words = {
+  patchNotes: 'Notas de versión',
+  browserLanguage: 'Idioma del navegador',
+  resultLink: 'Enlace de resultados',
+  legacySpeed: 'Valor anterior',
   shareResult: 'Compartir resultado',
   sharePrivacy:
-    'Solo Compartir crea el enlace. Incluye canción y puntuación, sin identidad. Resultado local sin verificar.',
+    'El enlace contiene canción y puntuación, nunca identidad. Resultado local no verificado.',
   resultCopied: 'Enlace copiado',
   shareFailed: 'No se pudo compartir. Inténtalo de nuevo.',
   liveOptionHint:

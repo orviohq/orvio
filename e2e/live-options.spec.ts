@@ -6,7 +6,9 @@ test('game option readout, pause edit, cancel shuffle and explicit restart keep 
   await page.goto('/play/first-light/5/high/');
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
-  await expect(page.locator('#play-options')).toContainText('1.6×');
+  await expect(page.locator('#play-options')).toContainText('1.5×');
+  await expect(page.locator('#play-options svg')).toHaveCount(3);
+  await expect(page.locator('#play-options')).toHaveAccessibleName(/F3/);
   const before = await page.evaluate(() => ({
     session: (window as any).orvioDiagnostics.sessionId,
     notes: (window as any).orvioDiagnostics.notes.map((s: any) => s.note),
@@ -20,11 +22,11 @@ test('game option readout, pause edit, cancel shuffle and explicit restart keep 
   expect(
     await page.evaluate(() => (window as any).orvioDiagnostics.clock),
   ).toBeCloseTo(frozen, 2);
-  await page.locator('#speed').fill('2.2');
+  await page.locator('#speed').selectOption('2.5');
   await page.locator('#fader').selectOption('out');
   await page.keyboard.press('Escape');
   await expect(page.locator('#pause')).toBeVisible();
-  await expect(page.locator('#play-options')).toContainText('2.2×');
+  await expect(page.locator('#play-options')).toContainText('2.5×');
   await page.keyboard.press('Enter');
   await page.waitForFunction(
     () => (window as any).orvioDiagnostics.paused === false,
@@ -85,7 +87,7 @@ test('held note survives speed and effect changes without a new chart or remappi
     note.id,
   );
   expect(state.held).toBe(true);
-  await page.locator('#speed').fill('3.0');
+  await page.locator('#speed').selectOption('3');
   await page.locator('#fader').selectOption('in2');
   await page.click('#options-done');
   await expect(page.locator('#pause')).toBeVisible();

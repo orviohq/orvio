@@ -1,0 +1,213 @@
+---
+import { PATCHES, PATCH_LABELS } from '../patch-notes';
+import { LANGUAGES, type Language } from '../i18n';
+---
+
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#14131a" />
+    <meta
+      name="description"
+      content="Orvio release history in English, Korean, Chinese, Japanese and Spanish."
+    />
+    <title>Patch notes · orvio</title>
+    <link rel="icon" href="/favicon.png" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <a href="/" aria-label="orvio home">
+          <img src="/wordmark.svg" alt="orvio" width="105" />
+        </a>
+        <select id="patch-language" aria-label="Language">
+          {Object.entries(LANGUAGES).map(([key, name]) => (
+            <option value={key}>{name}</option>
+          ))}
+        </select>
+      </header>
+      {Object.entries(PATCH_LABELS).map(([lang, label]) => (
+        <div data-language={lang} lang={lang} hidden={lang !== 'ko'}>
+          <a class="back" href="/">
+            ← {label.back}
+          </a>
+          <h1>{label.title}</h1>
+          <p class="scope">{label.scope}</p>
+          {PATCHES.map((p) => (
+            <article id={`${lang}-${p.version}`}>
+              <div class="version">
+                <h2>v{p.version}</h2>
+                <time datetime={p.date}>{p.date}</time>
+              </div>
+              <ul>
+                {p.notes[lang as Language].map((text) => (
+                  <li>{text}</li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
+      ))}
+    </main>
+    <script>
+      import { LANGUAGES } from '../i18n';
+      import { resolvedLanguage } from '../language';
+      const select =
+        document.querySelector<HTMLSelectElement>('#patch-language')!;
+      function show(lang: string) {
+        if (!(lang in LANGUAGES)) lang = 'ko';
+        select.value = lang;
+        document.documentElement.lang = lang;
+        document
+          .querySelectorAll<HTMLElement>('[data-language]')
+          .forEach((el) => (el.hidden = el.dataset.language !== lang));
+        history.replaceState(null, '', '?lang=' + lang);
+      }
+      const params = new URLSearchParams(location.search);
+      let saved = {};
+      try {
+        saved = JSON.parse(localStorage.getItem('orvio.settings.v1') || '{}');
+      } catch {}
+      show(params.get('lang') || resolvedLanguage(saved, navigator.languages));
+      select.onchange = () => show(select.value);
+    </script>
+  </body>
+</html>
+<style>
+  @font-face {
+    font-family: Outfit;
+    src: url('/outfit.ttf');
+  }
+  @font-face {
+    font-family: Noto;
+    src: url('/korean.ttf');
+  }
+  @font-face {
+    font-family: NotoSC;
+    src: url('/chinese.ttf');
+    font-display: swap;
+  }
+  @font-face {
+    font-family: NotoJP;
+    src: url('/japanese.ttf');
+    font-display: swap;
+  }
+  [lang='zh'] {
+    font-family: Outfit, NotoSC, system-ui, sans-serif;
+  }
+  [lang='ja'] {
+    font-family: Outfit, NotoJP, system-ui, sans-serif;
+  }
+  body {
+    margin: 0;
+    background: #14131a;
+    color: #eeedf2;
+    font:
+      16px Outfit,
+      Noto,
+      system-ui,
+      sans-serif;
+    line-height: 1.8;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  main {
+    max-width: 900px;
+    margin: auto;
+    padding: 32px 28px 90px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 52px;
+  }
+  header img {
+    filter: invert(1);
+  }
+  select {
+    max-width: 52%;
+    background: #242333;
+    color: #eeedf2;
+    padding: 10px 12px;
+    border: 1px solid #ffffff30;
+    border-radius: 6px;
+    font: inherit;
+  }
+  a {
+    color: #29d8ff;
+  }
+  h1 {
+    font-size: clamp(32px, 6vw, 54px);
+    margin: 16px 0;
+  }
+  h2 {
+    font-size: 24px;
+    margin: 0;
+  }
+  article {
+    padding: 30px 0;
+    border-top: 1px solid #ffffff24;
+  }
+  .scope {
+    color: #aaa5b8;
+    margin-bottom: 42px;
+  }
+  .version {
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  time {
+    font-size: 13px;
+    color: #aaa5b8;
+  }
+  ul {
+    padding-left: 22px;
+  }
+  li {
+    margin: 12px 0;
+    overflow-wrap: anywhere;
+    word-break: keep-all;
+  }
+  [hidden] {
+    display: none !important;
+  }
+  a:focus-visible,
+  select:focus-visible {
+    outline: 2px solid #29d8ff;
+    outline-offset: 5px;
+  }
+  @media (max-width: 480px) {
+    main {
+      padding: 24px 20px 60px;
+    }
+    header {
+      margin-bottom: 36px;
+    }
+    @font-face {
+      font-family: NotoSC;
+      src: url('/chinese.ttf');
+      font-display: swap;
+    }
+    @font-face {
+      font-family: NotoJP;
+      src: url('/japanese.ttf');
+      font-display: swap;
+    }
+    [lang='zh'] {
+      font-family: Outfit, NotoSC, system-ui, sans-serif;
+    }
+    [lang='ja'] {
+      font-family: Outfit, NotoJP, system-ui, sans-serif;
+    }
+    body {
+      font-size: 15px;
+    }
+  }
+</style>

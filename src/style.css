@@ -2069,17 +2069,101 @@ dialog input[type='checkbox'] {
   outline: 2px solid #d7faff;
 }
 
+#highway {
+  height: calc(100% - 64px);
+  bottom: 64px;
+}
+#keycaps {
+  bottom: 88px;
+}
 .option-readout {
-  display: block;
-  max-width: 100%;
-  margin-top: 18px;
-  padding: 12px;
-  border: 1px solid #ffffff24;
-  border-radius: 8px;
-  line-height: 1.9;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  padding: 5px 10px;
+  background: #171b25;
+  border-top: 1px solid #ffffff1a;
   text-align: left;
-  font-size: 12px;
-  color: #cbc8d6;
+  z-index: 4;
+}
+.option-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  position: relative;
+  width: 66px;
+  height: 53px;
+  padding: 4px;
+  border: 1px solid #ffffff15;
+  border-radius: 6px;
+  background: #202431;
+  color: #a5a1b4;
+  white-space: nowrap;
+}
+.option-chip svg {
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+  color: #777e96;
+}
+.option-chip:first-child {
+  background: #193c4c;
+  border-color: #29d8ff44;
+  color: #e4fbff;
+}
+.option-chip:first-child svg,
+.option-chip.enabled svg {
+  color: #29d8ff;
+}
+.option-chip.enabled {
+  background: #1c303b;
+  border-color: #29d8ff44;
+  color: #dcf8ff;
+}
+.option-chip b {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0.3px;
+}
+.option-chip:first-child b {
+  font-size: 20px;
+}
+.option-readout kbd {
+  font:
+    10px Outfit,
+    sans-serif;
+  color: #8e899e;
+  padding: 5px;
+}
+.option-chip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  padding: 6px 9px;
+  border: 1px solid #ffffff25;
+  border-radius: 5px;
+  background: #242333;
+  color: #eeedf2;
+  font-size: 11px;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 5;
+}
+.option-chip:hover::after,
+.option-readout:focus-visible .option-chip::after {
+  opacity: 1;
+}
+.option-readout:hover .option-chip {
+  border-color: #29d8ff77;
 }
 
 #song-loading {
@@ -2125,4 +2209,161 @@ dialog input[type='checkbox'] {
   display: block;
   margin-top: 32px;
   font-size: 14px;
+}
+
+#share-result {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #ffffff30;
+  border-radius: 8px;
+  color: #29d8ff;
+}
+#share-result svg {
+  width: 24px;
+  height: 24px;
+}
+#position {
+  gap: 8px;
+}
+#position button {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid transparent;
+}
+#position button.selected {
+  border-color: #29d8ff77;
+}
+.position-preview {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  height: 48px;
+  padding: 5px;
+  background: #10121b;
+  border: 1px solid #ffffff18;
+  border-radius: 4px;
+  margin-bottom: 7px;
+  align-items: stretch;
+}
+.position-preview i {
+  flex: 1;
+  background: #ffffff0a;
+  border-radius: 2px;
+}
+.position-preview b {
+  width: 35%;
+  background: repeating-linear-gradient(
+    90deg,
+    #29d8ff30 0,
+    #29d8ff30 5px,
+    #29d8ff70 5px,
+    #29d8ff70 6px
+  );
+  border: 1px solid #29d8ff80;
+  border-bottom: 3px solid #29d8ff;
+  border-radius: 2px;
+}
+[data-pos='left'] .position-preview b {
+  order: -1;
+}
+[data-pos='right'] .position-preview b {
+  order: 1;
+}
+
+.home-patches {
+  position: absolute;
+  bottom: 26px;
+  right: 32px;
+  font-size: 12px;
+  color: #aaa5b8;
+}
+.footer-strip a {
+  font-size: 11px;
+  color: #aaa5b8;
+  white-space: nowrap;
+}
+
+.binding-keys {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.binding-keys .key-bind {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  padding: 4px;
+  line-height: 1;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.binding-keys .key-bind.listening {
+  font-size: 15px;
+}
+#bind-hint {
+  min-height: 3.8em;
+  line-height: 1.7;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+#settings label,
+#settings .hint,
+#game-options .hint {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+#settings .dialog-title h2,
+#game-options .dialog-title h2 {
+  min-width: 0;
+}
+@media (max-width: 480px) {
+  .control-row,
+  .mode-row {
+    flex-wrap: wrap;
+  }
+  #difficulty {
+    flex: 1;
+    min-width: 0;
+  }
+  #difficulty button {
+    padding-left: 9px;
+    padding-right: 9px;
+  }
+  #lanes {
+    flex-shrink: 0;
+  }
+  .footer-strip {
+    flex-wrap: wrap;
+    row-gap: 14px;
+  }
+  .footer-strip > span {
+    width: 100%;
+    order: 2;
+    line-height: 1.7;
+  }
+}
+
+#result-url {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #ffffff25;
+  background: #121722;
+  color: #b6becb;
+  font:
+    12px Outfit,
+    system-ui,
+    sans-serif;
+  padding: 10px;
+  margin: 4px 0 12px;
+  border-radius: 0;
+}
+
+#bind-hint {
+  display: grid;
+}
+#bind-hint > span {
+  grid-area: 1/1;
 }
