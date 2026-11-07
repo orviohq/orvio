@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Hourly production browser checks, retained failure evidence and recovery runbook.
+
 ## [0.1.0] - 2026-11-07
 
 ### Added

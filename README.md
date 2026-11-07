@@ -47,6 +47,6 @@ The judgment labels follow the RESPECT family: MAX 100%, 90%, 80%, 70%, 60%, 50%
 
 ## Quality and release
 
-Tests, formatting, strict type checking and production build run in CI. Versioned releases use SemVer and `CHANGELOG.md`. See [contributing](CONTRIBUTING.md), [security](SECURITY.md), [performance](docs/performance.md), and [asset provenance](docs/assets.md).
+Tests, formatting, strict type checking and production build run in CI. Hourly production browser checks and an independent failure/missing-run watch cover the deployed site. See the [operations and recovery runbook](docs/operations.md). Versioned releases use SemVer and `CHANGELOG.md`. See [contributing](CONTRIBUTING.md), [security](SECURITY.md), [performance](docs/performance.md), and [asset provenance](docs/assets.md).
 
 Code and original procedural music are MIT licensed. Outfit and the subset of Noto Sans KR retain their respective SIL OFL notices in `public/`. The logo is original project artwork, with no trademark-clearance claim. No DJMAX music, graphics, charts or code are included.

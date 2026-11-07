@@ -1,0 +1,35 @@
+name: production
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: production-monitor
+  cancel-in-progress: false
+jobs:
+  production-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Check deployed game, keyboard results, settings and mobile browsing
+        run: npx playwright test --config playwright.production.config.ts
+      - name: Keep failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-e2e-failure
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
