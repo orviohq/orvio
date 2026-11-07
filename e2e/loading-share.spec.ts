@@ -15,7 +15,7 @@ test('original song loading precedes scoring and sends no result before explicit
   expect(
     await page.evaluate(() => (window as any).orvioDiagnostics.active),
   ).toBe(false);
-  await page.screenshot({ path: '/downloads/orvio025-loading.png' });
+  await page.screenshot({ path: 'test-results/loading.png' });
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
   await expect(page.locator('#song-loading')).toBeHidden();
   await expect(page.locator('#results')).toBeVisible({ timeout: 50000 });
@@ -32,5 +32,5 @@ test('original song loading precedes scoring and sends no result before explicit
   expect(url).toContain('score=0');
   expect(new URL(url).searchParams.size).toBe(7);
   expect(resultRequests).toEqual([]);
-  await page.screenshot({ path: '/downloads/orvio025-share.png' });
+  await page.screenshot({ path: 'test-results/sharing.png' });
 });
