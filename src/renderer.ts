@@ -1,3 +1,4 @@
+import { fadeAlpha, type Fader } from './game-options';
 import { noteLayout } from './note-layout';
 import { Application, Graphics, Container, Sprite, Texture } from 'pixi.js';
 import type { Engine } from './engine';
@@ -21,6 +22,8 @@ export class Playfield {
   private host!: HTMLElement;
   private burstTexture!: Texture;
   reducedMotion = false;
+  fader: Fader = 'off';
+  private visibilityMask = new Graphics();
   width = 440;
   height = 620;
   frames: number[] = [];
@@ -63,6 +66,8 @@ export class Playfield {
     ctx.fillRect(32, 84, 64, 10);
     this.burstTexture = Texture.from(c);
     host.appendChild(this.app.canvas);
+    this.app.stage.addChild(this.visibilityMask);
+    this.notes.mask = this.visibilityMask;
     this.app.stage.addChild(this.grid, this.notes, this.hit);
   }
   private rect(color: number) {
@@ -175,6 +180,20 @@ export class Playfield {
     const width = this.width / lanes;
     const target = this.height - 92;
     const px = target / travel;
+    const edge =
+      this.fader === 'in'
+        ? 0.5
+        : this.fader === 'in2'
+          ? 2 / 3
+          : this.fader === 'out'
+            ? 2 / 3
+            : 0.5;
+    const startY = this.fader.startsWith('in') ? target * edge : 0;
+    const endY = this.fader.startsWith('out') ? target * edge : this.height;
+    this.visibilityMask
+      .clear()
+      .rect(0, startY, this.width, endY - startY)
+      .fill(0xffffff);
     for (let lane = 0; lane < lanes; lane++) {
       const k = this.keys[lane];
       k.visible = this.pressed.has(lane);
@@ -224,6 +243,7 @@ export class Playfield {
       const layout = noteLayout(s, target, time, px, this.height);
       const { visible, headY: y, endY } = layout;
       v.head.visible = layout.showHead;
+      v.head.alpha = fadeAlpha(this.fader, y / target);
       const x = n.lane * width + 5;
       const nw = width - 10;
       if (v.head.visible) {
@@ -239,7 +259,8 @@ export class Playfield {
           v.body.tint = layout.failed ? 0x66747e : this.noteColor;
           v.body.alpha = layout.failed ? 0.2 : 0.36;
           v.tail.tint = layout.failed ? 0x88949b : 0xe5faff;
-          v.tail.alpha = layout.failed ? 0.45 : 1;
+          v.tail.alpha =
+            (layout.failed ? 0.45 : 1) * fadeAlpha(this.fader, endY / target);
           v.body.x = x + nw * 0.23;
           v.body.y = endY;
           v.body.width = nw * 0.54;

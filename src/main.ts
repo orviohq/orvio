@@ -1,3 +1,4 @@
+import { transformChart, type Fader, type Shuffle } from './game-options';
 import { LANGUAGES, translate, type Language, type Word } from './i18n';
 import './style.css';
 import {
@@ -23,6 +24,8 @@ interface Settings {
   difficulty: Difficulty;
   position: 'left' | 'center' | 'right';
   speed: number;
+  fader: Fader;
+  shuffle: Shuffle;
   volume: number;
   keys: Record<Lanes, string[]>;
 }
@@ -43,14 +46,23 @@ function getSettings(): Settings {
     reducedMotion: false,
     lanes: 5,
     difficulty: 'low',
-    position: 'center',
+    position: 'left',
     speed: 1.6,
+    fader: 'off',
+    shuffle: 'off',
     volume: 0.7,
     keys: structuredClone(defaults),
     ...automatic,
   };
 }
 let settings = getSettings();
+settings.speed =
+  Math.round(Math.max(1, Math.min(9, Number(settings.speed) || 1.6)) * 10) / 10;
+if (!['off', 'in', 'in2', 'out', 'out2'].includes(settings.fader))
+  settings.fader = 'off';
+if (!['off', 'mirror', 'random'].includes(settings.shuffle))
+  settings.shuffle = 'off';
+let shuffleSeed = crypto.getRandomValues(new Uint32Array(1))[0];
 if (!(settings.language in LANGUAGES)) settings.language = 'ko';
 const t = (word: Word) => translate(settings.language, word);
 const label = (word: Word) => `<span data-i18n="${word}">${t(word)}</span>`;
@@ -87,9 +99,9 @@ function keyLabel(code: string) {
 const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.2</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
-<section id="home-screen"><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div class="eyebrow">${label('selected')} <span id="selection-number">01 / 03</span></div><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
-<section class="library" aria-label="Track selection"><div class="section-title"><strong>${label('select')}</strong><span>ORIGINALS / 001</span></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">${label('easy')} <small>01</small></button><button data-diff="mid">${label('normal')} <small>02</small></button><button data-diff="high">${label('hard')} <small>03</small></button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div><div class="under-start"><span id="chart-info"></span><span>${label('keyboard')}</span></div></section>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.3</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<section id="home-screen"><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div class="eyebrow">${label('selected')} <span id="selection-number">01 / 03</span></div><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
+<section class="library" aria-label="Track selection"><div class="section-title"><strong>${label('select')}</strong><span>ORIGINALS / 001</span></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">${label('easy')} <small>01</small></button><button data-diff="mid">${label('normal')} <small>02</small></button><button data-diff="high">${label('hard')} <small>03</small></button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div><div class="under-start"><span id="chart-info"></span><span>${label('keyboard')}</span></div></section>
 <section class="footer-strip"><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
 <section id="game" class="hidden" aria-label="Rhythm game"><div class="game-top"><button id="exit" class="quiet">ESC ${label('exit')}</button><div class="song-now"><strong id="now-title"></strong><span id="now-detail"></span></div><div class="perf"><span id="fps">-- FPS</span><i></i></div></div><div id="progress"><div></div></div><div id="arena" data-position="center"><aside class="score-block"><span class="eyebrow">${label('score')}</span><strong id="score">0000000</strong><div><b id="rate">100.00</b><span>% ${label('accuracy')}</span></div><div class="session-signal"><b>LIVE</b><span>OUTPUT SYNC</span></div></aside><div id="highway-wrap"><div id="highway"></div><div id="impact" aria-hidden="true"></div><div id="judge" aria-live="off"></div><div id="combo"></div><div id="keycaps"></div><div id="countdown"></div></div><aside class="track-block"><div class="orb-mini"></div><span class="eyebrow">ORVIO ORIGINALS</span><h2 id="side-title"></h2><div id="lane-detail"></div><p>${label('hold')}</p></aside></div><div class="game-footer"><span>${label('hold')}</span><span id="clock-info">${t('synced')}</span></div></section>
 <dialog id="pause"><div class="eyebrow">ORVIO / SESSION</div><h2>${label('pause')}</h2><button id="resume" class="primary">${label('resume')} ↵</button><button id="pause-settings" class="quiet">F2 ${label('options')}</button><button id="pause-exit" class="quiet">${label('back')}</button></dialog><dialog id="settings"><form method="dialog"><div class="dialog-title"><div><span class="eyebrow">SYSTEM / OPTIONS</span><h2>${label('options')}</h2></div><button class="close" aria-label="Close">×</button></div></form><label for="language">${label('language')}</label><select id="language">${Object.entries(
@@ -98,8 +110,8 @@ app.innerHTML = `
   .map(([k, v]) => `<option value="${k}">${v}</option>`)
   .join(
     '',
-  )}</select><label>${label('position')}</label><div class="segmented" id="position"><button data-pos="left">${label('left')}</button><button data-pos="center">${label('center')}</button><button data-pos="right">${label('right')}</button></div><label for="speed">${label('speed')} <output id="speed-value"></output></label><input id="speed" type="range" min="0.8" max="3" step="0.1"><p class="hint">${label('auto')}</p><label for="volume">${label('volume')}</label><input id="volume" type="range" min="0" max="1" step="0.05"><label>${label('bindings')} <span id="binding-mode"></span></label><div id="bindings"></div><p class="hint" id="bind-hint">${label('bindHint')}</p><label class="toggle"><span>${label('reduced')}</span><input id="reduced-motion" type="checkbox"></label><button id="reset" class="quiet">${label('reset')}</button><p class="local-note">${label('local')} · TAB / SHIFT TAB / ESC</p></dialog>
-<dialog id="results"><div class="result-system">ORVIO / SESSION REPORT</div><span class="eyebrow">${label('session')}</span><div class="result-heading"><h2 id="result-song"></h2><span id="result-rank"></span></div><div id="result-badge"></div><div class="result-score" id="result-score"></div><div class="result-stats"><div><span>${label('accuracy')}</span><strong id="result-rate"></strong></div><div><span>${label('maxCombo')}</span><strong id="result-combo"></strong></div><div><span>BREAK</span><strong id="result-break"></strong></div></div><div id="judgment-list"></div><p id="result-perf" class="hint"></p><div class="result-actions"><button id="back" class="quiet">ESC ${label('back')}</button><button id="retry" class="primary">${label('retry')} ↵</button></div><p class="hint">${label('resultHint')}</p></dialog>
+  )}</select><label>${label('position')}</label><div class="segmented" id="position"><button data-pos="left">${label('left')}</button><button data-pos="center">${label('center')}</button><button data-pos="right">${label('right')}</button></div><p class="hint">${label('auto')}</p><label for="volume">${label('volume')}</label><input id="volume" type="range" min="0" max="1" step="0.05"><label>${label('bindings')} <span id="binding-mode"></span></label><div id="bindings"></div><p class="hint" id="bind-hint">${label('bindHint')}</p><label class="toggle"><span>${label('reduced')}</span><input id="reduced-motion" type="checkbox"></label><button id="reset" class="quiet">${label('reset')}</button><p class="local-note">${label('local')} · TAB / SHIFT TAB / ESC</p></dialog>
+<dialog id="game-options"><form method="dialog"><div class="dialog-title"><h2>${label('gameOptions')}</h2><button class="close" aria-label="Close">×</button></div></form><label for="speed">${label('speed')} <output id="speed-value"></output></label><input id="speed" type="range" min="1" max="9" step="0.1"><label for="fader">${label('fader')}</label><select id="fader"><option value="off">OFF</option><option value="in">FADE IN</option><option value="in2">FADE IN 2</option><option value="out">FADE OUT</option><option value="out2">FADE OUT 2</option></select><label for="shuffle">${label('shuffle')}</label><select id="shuffle"><option value="off">OFF</option><option value="mirror">MIRROR</option><option value="random">RANDOM</option></select><p class="hint">${label('optionHint')}</p><button id="options-done" class="primary">${label('close')} ↵</button></dialog><dialog id="results"><div class="result-system">ORVIO / SESSION REPORT</div><span class="eyebrow">${label('session')}</span><div class="result-heading"><h2 id="result-song"></h2><span id="result-rank"></span></div><div id="result-badge"></div><div class="result-score" id="result-score"></div><div class="result-stats"><div><span>${label('accuracy')}</span><strong id="result-rate"></strong></div><div><span>${label('maxCombo')}</span><strong id="result-combo"></strong></div><div><span>BREAK</span><strong id="result-break"></strong></div></div><div id="judgment-list"></div><p id="result-perf" class="hint"></p><div class="result-actions"><button id="back" class="quiet">ESC ${label('back')}</button><button id="retry" class="primary">${label('retry')} ↵</button></div><p class="hint">${label('resultHint')}</p></dialog>
 <dialog id="about"><form method="dialog"><div class="dialog-title"><h2>${label('aboutTitle')}</h2><button class="close" aria-label="Close">×</button></div></form><p>${label('aboutBody')}</p><a href="https://github.com/orviohq/orvio" target="_blank" rel="noreferrer">${label('code')} ↗</a></dialog><div id="toast" role="status"></div>`;
 function localize() {
   document.documentElement.lang = settings.language;
@@ -180,6 +192,8 @@ function syncSettings() {
     `${makeChart(SONGS[songIndex], settings.difficulty, settings.lanes).length} ${t('notes')} · ${t('original')}`;
   for (const id of ['speed', 'volume'] as const)
     $<HTMLInputElement>('#' + id).value = String(settings[id]);
+  $<HTMLSelectElement>('#fader').value = settings.fader;
+  $<HTMLSelectElement>('#shuffle').value = settings.shuffle;
   $('#speed-value').textContent = settings.speed.toFixed(1) + '×';
   $('#binding-mode').textContent = '5 KEY / 7 KEY';
   $('#bindings').innerHTML = ([5, 7] as Lanes[])
@@ -234,7 +248,7 @@ async function prepare() {
 }
 async function start() {
   if (screen === 'home') {
-    location.href = '/select/';
+    $('#home-start').click();
     return;
   }
   if (preparing || active) return;
@@ -258,11 +272,19 @@ async function start() {
       await field.init($('#highway'));
     }
     const song = SONGS[songIndex];
-    engine = new Engine(makeChart(song, settings.difficulty, settings.lanes));
+    engine = new Engine(
+      transformChart(
+        makeChart(song, settings.difficulty, settings.lanes),
+        settings.lanes,
+        settings.shuffle,
+        shuffleSeed,
+      ),
+    );
     seenEvents = 0;
     sequence = 0;
     sessionId = crypto.randomUUID();
     field.reducedMotion = settings.reducedMotion;
+    field.fader = settings.fader;
     field.pressed.clear();
     field.flashes.clear();
     field.setup(
@@ -489,6 +511,23 @@ window.addEventListener('keydown', (e) => {
     } else void pauseGame();
     return;
   }
+  if ($<HTMLDialogElement>('#game-options').open) {
+    if (e.code === 'Escape') {
+      e.preventDefault();
+      $<HTMLDialogElement>('#game-options').close();
+    }
+    return;
+  }
+  if (
+    e.code === 'F3' &&
+    !document.querySelector('dialog[open]') &&
+    !active &&
+    screen !== 'home'
+  ) {
+    e.preventDefault();
+    $('#open-game-options').click();
+    return;
+  }
   if (!active) {
     if (screen === 'home' || screen === 'ready') {
       if (
@@ -653,6 +692,25 @@ $('#settings').addEventListener('close', () => {
     $('#resume').focus();
   }
 });
+function openGameOptions() {
+  if (active) return;
+  syncSettings();
+  $<HTMLDialogElement>('#game-options').showModal();
+}
+$('#open-game-options').onclick = openGameOptions;
+$('#ready-options').onclick = openGameOptions;
+$('#options-done').onclick = () =>
+  $<HTMLDialogElement>('#game-options').close();
+for (const id of ['fader', 'shuffle'] as const)
+  $<HTMLSelectElement>('#' + id).onchange = (e) => {
+    const value = (e.target as HTMLSelectElement).value;
+    if (id === 'fader') settings.fader = value as Fader;
+    else {
+      settings.shuffle = value as Shuffle;
+      shuffleSeed = crypto.getRandomValues(new Uint32Array(1))[0];
+    }
+    syncSettings();
+  };
 $('#start').onclick = () => void start();
 $('#exit').onclick = () => void pauseGame();
 $('#retry').onclick = () => {
@@ -763,18 +821,20 @@ $('#reset').onclick = () => {
     reducedMotion: settings.reducedMotion,
     lanes: settings.lanes,
     difficulty: settings.difficulty,
-    position: 'center',
+    position: 'left',
     speed: 1.6,
+    fader: 'off',
+    shuffle: 'off',
     volume: 0.7,
     keys: structuredClone(defaults),
   };
   syncSettings();
 };
 function playPath() {
-  return `/play/${SONGS[songIndex].id}/${settings.lanes}/${settings.difficulty}/`;
+  return `/play/${SONGS[songIndex].id}/${settings.lanes}/${settings.difficulty}/?speed=${settings.speed.toFixed(1)}&fader=${settings.fader}&shuffle=${settings.shuffle}&seed=${shuffleSeed}`;
 }
 function selectionPath() {
-  return `/select/?song=${SONGS[songIndex].id}&lanes=${settings.lanes}&difficulty=${settings.difficulty}`;
+  return `/select/?song=${SONGS[songIndex].id}&lanes=${settings.lanes}&difficulty=${settings.difficulty}&speed=${settings.speed.toFixed(1)}&fader=${settings.fader}&shuffle=${settings.shuffle}&seed=${shuffleSeed}`;
 }
 function readRoute() {
   readingRoute = true;
@@ -784,6 +844,21 @@ function readRoute() {
   if (active || paused) exit();
   const parts = location.pathname.split('/').filter(Boolean);
   const q = new URLSearchParams(location.search);
+  const speed = Number(q.get('speed'));
+  if (q.has('speed') && Number.isFinite(speed) && speed >= 1 && speed <= 9)
+    settings.speed = Math.round(speed * 10) / 10;
+  if (['off', 'in', 'in2', 'out', 'out2'].includes(q.get('fader') || ''))
+    settings.fader = q.get('fader') as Fader;
+  if (['off', 'mirror', 'random'].includes(q.get('shuffle') || ''))
+    settings.shuffle = q.get('shuffle') as Shuffle;
+  const seed = Number(q.get('seed'));
+  if (
+    q.has('seed') &&
+    Number.isInteger(seed) &&
+    seed >= 0 &&
+    seed <= 4294967295
+  )
+    shuffleSeed = seed;
   const id = parts[0] === 'play' ? parts[1] : q.get('song');
   const idx = SONGS.findIndex((s) => s.id === id);
   if (idx >= 0) songIndex = idx;
@@ -829,7 +904,7 @@ readRoute();
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.2.2',
+    version: '0.2.3',
     active,
     paused,
     sessionId,
@@ -838,6 +913,10 @@ Object.defineProperty(window, 'orvioDiagnostics', {
       language: settings.language,
       lanes: settings.lanes,
       difficulty: settings.difficulty,
+      speed: settings.speed,
+      fader: settings.fader,
+      shuffle: settings.shuffle,
+      shuffleSeed,
     },
     clock: clock?.now(),
     notes: engine?.states.map((s) => ({ ...s })),

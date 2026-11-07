@@ -7,6 +7,12 @@ export const LANGUAGES = {
 } as const;
 export type Language = keyof typeof LANGUAGES;
 const en = {
+  gameOptions: 'GAME OPTIONS',
+  fader: 'Note visibility',
+  shuffle: 'Lane shuffle',
+  optionHint:
+    'Applied to the next play. Random uses one lane permutation for the entire chart, keeping holds and chords intact.',
+
   pause: 'PAUSED',
   resume: 'RESUME',
   select: 'TRACK SELECT',
@@ -85,6 +91,12 @@ const en = {
 };
 type Words = typeof en;
 const ko: Words = {
+  gameOptions: '게임 옵션',
+  fader: '노트 표시',
+  shuffle: '노트 섞기',
+  optionHint:
+    '다음 플레이에 적용됩니다. RANDOM은 채보 전체에 같은 레인 순서를 적용해 롱노트와 동시입력을 보존합니다.',
+
   pause: '일시정지',
   resume: '계속 플레이',
   select: '곡 선택',
@@ -162,6 +174,12 @@ const ko: Words = {
   unmute: '음소거 해제',
 };
 const zh: Words = {
+  gameOptions: '游戏选项',
+  fader: '音符显示',
+  shuffle: '轨道随机',
+  optionHint:
+    '下一次游戏生效。RANDOM 整曲使用相同轨道顺序，保留长按和同时音符。',
+
   pause: '已暂停',
   resume: '继续游戏',
   select: '曲目选择',
@@ -238,6 +256,12 @@ const zh: Words = {
   unmute: '取消静音',
 };
 const ja: Words = {
+  gameOptions: 'ゲームオプション',
+  fader: 'ノート表示',
+  shuffle: 'ノート配置',
+  optionHint:
+    '次のプレイに適用。RANDOM は曲全体で同じレーン順を使い、ロングノートと同時押しを保ちます。',
+
   pause: '一時停止',
   resume: 'プレイ再開',
   select: '楽曲選択',
@@ -316,6 +340,12 @@ const ja: Words = {
   unmute: 'ミュート解除',
 };
 const es: Words = {
+  gameOptions: 'OPCIONES DE JUEGO',
+  fader: 'Visibilidad de notas',
+  shuffle: 'Mezcla de carriles',
+  optionHint:
+    'Se aplica en la próxima partida. RANDOM mantiene el mismo orden de carriles en toda la canción, incluidas notas largas y acordes.',
+
   pause: 'PAUSA',
   resume: 'CONTINUAR',
   select: 'SELECCIÓN',

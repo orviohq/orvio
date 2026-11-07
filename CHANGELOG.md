@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-07
+
+### Added
+
+- Separate game options (F3) in track selection and direct-chart ready screens: speed 1.0–9.0 in 0.1 steps, FADE IN / IN 2 / OUT / OUT 2, MIRROR and RANDOM.
+- Reproducible full-chart lane permutations with a URL seed; holds and chords remain intact. Fader changes affect only note visibility, not scoring.
+
+### Changed
+
+- Scroll speed moved out of system settings. Game options apply at the next play and are preserved in direct-chart and selection URLs.
+- New and reset playfields default to left. Explicit saved left/center/right choices remain intact.
+
+### Scope
+
+- Option names and approximate reveal/hide regions are informed by community RESPECT V documentation, not an exact renderer or timing clone. Orvio's custom seven lanes have their own lane permutation. No CHAOS, BLINK, FOG, PIXEL or BLIND claim.
+
 ## [0.2.2] - 2026-11-07
 
 ### Changed

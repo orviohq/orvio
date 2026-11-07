@@ -1,0 +1,47 @@
+import { test, expect } from '@playwright/test';
+test('options separate from system settings, saved URL, keyboard, defaults and saved position', async ({
+  page,
+}) => {
+  await page.goto('/select/');
+  await page.keyboard.press('F2');
+  await expect(page.locator('#settings #speed')).toHaveCount(0);
+  await expect(page.locator('[data-pos="left"]')).toHaveClass(/selected/);
+  await page.click('[data-pos="right"]');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('F3');
+  await expect(page.locator('#game-options')).toBeVisible();
+  await expect(page.locator('#speed')).toHaveAttribute('step', '0.1');
+  await expect(page.locator('#speed')).toHaveAttribute('min', '1');
+  await expect(page.locator('#speed')).toHaveAttribute('max', '9');
+  await page.locator('#speed').fill('2.3');
+  await page.locator('#fader').selectOption('in2');
+  await page.locator('#shuffle').selectOption('random');
+  await page.screenshot({ path: 'test-results/game-options.png' });
+  await page.keyboard.press('Escape');
+  const link = page.url();
+  expect(link).toContain('speed=2.3');
+  expect(link).toContain('fader=in2');
+  expect(link).toContain('shuffle=random');
+  await page.reload();
+  await page.keyboard.press('F2');
+  await expect(page.locator('[data-pos="right"]')).toHaveClass(/selected/);
+  await page.click('#reset');
+  await expect(page.locator('[data-pos="left"]')).toHaveClass(/selected/);
+  await page.keyboard.press('Escape');
+  await page.goto(link);
+  await page.keyboard.press('F3');
+  await expect(page.locator('#fader')).toHaveValue('in2');
+  await expect(page.locator('#speed')).toHaveValue('2.3');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
+  await expect(page.locator('#arena')).toHaveAttribute('data-position', 'left');
+  const url = page.url();
+  expect(url).toContain('shuffle=random');
+  await page.reload();
+  await expect(page.locator('#ready-screen')).toBeVisible();
+  await page.keyboard.press('F3');
+  await expect(page.locator('#game-options')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#game-options')).not.toBeVisible();
+});
