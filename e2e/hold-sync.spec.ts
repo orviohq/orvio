@@ -50,18 +50,8 @@ test('legacy calibration removed and held body stays visible past head culling',
       during.events.find((e: any) => e.noteId === n.id && !e.tail).delta,
     ),
   ).toBeLessThan(45);
-  await page
-    .locator('canvas')
-    .screenshot({ path: 'test-results/hold-mid.png' });
-  console.log(
-    'HOLD_PIXEL_REGION',
-    JSON.stringify({
-      note: n,
-      clock: during.clock,
-      canvas: await page.locator('canvas').boundingBox(),
-      outputLatency: during.latency,
-    }),
-  );
+  // Do not take a screenshot between head and tail: capture latency can exceed
+  // the remaining hold on a loaded runner and delay the real key-up event.
   await page.waitForFunction(
     (t) => (window as any).orvioDiagnostics.clock >= t,
     n.end,
