@@ -268,7 +268,6 @@ async function start() {
     return;
   }
   preparing = true;
-  const loadingAt = performance.now();
   const loadingSong = SONGS[songIndex];
   $<HTMLImageElement>('#loading-wallpaper').src =
     `/wallpapers/${loadingSong.id}.png`;
@@ -284,6 +283,8 @@ async function start() {
   document.body.classList.add('playing');
   $('#start').setAttribute('disabled', '');
   try {
+    await $<HTMLImageElement>('#loading-wallpaper').decode();
+    const wallpaperAt = performance.now();
     const track = await prepare();
     $('#lobby').classList.add('hidden');
     $('#game').classList.remove('hidden');
@@ -328,7 +329,7 @@ async function start() {
     $('#clock-info').textContent = t('synced');
     clock.setVolume(settings.volume);
     await new Promise((resolve) =>
-      setTimeout(resolve, Math.max(0, 900 - (performance.now() - loadingAt))),
+      setTimeout(resolve, Math.max(0, 900 - (performance.now() - wallpaperAt))),
     );
     $('#song-loading').classList.add('hidden');
     await clock.play(track.buffer);
