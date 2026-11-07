@@ -23,7 +23,6 @@ export class Playfield {
   private burstTexture!: Texture;
   reducedMotion = false;
   fader: Fader = 'off';
-  private visibilityMask = new Graphics();
   width = 440;
   height = 620;
   frames: number[] = [];
@@ -66,8 +65,7 @@ export class Playfield {
     ctx.fillRect(32, 84, 64, 10);
     this.burstTexture = Texture.from(c);
     host.appendChild(this.app.canvas);
-    this.app.stage.addChild(this.visibilityMask);
-    this.notes.mask = this.visibilityMask;
+
     this.app.stage.addChild(this.grid, this.notes, this.hit);
   }
   private rect(color: number) {
@@ -190,10 +188,6 @@ export class Playfield {
             : 0.5;
     const startY = this.fader.startsWith('in') ? target * edge : 0;
     const endY = this.fader.startsWith('out') ? target * edge : this.height;
-    this.visibilityMask
-      .clear()
-      .rect(0, startY, this.width, endY - startY)
-      .fill(0xffffff);
     for (let lane = 0; lane < lanes; lane++) {
       const k = this.keys[lane];
       k.visible = this.pressed.has(lane);
@@ -262,9 +256,15 @@ export class Playfield {
           v.tail.alpha =
             (layout.failed ? 0.45 : 1) * fadeAlpha(this.fader, endY / target);
           v.body.x = x + nw * 0.23;
-          v.body.y = endY;
+          const bodyTop = Math.max(endY, startY);
+          const bodyBottom = Math.min(
+            endY + layout.bodyHeight,
+            this.fader.startsWith('out') ? target * edge : this.height,
+          );
+          v.body.y = bodyTop;
           v.body.width = nw * 0.54;
-          v.body.height = layout.bodyHeight;
+          v.body.height = Math.max(0, bodyBottom - bodyTop);
+          v.body.visible = bodyBottom > bodyTop;
           v.tail.x = x;
           v.tail.y = endY;
           v.tail.width = nw;
