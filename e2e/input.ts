@@ -12,7 +12,7 @@ export async function atKey(
       new Promise<void>((resolve) => {
         const tick = () => {
           if ((window as any).orvioDiagnostics.clock < at) {
-            requestAnimationFrame(tick);
+            setTimeout(tick, 1);
             return;
           }
           window.dispatchEvent(
