@@ -14,7 +14,8 @@ Choose a track, difficulty (하 / 중 / 상) and 5 KEY or 7 KEY. Press Enter or 
 
 - 5 keys: D F Space J K
 - 7 keys: S D F Space J K L
-- Settings: rebind each key, move the playfield left/center/right, change scroll speed and volume.
+- F2 system settings: rebind each key, move the playfield left/center/right, and change volume.
+- F3 game options: speed, note visibility and lane shuffle. The gameplay panel shows the applied values and opens the same options. Opening options pauses play; speed and visibility apply to the current chart when closed. Changing shuffle requires an explicit restart from the beginning, or cancel to keep the current chart and score.
 - Notes and keyboard events share the automatic audible-output clock. Legacy manual offsets are discarded. Browser/device latency reports are best-effort, not a guarantee of zero physical latency.
 - Mobile is a browsing/listening layout, not a touch game.
 
@@ -58,6 +59,6 @@ Code and original procedural music are MIT licensed. Outfit and the subset of No
 - `/`: single start-button home.
 - `/select/`: track selection. Optional `song`, `lanes` and `difficulty` query parameters preserve the selection.
 - `/play/{song}/{5|7}/{low|mid|high}/`: directly shareable play-ready page. All 18 built-in chart routes are generated at build time. Enter or the start button begins playback; opening a link never starts the score clock.
-- Copy Link on selection copies the currently selected chart. The address bar also shares the selection page. Back/forward returns to a safe ready/selection screen, never a running game.
+- The address bar preserves the chart, speed, visibility, shuffle and seed. Back/forward returns to a safe ready/selection screen, never a running game.
 
 Astro generates static HTML. The existing TypeScript/PixiJS/Web Audio client runs the game. No server adapter or account is required.

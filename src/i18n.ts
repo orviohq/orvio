@@ -7,6 +7,14 @@ export const LANGUAGES = {
 } as const;
 export type Language = keyof typeof LANGUAGES;
 const en = {
+  liveOptionHint:
+    'Speed and visibility apply to this play. Changing shuffle requires restarting the song.',
+  shuffleRestart: 'Restart to change shuffle?',
+  shuffleRestartHint:
+    'The current score will reset. The new lane order applies from the start, preserving holds and input.',
+  restartApply: 'RESTART AND APPLY',
+  cancelChange: 'CANCEL SHUFFLE CHANGE',
+
   gameOptions: 'GAME OPTIONS',
   fader: 'Note visibility',
   shuffle: 'Lane shuffle',
@@ -91,6 +99,14 @@ const en = {
 };
 type Words = typeof en;
 const ko: Words = {
+  liveOptionHint:
+    '속도와 노트 표시는 현재 곡에 적용됩니다. 노트 섞기는 곡을 처음부터 다시 시작해야 합니다.',
+  shuffleRestart: '노트 섞기를 바꾸고 다시 시작할까요?',
+  shuffleRestartHint:
+    '현재 점수는 초기화됩니다. 롱노트와 입력을 보존하도록 새 배치는 처음부터 적용됩니다.',
+  restartApply: '다시 시작하여 적용',
+  cancelChange: '노트 섞기 변경 취소',
+
   gameOptions: '게임 옵션',
   fader: '노트 표시',
   shuffle: '노트 섞기',
@@ -174,6 +190,12 @@ const ko: Words = {
   unmute: '음소거 해제',
 };
 const zh: Words = {
+  liveOptionHint: '速度和显示在当前歌曲生效。更改轨道顺序需要重新开始。',
+  shuffleRestart: '重新开始以更改轨道顺序？',
+  shuffleRestartHint: '当前分数将重置。新顺序从歌曲开头生效，保留长按和输入。',
+  restartApply: '重新开始并应用',
+  cancelChange: '取消轨道更改',
+
   gameOptions: '游戏选项',
   fader: '音符显示',
   shuffle: '轨道随机',
@@ -256,6 +278,14 @@ const zh: Words = {
   unmute: '取消静音',
 };
 const ja: Words = {
+  liveOptionHint:
+    '速度と表示は現在の曲に適用。配置変更は曲の再スタートが必要です。',
+  shuffleRestart: '配置を変更して再スタート？',
+  shuffleRestartHint:
+    '現在のスコアはリセットされます。ロングノートと入力を保つため、配置は曲の最初から適用します。',
+  restartApply: '再スタートして適用',
+  cancelChange: '配置変更を取り消す',
+
   gameOptions: 'ゲームオプション',
   fader: 'ノート表示',
   shuffle: 'ノート配置',
@@ -340,6 +370,14 @@ const ja: Words = {
   unmute: 'ミュート解除',
 };
 const es: Words = {
+  liveOptionHint:
+    'La velocidad y visibilidad cambian en esta partida. Cambiar carriles requiere reiniciar.',
+  shuffleRestart: '¿Reiniciar para cambiar carriles?',
+  shuffleRestartHint:
+    'La puntuación se reinicia. El nuevo orden se aplica desde el inicio para mantener notas largas y entradas.',
+  restartApply: 'REINICIAR Y APLICAR',
+  cancelChange: 'CANCELAR CAMBIO',
+
   gameOptions: 'OPCIONES DE JUEGO',
   fader: 'Visibilidad de notas',
   shuffle: 'Mezcla de carriles',

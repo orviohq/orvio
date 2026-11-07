@@ -2068,3 +2068,16 @@ dialog input[type='checkbox'] {
   background: #29d8ff;
   outline: 2px solid #d7faff;
 }
+
+.option-readout {
+  display: block;
+  max-width: 100%;
+  margin-top: 18px;
+  padding: 12px;
+  border: 1px solid #ffffff24;
+  border-radius: 8px;
+  line-height: 1.9;
+  text-align: left;
+  font-size: 12px;
+  color: #cbc8d6;
+}

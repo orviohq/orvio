@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-11-07
+
+### Added
+
+- Applied speed, shuffle and note-visibility readout in gameplay, with a clickable options button and F3 access. Opening options pauses the audio and score clock.
+- Speed and visibility changes apply to the current chart without replacing notes, holds or score.
+- Shuffle changes require explicit restart confirmation. Cancel keeps the previous shuffle, seed, chart and score. Restart applies the new permutation from the beginning.
+
+### Fixed
+
+- Remove stale README references to the deleted copy button and speed in system settings.
+
 ## [0.2.3] - 2026-11-07
 
 ### Added
