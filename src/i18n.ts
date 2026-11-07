@@ -7,6 +7,9 @@ export const LANGUAGES = {
 } as const;
 export type Language = keyof typeof LANGUAGES;
 const en = {
+  copyLink: 'COPY CHART LINK',
+  copied: 'LINK COPIED',
+  copySelection: 'COPY SELECT LINK',
   pause: 'PAUSED',
   resume: 'RESUME',
   select: 'TRACK SELECT',
@@ -85,6 +88,9 @@ const en = {
 };
 type Words = typeof en;
 const ko: Words = {
+  copyLink: '채보 링크 복사',
+  copied: '링크 복사됨',
+  copySelection: '선택 화면 링크 복사',
   pause: '일시정지',
   resume: '계속 플레이',
   select: '곡 선택',
@@ -161,6 +167,9 @@ const ko: Words = {
   unmute: '음소거 해제',
 };
 const zh: Words = {
+  copyLink: '复制谱面链接',
+  copied: '链接已复制',
+  copySelection: '复制选曲链接',
   pause: '已暂停',
   resume: '继续游戏',
   select: '曲目选择',
@@ -236,6 +245,9 @@ const zh: Words = {
   unmute: '取消静音',
 };
 const ja: Words = {
+  copyLink: '譜面リンクをコピー',
+  copied: 'コピーしました',
+  copySelection: '選曲リンクをコピー',
   pause: '一時停止',
   resume: 'プレイ再開',
   select: '楽曲選択',
@@ -313,6 +325,9 @@ const ja: Words = {
   unmute: 'ミュート解除',
 };
 const es: Words = {
+  copyLink: 'COPIAR ENLACE DE PARTIDA',
+  copied: 'ENLACE COPIADO',
+  copySelection: 'COPIAR SELECCIÓN',
   pause: 'PAUSA',
   resume: 'CONTINUAR',
   select: 'SELECCIÓN',

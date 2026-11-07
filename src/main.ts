@@ -87,8 +87,8 @@ const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
 <header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
-<section id="home-screen"><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><a href="/select/">${label('back')}</a><button class="quiet share-link">↗ COPY LINK</button></section><main id="lobby"><section class="intro"><div class="eyebrow">${label('selected')} <span id="selection-number">01 / 03</span></div><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
-<section class="library" aria-label="Track selection"><div class="section-title"><strong>${label('select')}</strong><span>ORIGINALS / 001</span></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">${label('easy')} <small>01</small></button><button data-diff="mid">${label('normal')} <small>02</small></button><button data-diff="high">${label('hard')} <small>03</small></button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div><div class="under-start"><button class="quiet share-link">↗ COPY LINK</button><span id="chart-info"></span><span>${label('keyboard')}</span></div></section>
+<section id="home-screen"><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><a href="/select/">${label('back')}</a><button class="quiet share-link">↗ ${label('copyLink')}</button></section><main id="lobby"><section class="intro"><div class="eyebrow">${label('selected')} <span id="selection-number">01 / 03</span></div><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
+<section class="library" aria-label="Track selection"><div class="section-title"><strong>${label('select')}</strong><span>ORIGINALS / 001</span></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">${label('easy')} <small>01</small></button><button data-diff="mid">${label('normal')} <small>02</small></button><button data-diff="high">${label('hard')} <small>03</small></button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div><div class="under-start"><button class="quiet share-link">↗ ${label('copyLink')}</button><button id="share-selection" class="quiet">↗ ${label('copySelection')}</button><span id="chart-info"></span><span>${label('keyboard')}</span></div></section>
 <section class="footer-strip"><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
 <section id="game" class="hidden" aria-label="Rhythm game"><div class="game-top"><button id="exit" class="quiet">ESC ${label('exit')}</button><div class="song-now"><strong id="now-title"></strong><span id="now-detail"></span></div><div class="perf"><span id="fps">-- FPS</span><i></i></div></div><div id="progress"><div></div></div><div id="arena" data-position="center"><aside class="score-block"><span class="eyebrow">${label('score')}</span><strong id="score">0000000</strong><div><b id="rate">100.00</b><span>% ${label('accuracy')}</span></div><div class="session-signal"><b>LIVE</b><span>OUTPUT SYNC</span></div></aside><div id="highway-wrap"><div id="highway"></div><div id="impact" aria-hidden="true"></div><div id="judge" aria-live="off"></div><div id="combo"></div><div id="keycaps"></div><div id="countdown"></div></div><aside class="track-block"><div class="orb-mini"></div><span class="eyebrow">ORVIO ORIGINALS</span><h2 id="side-title"></h2><div id="lane-detail"></div><p>${label('hold')}</p></aside></div><div class="game-footer"><span>${label('hold')}</span><span id="clock-info">${t('synced')}</span></div></section>
 <dialog id="pause"><div class="eyebrow">ORVIO / SESSION</div><h2>${label('pause')}</h2><button id="resume" class="primary">${label('resume')} ↵</button><button id="pause-settings" class="quiet">F2 ${label('options')}</button><button id="pause-exit" class="quiet">${label('back')}</button></dialog><dialog id="settings"><form method="dialog"><div class="dialog-title"><div><span class="eyebrow">SYSTEM / OPTIONS</span><h2>${label('options')}</h2></div><button class="close" aria-label="Close">×</button></div></form><label for="language">${label('language')}</label><select id="language">${Object.entries(
@@ -786,7 +786,7 @@ function readRoute() {
   $('#game').classList.add('hidden');
   $('#ready-title').textContent = SONGS[songIndex].title;
   $('#ready-detail').textContent =
-    `${settings.lanes} KEY / ${settings.difficulty.toUpperCase()} / ENTER`;
+    `${settings.lanes} KEY / ${t(settings.difficulty === 'low' ? 'easy' : settings.difficulty === 'mid' ? 'normal' : 'hard')} / ENTER`;
   localize();
   songCards();
   selectedSong();
@@ -808,12 +808,20 @@ document.querySelectorAll<HTMLButtonElement>('.share-link').forEach(
           location.origin +
             (screen === 'select' ? playPath() : location.pathname),
         );
-        button.textContent = '✓ LINK COPIED';
+        button.textContent = '✓ ' + t('copied');
       } catch {
         toast(location.origin + playPath());
       }
     }),
 );
+$('#share-selection').onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(location.origin + selectionPath());
+    toast(t('copied'));
+  } catch {
+    toast(location.origin + selectionPath());
+  }
+};
 window.addEventListener('popstate', readRoute);
 readRoute();
 

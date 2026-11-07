@@ -1026,13 +1026,7 @@ body {
   inset: 0;
   z-index: -1;
   overflow: hidden;
-  background:
-    radial-gradient(
-      ellipse at 28% 46%,
-      color-mix(in srgb, var(--accent) 12%, transparent),
-      transparent 60%
-    ),
-    #070d15;
+  background: #0b1724;
 }
 .ambient-disc {
   position: absolute;
@@ -1049,12 +1043,7 @@ body {
 .scanlines {
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 3px,
-    #0002 4px
-  );
+  background: #0b1724;
   opacity: 0.2;
 }
 header {
@@ -1097,22 +1086,20 @@ nav {
   height: clamp(180px, 33vh, 400px);
   position: relative;
   overflow: hidden;
-  background: linear-gradient(145deg, #102c3a, #124552 55%, #06141e);
+  background: #0b1724;
   border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   clip-path: polygon(0 0, 94% 0, 100% 9%, 100% 100%, 6% 100%, 0 91%);
 }
 .selected-art.cover-1 {
-  background: linear-gradient(145deg, #071e24, #17564e, #0b1522);
+  background: #0b1724;
 }
 .selected-art.cover-2 {
-  background: linear-gradient(145deg, #261622, #582a30, #171328);
+  background: #0b1724;
 }
 .art-grid {
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(90deg, #ffffff08 1px, transparent 1px),
-    linear-gradient(#ffffff08 1px, transparent 1px);
+  background: #0b1724;
   background-size: 40px 40px;
   transform: perspective(300px) rotateX(30deg) scale(1.4);
 }
@@ -1141,7 +1128,7 @@ nav {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%) rotate(45deg);
-  background: linear-gradient(135deg, var(--accent), #ffffff22);
+  background: #0b1724;
   box-shadow: 0 0 65px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .art-index {
@@ -1256,11 +1243,7 @@ nav {
     transform 0.14s;
 }
 .song-card.selected {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--accent) 16%, #101e2d),
-    #101e2d
-  );
+  background: #0b1724;
   border-color: color-mix(in srgb, var(--accent) 65%, transparent);
   transform: translateX(-8px);
   box-shadow:
@@ -1359,7 +1342,7 @@ nav {
   height: calc(100dvh - 70px);
   min-height: 0;
   padding: 0 3vw;
-  background: linear-gradient(90deg, #070d1599, transparent, #070d1599);
+  background: #0b1724;
 }
 .game-top {
   height: 58px;
@@ -1430,7 +1413,7 @@ nav {
   opacity: 0;
 }
 .perfect-impact {
-  background: linear-gradient(0deg, #e6c4ff44, transparent 45%);
+  background: #0b1724;
   animation: impact-light 0.3s ease-out;
 }
 .perfect-impact::after {
@@ -1444,13 +1427,7 @@ nav {
   box-shadow: 0 0 30px 5px #35dcff;
 }
 .break-impact {
-  background: linear-gradient(
-    90deg,
-    #ff234f22,
-    transparent 30%,
-    transparent 70%,
-    #ff234f22
-  );
+  background: #0b1724;
   box-shadow: inset 0 0 45px #ff184744;
   animation: impact-light 0.45s ease-out;
 }
@@ -1537,7 +1514,7 @@ dialog input[type='checkbox'] {
 #results {
   width: min(780px, calc(100% - 30px));
   padding: 35px 45px;
-  background: radial-gradient(ellipse at top right, #163d50, #101c28 65%);
+  background: #0b1724;
 }
 .result-system {
   font-size: 9px;
@@ -1869,13 +1846,13 @@ dialog input[type='checkbox'] {
   --accent: #29d8ff;
 }
 .selected-art.cover-0 {
-  background: linear-gradient(130deg, #062437, #087b98 55%, #052337);
+  background: #0b1724;
 }
 .selected-art.cover-1 {
-  background: linear-gradient(130deg, #042d28, #087e65 55%, #041f29);
+  background: #0b1724;
 }
 .selected-art.cover-2 {
-  background: linear-gradient(130deg, #382106, #bd6711 55%, #231706);
+  background: #0b1724;
 }
 .art-core {
   border-radius: 0;
@@ -1889,7 +1866,7 @@ dialog input[type='checkbox'] {
     0 0 35px #ffad1f;
 }
 #results {
-  background: radial-gradient(ellipse at top right, #13384d, #101b28 65%);
+  background: #0b1724;
 }
 
 .playing header {
@@ -1962,7 +1939,7 @@ dialog input[type='checkbox'] {
   color: #a7b5c5;
 }
 .playing #keycaps {
-  background: linear-gradient(0deg, #0b1727, transparent);
+  background: #0b1724;
   padding-top: 12px;
   padding-bottom: 4px;
 }
@@ -1976,7 +1953,7 @@ dialog input[type='checkbox'] {
   flex-direction: column;
   gap: 26px;
   padding: 32px;
-  background: radial-gradient(ellipse at center, #123c4d, #060e17 70%);
+  background: #0b1724;
 }
 #home-screen .primary {
   width: min(450px, 85vw);
@@ -2016,4 +1993,33 @@ dialog input[type='checkbox'] {
 }
 #ready-start span:first-child {
   font-size: 22px;
+}
+
+.ambient {
+  background: #070d15;
+}
+.selected-art.cover-0 {
+  background: #075b72;
+}
+.selected-art.cover-1 {
+  background: #086654;
+}
+.selected-art.cover-2 {
+  background: #80591d;
+}
+.song-card.selected {
+  background: #163144;
+}
+#results {
+  background: #101c28;
+}
+#home-screen,
+#ready-screen {
+  background: #07111b;
+}
+.art-grid {
+  background: none;
+}
+.art-core {
+  background: var(--accent);
 }
