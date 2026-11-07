@@ -25,12 +25,25 @@ test('real renderer blink, gear blink, fog, blind and pixel retain original char
     await page.keyboard.press('Escape');
     await page.click('#resume');
     await page.waitForTimeout(100);
+    // BLINK is beat-locked and clamps negative lead-in time to phase 0.
+    // Start observing after audio t=0, then sample faster than its half-beat.
+    await page.waitForFunction(() => (window as any).orvioAudioTime > 0.05);
     const fx = () =>
       page.evaluate(() => (window as any).orvioDiagnostics.metrics.effects);
     if (fader === 'blink' || fader === 'blink2') {
       const prop = fader === 'blink' ? 'noteAlpha' : 'gearAlpha';
-      await expect.poll(async () => (await fx())[prop]).toBe(0);
-      await expect.poll(async () => (await fx())[prop]).toBe(1);
+      await expect
+        .poll(async () => (await fx())[prop], {
+          intervals: [25],
+          timeout: 2000,
+        })
+        .toBe(0);
+      await expect
+        .poll(async () => (await fx())[prop], {
+          intervals: [25],
+          timeout: 2000,
+        })
+        .toBe(1);
     } else if (fader === 'blind') expect((await fx()).noteAlpha).toBe(0);
     else if (fader === 'fog') expect((await fx()).fog).toBe(true);
     if (fader === 'pixel' || fader === 'pixel2') {
