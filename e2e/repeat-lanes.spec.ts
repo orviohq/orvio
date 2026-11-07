@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test('physical custom keys stay on their pixel lane across repeated starts and 5/7/5 modes', async ({
   page,
 }) => {
-  test.setTimeout(60000);
+  test.setTimeout(120000);
   await page.addInitScript(() => {
     const w = window as any;
     w.lostPlayfields = 0;
@@ -30,6 +30,12 @@ test('physical custom keys stay on their pixel lane across repeated starts and 5
     } as any;
   });
   await page.goto('/select/');
+  // Isolate the canvas lane geometry from DOM judgment overlays. BREAK can
+  // dim the whole clipped screenshot even while the actual key glow is right.
+  // This does not change canvas drawing, input, chart times or judgments.
+  await page.addStyleTag({
+    content: '#impact, #judge, #combo { visibility: hidden !important; }',
+  });
   await page.click('#open-settings');
   await page.click('[data-keymode="5"][data-slot="0"]');
   for (const key of ['n', 'm', ',', '.', '/']) await page.keyboard.press(key);
@@ -37,6 +43,11 @@ test('physical custom keys stay on their pixel lane across repeated starts and 5
   for (const key of ['q', 'w', 'e', 'r', 't', 'y', 'u'])
     await page.keyboard.press(key);
   await page.locator('#settings .close').click();
+  // Use the standard BLIND option to remove note heads and hold bodies from
+  // this key-geometry measurement, without changing the renderer or chart.
+  await page.keyboard.press('F3');
+  await page.locator('.icon-options-fader [data-value=blind]').click();
+  await page.keyboard.press('Escape');
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const samples = [];
@@ -52,41 +63,77 @@ test('physical custom keys stay on their pixel lane across repeated starts and 5
       lanes === 5
         ? ['n', 'm', ',', '.', '/']
         : ['q', 'w', 'e', 'r', 't', 'y', 'u'];
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as any).orvioDiagnostics.metrics.effects.noteAlpha,
+        ),
+      )
+      .toBe(0);
     for (const [lane, key] of keys.entries()) {
+      await page.waitForTimeout(80);
+      const before = await page.locator('#highway canvas').screenshot();
       await page.keyboard.down(key);
       await page.waitForTimeout(80);
-      const png = await page.locator('#highway canvas').screenshot();
-      const brightness = await page.evaluate(
-        async ({ data, lanes }) => {
-          const image = new Image();
-          image.src = 'data:image/png;base64,' + data;
-          await image.decode();
-          const canvas = document.createElement('canvas');
-          canvas.width = image.width;
-          canvas.height = image.height;
-          const ctx = canvas.getContext('2d')!;
-          ctx.drawImage(image, 0, 0);
-          return Array.from({ length: lanes }, (_, i) => {
-            const pixels = ctx.getImageData(
-              Math.floor(((i + 0.5) * canvas.width) / lanes) - 3,
-              canvas.height - 55,
-              6,
-              12,
-            ).data;
-            let sum = 0;
-            for (let p = 0; p < pixels.length; p += 4) sum += pixels[p + 2];
-            return sum / (pixels.length / 4);
+      const held = await page.locator('#highway canvas').screenshot();
+      expect(
+        await page.evaluate(() => ({
+          active: (window as any).orvioDiagnostics.active,
+          paused: (window as any).orvioDiagnostics.paused,
+          fader: (window as any).orvioDiagnostics.settings.fader,
+          alpha: (window as any).orvioDiagnostics.metrics.effects.noteAlpha,
+        })),
+      ).toEqual({ active: true, paused: false, fader: 'blind', alpha: 0 });
+      // Measure the change in the key glow, not absolute brightness. Exclude
+      // the keycap overlay and use a median across the remaining tall region
+      // so a moving 10px note head cannot masquerade as a held key.
+      const changes = await page.evaluate(
+        async ({ before, held, lanes }) => {
+          const pixels = async (data: string) => {
+            const image = new Image();
+            image.src = 'data:image/png;base64,' + data;
+            await image.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = image.width;
+            canvas.height = image.height;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(image, 0, 0);
+            return {
+              width: canvas.width,
+              height: canvas.height,
+              data: ctx.getImageData(0, 0, canvas.width, canvas.height).data,
+            };
+          };
+          const a = await pixels(before),
+            b = await pixels(held);
+          return Array.from({ length: lanes }, (_, lane) => {
+            const differences: number[] = [];
+            const center = Math.floor(((lane + 0.5) * a.width) / lanes);
+            for (let y = a.height - 86; y < a.height - 12; y++) {
+              if (y >= a.height - 55 && y < a.height - 24) continue;
+              for (let x = center - 3; x < center + 3; x++) {
+                const i = (y * a.width + x) * 4 + 2;
+                differences.push(b.data[i] - a.data[i]);
+              }
+            }
+            differences.sort((a, b) => a - b);
+            return differences[Math.floor(differences.length / 2)];
           });
         },
-        { data: png.toString('base64'), lanes },
+        {
+          before: before.toString('base64'),
+          held: held.toString('base64'),
+          lanes,
+        },
       );
-      const brightest = brightness.indexOf(Math.max(...brightness));
       expect(
-        brightest,
-        `round ${round + 1} ${lanes}K ${key}: ${brightness}`,
+        changes.indexOf(Math.max(...changes)),
+        `round ${round + 1} ${lanes}K ${key}: ${changes}`,
       ).toBe(lane);
-      expect(brightness[lane]).toBeGreaterThan(35);
-      samples.push({ round, lanes, key, lane, brightness, startupMs });
+      expect(changes[lane]).toBeGreaterThan(15);
+      for (const [other, value] of changes.entries())
+        if (other !== lane) expect(Math.abs(value)).toBeLessThan(10);
+      samples.push({ round, lanes, key, lane, changes, startupMs });
       await page.keyboard.up(key);
     }
     await page.screenshot({
