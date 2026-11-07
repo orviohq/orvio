@@ -52,6 +52,11 @@ export const EXTRA_PATCH_LABELS = {
 export type ExtraLanguage = keyof typeof EXTRA_PATCH_LABELS;
 export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
   fr: {
+    '0.2.10': [
+      'PWA installable sur ordinateur et application statique locale hors ligne. Compatibilité selon navigateur ; mise à jour après fermeture des anciennes fenêtres.',
+      'Musique préparée conservée sur l’appareil avec version de synthèse. Démarrage explicite puis réutilisation rapide du cache, même hors ligne. Suppression ou quota atteint : nouvelle synthèse, sans envoi audio ou jeu.',
+      'Tous les menus déroulants utilisent le même composant clavier. Historique en 13 langues séparé en fonctionnalités/améliorations et corrections, textes conservés.',
+    ],
     '0.2.9': [
       'Les notes rapides relient seulement le trajet du cadre précédent avec une seule tête nette. Maintiens, pause et basse vitesse inchangés. La résolution du symptôme sur écran physique reste non confirmée.',
       'Résultat avec morceau, touches, difficulté et options enregistrées. Rejouer un lien restaure la partition et les options, pas l’accueil. Aucune option absente inventée pour les anciens liens. Texte doublé supprimé.',
@@ -99,6 +104,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   de: {
+    '0.2.10': [
+      'Installierbare Desktop-PWA und lokale statische Offline-App. Unterstützung je Browser; Updates warten auf das Schließen alter Fenster.',
+      'Vorbereitete Musik mit Syntheseversion auf dem Gerät gespeichert. Nach ausdrücklichem Start schnelle Wiederverwendung, auch offline. Löschung oder volles Kontingent führt zur Neuberechnung, ohne Audio- oder Spieldaten hochzuladen.',
+      'Alle Auswahllisten durch einheitliche Tastaturmenüs ersetzt. Gesamter Verlauf in 13 Sprachen nach Funktionen/Verbesserungen und Fehlerbehebungen gegliedert; Texte erhalten.',
+    ],
     '0.2.9': [
       'Schnelle Noten verbinden nur die Bewegungslücke zum vorigen Bild mit einem scharfen Kopf. Halten, Pause und langsame Noten unverändert. Lösung des realen Displayproblems noch nicht bestätigt.',
       'Ergebnis zeigt Titel, Tasten, Schwierigkeit und gespeicherte Optionen. Erneutes Spielen geteilter Ergebnisse stellt Chart und Optionen wieder her statt der Startseite. Fehlende alte Werte werden nicht erfunden. Doppelter Text entfernt.',
@@ -146,6 +156,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   pt: {
+    '0.2.10': [
+      'PWA instalável no computador e aplicação estática local offline. Suporte depende do navegador; atualização espera fechar janelas antigas.',
+      'Música preparada guardada no dispositivo com versão de síntese. Após início explícito, reutilização rápida mesmo offline. Cache apagada ou quota cheia: nova síntese, sem envio de áudio ou jogo.',
+      'Todos os seletores usam um menu personalizado com teclado. Histórico em 13 idiomas dividido entre funcionalidades/melhorias e correções, preservando o texto.',
+    ],
     '0.2.9': [
       'Notas rápidas ligam apenas o intervalo até ao quadro anterior, com uma só cabeça nítida. Notas longas, pausa e baixa velocidade sem mudanças. Problema no ecrã físico ainda não confirmado como resolvido.',
       'Resultado com música, teclas, dificuldade e opções registadas. Repetir o link restaura o mapa e as opções, não o início. Links antigos não inventam valores ausentes. Texto duplicado removido.',
@@ -193,6 +208,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   it: {
+    '0.2.10': [
+      'PWA installabile su desktop e app statica locale offline. Supporto secondo browser; aggiornamento dopo la chiusura delle vecchie finestre.',
+      'Musica preparata salvata sul dispositivo con versione di sintesi. Dopo avvio esplicito, riuso rapido anche offline. Cache eliminata o quota piena: nuova sintesi, senza inviare audio o gioco.',
+      'Tutti i menu a discesa usano lo stesso componente da tastiera. Cronologia in 13 lingue divisa fra funzioni/migliorie e correzioni, con testi conservati.',
+    ],
     '0.2.9': [
       'Le note veloci collegano solo il tratto dal fotogramma precedente con una sola testa nitida. Note lunghe, pausa e bassa velocità invariate. Risoluzione del problema sullo schermo fisico non confermata.',
       'Risultato con brano, tasti, difficoltà e opzioni registrate. Rigiocare dal link ripristina mappa e opzioni invece della home. Nessun valore mancante inventato nei vecchi link. Testo duplicato rimosso.',
@@ -240,6 +260,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   ru: {
+    '0.2.10': [
+      'Устанавливаемая настольная PWA и локальная статическая офлайн-версия. Поддержка зависит от браузера; обновление ждёт закрытия старых окон.',
+      'Подготовленная музыка сохраняется на устройстве с версией синтеза. После явного запуска быстро используется кеш, в том числе офлайн. Удаление или переполнение хранилища вызывает повторный синтез без отправки аудио или игры.',
+      'Все списки заменены единым клавиатурным меню. История на 13 языках разделена на функции/улучшения и исправления с сохранением текста.',
+    ],
     '0.2.9': [
       'Быстрые ноты соединяют только промежуток до предыдущего кадра, сохраняя одну чёткую головку. Удержание, пауза и низкая скорость без изменений. Исправление восприятия на физическом экране не подтверждено.',
       'Результат показывает трек, клавиши, сложность и записанные настройки. Повтор из ссылки восстанавливает карту и настройки вместо главного экрана. Старые отсутствующие значения не выдумываются. Повтор текста убран.',
@@ -287,6 +312,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   id: {
+    '0.2.10': [
+      'PWA desktop yang dapat dipasang dan aplikasi statis lokal offline. Dukungan bergantung browser; pembaruan menunggu jendela lama ditutup.',
+      'Musik siap disimpan di perangkat dengan versi sintesis. Setelah mulai secara eksplisit, cache dipakai cepat bahkan offline. Cache dihapus atau kuota penuh: sintesis ulang tanpa unggah audio atau permainan.',
+      'Semua dropdown memakai menu kustom seragam dengan keyboard. Riwayat 13 bahasa dibagi menjadi fitur/peningkatan dan perbaikan, teks tetap utuh.',
+    ],
     '0.2.9': [
       'Not cepat hanya menyambung celah ke bingkai sebelumnya dengan satu kepala tajam. Tahan, jeda dan kecepatan rendah tetap sama. Perbaikan gejala layar fisik belum terkonfirmasi.',
       'Hasil menampilkan lagu, tombol, kesulitan dan opsi tercatat. Main ulang dari tautan memulihkan peta dan opsi, bukan beranda. Tautan lama tidak mengarang nilai yang hilang. Teks ganda dihapus.',
@@ -334,6 +364,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   tr: {
+    '0.2.10': [
+      'Masaüstüne kurulabilen PWA ve yerel statik çevrimdışı uygulama. Destek tarayıcıya bağlıdır; güncelleme eski pencerelerin kapanmasını bekler.',
+      'Hazırlanan müzik sentez sürümüyle cihazda saklanır. Açık başlatma sonrası önbellekten hızlı ve çevrimdışı kullanım. Silinme veya kota sorunu yeniden sentez yapar; ses veya oyun yüklenmez.',
+      'Tüm açılır listeler ortak klavye destekli menü oldu.13 dilde tüm geçmiş özellikler/iyileştirmeler ve hata düzeltmeleri olarak ayrıldı, metinler korundu.',
+    ],
     '0.2.9': [
       'Hızlı notalar tek keskin başla yalnızca önceki kareye kadar olan boşluğu birleştirir. Basılı nota, duraklama ve düşük hız değişmez. Fiziksel ekran sorununun çözümü henüz doğrulanmadı.',
       'Sonuçta parça, tuş, zorluk ve kaydedilen seçenekler gösterilir. Bağlantıdan tekrar oyun harita ve seçenekleri geri getirir, ana sayfayı değil. Eski eksik değerler uydurulmaz. Yinelenen metin kaldırıldı.',
@@ -381,6 +416,11 @@ export const EXTRA_PATCHES: Record<ExtraLanguage, Record<string, string[]>> = {
     ],
   },
   vi: {
+    '0.2.10': [
+      'PWA cài trên máy tính và ứng dụng tĩnh cục bộ ngoại tuyến. Hỗ trợ tùy trình duyệt; cập nhật chờ đóng cửa sổ cũ.',
+      'Nhạc đã chuẩn bị được lưu trên thiết bị theo phiên bản tổng hợp. Sau thao tác bắt đầu, dùng lại cache nhanh cả khi ngoại tuyến. Xóa cache hoặc hết chỗ sẽ tổng hợp lại, không tải âm thanh hay lượt chơi lên.',
+      'Mọi danh sách thả xuống dùng chung menu tùy chỉnh hỗ trợ bàn phím. Toàn bộ lịch sử 13 ngôn ngữ chia thành tính năng/cải tiến và sửa lỗi, giữ nguyên nội dung.',
+    ],
     '0.2.9': [
       'Nốt nhanh chỉ nối khoảng cách tới khung trước với một đầu rõ nét. Giữ nốt, tạm dừng và tốc độ thấp không đổi. Chưa xác nhận giải quyết triệu chứng trên màn hình thực.',
       'Kết quả có bài hát, phím, độ khó và tùy chọn đã ghi. Chơi lại từ liên kết khôi phục bản nốt và tùy chọn thay vì trang đầu. Không bịa tùy chọn còn thiếu ở liên kết cũ. Bỏ chữ hoàn thành trùng.',

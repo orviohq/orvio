@@ -1,4 +1,5 @@
 ---
+import { GROUP_LABELS, patchGroups } from '../patch-groups';
 import { PATCHES, PATCH_LABELS } from '../patch-notes';
 import { LANGUAGES, type Language } from '../i18n';
 ---
@@ -12,6 +13,7 @@ import { LANGUAGES, type Language } from '../i18n';
     <meta name="description" content="Orvio release history in 13 languages." />
     <title>Patch notes · orvio</title>
     <link rel="icon" href="/favicon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
   </head>
   <body>
     <main>
@@ -38,11 +40,34 @@ import { LANGUAGES, type Language } from '../i18n';
                 <h2>v{p.version}</h2>
                 <time datetime={p.date}>{p.date}</time>
               </div>
-              <ul>
-                {p.notes[lang as Language].map((text) => (
-                  <li>{text}</li>
-                ))}
-              </ul>
+              {Object.entries(
+                patchGroups(
+                  p.version,
+                  lang as Language,
+                  p.notes[lang as Language],
+                ),
+              ).map(([group, notes]) => (
+                <section data-patch-group={group}>
+                  <h3>
+                    {
+                      GROUP_LABELS[lang as Language][
+                        group as 'features' | 'fixes'
+                      ]
+                    }
+                  </h3>
+                  {notes.length ? (
+                    <ul>
+                      {notes.map((text) => (
+                        <li>{text}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p class="empty-group">
+                      {GROUP_LABELS[lang as Language].none}
+                    </p>
+                  )}
+                </section>
+              ))}
             </article>
           ))}
         </div>
@@ -50,6 +75,8 @@ import { LANGUAGES, type Language } from '../i18n';
     </main>
     <script>
       import { LANGUAGES } from '../i18n';
+      import { enhanceSelects } from '../select-ui';
+      import '../select-ui.css';
       import { resolvedLanguage } from '../language';
       const select =
         document.querySelector<HTMLSelectElement>('#patch-language')!;
@@ -70,6 +97,11 @@ import { LANGUAGES, type Language } from '../i18n';
       } catch {}
       show(params.get('lang') || resolvedLanguage(saved, navigator.languages));
       select.onchange = () => show(select.value);
+      enhanceSelects();
+    </script>
+    <script>
+      import { registerApp } from '../pwa';
+      registerApp();
     </script>
   </body>
 </html>

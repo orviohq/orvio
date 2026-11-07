@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-11-07
+
+### Added
+
+- Desktop-installable PWA manifest and local static offline shell. Browser installation support varies; an update waits until old app windows close.
+- Prepared original music is saved on this device with a synthesis version. Warm reload/offline playback reuses it and skips the old loading delay, after an explicit user start. Storage eviction or quota failure falls back to synthesis; no audio or play data is uploaded.
+- Replaced every visible native dropdown with the same keyboard-accessible custom menu, including language, speed, fade, shuffle and patch-note language. All release notes now have feature/improvement and bug-fix sections in 13 languages, preserving original historical entries.
+
 ## [0.2.9] - 2026-11-07
 
 ### Changed

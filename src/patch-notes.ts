@@ -45,6 +45,37 @@ const BASE_PATCHES: {
   notes: Record<Exclude<Language, ExtraLanguage>, string[]>;
 }[] = [
   {
+    version: '0.2.10',
+    date: '2026-11-07',
+    notes: {
+      en: [
+        'Desktop-installable PWA manifest and local static offline shell. Browser installation support varies; an update waits until old app windows close.',
+        'Prepared original music is saved on this device with a synthesis version. Warm reload/offline playback reuses it and skips the old loading delay, after an explicit user start. Storage eviction or quota failure falls back to synthesis; no audio or play data is uploaded.',
+        'Replaced every visible native dropdown with the same keyboard-accessible custom menu, including language, speed, fade, shuffle and patch-note language. All release notes now have feature/improvement and bug-fix sections in 13 languages, preserving original historical entries.',
+      ],
+      ko: [
+        '데스크톱에 설치 가능한 PWA와 로컬 정적 오프라인 앱을 추가했습니다. 설치 지원은 브라우저마다 다르며 업데이트는 이전 앱 창을 닫은 뒤 적용됩니다.',
+        '한 번 준비한 오리지널 곡을 합성 버전과 함께 기기에 저장합니다. 재접속·오프라인에서는 사용자 시작 후 캐시를 재사용하고 기존 로딩 대기를 생략합니다. 저장공간 부족·삭제 시 재합성하며 오디오나 플레이 데이터를 올리지 않습니다.',
+        '언어·속도·효과·섞기·패치노트 언어의 모든 드롭다운을 같은 키보드 지원 커스텀 메뉴로 바꿨습니다.13언어 전 버전 기록을 원문 보존하며 기능 개선/추가와 버그 수정으로 나눴습니다.',
+      ],
+      zh: [
+        '新增可在桌面安装的PWA与本地静态离线应用。安装支持因浏览器而异，更新等待旧应用窗口关闭。',
+        '准备好的原创音乐按合成版本保存在设备。用户明确开始后，热缓存及离线播放复用音频并跳过旧等待。存储清除或容量不足时重新合成，不上传音频或游玩数据。',
+        '语言、速度、显示效果、随机及日志语言均改为同一键盘可操作自定义菜单。13种语言的全部版本按功能改进/新增与错误修复分类，保留历史原文。',
+      ],
+      ja: [
+        'デスクトップにインストール可能なPWAとローカル静的オフラインアプリを追加。対応はブラウザー次第で、更新は旧ウィンドウを閉じてから適用。',
+        '準備済みオリジナル曲を合成バージョン付きで端末に保存。明示的な開始後、再訪・オフラインでは再利用して旧待機を省略。容量不足や削除時は再合成し、音声やプレイデータは送信しません。',
+        '言語・速度・表示効果・シャッフル・履歴言語の全ドロップダウンを同じキーボード対応メニューに変更。13言語全履歴を原文保持で機能改善/追加と不具合修正に分類。',
+      ],
+      es: [
+        'PWA instalable en escritorio y aplicación estática local sin conexión. El soporte varía por navegador; la actualización espera al cierre de ventanas antiguas.',
+        'Música preparada guardada en el dispositivo con versión de síntesis. Inicio explícito y reproducción rápida desde caché, incluso sin conexión. Borrado o falta de espacio provoca nueva síntesis, sin subir audio ni partidas.',
+        'Todos los desplegables comparten menú personalizado con teclado. Historial completo en 13 idiomas separado en funciones/mejoras y correcciones, conservando los textos.',
+      ],
+    },
+  },
+  {
     version: '0.2.9',
     date: '2026-11-07',
     notes: {

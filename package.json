@@ -1,12 +1,12 @@
 {
   "name": "orvio",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "private": true,
   "type": "module",
   "license": "MIT",
   "scripts": {
     "dev": "astro dev --host 0.0.0.0",
-    "build": "tsc --noEmit && astro build",
+    "build": "tsc --noEmit && astro build && node scripts/build-pwa.mjs",
     "test": "vitest run",
     "check": "prettier --check . && tsc --noEmit",
     "format": "prettier --write .",

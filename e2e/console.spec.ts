@@ -22,7 +22,8 @@ test('keyboard-only track, difficulty, lanes, settings, locales, start and exit'
   await expect(page.locator('#settings')).toBeVisible();
   // The dialog close button is initially focused. Tab reaches the language menu.
   await page.keyboard.press('Tab');
-  await expect(page.locator('#language')).toBeFocused();
+  await expect(page.locator('#language-trigger')).toBeFocused();
+  await page.keyboard.press('Enter');
   await page.keyboard.press('Home');
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
