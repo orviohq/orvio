@@ -167,13 +167,14 @@ export class AudioClock {
     this.volume.gain.value = 0.7;
     this.volume.connect(this.context.destination);
   }
-  async play(buffer: AudioBuffer) {
+  async play(buffer: AudioBuffer, leadIn = 0.15, signal?: AbortSignal) {
     await this.context.resume();
+    signal?.throwIfAborted();
     this.stop();
     this.source = this.context.createBufferSource();
     this.source.buffer = buffer;
     this.source.connect(this.volume);
-    this.anchor = this.context.currentTime + 0.15;
+    this.anchor = this.context.currentTime + leadIn;
     this.source.start(this.anchor);
     this.started = true;
   }
@@ -210,6 +211,10 @@ export class AudioClock {
     this.source = undefined;
     this.frozenTime = undefined;
     this.started = false;
+  }
+  dispose() {
+    this.stop();
+    void this.context.close().catch(() => {});
   }
   setVolume(v: number) {
     this.volume.gain.setTargetAtTime(

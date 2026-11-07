@@ -61,8 +61,14 @@ test('GPU warmup stays under loading and leaves chart, engine and audio untouche
       },
     ]);
     await expect(page.locator('#song-loading')).toBeHidden();
-    await page.waitForFunction(() => (window as any).orvioAudioTime > 0.1);
+    // Countdown now precedes the earliest possible first fall, not chart t=0.
+    // Warmup still must leave audio/chart/input untouched, as asserted above.
     await expect(page.locator('#countdown')).toHaveText('4');
+    const countdown = await page.evaluate(() => {
+      const d = (window as any).orvioDiagnostics;
+      return { time: d.clock, firstFall: d.notes[0].note.time - 2 };
+    });
+    expect(countdown.time).toBeLessThan(countdown.firstFall);
     await page.keyboard.press('Escape');
     await page.click('#pause-exit');
   }

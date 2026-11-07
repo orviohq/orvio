@@ -17,6 +17,8 @@ export function packReplay(r: ReplayData): Uint8Array {
   function exact(n: number, prediction: number) {
     variable(bits(n) ^ bits(prediction));
   }
+  // A 7th element carries the recording's audio lead-in. Pre-A5 replays have 6
+  // elements and stay byte-identical; old decoders ignore the extra element.
   const meta = new TextEncoder().encode(
     JSON.stringify([
       r.song,
@@ -25,6 +27,7 @@ export function packReplay(r: ReplayData): Uint8Array {
       r.options,
       r.end,
       r.ops.length,
+      ...(r.audioLeadIn !== undefined ? [r.audioLeadIn] : []),
     ]),
   );
   variable(BigInt(meta.length));
@@ -73,7 +76,12 @@ export function unpackReplay(bytes: Uint8Array): ReplayData {
     throw Error('Invalid replay header');
   const meta = JSON.parse(new TextDecoder().decode(bytes.subarray(p, p + len)));
   p += len;
-  const [song, lanes, difficulty, options, end, count] = meta;
+  const [song, lanes, difficulty, options, end, count, audioLeadIn] = meta;
+  if (
+    audioLeadIn !== undefined &&
+    (typeof audioLeadIn !== 'number' || !Number.isFinite(audioLeadIn))
+  )
+    throw Error('Invalid replay audio lead-in');
   if (!Number.isInteger(count) || count < 0 || count > 12000)
     throw Error('Invalid replay count');
   const ops: ReplayOp[] = [];
@@ -100,5 +108,14 @@ export function unpackReplay(bytes: Uint8Array): ReplayData {
     } else throw Error('Unknown replay operation');
   }
   if (p !== bytes.length) throw Error('Trailing replay data');
-  return { version: 1, song, lanes, difficulty, options, end, ops };
+  return {
+    version: 1,
+    song,
+    lanes,
+    difficulty,
+    options,
+    end,
+    ops,
+    ...(audioLeadIn !== undefined ? { audioLeadIn } : {}),
+  };
 }

@@ -38,7 +38,17 @@ export class Playfield {
   private lastFrame = 0;
   pressed = new Set<number>();
   flashes = new Map<number, { at: number; ok: boolean }>();
-  async init(host: HTMLElement) {
+  private disposed = false;
+  private initialized = false;
+  dispose() {
+    this.disposed = true;
+    this.resizeObserver?.disconnect();
+    if (this.initialized) {
+      this.app.destroy(true, { children: true });
+      this.initialized = false;
+    }
+  }
+  async init(host: HTMLElement, signal?: AbortSignal) {
     this.host = host;
     this.hostWidth = host.clientWidth;
     this.hostHeight = host.clientHeight;
@@ -63,6 +73,11 @@ export class Playfield {
       autoDensity: true,
       powerPreference: 'high-performance',
     });
+    this.initialized = true;
+    if (this.disposed || signal?.aborted) {
+      this.dispose();
+      throw new Error('Startup cancelled');
+    }
     // Original raster burst, generated locally once. No copied game texture.
     const c = document.createElement('canvas');
     c.width = 128;

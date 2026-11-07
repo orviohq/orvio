@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.2.17] - 2026-11-08
+
+### Fixed
+
+- Finish the countdown before any note can enter the field, including after a live speed change. Reserve the longest supported travel window without hiding notes or changing their chart times.
+- Audio preparation has a 30-second deadline and a Cancel/Esc path back to track selection. Retry owns a new startup attempt; late completion from a cancelled attempt cannot start another soundtrack.
+- New replays retain their exact audio lead-in. Older local replays keep their original audio anchor and input timing.
+
+### Scope
+
+- Charts, judgments, controls and scores are unchanged. This release does not fix the separately reported second-round lane highlight issue, change difficulty ratings or chart generation, or add FEVER.
+
 ## [0.2.16] - 2026-11-08
 
 ### Changed

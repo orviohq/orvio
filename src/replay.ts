@@ -23,6 +23,9 @@ export interface ReplayData {
   options: NonNullable<SharedResult['options']>;
   ops: ReplayOp[];
   end: number;
+  // Seconds the audio anchor was held after session start when recorded.
+  // Absent on pre-A5 replays, whose anchor was the fixed 0.15s lead-in.
+  audioLeadIn?: number;
 }
 export type RuntimeReplay = Omit<ReplayData, 'song'> & { song: string };
 const faders: readonly string[] = FADERS;
@@ -49,7 +52,11 @@ export function validateRuntimeReplay(
     r.ops.length > 12000 ||
     !Number.isFinite(r.end) ||
     r.end < 0 ||
-    r.end > 600000
+    r.end > 600000 ||
+    (r.audioLeadIn !== undefined &&
+      (!Number.isFinite(r.audioLeadIn) ||
+        r.audioLeadIn < 0 ||
+        r.audioLeadIn > 10))
   )
     return null;
   const o = r.options;
@@ -74,7 +81,7 @@ export function validateRuntimeReplay(
       op[1] < prev ||
       op[1] > r.end ||
       !Number.isFinite(op[2]) ||
-      op[2] < -2 ||
+      op[2] < (r.audioLeadIn === undefined ? -2 : -(r.audioLeadIn + 1)) ||
       (op[2] > 600 &&
         !(op[0] === 1 && op[2] === 9999 && i === r.ops.length - 1))
     )
@@ -115,6 +122,7 @@ export function validateRuntimeReplay(
     },
     ops: r.ops.map((op) => [...op] as ReplayOp),
     end: r.end,
+    ...(r.audioLeadIn !== undefined ? { audioLeadIn: r.audioLeadIn } : {}),
   };
 }
 export function replayEngine(r: RuntimeReplay) {
