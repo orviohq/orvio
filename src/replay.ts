@@ -1,3 +1,4 @@
+import { packReplay, unpackReplay } from './replay-binary';
 import { SONGS, makeChart, type Difficulty, type Lanes } from './chart';
 import { Engine } from './engine';
 import { transformChart, type Fader, type Shuffle } from './game-options';
@@ -173,10 +174,7 @@ async function transformed(bytes: Uint8Array, compress: boolean) {
 export async function encodeReplay(r: ReplayData): Promise<string> {
   const safe = validateReplay(r);
   if (!safe) throw new Error('Invalid replay');
-  const packed = await transformed(
-    new TextEncoder().encode(JSON.stringify(safe)),
-    true,
-  );
+  const packed = await transformed(packReplay(safe), true);
   let binary = '';
   for (let i = 0; i < packed.length; i += 8192)
     binary += String.fromCharCode(...packed.subarray(i, i + 8192));
@@ -196,7 +194,11 @@ export async function decodeReplay(text: string): Promise<ReplayData | null> {
       Uint8Array.from(binary, (c) => c.charCodeAt(0)),
       false,
     );
-    return validateReplay(JSON.parse(new TextDecoder().decode(raw)));
+    return validateReplay(
+      raw[0] === 82 && raw[1] === 50
+        ? unpackReplay(raw)
+        : JSON.parse(new TextDecoder().decode(raw)),
+    );
   } catch {
     return null;
   }

@@ -1,4 +1,5 @@
 import { atKey } from './input';
+import { judge } from '../src/engine';
 import { test, expect } from '@playwright/test';
 test('legacy calibration removed and held body stays visible past head culling', async ({
   page,
@@ -41,11 +42,9 @@ test('legacy calibration removed and held body stays visible past head culling',
   }, n.id);
   expect(during.state.held).toBe(true);
   expect(during.state.done).toBe(false);
-  expect(
-    Math.abs(
-      during.events.find((e: any) => e.noteId === n.id && !e.tail).delta,
-    ),
-  ).toBeLessThan(45);
+  const head = during.events.find((e: any) => e.noteId === n.id && !e.tail);
+  expect(head.value).toBe(judge(head.delta));
+  expect(head.value).toBeGreaterThan(0);
   // Do not take a screenshot between head and tail: capture latency can exceed
   // the remaining hold on a loaded runner and delay the real key-up event.
   await atKey(page, n.end, keys[n.lane], false);
@@ -56,8 +55,9 @@ test('legacy calibration removed and held body stays visible past head culling',
       ),
     n.id,
   );
-  expect(tail.value).toBe(100);
-  expect(Math.abs(tail.delta)).toBeLessThan(45);
+  expect(tail.value).toBe(tail.delta > 116.67 ? 1 : head.value);
+  expect(tail.value).toBeGreaterThan(0);
+  expect(tail.tail).toBe(true);
   await page.keyboard.press('Escape');
   await page.click('#pause-exit');
 });

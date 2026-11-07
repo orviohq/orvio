@@ -118,6 +118,9 @@ let lastRecordedSpeed = settings.speed,
 let replayCursor = 0,
   sessionWallAt = 0,
   replayText = '';
+let replayExpected = false,
+  replayIssue = false,
+  replayExpectedLength = 0;
 let replayEncoding: Promise<void> = Promise.resolve();
 let replayAudioQueue: Promise<void> = Promise.resolve();
 function recordOp(op: ReplayOp) {
@@ -140,6 +143,9 @@ function syncReplayButton() {
   if (!b) return;
   b.textContent = '▷ ' + REPLAY_LABELS[settings.language][0];
   b.classList.toggle('hidden', !savedReplay);
+  const status = $('#replay-status');
+  status.textContent = replayIssue ? REPLAY_LABELS[settings.language][2] : '';
+  status.classList.toggle('hidden', !replayIssue);
 }
 function stopReplay() {
   if (!playReplay) return;
@@ -182,7 +188,7 @@ app.innerHTML = `
   .join(
     '',
   )}</select><label>${label('position')}</label><div class="segmented" id="position"><button data-pos="left"><span class="position-preview" aria-hidden="true"><i></i><b></b><i></i></span>${label('left')}</button><button data-pos="center"><span class="position-preview" aria-hidden="true"><i></i><b></b><i></i></span>${label('center')}</button><button data-pos="right"><span class="position-preview" aria-hidden="true"><i></i><b></b><i></i></span>${label('right')}</button></div><label for="volume">${label('volume')}</label><input id="volume" type="range" min="0" max="1" step="0.05"></section><section class="settings-keys" id="settings-keys" role="tabpanel" aria-labelledby="settings-keys-tab"><label>${label('bindings')} <span id="binding-mode"></span></label><div id="bindings"></div><p class="hint" id="bind-hint">${label('bindHint')}</p></section></div><label class="toggle"><span>${label('reduced')}</span><input id="reduced-motion" type="checkbox"></label><button id="reset" class="quiet">${label('reset')}</button><p class="local-note">${label('local')} · TAB / SHIFT TAB / ESC</p></dialog>
-<div id="song-loading" class="hidden" role="status" aria-live="polite"><img id="loading-wallpaper" alt=""><div class="loading-info"><span>ORVIO ORIGINALS</span><h1 id="loading-title"></h1><p id="loading-detail"></p><strong id="loading-status"></strong></div></div><dialog id="game-options"><form method="dialog"><div class="dialog-title"><h2>${label('gameOptions')}</h2><button class="close" aria-label="Close">×</button></div></form><label for="speed">${label('speed')} <output id="speed-value"></output></label><select id="speed"></select><label for="fader">${label('fader')}</label><select id="fader"><option value="off">OFF</option><option value="in">FADE IN</option><option value="in2">FADE IN 2</option><option value="out">FADE OUT</option><option value="out2">FADE OUT 2</option></select><label for="shuffle">${label('shuffle')}</label><select id="shuffle"><option value="off">OFF</option><option value="mirror">MIRROR</option><option value="random">RANDOM</option></select><p class="hint" id="option-hint">${label('optionHint')}</p><button id="options-done" class="primary">${label('close')} ↵</button></dialog><dialog id="restart-options"><h2>${label('shuffleRestart')}</h2><p>${label('shuffleRestartHint')}</p><button id="confirm-shuffle-restart" class="primary">${label('restartApply')}</button><button id="cancel-shuffle-restart" class="quiet">${label('cancelChange')}</button></dialog><dialog id="results" tabindex="-1" aria-labelledby="result-song"><div class="result-system">ORVIO / SESSION REPORT</div><div class="result-heading"><img id="result-art" alt=""><div class="result-track"><h2 id="result-song"></h2><p id="result-metadata"></p><button id="result-preview" class="quiet" aria-pressed="false"></button></div><span id="result-rank"></span></div><p id="result-options"></p><div id="result-badge"></div><div class="result-score" id="result-score"></div><div class="result-stats"><div><span>${label('accuracy')}</span><strong id="result-rate"></strong></div><div><span>${label('maxCombo')}</span><strong id="result-combo"></strong></div><div><span>BREAK</span><strong id="result-break"></strong></div></div><div id="judgment-list"></div><button id="watch-replay" class="quiet hidden"></button><div class="result-actions"><button id="share-result" class="quiet"></button><button id="back" class="quiet">ESC ${label('back')}</button><button id="retry" class="primary">${label('retry')} ↵</button></div></dialog>
+<div id="song-loading" class="hidden" role="status" aria-live="polite"><img id="loading-wallpaper" alt=""><div class="loading-info"><span>ORVIO ORIGINALS</span><h1 id="loading-title"></h1><p id="loading-detail"></p><strong id="loading-status"></strong></div></div><dialog id="game-options"><form method="dialog"><div class="dialog-title"><h2>${label('gameOptions')}</h2><button class="close" aria-label="Close">×</button></div></form><label for="speed">${label('speed')} <output id="speed-value"></output></label><select id="speed"></select><label for="fader">${label('fader')}</label><select id="fader"><option value="off">OFF</option><option value="in">FADE IN</option><option value="in2">FADE IN 2</option><option value="out">FADE OUT</option><option value="out2">FADE OUT 2</option></select><label for="shuffle">${label('shuffle')}</label><select id="shuffle"><option value="off">OFF</option><option value="mirror">MIRROR</option><option value="random">RANDOM</option></select><p class="hint" id="option-hint">${label('optionHint')}</p><button id="options-done" class="primary">${label('close')} ↵</button></dialog><dialog id="restart-options"><h2>${label('shuffleRestart')}</h2><p>${label('shuffleRestartHint')}</p><button id="confirm-shuffle-restart" class="primary">${label('restartApply')}</button><button id="cancel-shuffle-restart" class="quiet">${label('cancelChange')}</button></dialog><dialog id="results" tabindex="-1" aria-labelledby="result-song"><div class="result-system">ORVIO / SESSION REPORT</div><div class="result-heading"><img id="result-art" alt=""><div class="result-track"><h2 id="result-song"></h2><p id="result-metadata"></p><button id="result-preview" class="quiet" aria-pressed="false"></button></div><span id="result-rank"></span></div><p id="result-options"></p><div id="result-badge"></div><div class="result-score" id="result-score"></div><div class="result-stats"><div><span>${label('accuracy')}</span><strong id="result-rate"></strong></div><div><span>${label('maxCombo')}</span><strong id="result-combo"></strong></div><div><span>BREAK</span><strong id="result-break"></strong></div></div><div id="judgment-list"></div><p id="replay-status" class="hint hidden" role="status"></p><button id="watch-replay" class="quiet hidden"></button><div class="result-actions"><button id="share-result" class="quiet"></button><button id="back" class="quiet">ESC ${label('back')}</button><button id="retry" class="primary">${label('retry')} ↵</button></div></dialog>
 <dialog id="about"><form method="dialog"><div class="dialog-title"><h2>${label('aboutTitle')}</h2><button class="close" aria-label="Close">×</button></div></form><p>${label('aboutBody')}</p><a href="https://github.com/orviohq/orvio" target="_blank" rel="noreferrer">${label('code')} ↗</a></dialog><div id="toast" role="status"></div>`;
 guardFullscreenEscape();
 function localize() {
@@ -437,6 +443,11 @@ async function start() {
     );
     seenEvents = 0;
     sequence = 0;
+    if (!playReplay) {
+      replayExpected = false;
+      replayIssue = false;
+      replayExpectedLength = 0;
+    }
     savedReplay = playReplay ?? undefined;
     replayText = playReplay ? replayText : '';
     sessionReplay = playReplay
@@ -483,6 +494,10 @@ async function start() {
     $('#keycaps').innerHTML = settings.keys[settings.lanes]
       .map((k) => `<span>${keyLabel(k)}</span>`)
       .join('');
+    $('#countdown').textContent = '';
+    hudAt = 0;
+    $('#score').textContent = '0000000';
+    $('#rate').textContent = '100.00';
     $('#judge').textContent = '';
     $('#combo').textContent = '';
     clock.setVolume(settings.volume);
@@ -711,10 +726,12 @@ function finish() {
     (v) => engine!.events.filter((e) => e.value === v).length,
   );
   const completed = lastResult;
+  replayExpected = true;
   replayEncoding = (async () => {
     if (savedReplay && replayMatches(savedReplay, completed)) {
       try {
         replayText = await encodeReplay(savedReplay);
+        replayExpectedLength = replayText.length;
       } catch {
         savedReplay = undefined;
         replayText = '';
@@ -725,6 +742,7 @@ function finish() {
     }
     if (lastResult === completed) {
       history.replaceState(null, '', resultLink(completed));
+      replayIssue = !savedReplay;
       syncReplayButton();
     }
   })();
@@ -737,6 +755,10 @@ function finish() {
 }
 function resultLink(result: SharedResult) {
   const p = resultParams(result);
+  if (replayExpected) {
+    p.set('rp', '1');
+    p.set('rn', String(replayExpectedLength));
+  }
   if (replayText && savedReplay && replayMatches(savedReplay, result))
     p.set('r', replayText);
   return new URL('/result/#' + p, location.origin).href;
@@ -1433,19 +1455,34 @@ function readRoute() {
         )
       : null;
   if (shared) {
-    const encoded = new URLSearchParams(location.hash.slice(1)).get('r');
+    lastResult = shared;
+    const replayParams = new URLSearchParams(location.hash.slice(1));
+    const encoded = replayParams.get('r');
+    replayExpected = replayParams.get('rp') === '1' || !!encoded;
+    replayExpectedLength = Number(
+      replayParams.get('rn') || encoded?.length || 0,
+    );
+    replayIssue = replayExpected && !encoded;
     savedReplay = undefined;
     replayText = '';
     if (encoded) {
       replayEncoding = (async () => {
-        const r = await decodeReplay(encoded);
+        const r =
+          replayParams.has('rn') &&
+          (replayExpectedLength !== encoded.length ||
+            !Number.isInteger(replayExpectedLength))
+            ? null
+            : await decodeReplay(encoded);
         if (lastResult === shared && r && replayMatches(r, shared)) {
           savedReplay = r;
           replayText = encoded;
           history.replaceState(null, '', resultLink(shared));
           syncReplayButton();
-        } else if (lastResult === shared)
+        } else if (lastResult === shared) {
+          replayIssue = true;
+          syncReplayButton();
           toast(REPLAY_LABELS[settings.language][2]);
+        }
       })();
     }
     settings.lanes = shared.lanes;
