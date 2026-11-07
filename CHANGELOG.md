@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.2.16] - 2026-11-08
+
+### Changed
+
+- YouTube imports show a visible loading panel, indeterminate progress and elapsed time, with safe cancel, retry and error recovery.
+- YouTube thumbnails appear in track selection, the play background, loading and results. Image failures use local artwork and cannot indefinitely block play.
+- Existing charts, scores, controls, local replays and original-song artwork remain unchanged.
+
+### Scope
+
+- This release does not change chart generation, difficulty ratings, key mapping, countdown timing or add FEVER. The short-video limits remain unchanged.
+
 ## [0.2.15] - 2026-11-08
 
 ### Added

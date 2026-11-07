@@ -37,6 +37,7 @@ test('all 13 import dialogs translate and show distinct invalid, duration, busy 
     if (locale !== 'en') expect(title).not.toBe('Add YouTube');
     await page.fill('#youtube-url', 'https://example.com/wrong');
     await page.click('#youtube-submit');
+    await expect(page.locator('#youtube-status')).not.toHaveText('');
     const invalid = await page.locator('#youtube-status').textContent();
     expect(invalid).toBeTruthy();
     await page.fill('#youtube-url', 'https://youtu.be/uXn-zOt68V8');

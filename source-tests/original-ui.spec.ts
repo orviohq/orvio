@@ -24,6 +24,12 @@ test('original main imports exact source and uses original clock, key input and 
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   let posts = 0;
+  await page.route('https://i.ytimg.com/**', (route) =>
+    route.fulfill({
+      contentType: 'image/png',
+      body: fs.readFileSync('public/wallpapers/first-light.png'),
+    }),
+  );
   await page.route(base + '/**', (route) => {
     if (route.request().method() === 'POST') posts++;
     const headers = {
@@ -61,10 +67,20 @@ test('original main imports exact source and uses original clock, key input and 
   await expect(page.locator('#selected-title')).toHaveText(
     'Monkeys Spinning Monkeys',
   );
+  await expect(page.locator('#selected-art')).toHaveCSS(
+    'background-image',
+    /i.ytimg.com/,
+  );
+  await page.screenshot({ path: 'test-results/a3-selection.png' });
   await page.click('[data-lanes="7"]');
   await page.click('[data-diff="high"]');
   await page.click('#start');
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
+  expect(
+    await page.evaluate(() =>
+      document.body.style.getPropertyValue('--play-wallpaper'),
+    ),
+  ).toContain('i.ytimg.com');
   const d = await page.evaluate(() => (window as any).orvioDiagnostics);
   expect(d.total).toBe(250);
   const n = d.notes.find((s: any) => s.note.time > 1).note;

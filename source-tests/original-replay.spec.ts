@@ -22,6 +22,12 @@ const sha = createHash('sha256').update(bytes).digest('hex');
 test('original finish, saved source-bound replay, reload recovery and replay events agree on an 8s exact PCM excerpt', async ({
   page,
 }) => {
+  await page.route('https://i.ytimg.com/**', (route) =>
+    route.fulfill({
+      contentType: 'image/png',
+      body: fs.readFileSync('public/wallpapers/first-light.png'),
+    }),
+  );
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   let posts = 0,
@@ -88,6 +94,15 @@ test('original finish, saved source-bound replay, reload recovery and replay eve
   );
   await page.keyboard.press(['s', 'd', 'f', 'Space', 'j', 'k', 'l'][note.lane]);
   await expect(page.locator('#results')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('#result-art')).toHaveAttribute(
+    'src',
+    /i.ytimg.com/,
+  );
+  expect(
+    await page
+      .locator('#result-art')
+      .evaluate((img: HTMLImageElement) => img.naturalWidth),
+  ).toBeGreaterThan(0);
   await expect(page.locator('#watch-replay')).toBeVisible();
   await expect(page.locator('#share-result')).toBeHidden();
   const original = await page.evaluate(() => (window as any).orvioDiagnostics);
