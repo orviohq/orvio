@@ -533,6 +533,7 @@ async function start() {
     $('#judge').textContent = '';
     $('#combo').textContent = '';
     clock.setVolume(settings.volume);
+    await field.warmup(engine, settings.lanes, 2 / settings.speed);
     await new Promise((resolve) =>
       setTimeout(
         resolve,

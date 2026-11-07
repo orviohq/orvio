@@ -106,6 +106,19 @@ export class Playfield {
     s.roundPixels = true;
     return s;
   }
+  /** Submit the initial GPU resources under the loading overlay, before audio.
+   * Does not update the engine or advance the gameplay clock.
+   */
+  async warmup(engine: Engine, lanes: number, travel: number) {
+    this.draw(engine, lanes, -0.2, travel, performance.now());
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    this.visualClock.reset();
+    this.lastFrame = 0;
+    this.frames = [];
+    this.work = [];
+  }
   setup(engine: Engine, lanes: number, color: number) {
     this.noteColor = color;
     this.notes.removeChildren().forEach((c) => c.destroy());
