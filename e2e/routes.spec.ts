@@ -1,9 +1,7 @@
 import { test, expect } from '@playwright/test';
-test('home, share, direct play, refresh and history are safe keyboard routes', async ({
+test('home, direct play, refresh and history are safe keyboard routes', async ({
   page,
-  context,
 }) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/');
   await expect(page.locator('#home-start')).toBeVisible();
   await expect(page.locator('#lobby')).not.toBeVisible();
@@ -15,11 +13,10 @@ test('home, share, direct play, refresh and history are safe keyboard routes', a
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('7');
-  await page.click('#lobby .share-link');
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
-    '/play/afterimage/7/mid/',
-  );
+  await expect(page.locator('.share-link, #share-selection')).toHaveCount(0);
+  await expect(page).toHaveURL(/song=afterimage/);
   await page.goto('/play/afterimage/7/mid/');
+  await expect(page.locator('.share-link, #share-selection')).toHaveCount(0);
   await expect(page.locator('#ready-title')).toHaveText('Afterimage');
   expect(
     await page.evaluate(() => (window as any).orvioDiagnostics.active),

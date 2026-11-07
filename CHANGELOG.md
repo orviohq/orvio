@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-07
+
+### Changed
+
+- Removed chart-link and selection-link copy buttons. Direct chart URLs, address-bar state, refresh and history remain supported.
+
+### Added
+
+- Home start requests fullscreen during the click or Enter gesture, keeping the selection transition in the same document. Unsupported or denied fullscreen does not block play.
+- Separate five-key and seven-key binding rows in one settings screen.
+- Consecutive left-to-right key capture with automatic advance, same-mode duplicate checks, repeat rejection and Escape cancellation. Saved modes remain independent.
+
 ## [0.2.1] - 2026-11-07
 
 ### Fixed

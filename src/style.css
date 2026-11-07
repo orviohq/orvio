@@ -1978,10 +1978,6 @@ dialog input[type='checkbox'] {
 .home-screen .ambient {
   display: none;
 }
-.share-link {
-  white-space: nowrap;
-  font-size: 11px;
-}
 #ready-screen .primary {
   width: 320px;
 }
@@ -2039,4 +2035,36 @@ dialog input[type='checkbox'] {
     transform: scale(1);
     opacity: 1;
   }
+}
+
+#bindings {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.binding-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.binding-row > strong {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: #9dc9db;
+}
+.binding-keys {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 7px;
+}
+.binding-keys .key-bind {
+  min-width: 0;
+  font-size: 13px;
+  padding: 10px 2px;
+}
+.binding-keys .listening {
+  font-size: 9px;
+  color: #07111b;
+  background: #29d8ff;
+  outline: 2px solid #d7faff;
 }

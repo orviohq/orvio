@@ -7,9 +7,6 @@ export const LANGUAGES = {
 } as const;
 export type Language = keyof typeof LANGUAGES;
 const en = {
-  copyLink: 'COPY CHART LINK',
-  copied: 'LINK COPIED',
-  copySelection: 'COPY SELECT LINK',
   pause: 'PAUSED',
   resume: 'RESUME',
   select: 'TRACK SELECT',
@@ -30,7 +27,7 @@ const en = {
   local: 'Saved on this device only. No account or upload.',
   auto: 'Notes and input follow the audible music clock automatically.',
   bindHint:
-    'Choose a key, then press its replacement. Duplicate keys are not allowed.',
+    'Choose a 5/7-key slot, then enter keys left to right. Next slot is automatic. Esc cancels. Duplicate keys stay on the same slot.',
   mobile: 'Browse tracks and settings here. Play on a desktop keyboard.',
   easy: 'EASY',
   normal: 'NORMAL',
@@ -88,9 +85,6 @@ const en = {
 };
 type Words = typeof en;
 const ko: Words = {
-  copyLink: '채보 링크 복사',
-  copied: '링크 복사됨',
-  copySelection: '선택 화면 링크 복사',
   pause: '일시정지',
   resume: '계속 플레이',
   select: '곡 선택',
@@ -110,7 +104,8 @@ const ko: Words = {
   reset: '조작 설정 초기화',
   local: '이 기기에만 저장돼요. 계정·서버 전송 없음.',
   auto: '노트와 입력을 음악 출력 시계에 자동으로 맞춰요.',
-  bindHint: '키를 선택한 뒤 새 키를 누르세요. 중복 키는 사용할 수 없어요.',
+  bindHint:
+    '5키/7키 칸을 선택하고 왼쪽부터 연속 입력하세요. 다음 칸으로 자동 이동합니다. Esc 취소. 중복 키는 같은 칸에서 다시 입력하세요.',
   mobile: '여기서는 곡과 설정을 둘러보세요. 플레이는 데스크톱 키보드에서.',
   easy: '하',
   normal: '중',
@@ -167,9 +162,6 @@ const ko: Words = {
   unmute: '음소거 해제',
 };
 const zh: Words = {
-  copyLink: '复制谱面链接',
-  copied: '链接已复制',
-  copySelection: '复制选曲链接',
   pause: '已暂停',
   resume: '继续游戏',
   select: '曲目选择',
@@ -189,7 +181,8 @@ const zh: Words = {
   reset: '重置操作',
   local: '仅保存在此设备。无需账号，不上传数据。',
   auto: '音符与输入自动同步到音乐输出时钟。',
-  bindHint: '选择按键后按下新键。按键不能重复。',
+  bindHint:
+    '选择5键或7键的键位，然后从左至右连续输入。自动跳到下一格，Esc取消。重复键需重新输入。',
   mobile: '此处可浏览曲目与设置。请使用桌面键盘游玩。',
   easy: '简单',
   normal: '普通',
@@ -245,9 +238,6 @@ const zh: Words = {
   unmute: '取消静音',
 };
 const ja: Words = {
-  copyLink: '譜面リンクをコピー',
-  copied: 'コピーしました',
-  copySelection: '選曲リンクをコピー',
   pause: '一時停止',
   resume: 'プレイ再開',
   select: '楽曲選択',
@@ -267,7 +257,8 @@ const ja: Words = {
   reset: '操作設定をリセット',
   local: 'この端末にのみ保存。アカウント・送信なし。',
   auto: 'ノーツと入力を音楽の出力クロックに自動同期します。',
-  bindHint: 'キーを選んで新しいキーを押してください。重複は使用できません。',
+  bindHint:
+    '5キー・7キーの枠を選び、左から順に入力。次の枠へ自動移動、Escで中止。重複キーは再入力してください。',
   mobile:
     'ここでは楽曲と設定を確認できます。プレイはデスクトップのキーボードで。',
   easy: '簡単',
@@ -325,9 +316,6 @@ const ja: Words = {
   unmute: 'ミュート解除',
 };
 const es: Words = {
-  copyLink: 'COPIAR ENLACE DE PARTIDA',
-  copied: 'ENLACE COPIADO',
-  copySelection: 'COPIAR SELECCIÓN',
   pause: 'PAUSA',
   resume: 'CONTINUAR',
   select: 'SELECCIÓN',
@@ -348,7 +336,7 @@ const es: Words = {
   local: 'Solo se guarda en este dispositivo. Sin cuenta ni envíos.',
   auto: 'Las notas y las teclas se sincronizan con el reloj de salida del audio.',
   bindHint:
-    'Elige una tecla y pulsa su reemplazo. No se permiten teclas repetidas.',
+    'Elige una casilla de 5 o 7 teclas e introduce las teclas de izquierda a derecha. Avanza automáticamente. Esc cancela. No se permiten duplicados.',
   mobile: 'Explora pistas y opciones. Juega con un teclado de escritorio.',
   easy: 'FÁCIL',
   normal: 'NORMAL',
