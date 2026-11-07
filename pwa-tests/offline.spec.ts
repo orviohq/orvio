@@ -3,6 +3,8 @@ test('desktop installability, exact local song cache and offline warm start', as
   page,
   context,
 }) => {
+  const sw = await (await page.request.get('/sw.js')).text();
+  expect(sw).not.toMatch(/"\/(?:_routes\.json|_headers|_redirects)"/);
   await page.goto('/');
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.reload();

@@ -7,7 +7,10 @@ async function walk(dir) {
   for (const e of await readdir(dir, { withFileTypes: true })) {
     const p = join(dir, e.name);
     if (e.isDirectory()) all.push(...(await walk(p)));
-    else if (!p.endsWith('/sw.js')) all.push(p);
+    else if (
+      !['sw.js', '_routes.json', '_headers', '_redirects'].includes(e.name)
+    )
+      all.push(p);
   }
   return all;
 }
