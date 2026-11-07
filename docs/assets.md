@@ -9,3 +9,7 @@
 
 - `public/chinese.ttf` and `public/japanese.ttf`: locally subset Noto Sans SC / JP from the Google Fonts repository, SIL OFL1.1, regional glyphs. Sources https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf and https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf . Notices `OFL-NotoSansSC.txt` / `OFL-NotoSansJP.txt`.
 - Arcade backgrounds, hit beams and particles are original CSS/PixiJS graphics, not copied game assets.
+
+## Wallpaper and social images
+
+Three original geometric wallpapers are authored for the built-in tracks using flat colors and project-owned shapes. They do not copy DJMAX art. Default social art uses the existing OFL Outfit font. The result PNG renderer uses a bounded raster glyph subset derived from that same font; its license remains in public/OFL-Outfit.txt.

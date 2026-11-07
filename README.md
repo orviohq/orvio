@@ -2,7 +2,7 @@
 
 # Find your flow
 
-A local-first, open-source keyboard rhythm game. Three original synth tracks, eighteen charts, five or seven lanes. No sign-in, analytics, paid APIs, or remote runtime dependencies.
+A local-first, open-source keyboard rhythm game. Three original synth tracks, eighteen charts, five or seven lanes. No sign-in, analytics or paid APIs. Gameplay is local; optional result sharing uses small same-site Pages Functions.
 
 **Prototype:** https://orvio-play.pages.dev/
 
@@ -62,3 +62,9 @@ Code and original procedural music are MIT licensed. Outfit and the subset of No
 - The address bar preserves the chart, speed, visibility, shuffle and seed. Back/forward returns to a safe ready/selection screen, never a running game.
 
 Astro generates static HTML. The existing TypeScript/PixiJS/Web Audio client runs the game. No server adapter or account is required.
+
+## Result sharing
+
+Results stay in memory until Share is pressed. Share opens the device share sheet or copies a result URL. Opening that URL requests a same-site HTML result and PNG social image. Only a fixed built-in song ID, key mode, difficulty, score, accuracy and combo are included. No identity, account, timestamp, device data or local settings are sent. Shared URLs are public to anyone who receives them. Results are self-reported local play, not authenticated leaderboard records.
+
+Cloudflare Pages Functions handle only `/result/*` and `/result.png`; all gameplay routes remain static. Local result testing: `npx wrangler pages dev dist --port 4176`. The PNG renderer has no runtime font download, external image URL or third-party API dependency.

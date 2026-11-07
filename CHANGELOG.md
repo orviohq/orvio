@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-11-07
+
+### Added
+
+- Explicit result sharing with score, accuracy and maximum combo in a 1200×630 PNG social preview. Results remain local until Share is pressed; no player identity, account, timestamp or device data is included.
+- Server-rendered result pages and PNG Open Graph/Twitter metadata. Results are labeled local and unverified, never leaderboard records. Strict bounded fields and fixed song titles prevent arbitrary markup or tracking content.
+- Original wallpaper loading screens for all three built-in tracks. Song art and title remain visible for at least 900ms and through audio/renderer preparation, before the score clock or notes start. No copied game artwork.
+- Default site Open Graph image and metadata.
+
 ## [0.2.4] - 2026-11-07
 
 ### Added

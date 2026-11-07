@@ -7,6 +7,11 @@ export const LANGUAGES = {
 } as const;
 export type Language = keyof typeof LANGUAGES;
 const en = {
+  shareResult: 'Share result',
+  sharePrivacy:
+    'Only Share sends a link. Includes song and score, never identity. Local play, unverified.',
+  resultCopied: 'Result link copied',
+  shareFailed: 'Sharing failed. Try again.',
   liveOptionHint:
     'Speed and visibility apply to this play. Changing shuffle requires restarting the song.',
   shuffleRestart: 'Restart to change shuffle?',
@@ -99,6 +104,11 @@ const en = {
 };
 type Words = typeof en;
 const ko: Words = {
+  shareResult: '결과 공유',
+  sharePrivacy:
+    '공유를 눌러야 링크가 만들어집니다. 곡과 점수만 포함하며 신원 정보는 없습니다. 검증되지 않은 로컬 결과입니다.',
+  resultCopied: '결과 링크를 복사했습니다',
+  shareFailed: '공유하지 못했습니다. 다시 시도하세요.',
   liveOptionHint:
     '속도와 노트 표시는 현재 곡에 적용됩니다. 노트 섞기는 곡을 처음부터 다시 시작해야 합니다.',
   shuffleRestart: '노트 섞기를 바꾸고 다시 시작할까요?',
@@ -190,6 +200,11 @@ const ko: Words = {
   unmute: '음소거 해제',
 };
 const zh: Words = {
+  shareResult: '分享成绩',
+  sharePrivacy:
+    '仅分享时创建链接。仅包含歌曲和分数，无身份信息。本地成绩未经验证。',
+  resultCopied: '成绩链接已复制',
+  shareFailed: '分享失败，请重试。',
   liveOptionHint: '速度和显示在当前歌曲生效。更改轨道顺序需要重新开始。',
   shuffleRestart: '重新开始以更改轨道顺序？',
   shuffleRestartHint: '当前分数将重置。新顺序从歌曲开头生效，保留长按和输入。',
@@ -278,6 +293,11 @@ const zh: Words = {
   unmute: '取消静音',
 };
 const ja: Words = {
+  shareResult: '結果を共有',
+  sharePrivacy:
+    '共有時のみリンクを作成します。曲とスコアのみで個人情報は含みません。未検証のローカル結果です。',
+  resultCopied: '結果リンクをコピーしました',
+  shareFailed: '共有できませんでした。再試行してください。',
   liveOptionHint:
     '速度と表示は現在の曲に適用。配置変更は曲の再スタートが必要です。',
   shuffleRestart: '配置を変更して再スタート？',
@@ -370,6 +390,11 @@ const ja: Words = {
   unmute: 'ミュート解除',
 };
 const es: Words = {
+  shareResult: 'Compartir resultado',
+  sharePrivacy:
+    'Solo Compartir crea el enlace. Incluye canción y puntuación, sin identidad. Resultado local sin verificar.',
+  resultCopied: 'Enlace copiado',
+  shareFailed: 'No se pudo compartir. Inténtalo de nuevo.',
   liveOptionHint:
     'La velocidad y visibilidad cambian en esta partida. Cambiar carriles requiere reiniciar.',
   shuffleRestart: '¿Reiniciar para cambiar carriles?',
