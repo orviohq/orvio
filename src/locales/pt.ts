@@ -12,14 +12,13 @@ export const pt = {
     'Velocidade e visibilidade são aplicadas nesta partida. Mudar a ordem das pistas exige reiniciar a música.',
   shuffleRestart: 'Reiniciar para mudar as pistas?',
   shuffleRestartHint:
-    'A pontuação será zerada. A nova ordem vale desde o início e preserva notas longas e comandos.',
+    'A pontuação será reiniciada. A nova ordem das pistas aplica-se desde o início.',
   restartApply: 'REINICIAR E APLICAR',
   cancelChange: 'CANCELAR MUDANÇA',
   gameOptions: 'OPÇÕES DE JOGO',
   fader: 'Efeitos das notas',
   shuffle: 'Ordem das pistas',
-  optionHint:
-    'Vale para a próxima partida. RANDOM mantém a mesma permutação em toda a música, preservando notas longas e acordes.',
+  optionHint: 'Aplica-se à próxima partida.',
   pause: 'PAUSADO',
   resume: 'CONTINUAR',
   select: 'SELECIONAR MÚSICA',
@@ -66,10 +65,10 @@ export const pt = {
   hold: 'SEGURE ATÉ O FINAL ALCANÇAR A LINHA',
   synced: 'SINCRONIA DA SAÍDA DE ÁUDIO',
   about: 'SOBRE',
-  aboutTitle: 'Notas do protótipo',
+  aboutTitle: 'Como jogar',
   aboutBody:
-    'Três músicas originais de sintetizador. Jogo de ritmo com teclado em 5 ou 7 pistas. Os nomes dos julgamentos se inspiram em DJMAX RESPECT V; as janelas de tempo e regras de notas longas são próprias do protótipo, sem equivalência exata. Latência de áudio/tela e taxa de quadros variam por dispositivo.',
-  code: 'CÓDIGO E LICENÇAS',
+    'Joga três músicas originais com 5 ou 7 teclas. Acerta as notas na linha e mantém as notas longas até ao fim.',
+  code: 'Créditos e licenças',
   unsupported: 'Jogue no computador com teclado.',
   startError:
     'O áudio não iniciou. Verifique a permissão do navegador e tente novamente.',

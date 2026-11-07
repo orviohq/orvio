@@ -12,14 +12,13 @@ export const vi = {
     'Tốc độ và hiển thị áp dụng cho lượt chơi này. Đổi thứ tự làn cần chơi lại bài hát từ đầu.',
   shuffleRestart: 'Chơi lại để đổi thứ tự làn?',
   shuffleRestartHint:
-    'Điểm sẽ về không. Thứ tự mới áp dụng từ đầu, giữ nguyên nốt giữ và thao tác nhập.',
+    'Điểm hiện tại sẽ đặt lại. Thứ tự làn mới áp dụng từ đầu.',
   restartApply: 'CHƠI LẠI VÀ ÁP DỤNG',
   cancelChange: 'HỦY THAY ĐỔI',
   gameOptions: 'TÙY CHỌN TRÒ CHƠI',
   fader: 'Hiệu ứng nốt',
   shuffle: 'Thứ tự làn',
-  optionHint:
-    'Áp dụng ở lượt chơi tiếp theo. RANDOM dùng một thứ tự làn cho cả bài, giữ nguyên nốt giữ và hợp âm.',
+  optionHint: 'Áp dụng cho lượt chơi tiếp theo.',
   pause: 'TẠM DỪNG',
   resume: 'TIẾP TỤC',
   select: 'CHỌN BÀI HÁT',
@@ -65,10 +64,10 @@ export const vi = {
   hold: 'GIỮ ĐẾN KHI ĐUÔI NỐT CHẠM VẠCH',
   synced: 'ĐỒNG BỘ ĐẦU RA ÂM THANH',
   about: 'GIỚI THIỆU',
-  aboutTitle: 'Ghi chú bản mẫu',
+  aboutTitle: 'Cách chơi',
   aboutBody:
-    'Ba bài nhạc tổng hợp gốc. Trò chơi nhịp điệu bằng bàn phím với 5 hoặc 7 làn. Tên đánh giá lấy cảm hứng từ DJMAX RESPECT V; khoảng thời gian và quy tắc nốt giữ là quy tắc riêng của bản mẫu, không giống hoàn toàn. Độ trễ âm thanh/màn hình và tốc độ khung hình tùy thiết bị.',
-  code: 'MÃ NGUỒN VÀ GIẤY PHÉP',
+    'Chơi ba bài nhạc gốc bằng 5 hoặc 7 phím. Nhấn nốt tại vạch và giữ nốt dài đến cuối.',
+  code: 'Tác giả và giấy phép',
   unsupported: 'Chơi trên máy tính có bàn phím.',
   startError:
     'Không thể bắt đầu âm thanh. Kiểm tra quyền trình duyệt rồi thử lại.',

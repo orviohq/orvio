@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.2.13] - 2026-11-07
+
+- One-click short-link copying without an app verification window or waiting message.
+- Result-only entry screen and initial-HTML result preview card.
+- Removed generated translucent trails behind fast notes; speed, charts and judgments are unchanged.
+- Player-focused release history with selectable, copyable text and updated local fonts.
+
 ## [0.2.12] - 2026-11-07
 
 - Icon radio controls for note speed, note effects and shuffle; approximate BLINK/BLINK 2/FOG/PIXEL/PIXEL 2/BLIND display effects.

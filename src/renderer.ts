@@ -1,4 +1,3 @@
-import { motionExposure } from './motion-exposure';
 import { VisualClock } from './visual-clock';
 import { blinkAlpha, fadeAlpha, type Fader } from './game-options';
 import { noteLayout } from './note-layout';
@@ -6,7 +5,6 @@ import { Application, Graphics, Container, Sprite, Texture } from 'pixi.js';
 import type { Engine } from './engine';
 interface NoteVisual {
   head: Sprite;
-  exposure: Sprite;
   body?: Sprite;
   tail?: Sprite;
 }
@@ -28,7 +26,6 @@ export class Playfield {
   private resizeObserver?: ResizeObserver;
   private visualClock = new VisualClock();
   private burstTexture!: Texture;
-  private exposureTexture!: Texture;
   reducedMotion = false;
   fader: Fader = 'off';
   bpm = 120;
@@ -87,16 +84,6 @@ export class Playfield {
     ctx.globalAlpha = 0.35;
     ctx.fillRect(32, 84, 64, 10);
     this.burstTexture = Texture.from(c);
-    const shutter = document.createElement('canvas');
-    shutter.width = 1;
-    shutter.height = 64;
-    const brush = shutter.getContext('2d')!;
-    const gradient = brush.createLinearGradient(0, 0, 0, 64);
-    gradient.addColorStop(0, 'rgba(255,255,255,0)');
-    gradient.addColorStop(1, 'rgba(255,255,255,0.45)');
-    brush.fillStyle = gradient;
-    brush.fillRect(0, 0, 1, 64);
-    this.exposureTexture = Texture.from(shutter);
     host.appendChild(this.app.canvas);
 
     const fogCanvas = document.createElement('canvas');
@@ -137,10 +124,7 @@ export class Playfield {
     this.visualClock.reset();
     for (const s of engine.states) {
       const head = this.rect(s.note.lane % 2 ? 0xebfaff : color);
-      const exposure = new Sprite(this.exposureTexture);
-      exposure.tint = head.tint;
-      this.notes.addChild(exposure);
-      const visual: NoteVisual = { head, exposure };
+      const visual: NoteVisual = { head };
       if (s.note.end) {
         visual.body = this.rect(color);
         visual.body.alpha = 0.36;
@@ -316,19 +300,6 @@ export class Playfield {
       v.head.alpha = fadeAlpha(this.fader, y / target);
       const x = n.lane * width + 5;
       const nw = width - 10;
-      const shutter = motionExposure(
-        px,
-        frameMs,
-        s.held || !!s.note.end || this.reducedMotion,
-      );
-      v.exposure.visible = v.head.visible && shutter > 0;
-      if (v.exposure.visible) {
-        v.exposure.x = x;
-        v.exposure.y = y - 5 - shutter;
-        v.exposure.width = nw;
-        v.exposure.height = shutter;
-        v.exposure.alpha = v.head.alpha;
-      }
       if (v.head.visible) {
         v.head.x = x;
         v.head.y = y - 5;

@@ -13,14 +13,13 @@ export const de = {
     'Tempo und Sichtbarkeit gelten für dieses Spiel. Eine andere Spurfolge erfordert einen Neustart.',
   shuffleRestart: 'Für neue Spurfolge neu starten?',
   shuffleRestartHint:
-    'Der Punktestand wird zurückgesetzt. Die neue Spurfolge gilt ab dem Anfang; Haltenoten und Eingaben bleiben erhalten.',
+    'Dein Punktestand wird zurückgesetzt. Die neue Spurreihenfolge gilt ab dem Start.',
   restartApply: 'NEU STARTEN UND ANWENDEN',
   cancelChange: 'ÄNDERUNG ABBRECHEN',
   gameOptions: 'SPIELOPTIONEN',
   fader: 'Noteneffekte',
   shuffle: 'Spurfolge',
-  optionHint:
-    'Gilt ab dem nächsten Spiel. RANDOM verwendet dieselbe Spurfolge im ganzen Chart und erhält Haltenoten und Akkorde.',
+  optionHint: 'Gilt für das nächste Spiel.',
   pause: 'PAUSE',
   resume: 'FORTSETZEN',
   select: 'TITELAUSWAHL',
@@ -67,10 +66,10 @@ export const de = {
   hold: 'HALTEN, BIS DAS ENDE DIE LINIE ERREICHT',
   synced: 'AUDIOAUSGABE-SYNC',
   about: 'INFO',
-  aboutTitle: 'Hinweise zum Prototyp',
+  aboutTitle: 'So spielst du',
   aboutBody:
-    'Drei eigene Synthesizer-Titel. Rhythmusspiel mit 5 oder 7 Spuren per Tastatur. Die Wertungsnamen orientieren sich an DJMAX RESPECT V; Zeitfenster und Halteregeln sind eigene Prototypregeln, keine exakte Nachbildung. Audio-/Bildschirmlatenz und Bildrate hängen vom Gerät ab.',
-  code: 'QUELLCODE UND LIZENZEN',
+    'Spiele drei eigene Songs mit 5 oder 7 Tasten. Triff die Noten an der Linie und halte lange Noten bis zum Ende.',
+  code: 'Mitwirkende und Lizenzen',
   unsupported: 'Spiele am Computer mit einer Tastatur.',
   startError:
     'Audio konnte nicht starten. Prüfe die Browserberechtigung und versuche es erneut.',

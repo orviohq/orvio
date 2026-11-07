@@ -12,14 +12,13 @@ export const it = {
     'Velocità e visibilità si applicano a questa partita. Cambiare le corsie richiede di ricominciare il brano.',
   shuffleRestart: 'Ricominciare per cambiare le corsie?',
   shuffleRestartHint:
-    "Il punteggio verrà azzerato. Il nuovo ordine si applica dall'inizio, mantenendo note lunghe e comandi.",
+    'Il punteggio sarà azzerato. Il nuovo ordine delle corsie si applica dall’inizio.',
   restartApply: 'RICOMINCIA E APPLICA',
   cancelChange: 'ANNULLA MODIFICA',
   gameOptions: 'OPZIONI DI GIOCO',
   fader: 'Effetti delle note',
   shuffle: 'Ordine delle corsie',
-  optionHint:
-    'Si applica alla prossima partita. RANDOM usa la stessa permutazione per tutto il brano, mantenendo note lunghe e accordi.',
+  optionHint: 'Si applica alla prossima partita.',
   pause: 'PAUSA',
   resume: 'RIPRENDI',
   select: 'SCELTA BRANO',
@@ -66,10 +65,10 @@ export const it = {
   hold: 'TIENI PREMUTO FINCHÉ LA CODA RAGGIUNGE LA LINEA',
   synced: 'SINCRONIA USCITA AUDIO',
   about: 'INFORMAZIONI',
-  aboutTitle: 'Note sul prototipo',
+  aboutTitle: 'Come giocare',
   aboutBody:
-    'Tre brani originali di sintetizzatore. Gioco ritmico con tastiera a 5 o 7 corsie. I nomi dei giudizi si ispirano a DJMAX RESPECT V; finestre temporali e regole delle note lunghe sono proprie del prototipo, non una replica esatta. Latenza audio/schermo e frequenza dei fotogrammi dipendono dal dispositivo.',
-  code: 'CODICE E LICENZE',
+    'Gioca tre brani originali con 5 o 7 tasti. Premi le note sulla linea e tieni le note lunghe fino alla fine.',
+  code: 'Crediti e licenze',
   unsupported: 'Gioca su un computer con tastiera.',
   startError:
     "Impossibile avviare l'audio. Controlla i permessi del browser e riprova.",

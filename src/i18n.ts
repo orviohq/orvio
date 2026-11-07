@@ -36,15 +36,14 @@ const en = {
     'Speed and visibility apply to this play. Changing shuffle requires restarting the song.',
   shuffleRestart: 'Restart to change shuffle?',
   shuffleRestartHint:
-    'The current score will reset. The new lane order applies from the start, preserving holds and input.',
+    'Your current score will reset. The new lane order applies from the start.',
   restartApply: 'RESTART AND APPLY',
   cancelChange: 'CANCEL SHUFFLE CHANGE',
 
   gameOptions: 'GAME OPTIONS',
   fader: 'Note effects',
   shuffle: 'Lane shuffle',
-  optionHint:
-    'Applied to the next play. Random uses one lane permutation for the entire chart, keeping holds and chords intact.',
+  optionHint: 'Applies to your next play.',
 
   pause: 'PAUSED',
   resume: 'RESUME',
@@ -91,10 +90,10 @@ const en = {
   hold: 'HOLD UNTIL THE TAIL REACHES THE LINE',
   synced: 'AUDIO OUTPUT SYNC',
   about: 'ABOUT',
-  aboutTitle: 'Prototype notes',
+  aboutTitle: 'How to play',
   aboutBody:
-    'Three original synth tracks. Keyboard rhythm play with 5 or 7 lanes. Judgment labels are inspired by DJMAX RESPECT V; timing windows and hold rules are original prototype policy, not exact parity. Physical audio/display latency and frame rate vary by device.',
-  code: 'SOURCE & LICENSES',
+    'Play three original tracks with 5 or 7 keys. Hit notes on the line and hold long notes to the end.',
+  code: 'Credits & licenses',
   unsupported: 'Play on a desktop with a keyboard.',
   startError: 'Audio could not start. Check browser permission and try again.',
   aborted: 'Session stopped. Start again for a new score.',
@@ -137,15 +136,14 @@ const ko: Words = {
     '속도와 노트 표시는 현재 곡에 적용됩니다. 노트 섞기는 곡을 처음부터 다시 시작해야 합니다.',
   shuffleRestart: '노트 섞기를 바꾸고 다시 시작할까요?',
   shuffleRestartHint:
-    '현재 점수는 초기화됩니다. 롱노트와 입력을 보존하도록 새 배치는 처음부터 적용됩니다.',
+    '현재 점수가 초기화됩니다. 바뀐 노트 배치로 처음부터 시작합니다.',
   restartApply: '다시 시작하여 적용',
   cancelChange: '노트 섞기 변경 취소',
 
   gameOptions: '게임 옵션',
   fader: '노트 효과',
   shuffle: '노트 섞기',
-  optionHint:
-    '다음 플레이에 적용됩니다. RANDOM은 채보 전체에 같은 레인 순서를 적용해 롱노트와 동시입력을 보존합니다.',
+  optionHint: '다음 플레이에 적용됩니다.',
 
   pause: '일시정지',
   resume: '계속 플레이',
@@ -191,10 +189,10 @@ const ko: Words = {
   hold: '꼬리가 판정선에 닿을 때까지 길게 누르세요',
   synced: '음악 출력 자동 싱크',
   about: '게임 정보',
-  aboutTitle: '프로토타입 안내',
+  aboutTitle: '플레이 안내',
   aboutBody:
-    '세 곡 모두 오리지널 신스 트랙입니다. 5키·7키 키보드 리듬게임입니다. DJMAX RESPECT V의 판정 표기를 참고하지만 시간창과 롱노트 규칙은 자체 프로토타입 정책으로 완전 동일하지 않습니다. 실제 오디오·화면 지연과 프레임은 기기마다 다릅니다.',
-  code: '소스 · 라이선스',
+    '오리지널 3곡을 5키 또는 7키로 플레이하세요. 판정선에 맞춰 누르고 롱노트는 끝까지 유지하세요.',
+  code: '제작 정보·라이선스',
   unsupported: '키보드가 연결된 데스크톱에서 플레이해주세요.',
   startError:
     '오디오를 시작하지 못했어요. 브라우저 권한을 확인하고 다시 시도해주세요.',
@@ -234,15 +232,14 @@ const zh: Words = {
   shareFailed: '无法复制。请复制地址栏中的链接。',
   liveOptionHint: '速度和显示在当前歌曲生效。更改轨道顺序需要重新开始。',
   shuffleRestart: '重新开始以更改轨道顺序？',
-  shuffleRestartHint: '当前分数将重置。新顺序从歌曲开头生效，保留长按和输入。',
+  shuffleRestartHint: '当前分数将重置，并以新轨道顺序重新开始。',
   restartApply: '重新开始并应用',
   cancelChange: '取消轨道更改',
 
   gameOptions: '游戏选项',
   fader: '音符效果',
   shuffle: '轨道随机',
-  optionHint:
-    '下一次游戏生效。RANDOM 整曲使用相同轨道顺序，保留长按和同时音符。',
+  optionHint: '下次游玩时生效。',
 
   pause: '已暂停',
   resume: '继续游戏',
@@ -288,10 +285,10 @@ const zh: Words = {
   hold: '长按直到尾部到达判定线',
   synced: '音乐输出自动同步',
   about: '关于',
-  aboutTitle: '原型说明',
+  aboutTitle: '玩法',
   aboutBody:
-    '三首原创合成音乐，支持5键与7键。判定名称参考DJMAX RESPECT V，但时间窗和长按规则为独立原型设计，并非完全一致。设备的音频与显示延迟及帧率可能不同。',
-  code: '源代码与许可',
+    '用5键或7键游玩三首原创歌曲。在判定线按下音符，长按音符要坚持到末尾。',
+  code: '制作信息与许可',
   unsupported: '请使用桌面键盘游玩。',
   startError: '音频无法启动，请检查浏览器权限后重试。',
   aborted: '已停止游戏。重新开始将清空得分。',
@@ -334,15 +331,14 @@ const ja: Words = {
     '速度と表示は現在の曲に適用。配置変更は曲の再スタートが必要です。',
   shuffleRestart: '配置を変更して再スタート？',
   shuffleRestartHint:
-    '現在のスコアはリセットされます。ロングノートと入力を保つため、配置は曲の最初から適用します。',
+    '現在のスコアがリセットされ、新しい配置で最初から始まります。',
   restartApply: '再スタートして適用',
   cancelChange: '配置変更を取り消す',
 
   gameOptions: 'ゲームオプション',
   fader: 'ノート効果',
   shuffle: 'ノート配置',
-  optionHint:
-    '次のプレイに適用。RANDOM は曲全体で同じレーン順を使い、ロングノートと同時押しを保ちます。',
+  optionHint: '次のプレイから適用します。',
 
   pause: '一時停止',
   resume: 'プレイ再開',
@@ -389,10 +385,10 @@ const ja: Words = {
   hold: '終点が判定ラインに届くまで長押し',
   synced: '音楽出力に自動同期',
   about: 'ゲーム情報',
-  aboutTitle: 'プロトタイプについて',
+  aboutTitle: '遊び方',
   aboutBody:
-    '3曲のオリジナルシンセ音楽。5キー・7キー対応。判定名はDJMAX RESPECT Vを参考にしていますが、判定時間とロングノーツのルールは独自の試作仕様です。機器によって音声・表示の遅延やフレームレートは異なります。',
-  code: 'ソース・ライセンス',
+    'オリジナル3曲を5キーまたは7キーでプレイ。判定ラインでキーを押し、ロングノーツは最後まで押し続けましょう。',
+  code: 'クレジット・ライセンス',
   unsupported: 'キーボードのあるデスクトップでプレイしてください。',
   startError:
     '音声を開始できません。ブラウザーの権限を確認して再試行してください。',
@@ -435,15 +431,14 @@ const es: Words = {
     'La velocidad y visibilidad cambian en esta partida. Cambiar carriles requiere reiniciar.',
   shuffleRestart: '¿Reiniciar para cambiar carriles?',
   shuffleRestartHint:
-    'La puntuación se reinicia. El nuevo orden se aplica desde el inicio para mantener notas largas y entradas.',
+    'Tu puntuación se reiniciará. El nuevo orden de pistas se aplica desde el inicio.',
   restartApply: 'REINICIAR Y APLICAR',
   cancelChange: 'CANCELAR CAMBIO',
 
   gameOptions: 'OPCIONES DE JUEGO',
   fader: 'Efectos de notas',
   shuffle: 'Mezcla de carriles',
-  optionHint:
-    'Se aplica en la próxima partida. RANDOM mantiene el mismo orden de carriles en toda la canción, incluidas notas largas y acordes.',
+  optionHint: 'Se aplica a la próxima partida.',
 
   pause: 'PAUSA',
   resume: 'CONTINUAR',
@@ -490,10 +485,10 @@ const es: Words = {
   hold: 'MANTÉN HASTA QUE LA COLA LLEGUE A LA LÍNEA',
   synced: 'SINCRONIZACIÓN DE AUDIO',
   about: 'ACERCA DE',
-  aboutTitle: 'Notas del prototipo',
+  aboutTitle: 'Cómo jugar',
   aboutBody:
-    'Tres pistas originales de sintetizador. Juego con 5 o 7 teclas. Los nombres de los juicios se inspiran en DJMAX RESPECT V; las ventanas de tiempo y las reglas de notas largas son propias del prototipo. La latencia física y los fotogramas varían según el dispositivo.',
-  code: 'CÓDIGO Y LICENCIAS',
+    'Juega tres canciones originales con 5 o 7 teclas. Pulsa las notas en la línea y mantén las notas largas hasta el final.',
+  code: 'Créditos y licencias',
   unsupported: 'Juega en un equipo de escritorio con teclado.',
   startError:
     'No se pudo iniciar el audio. Comprueba los permisos e inténtalo de nuevo.',

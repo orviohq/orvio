@@ -40,7 +40,7 @@ test('quota never overwrites clipboard with long link, expired/malformed short r
   await page.goto('/result/#' + fragment);
   await page.evaluate(() => navigator.clipboard.writeText('unchanged'));
   await page.click('#share-result');
-  await expect(page.locator('#share-status')).toContainText('무료 공유 한도');
+  await expect(page.locator('#share-status')).toContainText('공유하지 못');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
     'unchanged',
   );
@@ -59,29 +59,35 @@ test('quota never overwrites clipboard with long link, expired/malformed short r
   await expect(page.locator('.share-error')).toContainText('손상');
 });
 
-test('Escape cancels real share verification before any payload upload', async ({
+test('sharing has no verification dialog or loading explanation, even with a slow response', async ({
   page,
   context,
 }) => {
-  const requests: string[] = [];
-  await context.route('https://challenges.cloudflare.com/turnstile/**', (r) =>
-    r.fulfill({
-      contentType: 'application/javascript',
-      body: "window.turnstile={render:()=> 'pending',remove:()=>{}}",
-    }),
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const outbound: string[] = [];
+  page.on('request', (r) => outbound.push(r.url()));
+  await context.route(
+    'https://orvio-share.pn-26f.workers.dev/**',
+    async (r) => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await r.fulfill({
+        status: 201,
+        json: {
+          id: 'share0000000000000000000000',
+          expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        },
+      });
+    },
   );
-  await context.route('https://orvio-share.pn-26f.workers.dev/**', (r) => {
-    requests.push(r.request().url());
-    return r.fulfill({ status: 503, json: { error: 'closed' } });
-  });
   await page.goto('/result/#' + fragment);
   await page.click('#share-result');
-  await expect(page.locator('.share-verification')).toBeVisible();
-  await page.keyboard.press('Escape');
   await expect(page.locator('.share-verification')).toHaveCount(0);
-  await expect(page.locator('#share-result')).toBeEnabled();
-  expect(requests).toEqual([]);
-  await expect(page.locator('#share-status')).toContainText('공유하지 못');
-  await expect(page.locator('#toast')).toContainText('공유하지 못');
-  await expect(page.locator('#toast')).not.toContainText('주소창');
+  await expect(page.locator('#share-status')).toBeHidden();
+  await expect(page.locator('#toast')).toHaveText('링크를 복사했어요');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
+    '?s=share',
+  );
+  expect(outbound.some((u) => u.includes('challenges.cloudflare.com'))).toBe(
+    false,
+  );
 });

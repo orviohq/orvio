@@ -43,6 +43,9 @@ test('local fragments never reach requests; copy succeeds or visibly fails in th
     navigator.clipboard.writeText = async () => {
       throw new Error('denied');
     };
+    navigator.clipboard.write = async () => {
+      throw new Error('denied');
+    };
   });
   await page.click('#share-result');
   await expect(page.locator('#toast')).toHaveText(shareLabels('vi').failed);

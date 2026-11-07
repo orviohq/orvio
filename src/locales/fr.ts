@@ -12,14 +12,13 @@ export const fr = {
     'La vitesse et la visibilité changent pendant cette partie. Modifier les pistes exige de recommencer le morceau.',
   shuffleRestart: 'Recommencer pour modifier les pistes ?',
   shuffleRestartHint:
-    'Le score sera remis à zéro. Le nouvel ordre des pistes est appliqué dès le début, en préservant les notes tenues et les entrées.',
+    'Votre score sera remis à zéro. Le nouvel ordre des pistes s’applique dès le début.',
   restartApply: 'RECOMMENCER ET APPLIQUER',
   cancelChange: 'ANNULER LE CHANGEMENT',
   gameOptions: 'OPTIONS DE JEU',
   fader: 'Effets des notes',
   shuffle: 'Ordre des pistes',
-  optionHint:
-    'Appliqué à la prochaine partie. RANDOM conserve un seul ordre des pistes pour tout le morceau, sans modifier les notes tenues ni les accords.',
+  optionHint: 'S’applique à la prochaine partie.',
   pause: 'PAUSE',
   resume: 'REPRENDRE',
   select: 'CHOIX DU MORCEAU',
@@ -66,10 +65,10 @@ export const fr = {
   hold: "MAINTENEZ JUSQU'À CE QUE LA FIN ATTEIGNE LA LIGNE",
   synced: 'SYNCHRO SORTIE AUDIO',
   about: 'À PROPOS',
-  aboutTitle: 'À propos du prototype',
+  aboutTitle: 'Comment jouer',
   aboutBody:
-    "Trois morceaux de synthèse originaux. Jeu de rythme au clavier sur 5 ou 7 pistes. Les libellés de jugement s'inspirent de DJMAX RESPECT V ; les fenêtres de temps et les règles des notes tenues sont propres au prototype, sans équivalence exacte. La latence audio/écran et la fréquence d'images dépendent de l'appareil.",
-  code: 'CODE ET LICENCES',
+    'Jouez trois morceaux originaux avec 5 ou 7 touches. Appuyez sur la ligne et maintenez les notes longues jusqu’au bout.',
+  code: 'Crédits et licences',
   unsupported: 'Jouez sur un ordinateur avec un clavier.',
   startError:
     "Le son n'a pas pu démarrer. Vérifiez les autorisations du navigateur et réessayez.",

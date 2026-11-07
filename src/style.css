@@ -3016,14 +3016,6 @@ canvas {
 #results .result-actions {
   padding-bottom: 18px;
 }
-.share-verification {
-  max-width: calc(100vw - 24px);
-  padding: 24px;
-}
-.share-verification h2 {
-  font-size: 18px;
-  overflow-wrap: anywhere;
-}
 #results .result-actions button {
   scroll-margin-bottom: 18px;
 }

@@ -1,7 +1,50 @@
+---
+const resultEntry = Astro.url.pathname.startsWith('/result');
+---
+
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-result-pending={resultEntry || undefined}>
   <head>
     <meta charset="UTF-8" />
+    <style is:inline>
+      html[data-result-pending] {
+        background: #14131a;
+      }
+      html[data-result-pending] #app {
+        visibility: hidden;
+      }
+      #result-entry {
+        display: none;
+      }
+      html[data-result-pending] #result-entry {
+        display: grid;
+        place-content: center;
+        position: fixed;
+        inset: 0;
+        padding: 24px;
+        color: #e8e7f2;
+        font:
+          600 18px system-ui,
+          sans-serif;
+      }
+      #result-entry section {
+        width: min(480px, calc(100vw - 48px));
+        border-top: 2px solid #27cceb;
+        padding: 32px 0;
+      }
+      #result-entry img {
+        filter: brightness(0) invert(1);
+      }
+      #result-entry h1 {
+        font-size: 48px;
+        margin: 24px 0;
+      }
+      #result-entry p {
+        color: #8f95ab;
+        font-size: 12px;
+        letter-spacing: 0.14em;
+      }
+    </style>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#14131a" />
     <meta
@@ -9,14 +52,27 @@
       content="Orvio. Find your flow. An open-source keyboard rhythm game."
     />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="orvio · find your flow" />
+    <meta
+      property="og:title"
+      content={
+        resultEntry ? 'Orvio result · score & replay' : 'orvio · find your flow'
+      }
+    />
     <meta
       property="og:description"
-      content="Original music. Five or seven keys. Find your rhythm."
+      content={
+        resultEntry
+          ? 'View the score, accuracy and combo. Watch the replay and play the track.'
+          : 'Original music. Five or seven keys. Find your rhythm.'
+      }
     />
     <meta
       property="og:image"
-      content="https://orvio-play.pages.dev/og-default.png"
+      content={
+        resultEntry
+          ? 'https://orvio-play.pages.dev/og-result.png'
+          : 'https://orvio-play.pages.dev/og-default.png'
+      }
     />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -28,6 +84,15 @@
     <link rel="manifest" href="/manifest.webmanifest" />
   </head>
   <body>
+    {resultEntry && (
+      <div id="result-entry" aria-hidden="true">
+        <section>
+          <img src="/wordmark.svg" alt="" width="105" height="30" />
+          <h1>RESULT</h1>
+          <p>SCORE / ACCURACY / MAX COMBO</p>
+        </section>
+      </div>
+    )}
     <div id="app"></div>
     <script src="../main.ts"></script>
     <script>

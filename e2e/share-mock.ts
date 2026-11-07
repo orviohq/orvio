@@ -1,11 +1,5 @@
 import type { BrowserContext } from '@playwright/test';
 export async function mockShare(context: BrowserContext) {
-  await context.route('https://challenges.cloudflare.com/turnstile/**', (r) =>
-    r.fulfill({
-      contentType: 'application/javascript',
-      body: "window.turnstile={render:(host,options)=>{setTimeout(()=>options.callback('mock-test-token'),30);return 'test-widget';},remove:()=>{}}",
-    }),
-  );
   const records = new Map<string, string>();
   const requests: { method: string; body: any }[] = [];
   await context.route(

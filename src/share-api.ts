@@ -4,16 +4,13 @@ export class ShareError extends Error {
     super('Share request failed: ' + status);
   }
 }
-export async function saveSharedReplay(fragment: string, token?: string) {
+export async function saveSharedReplay(fragment: string) {
   if (new TextEncoder().encode(fragment).length > 160000)
     throw new ShareError(413);
   const response = await fetch(SHARE_API + '/v1/replays', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      fragment,
-      ...(token ? { turnstileToken: token } : {}),
-    }),
+    body: JSON.stringify({ fragment }),
     signal: AbortSignal.timeout(12000),
   });
   if (!response.ok) throw new ShareError(response.status);

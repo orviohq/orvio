@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { LANGUAGES } from '../src/i18n';
+import { PATCHES } from '../src/patch-notes';
 test('thirteen-language layout states, fixed binding capture size, symbols and miniature position controls', async ({
   page,
 }) => {
@@ -86,7 +87,7 @@ test('all releases and languages on website with safe small-screen layout', asyn
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/patch-notes/?lang=' + lang);
     await expect(page.locator('[data-language]:visible article')).toHaveCount(
-      14,
+      PATCHES.length,
     );
     expect(
       await page.evaluate(
