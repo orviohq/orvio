@@ -458,7 +458,10 @@ export const __test__ = {
   replayMatches,
 };
 
-// Strict fragment validation per the frontend contract. Returns {result} or {error}.
+// Strict fragment validation per the frontend contract: the same criteria as the
+// frontend's readResult, per version. v1/v2: base result only. v3: + judgments.
+// v4: + options + replay attachment. Missing judgments/options are NEVER fabricated.
+// Replay keys are accepted only on v=4.
 export function validateFragmentSchema(fragment) {
   const params = new URLSearchParams(fragment);
   const seen = new Set();
@@ -467,7 +470,9 @@ export function validateFragmentSchema(fragment) {
       return { error: 'bad_fragment_format' };
     seen.add(k);
   }
-  if (params.get('v') !== '4') return { error: 'bad_fragment_format' };
+  const ver = params.get('v') || '';
+  if (!['1', '2', '3', '4'].includes(ver))
+    return { error: 'bad_fragment_format' };
   const song = params.get('song');
   const lanes = Number(params.get('keys'));
   const difficulty = params.get('diff');
@@ -484,55 +489,64 @@ export function validateFragmentSchema(fragment) {
     !Number.isFinite(accuracy) ||
     accuracy < 0 ||
     accuracy > 100 ||
-    !/^\d+(\.\d{1,2})?$/.test(params.get('acc') || '') ||
     !Number.isInteger(combo) ||
     combo < 0 ||
     combo > 10000 ||
     ['score', 'acc', 'combo'].some((k) => !params.has(k))
   )
     return { error: 'bad_fragment_format' };
-  const raw = params.get('j') || '';
-  if (!/^\d+(,\d+){11}$/.test(raw)) return { error: 'bad_fragment_format' };
-  const judgments = raw.split(',').map(Number);
-  const total = judgments.reduce((a, b) => a + b, 0);
-  if (
-    total <= 0 ||
-    total > 10000 ||
-    judgments.some((v) => v < 0 || v > 10000) ||
-    combo > total
-  )
-    return { error: 'bad_fragment_format' };
-  const weighted = judgments.reduce(
-    (sum, count, i) => sum + count * JUDGMENTS[i],
-    0,
-  );
-  if (
-    Math.abs(Math.round((weighted / total) * 100) / 100 - accuracy) > 0.011 ||
-    Math.floor((1000000 * weighted) / (100 * total)) !== score
-  )
-    return { error: 'bad_fragment_format' };
-  const speed = Number(params.get('speed'));
-  const fader = params.get('fade');
-  const shuffle = params.get('shuffle');
-  const seed = Number(params.get('seed'));
-  if (
-    !params.has('speed') ||
-    !params.has('seed') ||
-    !Number.isFinite(speed) ||
-    speed < 1 ||
-    speed > 9 ||
-    !FADERS.includes(fader || '') ||
-    !SHUFFLES.includes(shuffle || '') ||
-    !Number.isInteger(seed) ||
-    seed < 0 ||
-    seed > 4294967295
-  )
-    return { error: 'bad_fragment_format' };
-  // Replay attachment contract: rp='1' marks an attached original replay; rn is the
-  // compressed r char count; r is base64url 1..120000. r/rn without rp are rejected.
+  let judgments;
+  if (['3', '4'].includes(ver)) {
+    const raw = params.get('j') || '';
+    if (!/^\d+(,\d+){11}$/.test(raw)) return { error: 'bad_fragment_format' };
+    judgments = raw.split(',').map(Number);
+    const total = judgments.reduce((a, b) => a + b, 0);
+    if (
+      total <= 0 ||
+      total > 10000 ||
+      judgments.some((v) => v < 0 || v > 10000) ||
+      combo > total
+    )
+      return { error: 'bad_fragment_format' };
+    const weighted = judgments.reduce(
+      (sum, count, i) => sum + count * JUDGMENTS[i],
+      0,
+    );
+    if (
+      Math.abs(Math.round((weighted / total) * 100) / 100 - accuracy) > 0.011 ||
+      Math.floor((1000000 * weighted) / (100 * total)) !== score
+    )
+      return { error: 'bad_fragment_format' };
+  }
+  let options;
+  if (ver === '4') {
+    const speed = Number(params.get('speed'));
+    const fader = params.get('fade');
+    const shuffle = params.get('shuffle');
+    const seed = Number(params.get('seed'));
+    if (
+      !params.has('speed') ||
+      !params.has('seed') ||
+      !Number.isFinite(speed) ||
+      speed < 1 ||
+      speed > 9 ||
+      !FADERS.includes(fader || '') ||
+      !SHUFFLES.includes(shuffle || '') ||
+      !Number.isInteger(seed) ||
+      seed < 0 ||
+      seed > 4294967295 ||
+      !/^\d+(\.\d{1,2})?$/.test(params.get('acc') || '')
+    )
+      return { error: 'bad_fragment_format' };
+    options = { speed, fader, shuffle, seed };
+  }
+  // Replay attachment: v=4 only. rp='1' marks an attached original replay; rn is the
+  // compressed r char count; r is base64url 1..120000.
   const rp = params.get('rp');
   const rn = params.get('rn');
   const r = params.get('r');
+  if (ver !== '4' && (rp !== null || rn !== null || r !== null))
+    return { error: 'bad_fragment_format' };
   if (rp !== null && rp !== '1') return { error: 'bad_fragment_format' };
   if (rp === null && (rn !== null || r !== null))
     return { error: 'bad_fragment_format' };
@@ -551,7 +565,7 @@ export function validateFragmentSchema(fragment) {
       accuracy: Math.round(accuracy * 100) / 100,
       combo,
       judgments,
-      options: { speed, fader, shuffle, seed },
+      options,
       replay: rp === '1' ? r : null,
     },
   };

@@ -8,7 +8,7 @@ import {
   replayMatches,
   type ReplayData,
 } from '../src/replay';
-import { resultParams } from '../src/share';
+import { resultParams, readResult } from '../src/share';
 // Independent backend port must match current frontend chart, shuffle and exact input math.
 import {
   validateFragmentSchema,
@@ -109,4 +109,63 @@ test('backend validator agrees on every chart/effect/shuffle with original float
             (await verifyReplay(text.slice(0, -4), validated.result)).ok,
           ).toBe(false);
         }
+});
+
+test('backend preserves strict legacy result-only versions without invented fields', () => {
+  for (const v of ['1', '2', '3']) {
+    const p = new URLSearchParams({
+      v,
+      song: 'first-light',
+      keys: '5',
+      diff: 'low',
+      score: '1000000',
+      acc: '100.00',
+      combo: '1',
+    });
+    if (v === '3') p.set('j', '1,0,0,0,0,0,0,0,0,0,0,0');
+    const frontend = readResult(p);
+    expect(frontend).not.toBeNull();
+    const backend = validateFragmentSchema(p.toString());
+    expect(backend.error).toBeUndefined();
+    expect(backend.result).toMatchObject(frontend!);
+    expect(backend.result.options).toBeUndefined();
+    expect(backend.result.replay).toBeNull();
+    if (v !== '3') expect(backend.result.judgments).toBeUndefined();
+    else {
+      const missing = new URLSearchParams(p);
+      missing.delete('j');
+      expect(validateFragmentSchema(missing.toString()).error).toBe(
+        'bad_fragment_format',
+      );
+      const inconsistent = new URLSearchParams(p);
+      inconsistent.set('score', '999999');
+      expect(validateFragmentSchema(inconsistent.toString()).error).toBe(
+        'bad_fragment_format',
+      );
+    }
+    for (const [k, value] of [
+      ['rp', '1'],
+      ['rn', '1'],
+      ['r', 'A'],
+    ]) {
+      const attached = new URLSearchParams(p);
+      attached.set(k, value);
+      expect(validateFragmentSchema(attached.toString()).error).toBe(
+        'bad_fragment_format',
+      );
+    }
+    for (const key of ['score', 'acc', 'combo']) {
+      const missing = new URLSearchParams(p);
+      missing.delete(key);
+      expect(validateFragmentSchema(missing.toString()).error).toBe(
+        'bad_fragment_format',
+      );
+    }
+    expect(validateFragmentSchema(p.toString() + '&v=' + v).error).toBe(
+      'bad_fragment_format',
+    );
+    expect(validateFragmentSchema(p.toString() + '&host=arbitrary').error).toBe(
+      'bad_fragment_format',
+    );
+  }
 });
