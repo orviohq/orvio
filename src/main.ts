@@ -20,7 +20,6 @@ interface Settings {
   difficulty: Difficulty;
   position: 'left' | 'center' | 'right';
   speed: number;
-  offset: number;
   volume: number;
   keys: Record<Lanes, string[]>;
 }
@@ -31,15 +30,19 @@ function getSettings(): Settings {
   } catch {
     /* Optional local storage. */
   }
+  // Discard legacy manual calibration, including previously saved values.
+  const { offset: _legacyOffset, ...automatic } = saved as Record<
+    string,
+    unknown
+  >;
   return {
     lanes: 5,
     difficulty: 'low',
     position: 'center',
     speed: 1.6,
-    offset: 0,
     volume: 0.7,
     keys: structuredClone(defaults),
-    ...saved,
+    ...automatic,
   };
 }
 let settings = getSettings();
@@ -75,7 +78,7 @@ app.innerHTML = `
 <section class="library" aria-label="곡 선택"><div class="section-title"><span>SELECT YOUR FREQUENCY</span><span>01 — 03</span></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="난이도"><button data-diff="low">하 <small>EASY</small></button><button data-diff="mid">중 <small>NORMAL</small></button><button data-diff="high">상 <small>HARD</small></button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="preview" class="round" aria-label="선택곡 미리듣기">▷</button><button id="start" class="primary">플레이 <span>↗</span></button></div><div class="under-start"><span id="chart-info"></span><span>ENTER TO PLAY</span></div></section>
 <section class="footer-strip"><span><i></i> LOCAL-FIRST RHYTHM ENGINE</span><p>귀로 듣고, 손으로 느끼세요.</p><button id="about-button" class="quiet">프로토타입 노트 ↗</button></section></main>
 <section id="game" class="hidden" aria-label="리듬 게임"><div class="game-top"><button id="exit" class="quiet">← 나가기 <small>ESC</small></button><div class="song-now"><strong id="now-title"></strong><span id="now-detail"></span></div><div class="perf"><span id="fps">-- FPS</span><i></i></div></div><div id="progress"><div></div></div><div id="arena" data-position="center"><aside class="score-block"><span class="eyebrow">SCORE</span><strong id="score">0000000</strong><div><b id="rate">100.00</b><span>% ACCURACY</span></div><p id="live-note">헤드폰을 쓰고, 흐름을 따라가세요.</p></aside><div id="highway-wrap"><div id="highway"></div><div id="judge" aria-live="off"></div><div id="combo"></div><div id="keycaps"></div><div id="countdown"></div></div><aside class="track-block"><div class="orb-mini"></div><span class="eyebrow">FIND YOUR FLOW</span><h2 id="side-title"></h2><p>음악의 시간 위로<br>노트가 흐릅니다.</p><div id="lane-detail"></div></aside></div><div class="game-footer"><span>HOLD NOTES: 누르고 있다가 끝에서 놓으세요</span><span id="clock-info">AUDIO CLOCK · OUTPUT ALIGNED</span></div></section>
-<dialog id="settings"><form method="dialog"><div class="dialog-title"><div><span class="eyebrow">MAKE IT YOURS</span><h2>플레이 설정</h2></div><button class="close" aria-label="닫기">×</button></div></form><label>노트 영역 위치</label><div class="segmented" id="position"><button data-pos="left">왼쪽</button><button data-pos="center">중앙</button><button data-pos="right">오른쪽</button></div><label for="speed">스크롤 속도 <output id="speed-value"></output></label><input id="speed" type="range" min="0.8" max="3" step="0.1"><label for="offset">입력 보정 <output id="offset-value"></output></label><input id="offset" type="range" min="-150" max="150" step="1"><p class="hint">늦게 누르는 편이면 +, 빠르면 −. 블루투스 대신 유선 헤드폰을 권장해요.</p><label for="volume">음악 볼륨</label><input id="volume" type="range" min="0" max="1" step="0.05"><label>키 배치 <span id="binding-mode"></span></label><div id="bindings"></div><p class="hint" id="bind-hint">버튼을 선택하고 원하는 키를 누르세요. 중복 키는 사용할 수 없어요.</p><button id="reset" class="quiet">기본값으로 되돌리기</button><p class="local-note">설정은 이 브라우저에만 저장돼요. 서버 전송 없음.</p></dialog>
+<dialog id="settings"><form method="dialog"><div class="dialog-title"><div><span class="eyebrow">MAKE IT YOURS</span><h2>플레이 설정</h2></div><button class="close" aria-label="닫기">×</button></div></form><label>노트 영역 위치</label><div class="segmented" id="position"><button data-pos="left">왼쪽</button><button data-pos="center">중앙</button><button data-pos="right">오른쪽</button></div><label for="speed">스크롤 속도 <output id="speed-value"></output></label><input id="speed" type="range" min="0.8" max="3" step="0.1"><p class="hint">음악 출력 시계에 맞춰 노트와 입력을 자동 동기화해요. 기기의 소리 출력 지연은 브라우저가 제공하는 정보로 반영해요.</p><label for="volume">음악 볼륨</label><input id="volume" type="range" min="0" max="1" step="0.05"><label>키 배치 <span id="binding-mode"></span></label><div id="bindings"></div><p class="hint" id="bind-hint">버튼을 선택하고 원하는 키를 누르세요. 중복 키는 사용할 수 없어요.</p><button id="reset" class="quiet">기본값으로 되돌리기</button><p class="local-note">설정은 이 브라우저에만 저장돼요. 서버 전송 없음.</p></dialog>
 <dialog id="results"><span class="eyebrow">YOU FOUND YOUR FLOW</span><div class="result-heading"><h2 id="result-song"></h2><span id="result-rank"></span></div><div id="result-badge"></div><div class="result-score" id="result-score"></div><div class="result-stats"><div><span>ACCURACY</span><strong id="result-rate"></strong></div><div><span>MAX COMBO</span><strong id="result-combo"></strong></div><div><span>BREAK</span><strong id="result-break"></strong></div></div><div id="judgment-list"></div><p id="result-perf" class="hint"></p><div class="result-actions"><button id="back" class="quiet">곡 선택</button><button id="retry" class="primary">한 번 더 ↗</button></div></dialog>
 <dialog id="about"><form method="dialog"><div class="dialog-title"><h2>Prototype notes</h2><button class="close" aria-label="닫기">×</button></div></form><p>orvio 0.1 · 오픈소스 키보드 리듬게임</p><p>세 곡은 이 프로젝트를 위해 만든 오리지널 신스 트랙입니다. 5키 / 7키와 곡별 상·중·하, 롱노트를 지원해요.</p><p>판정 표기는 DJMAX RESPECT V의 MAX 100%~10%, MAX 1%, BREAK를 참고합니다. 1,000,000점 만점·정확도 기반 점수를 사용합니다.</p><p>전체 판정 시간표와 내부 반올림은 공식 공개자료에서 확인되지 않았어요. 이 버전의 세부 시간창·롱노트 처리는 프로토타입 규칙이며 DJMAX와 완전히 같다는 의미는 아닙니다.</p><p>브라우저의 주사율·기기·오디오 경로에 따라 지연과 프레임은 달라집니다. 무지연·모든 환경의 60fps 보장은 하지 않아요. 탭이 숨겨지면 플레이를 중단합니다.</p><a href="https://github.com/orviohq/orvio" target="_blank" rel="noreferrer">코드 · 테스트 · 판정 근거 ↗</a></dialog><div id="toast" role="status"></div>`;
 function songCards() {
@@ -125,11 +128,9 @@ function syncSettings() {
     );
   $('#chart-info').textContent =
     `${makeChart(SONGS[songIndex], settings.difficulty, settings.lanes).length} NOTES · ORIGINAL SYNTH`;
-  for (const id of ['speed', 'offset', 'volume'] as const)
+  for (const id of ['speed', 'volume'] as const)
     $<HTMLInputElement>('#' + id).value = String(settings[id]);
   $('#speed-value').textContent = settings.speed.toFixed(1) + '×';
-  $('#offset-value').textContent =
-    (settings.offset >= 0 ? '+' : '') + settings.offset + ' ms';
   $('#binding-mode').textContent = settings.lanes + ' KEY';
   $('#bindings').innerHTML = settings.keys[settings.lanes]
     .map(
@@ -320,7 +321,7 @@ function exit() {
 function keyTime(e: KeyboardEvent) {
   let stamp = e.timeStamp;
   if (stamp > 1e12) stamp -= performance.timeOrigin;
-  return clock.now(stamp) - settings.offset / 1000;
+  return clock.now(stamp);
 }
 window.addEventListener('keydown', (e) => {
   if (binding >= 0) {
@@ -464,7 +465,7 @@ document.querySelectorAll<HTMLButtonElement>('[data-pos]').forEach(
       syncSettings();
     }),
 );
-for (const id of ['speed', 'offset', 'volume'] as const)
+for (const id of ['speed', 'volume'] as const)
   $<HTMLInputElement>('#' + id).oninput = (e) => {
     settings[id] = Number((e.target as HTMLInputElement).value);
     syncSettings();
@@ -475,7 +476,6 @@ $('#reset').onclick = () => {
     difficulty: settings.difficulty,
     position: 'center',
     speed: 1.6,
-    offset: 0,
     volume: 0.7,
     keys: structuredClone(defaults),
   };
@@ -493,7 +493,6 @@ Object.defineProperty(window, 'orvioDiagnostics', {
     settings: {
       lanes: settings.lanes,
       difficulty: settings.difficulty,
-      offset: settings.offset,
     },
     clock: clock?.now(),
     notes: engine?.states.map((s) => ({ ...s })),

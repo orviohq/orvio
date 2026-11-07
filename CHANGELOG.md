@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep long-note heads on the judgment line and their bodies visible until release.
+- Use automatic audible-output synchronization only, ignoring saved manual offsets and accounting for delayed input events in the fallback clock.
+
+### Removed
+
+- Manual input calibration control.
+
 ### Added
 
 - Hourly production browser checks, retained failure evidence and recovery runbook.

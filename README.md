@@ -12,8 +12,8 @@ Choose a track, difficulty (하 / 중 / 상) and 5 KEY or 7 KEY. Press Enter or 
 
 - 5 keys: D F Space J K
 - 7 keys: S D F Space J K L
-- Settings: rebind each key, move the playfield left/center/right, change scroll speed, volume and input offset.
-- Positive offset compensates late input. Prefer wired headphones; Bluetooth adds device-dependent latency.
+- Settings: rebind each key, move the playfield left/center/right, change scroll speed and volume.
+- Notes and keyboard events share the automatic audible-output clock. Legacy manual offsets are discarded. Browser/device latency reports are best-effort, not a guarantee of zero physical latency.
 - Mobile is a browsing/listening layout, not a touch game.
 
 ## Develop
@@ -41,7 +41,7 @@ The judgment labels follow the RESPECT family: MAX 100%, 90%, 80%, 70%, 60%, 50%
 
 - TypeScript + Vite. PixiJS WebGL uses preallocated sprites; no scene reconstruction during frames.
 - OfflineAudioContext renders complete stereo tracks before play. Beat times and chart times share exact BPM arithmetic. AudioBufferSourceNode schedules the song independently of rendering.
-- Input timestamps use `getOutputTimestamp()` to map the browser event clock to the audible output clock; supported-browser fallback subtracts reported output/base latency. Calibration remains necessary for the actual device.
+- Input timestamps use `getOutputTimestamp()` to map the browser event clock to the audible output clock; supported-browser fallback subtracts both reported graph and output latency and maps the original event timestamp. No manual input calibration is used. Physical device/display latency can remain.
 - Pure deterministic engine consumes sequenced lane/time/down input events. Rendering cannot award points. This separates future replay/network transport from local judgment.
 - Future multiplayer must keep local audio/input immediate, distribute an agreed chart hash and future start epoch, exchange sequenced input/replay data, and reconcile with an authoritative server. No server exists in this prototype. Network delay cannot be zero; waiting for network acknowledgment must never be on the local key feedback path.
 

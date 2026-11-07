@@ -1,3 +1,4 @@
+import { noteLayout } from './note-layout';
 import { Application, Graphics, Container, Sprite, Texture } from 'pixi.js';
 import type { Engine } from './engine';
 interface NoteVisual {
@@ -142,12 +143,9 @@ export class Playfield {
     engine.states.forEach((s, i) => {
       const v = this.noteSprites[i];
       const n = s.note;
-      const y = target - (n.time - time) * px;
-      const visible =
-        !s.done &&
-        y > -((n.end ?? n.time) - n.time) * px - 30 &&
-        y < this.height + 30;
-      v.head.visible = visible && s.head === undefined;
+      const layout = noteLayout(s, target, time, px, this.height);
+      const { visible, headY: y, endY } = layout;
+      v.head.visible = layout.showHead;
       const x = n.lane * width + 5;
       const nw = width - 10;
       if (v.head.visible) {
@@ -160,11 +158,10 @@ export class Playfield {
         v.body.visible = visible;
         v.tail.visible = visible;
         if (visible) {
-          const endY = target - (n.end - time) * px;
           v.body.x = x + nw * 0.23;
           v.body.y = endY;
           v.body.width = nw * 0.54;
-          v.body.height = Math.max(2, (s.held ? target : y) - endY);
+          v.body.height = layout.bodyHeight;
           v.tail.x = x;
           v.tail.y = endY;
           v.tail.width = nw;

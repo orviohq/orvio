@@ -1,3 +1,4 @@
+import { outputTime } from './timing';
 import { duration, melodyIndex, type Song } from './chart';
 const midi = (n: number) => 440 * 2 ** ((n - 69) / 12);
 export interface Soundtrack {
@@ -176,25 +177,17 @@ export class AudioClock {
     this.started = true;
   }
   now(performanceTime = performance.now()): number {
-    const stamp = this.context.getOutputTimestamp?.();
-    if (
-      stamp &&
-      typeof stamp.contextTime === 'number' &&
-      typeof stamp.performanceTime === 'number' &&
-      stamp.contextTime > 0 &&
-      stamp.performanceTime > 0
-    )
-      return (
-        stamp.contextTime +
-        (performanceTime - stamp.performanceTime) / 1000 -
-        this.anchor
-      );
-    return (
-      this.context.currentTime -
-      this.anchor -
-      (this.context.outputLatency || this.context.baseLatency || 0)
+    return outputTime(
+      performanceTime,
+      performance.now(),
+      this.context.currentTime,
+      this.anchor,
+      this.context.baseLatency,
+      this.context.outputLatency,
+      this.context.getOutputTimestamp?.(),
     );
   }
+
   get active() {
     return this.started;
   }
