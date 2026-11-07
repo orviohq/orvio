@@ -18,6 +18,27 @@ for (const reduced of [false, true])
       const note = await page.evaluate(
         () => (window as any).orvioDiagnostics.notes[0].note,
       );
+      // Capture on the page's first score mutation, not a later remote read.
+      // A production network/trace round-trip may exceed the 220ms effect.
+      await page.evaluate(() => {
+        const score = document.querySelector('#score')!;
+        (window as any).scoreMutationSample = undefined;
+        const observer = new MutationObserver(() => {
+          const target = Number((score as HTMLElement).dataset.target);
+          if (target <= 0) return;
+          (window as any).scoreMutationSample = {
+            shown: Number(score.textContent),
+            target,
+            animations: score.getAnimations().length,
+          };
+          observer.disconnect();
+        });
+        observer.observe(score, {
+          attributes: true,
+          childList: true,
+          characterData: true,
+        });
+      });
       await atKey(
         page,
         note.time,
@@ -30,11 +51,10 @@ for (const reduced of [false, true])
             document.querySelector('#score')?.getAttribute('data-target'),
           ) > 0,
       );
-      const during = await page.locator('#score').evaluate((e) => ({
-        shown: Number(e.textContent),
-        target: Number((e as HTMLElement).dataset.target),
-        animations: e.getAnimations().length,
-      }));
+      const during = await page.evaluate(
+        () => (window as any).scoreMutationSample,
+      );
+      expect(during).toBeDefined();
       if (reduced) {
         expect(during.shown).toBe(during.target);
         expect(during.animations).toBe(0);
