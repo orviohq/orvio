@@ -28,7 +28,7 @@ test('full dense high-speed chart keeps exactly one head and no generated note t
   await page.waitForFunction(() => (window as any).orvioAudioTime > 18, {
     timeout: 25000,
   });
-  await page.screenshot({ path: '/downloads/orvio-no-shutter-dense.png' });
+  await page.screenshot({ path: 'test-results/orvio-no-shutter-dense.png' });
   await expect(page.locator('#results')).toBeVisible({ timeout: 25000 });
   const samples = await page.evaluate(() => (window as any).singleHeadFrames);
   expect(samples.length).toBeGreaterThan(500);

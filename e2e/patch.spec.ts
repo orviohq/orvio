@@ -28,9 +28,34 @@ test('equal integer lane widths survive resize and MAX100 has no field overlay',
   const note = await page.evaluate(
     () => (window as any).orvioDiagnostics.notes[0].note,
   );
+  // Observe the intended judgment in the rendering page. A later automation
+  // read can arrive after the next unplayed note has correctly become BREAK.
+  await page.evaluate(() => {
+    (window as any).targetPerfect = undefined;
+    const observer = new MutationObserver(() => {
+      const event = (window as any).orvioDiagnostics.events[0];
+      if (!event) return;
+      (window as any).targetPerfect = {
+        event,
+        judge: document.querySelector('#judge')!.className,
+        impact: document.querySelector('#impact')!.className,
+      };
+      observer.disconnect();
+    });
+    observer.observe(document.querySelector('#judge')!, {
+      childList: true,
+      attributes: true,
+      characterData: true,
+    });
+  });
   await atKey(page, note.time, ['d', 'f', 'Space', 'j', 'k'][note.lane], true);
-  await expect(page.locator('#judge')).toHaveClass('perfect');
-  await expect(page.locator('#impact')).toHaveAttribute('class', '');
+  await page.waitForFunction(() => (window as any).targetPerfect);
+  const sample = await page.evaluate(() => (window as any).targetPerfect);
+  expect(sample.event.noteId).toBe(note.id);
+  expect(sample.event.value).toBe(100);
+  expect(Math.abs(sample.event.delta)).toBeLessThanOrEqual(41.67);
+  expect(sample.judge).toBe('perfect');
+  expect(sample.impact).toBe('');
 });
 test('broken hold has muted remaining tail without score re-entry', async ({
   page,

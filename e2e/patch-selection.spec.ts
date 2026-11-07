@@ -28,5 +28,5 @@ test('patch notes permit real pointer text selection and clipboard copy', async 
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toBe(selected);
-  await page.screenshot({ path: '/downloads/orvio-patch-selection.png' });
+  await page.screenshot({ path: 'test-results/orvio-patch-selection.png' });
 });

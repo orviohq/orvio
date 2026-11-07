@@ -46,7 +46,7 @@ test('cold short entry paints only a result shell and then the result, never hom
   await page.goto(baseURL + '/result/?s=synthetic000000000000000000');
   await expect(page.locator('#result-entry')).toBeVisible();
   await expect(page.locator('#home-start')).toBeHidden();
-  await page.screenshot({ path: '/downloads/orvio-share-entry-shell.png' });
+  await page.screenshot({ path: 'test-results/orvio-share-entry-shell.png' });
   release();
   await expect(page.locator('#results')).toBeVisible();
   await expect(page.locator('#result-entry')).toBeHidden();
@@ -56,7 +56,7 @@ test('cold short entry paints only a result shell and then the result, never hom
       (window as any).entryFrames.some((f: any) => f.homeVisible),
     ),
   ).toBe(false);
-  await page.screenshot({ path: '/downloads/orvio-share-entry-result.png' });
+  await page.screenshot({ path: 'test-results/orvio-share-entry-result.png' });
   await context.close();
 });
 test('result Open Graph is in initial HTML, not a client-only rewrite', async ({

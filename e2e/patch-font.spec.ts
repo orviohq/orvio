@@ -9,6 +9,8 @@ test('all translated patch-note bodies have usable readable font coverage', asyn
     const body = page.locator(`[data-language=${lang}]`);
     await expect(body).toBeVisible();
     expect(await body.locator('article').count()).toBe(15);
-    await page.screenshot({ path: `/downloads/orvio-patch-final-${lang}.png` });
+    await page.screenshot({
+      path: `test-results/orvio-patch-final-${lang}.png`,
+    });
   }
 });
