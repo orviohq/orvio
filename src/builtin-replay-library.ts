@@ -1,4 +1,4 @@
-import { SONGS, makeChart, type Note } from './chart';
+import { SONGS, makeChart, duration, type Note } from './chart';
 import {
   validateRuntimeReplay,
   replayMatches,
@@ -15,6 +15,8 @@ export interface BuiltinSession {
   replay: RuntimeReplay;
   result: Result;
   title: string;
+  playedAt?: number;
+  durationSec?: number;
 }
 async function hash(chart: Note[]) {
   return Array.from(
@@ -106,6 +108,8 @@ export async function saveBuiltinSession(
     replay,
     result,
     title: song.title,
+    playedAt: Date.now(),
+    durationSec: duration(song),
   });
   const db = await open();
   try {

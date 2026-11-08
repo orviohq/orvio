@@ -21,6 +21,7 @@ export interface LocalAsset {
   bytes: ArrayBuffer;
 }
 export interface LocalSession {
+  playedAt?: number;
   key: string;
   source: SourceRecord;
   replay: RuntimeReplay;
@@ -129,6 +130,7 @@ export async function saveLocalSession(replay: RuntimeReplay, result: Result) {
   await put('sessions', {
     key,
     source: item.record,
+    playedAt: Date.now(),
     replay,
     result,
   });
@@ -204,7 +206,7 @@ export interface ListedLocalSession extends LocalSession {
 }
 
 // A24: enumerate every saved local session for the dedicated replay page.
-// The old schema carries no timestamp, so no date ordering is invented here.
+// Legacy sessions carry no timestamp; leave their history untouched.
 // Each entry goes through the full readLocalSession validation contract;
 // corrupt archives are skipped and left untouched, never rewritten.
 export async function listLocalSessions(): Promise<ListedLocalSession[]> {

@@ -327,6 +327,7 @@ app.insertAdjacentHTML(
 );
 // A24: dedicated replay collection page; entry lives in the header nav.
 initReplayPage({
+  getLanguage: () => settings.language,
   getLabels: () => ({
     title: externalLabels(settings.language).replay,
     empty: externalLabels(settings.language).empty,
