@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.21] - 2026-11-08
+
+- Support YouTube imports up to five minutes with bounded audio copies.
+- Explain typed audio failures, quota scopes and reset times; retry only fresh existing artifact GETs.
+- Restore select-all and normal editing in inputs, and use consistent scrollbars on game and patch notes.
+
 ## [0.2.20] - 2026-11-08
 
 - Add separate SC charts and Orvio-estimated numeric levels beside NM, HD and MX in selection and results.
