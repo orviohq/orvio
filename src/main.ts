@@ -1364,7 +1364,33 @@ document.addEventListener('pointerdown', (e) => {
     syncSettings();
   }
 });
+function editableTarget(target: EventTarget | null) {
+  return (
+    target instanceof HTMLElement &&
+    target.closest(
+      'input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]), textarea, [contenteditable]:not([contenteditable=false])',
+    )
+  );
+}
 window.addEventListener('keydown', (e) => {
+  const editable = editableTarget(e.target);
+  if (editable && e.code !== 'Escape') {
+    // Meta+A has no native select-all mapping in some embedded browser hosts.
+    // Select the actual field, never the game page. All other editing stays native.
+    if (
+      e.metaKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.isComposing &&
+      e.code === 'KeyA' &&
+      (editable instanceof HTMLInputElement ||
+        editable instanceof HTMLTextAreaElement)
+    ) {
+      editable.select();
+      e.preventDefault();
+    }
+    return;
+  }
   if ($<HTMLDialogElement>('#youtube-import').open) {
     if (e.code === 'Escape') {
       e.preventDefault();
@@ -2265,8 +2291,20 @@ Object.defineProperty(window, 'orvioDiagnostics', {
 });
 
 // Prevent page text/image dragging, while preserving ranges and real controls.
-document.addEventListener('dragstart', (e) => e.preventDefault(), true);
-document.addEventListener('selectstart', (e) => e.preventDefault(), true);
+document.addEventListener(
+  'dragstart',
+  (e) => {
+    if (!editableTarget(e.target)) e.preventDefault();
+  },
+  true,
+);
+document.addEventListener(
+  'selectstart',
+  (e) => {
+    if (!editableTarget(e.target)) e.preventDefault();
+  },
+  true,
+);
 
 // Lightweight read-only timing sample for input path diagnostics. Avoid copying
 // the whole chart each millisecond in real-time integration checks.
