@@ -199,3 +199,24 @@ test('real shared result copy feedback does not cover result title, stats or act
     await expect(page.locator('#back')).toBeInViewport();
   }
 });
+
+test('nested modal follows focused topmost dialog rather than DOM order', async ({
+  page,
+}) => {
+  await page.goto('/select/');
+  await page.evaluate(async () => {
+    const { showToast } = await import(
+      /* @vite-ignore */ String('/src/ui/sonner.ts')
+    );
+    (document.querySelector('#results') as HTMLDialogElement).showModal();
+    (document.querySelector('#settings') as HTMLDialogElement).showModal();
+    showToast('가장 위 대화상자 알림');
+  });
+  await expect(page.locator('#settings #toast-root')).toHaveCount(1);
+  await page.waitForTimeout(500);
+  await expect(page.locator('[data-sonner-toast]')).toBeInViewport();
+  await page.evaluate(() =>
+    (document.querySelector('#settings') as HTMLDialogElement).close(),
+  );
+  await expect(page.locator('#results #toast-root')).toHaveCount(1);
+});

@@ -10,6 +10,7 @@ import './sonner.css';
 let container: HTMLDivElement | undefined;
 let root: Root | undefined;
 let activeDialog: HTMLDialogElement | undefined;
+let lastOpenedDialog: HTMLDialogElement | undefined;
 let observer: MutationObserver | undefined;
 let resize: ResizeObserver | undefined;
 let placement = '';
@@ -24,6 +25,10 @@ function mount() {
   document.body.append(container);
   root = createRoot(container);
   observer = new MutationObserver((records) => {
+    for (const { target } of records) {
+      if (target instanceof HTMLDialogElement && target.open)
+        lastOpenedDialog = target;
+    }
     // Judgement and song-card animation classes are not placement changes.
     // Do not force geometry reads on every gameplay effect.
     if (
@@ -84,7 +89,11 @@ function syncHost() {
   const dialogs = [
     ...document.querySelectorAll<HTMLDialogElement>('dialog[open]'),
   ];
-  const dialog = dialogs.at(-1);
+  const focusedDialog =
+    document.activeElement?.closest<HTMLDialogElement>('dialog[open]');
+  const dialog =
+    focusedDialog ??
+    (lastOpenedDialog?.open ? lastOpenedDialog : dialogs.at(-1));
   if (activeDialog !== dialog) {
     activeDialog?.removeAttribute('data-toast-rail');
     activeDialog?.style.removeProperty('--toast-rail');
