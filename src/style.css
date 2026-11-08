@@ -4489,9 +4489,6 @@ html {
   }
 }
 
-#share-song {
-  margin-top: 12px;
-}
 .song-link-dialog {
   width: min(520px, calc(100% - 32px));
 }
@@ -4539,4 +4536,8 @@ html {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
+}
+
+.library-context-menu button[data-action='share'] {
+  color: #edf1f5;
 }

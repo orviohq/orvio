@@ -147,11 +147,12 @@ test('A33 A34 A36 A38 stable selection contextual removal and current per-song c
   await page.locator('#songs>[data-song]').first().focus();
   await page.keyboard.press('Shift+F10');
   await expect(page.locator('.library-context-menu')).toBeVisible();
+  await page.locator('.library-context-menu [data-action=remove]').focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#remove-song-dialog')).toBeVisible();
   await page.click('#remove-song-cancel');
   await page.locator('#songs>[data-song]').first().click({ button: 'right' });
-  await page.locator('.library-context-menu button').click();
+  await page.locator('.library-context-menu [data-action=remove]').click();
   await page.click('#remove-song-confirm');
   await expect(page.locator('#songs>[data-song]')).toHaveCount(3);
   await page.goto('/select/');

@@ -1,8 +1,9 @@
 export interface LibraryMenuTarget {
   label: string;
   remove: () => void;
+  share?: { label: string; run: () => void };
 }
-/** Only asks the existing caller to open its removal confirmation. */
+/** Actions bind to the context row, independently of the selected preview. */
 export function libraryContextMenu(
   host: HTMLElement,
   resolve: (row: HTMLElement) => LibraryMenuTarget | null,
@@ -14,15 +15,23 @@ export function libraryContextMenu(
   const button = document.createElement('button');
   button.type = 'button';
   button.setAttribute('role', 'menuitem');
-  menu.append(button);
+  const share = document.createElement('button');
+  share.type = 'button';
+  share.setAttribute('role', 'menuitem');
+  share.dataset.action = 'share';
+  button.dataset.action = 'remove';
+  menu.append(share, button);
   document.body.append(menu);
-  let anchor: HTMLElement | undefined, action: (() => void) | undefined;
+  let anchor: HTMLElement | undefined,
+    action: (() => void) | undefined,
+    shareAction: (() => void) | undefined;
   let anchoredAt: { top: number; left: number } | undefined;
   function close(focus = false) {
     if (!menu.matches(':popover-open')) return;
     menu.hidePopover();
     if (focus) anchor?.focus();
     action = undefined;
+    shareAction = undefined;
   }
   function show(row: HTMLElement, x: number, y: number) {
     const target = resolve(row);
@@ -30,6 +39,9 @@ export function libraryContextMenu(
     close();
     anchor = row;
     action = target.remove;
+    shareAction = target.share?.run;
+    share.hidden = !target.share;
+    share.textContent = target.share?.label ?? '';
     button.textContent = target.label;
     menu.showPopover();
     const r = menu.getBoundingClientRect();
@@ -38,9 +50,14 @@ export function libraryContextMenu(
       Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
     const anchorRect = row.getBoundingClientRect();
     anchoredAt = { top: anchorRect.top, left: anchorRect.left };
-    button.focus({ preventScroll: true });
+    (share.hidden ? button : share).focus({ preventScroll: true });
     return true;
   }
+  share.onclick = () => {
+    const work = shareAction;
+    close();
+    work?.();
+  };
   button.onclick = () => {
     const work = action;
     close();
@@ -54,7 +71,18 @@ export function libraryContextMenu(
     } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
       e.preventDefault();
       e.stopPropagation();
-      button.focus();
+      const items = [share, button].filter((x) => !x.hidden);
+      const current = items.indexOf(
+        document.activeElement as HTMLButtonElement,
+      );
+      const i =
+        e.key === 'Home'
+          ? 0
+          : e.key === 'End'
+            ? items.length - 1
+            : (current + (e.key === 'ArrowUp' ? -1 : 1) + items.length) %
+              items.length;
+      items[i].focus();
     }
   });
   host.addEventListener('contextmenu', (e) => {

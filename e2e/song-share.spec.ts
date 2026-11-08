@@ -203,8 +203,27 @@ for (const viewport of [
     await expect(page.locator('#selected-title')).toHaveText(title, {
       timeout: 15000,
     });
-    await expect(page.locator('#share-song')).toBeVisible();
-    await page.locator('#share-song').click();
+    await expect(page.locator('#share-song')).toHaveCount(0);
+    await page
+      .locator('.song-card')
+      .filter({ hasNotText: title })
+      .first()
+      .click();
+    await expect(page.locator('#selected-title')).not.toHaveText(title);
+    const row = page.locator('.song-card').filter({ hasText: title }).first();
+    await row.click({ button: 'right' });
+    await expect(
+      page.locator('.library-context-menu [data-action=share]'),
+    ).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(
+      page.locator('.library-context-menu [data-action=remove]'),
+    ).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await page.screenshot({
+      path: `/downloads/orv56-menu-${viewport.width}.png`,
+    });
+    await page.locator('.library-context-menu [data-action=share]').click();
     await expect(page.locator('.song-link-dialog textarea')).toBeVisible();
     const link = await page.locator('.song-link-dialog textarea').inputValue();
     expect(link).toContain('/song/#');
@@ -213,6 +232,17 @@ for (const viewport of [
       path: `/downloads/a40-proof/share-${viewport.width}.png`,
       fullPage: true,
     });
+    await page.locator('.song-link-dialog .quiet').click();
+    await row.focus();
+    await page.keyboard.press('Shift+F10');
+    await expect(
+      page.locator('.library-context-menu [data-action=share]'),
+    ).toBeFocused();
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#remove-song-dialog')).toBeVisible();
+    await page.locator('#remove-song-cancel').click();
+    await expect(row).toBeVisible();
     expect(calls.every((x) => x.startsWith('GET '))).toBe(true);
   });
 for (const state of ['missing', 'pending', 'changed', 'invalid'])

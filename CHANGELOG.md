@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.34] - 2026-11-09
+
+- Move song sharing to the song context menu and remove the duplicate preview action. Keyboard menu navigation and source-specific sharing are preserved.
+
 ## [0.2.33] - 2026-11-09
 
 - Add song-only sharing with explicit review and Add before local storage.
