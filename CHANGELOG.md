@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.46] - 2026-11-09
+
+- Coordinate network data through TanStack Query, using typed identity keys, small-JSON persistence, explicit retry rules and non-retrying mutations. Progressive transport has independent per-play query ownership, no shared Response or stream reader, no retries, zero post-completion cache retention and no persistent audio duplication.
+- Paint previously verified results before module loading, using exact result/arrival identity bindings and shared result styles. Preserve the visible result address on refresh, count-up behavior on cold visits, expiry handling and quota-safe optional display data.
+- Rename Local Replay to Replay in every supported language. Restore previously verified replay collection display before modules and local verification, using the same header, background and card layout on desktop and mobile. Display-only cards stay inert until verified session handoff; corrupt, unavailable, empty and language-mismatched data falls back honestly without changing stored sessions.
+
 ## [0.2.45] - 2026-11-09
 
 - Match loading, failed and retained-but-unready song cards to library artwork, spacing and text styles on desktop and mobile. Keep retry, dismiss, device inspection, replay history and removal actions grouped and usable. Storage and extraction failures remain truthful; no automatic retry or retained-source deletion is added.
