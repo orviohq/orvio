@@ -20,7 +20,7 @@ test('backend validator agrees on every chart/effect/shuffle with original float
   let count = 0;
   for (const song of SONGS)
     for (const lanes of [5, 7] as const)
-      for (const difficulty of ['low', 'mid', 'high'] as const)
+      for (const difficulty of ['low', 'mid', 'high', 'sc'] as const)
         for (const shuffle of ['off', 'mirror', 'random'] as const) {
           const fader = FADERS[count++ % FADERS.length],
             options = { speed: 9, fader, shuffle, seed: 4294967295 };

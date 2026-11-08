@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.20] - 2026-11-08
+
+- Add separate SC charts and Orvio-estimated numeric levels beside NM, HD and MX in selection and results.
+- Keep saved chart versions, results and replays unchanged; omit SC when no distinct arrangement exists.
+- Add optional automatic FEVER up to ×5 with hold ticks and a separate combo, without a score bonus.
+- Keep FEVER rules in replay metadata and record tick-only updates for replay timing.
+
 ## [Unreleased]
 
 ## [0.2.19] - 2026-11-08

@@ -1,4 +1,9 @@
 import type { Note, Difficulty, Lanes } from './chart';
+import {
+  validDifficultyMetadata,
+  familyForKey,
+  type ChartDifficultyMetadata,
+} from './chart-difficulty';
 export type ChartKey = `${Lanes}:${Difficulty}`;
 export interface SourceRecord {
   version: 1;
@@ -11,7 +16,12 @@ export interface SourceRecord {
   analyzerVersion: string;
   config: string;
   chartSetSha256?: string;
-  charts: Record<ChartKey, { notes: Note[]; sha256: string }>;
+  charts: Record<
+    `${Lanes}:${Exclude<Difficulty, 'sc'>}`,
+    { notes: Note[]; sha256: string }
+  > &
+    Partial<Record<`${Lanes}:sc`, { notes: Note[]; sha256: string }>>;
+  chartMetadata?: Partial<Record<ChartKey, ChartDifficultyMetadata>>;
 }
 const hash = /^[a-f0-9]{64}$/;
 const keys: ChartKey[] = [
@@ -51,7 +61,7 @@ export function validSourceRecord(raw: unknown): raw is SourceRecord {
     !r.charts
   )
     return false;
-  for (const key of keys) {
+  for (const key of presentChartKeys(r)) {
     const c = r.charts[key],
       lanes = Number(key[0]);
     if (
@@ -60,6 +70,12 @@ export function validSourceRecord(raw: unknown): raw is SourceRecord {
       !Array.isArray(c.notes) ||
       c.notes.length === 0 ||
       c.notes.length > 10000
+    )
+      return false;
+    if (
+      r.chartMetadata &&
+      (!validDifficultyMetadata(r.chartMetadata[key]) ||
+        r.chartMetadata[key]!.family !== familyForKey(key))
     )
       return false;
     const ids = new Set<number>();
@@ -107,15 +123,15 @@ export async function verifyChartHashes(
     record.chartSetSha256 !== (await chartSetHash(record))
   )
     return false;
-  for (const key of keys) {
+  for (const key of presentChartKeys(record)) {
     const bytes = new TextEncoder().encode(
-      JSON.stringify(record.charts[key].notes),
+      JSON.stringify(record.charts[key]!.notes),
     );
     const actual = Array.from(
       new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
       (b) => b.toString(16).padStart(2, '0'),
     ).join('');
-    if (actual !== record.charts[key].sha256) return false;
+    if (actual !== record.charts[key]!.sha256) return false;
   }
   return true;
 }
@@ -126,11 +142,24 @@ export async function chartSetHash(record: SourceRecord): Promise<string> {
     JSON.stringify({
       analyzer: record.analyzerVersion,
       config: record.config,
-      charts: keys.map((key) => [key, record.charts[key].sha256]),
+      charts: presentChartKeys(record).map((key) => [
+        key,
+        record.charts[key]!.sha256,
+      ]),
+      ...(record.chartMetadata ? { chartMetadata: record.chartMetadata } : {}),
     }),
   );
   return Array.from(
     new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
     (b) => b.toString(16).padStart(2, '0'),
   ).join('');
+}
+
+export function presentChartKeys(record: SourceRecord): ChartKey[] {
+  return [
+    ...keys,
+    ...(['5:sc', '7:sc'] as const).filter(
+      (key) => record.charts[key] !== undefined,
+    ),
+  ];
 }

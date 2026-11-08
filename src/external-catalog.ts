@@ -46,7 +46,9 @@ export function externalNotes(
 ): Note[] | undefined {
   const source = sources.get(id);
   return source
-    ? structuredClone(source.record.charts[`${lanes}:${difficulty}`].notes)
+    ? structuredClone(
+        source.record.charts[`${lanes}:${difficulty}`]?.notes ?? [],
+      )
     : undefined;
 }
 export function externalDuration(id: string) {

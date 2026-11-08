@@ -3201,3 +3201,28 @@ canvas {
 .fever-reduced strong {
   animation: none;
 }
+.song-level {
+  display: block;
+  margin-bottom: 5px;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+  color: #d7d3e3;
+}
+#difficulty {
+  flex-wrap: wrap;
+}
+#difficulty button {
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .selection {
+    flex-wrap: wrap;
+  }
+  #difficulty {
+    flex-basis: 100%;
+  }
+  #difficulty button {
+    flex: 1;
+  }
+}

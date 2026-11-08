@@ -49,7 +49,7 @@ export function validateRuntimeReplay(
     typeof r.song !== 'string' ||
     !allowed(r.song) ||
     ![5, 7].includes(r.lanes) ||
-    !['low', 'mid', 'high'].includes(r.difficulty) ||
+    !['low', 'mid', 'high', 'sc'].includes(r.difficulty) ||
     !r.options ||
     !Array.isArray(r.ops) ||
     r.ops.length > 12000 ||

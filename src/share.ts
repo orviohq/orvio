@@ -7,7 +7,7 @@ export const SHARED_SONGS = {
 export interface SharedResult {
   song: keyof typeof SHARED_SONGS;
   lanes: 5 | 7;
-  difficulty: 'low' | 'mid' | 'high';
+  difficulty: 'low' | 'mid' | 'high' | 'sc';
   score: number;
   accuracy: number;
   combo: number;
@@ -30,7 +30,7 @@ export function readResult(params: URLSearchParams): SharedResult | null {
   if (
     !Object.hasOwn(SHARED_SONGS, song) ||
     ![5, 7].includes(lanes) ||
-    !['low', 'mid', 'high'].includes(difficulty) ||
+    !['low', 'mid', 'high', 'sc'].includes(difficulty) ||
     !Number.isInteger(score) ||
     score < 0 ||
     score > 1000000 ||

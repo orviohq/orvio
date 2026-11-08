@@ -1,3 +1,9 @@
+import { replayFrameChanged } from './replay-frame';
+import {
+  difficultyForChart,
+  difficultyText,
+  ratingBasisText,
+} from './chart-difficulty';
 import { FEVER_LABELS } from './fever-labels';
 import { CURRENT_FEVER } from './fever';
 import { renderFeverHud } from './fever-hud';
@@ -221,9 +227,9 @@ function persist() {
 const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.19</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.20</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
 <section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div class="eyebrow">${label('selected')} <span id="selection-number">01 / 03</span></div><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
-<section class="library" aria-label="Track selection"><div class="section-title"><strong>${label('select')}</strong><span>ORIGINALS / 001</span></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">${label('easy')} <small>01</small></button><button data-diff="mid">${label('normal')} <small>02</small></button><button data-diff="high">${label('hard')} <small>03</small></button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div><div class="under-start"><span id="chart-info"></span><span>${label('keyboard')}</span></div></section>
+<section class="library" aria-label="Track selection"><div class="section-title"><strong>${label('select')}</strong><span>ORIGINALS / 001</span></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">NM</button><button data-diff="mid">HD</button><button data-diff="high">MX</button><button data-diff="sc">SC</button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div><div class="under-start"><span id="chart-info"></span><span>${label('keyboard')}</span></div></section>
 <section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
 <section id="game" class="hidden" aria-label="Rhythm game"><div class="game-top"><button id="exit" class="quiet">ESC ${label('exit')}</button><div class="song-now"><strong id="now-title"></strong><span id="now-detail"></span></div><span id="fps" hidden></span></div><div id="progress"><div></div></div><div id="arena" data-position="center"><aside class="score-block"><span class="eyebrow">${label('score')}</span><strong id="score">0000000</strong><div><b id="rate">100.00</b><span>% ${label('accuracy')}</span></div><section id="fever-hud" class="hidden" aria-live="off"></section></aside><div id="highway-wrap"><div id="highway"></div><div id="impact" aria-hidden="true"></div><div id="judge" aria-live="off"></div><div id="combo"></div><div id="keycaps"></div><button id="play-options" class="quiet option-readout"></button><div id="countdown"></div></div><aside class="track-block"><div class="orb-mini"></div><span class="eyebrow">ORVIO ORIGINALS</span><h2 id="side-title"></h2><div id="lane-detail"></div></aside></div><div class="game-footer"></div></section>
 <dialog id="pause"><div class="eyebrow">ORVIO / SESSION</div><h2>${label('pause')}</h2><button id="resume" class="primary">${label('resume')} ↵</button><button id="pause-settings" class="quiet">F2 ${label('options')}</button><button id="pause-exit" class="quiet">${label('back')}</button></dialog><dialog id="settings"><form method="dialog"><div class="dialog-title"><div><span class="eyebrow">SYSTEM / OPTIONS</span><h2>${label('options')}</h2></div><button class="close" aria-label="Close">×</button></div></form><div class="settings-tabs" role="tablist"><button data-settings-tab="general" id="settings-general-tab" role="tab" aria-controls="settings-general" aria-selected="true">${label('options')}</button><button data-settings-tab="keys" id="settings-keys-tab" role="tab" aria-controls="settings-keys" aria-selected="false" tabindex="-1">${label('bindings')}</button></div><div class="settings-grid"><section class="settings-general" id="settings-general" role="tabpanel" aria-labelledby="settings-general-tab"><label for="language">${label('language')}</label><select id="language"><option value="auto">${t('browserLanguage')}</option>${Object.entries(
@@ -444,7 +450,7 @@ function localize() {
     optionsDuringPlay ? 'liveOptionHint' : 'optionHint',
   );
   $('#ready-detail').textContent =
-    `${settings.lanes} KEY / ${t(settings.difficulty === 'low' ? 'easy' : settings.difficulty === 'mid' ? 'normal' : 'hard')} / ENTER`;
+    `${settings.lanes} KEY / ${chartLevel(SONGS[songIndex], settings.difficulty, settings.lanes)} / ENTER`;
   if (lastResult) {
     resultOptions(lastResult);
     const counts = lastResult.judgments;
@@ -521,6 +527,20 @@ function escapeText(text: string) {
   span.textContent = text;
   return span.innerHTML;
 }
+function chartLevel(
+  song: (typeof SONGS)[number],
+  diff: Difficulty,
+  lanes: Lanes,
+) {
+  const notes = makeChart(song, diff, lanes);
+  return notes.length
+    ? difficultyText(
+        externalSource(song.id)?.record.chartMetadata?.[`${lanes}:${diff}`] ??
+          difficultyForChart(notes, duration(song), `${lanes}:${diff}`),
+        settings.language,
+      )
+    : 'SC --';
+}
 function songCards() {
   document.querySelector<HTMLElement>(
     '.library .section-title>span',
@@ -529,7 +549,7 @@ function songCards() {
     : 'ORIGINALS / 001';
   $('#songs').innerHTML = SONGS.map(
     (s, i) =>
-      `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${externalSource(s.id) ? `<img class="youtube-cover" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle + ' · ' + (externalSource(s.id)!.record.chartSetSha256 ? regenerationLabels(settings.language).current : regenerationLabels(settings.language).original)) : t(('subtitle' + i) as Word)}</span></span><span class="song-time">${Math.floor(duration(s) / 60)}:${Math.floor(
+      `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${externalSource(s.id) ? `<img class="youtube-cover" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle + ' · ' + (externalSource(s.id)!.record.chartSetSha256 ? regenerationLabels(settings.language).current : regenerationLabels(settings.language).original)) : t(('subtitle' + i) as Word)}</span></span><span class="song-time"><em class="song-level">${chartLevel(s, settings.difficulty, settings.lanes)}</em>${Math.floor(duration(s) / 60)}:${Math.floor(
         duration(s) % 60,
       )
         .toString()
@@ -562,6 +582,28 @@ function updateOptionReadout() {
 }
 
 function syncSettings() {
+  const selected = SONGS[songIndex];
+  if (
+    settings.difficulty === 'sc' &&
+    !makeChart(selected, 'sc', settings.lanes).length
+  )
+    settings.difficulty = 'high';
+  document.querySelectorAll<HTMLButtonElement>('[data-diff]').forEach((b) => {
+    const diff = b.dataset.diff as Difficulty;
+    b.disabled = !makeChart(selected, diff, settings.lanes).length;
+    b.textContent = chartLevel(selected, diff, settings.lanes);
+    b.title = ratingBasisText(settings.language);
+  });
+  document
+    .querySelectorAll<HTMLElement>('.song-level')
+    .forEach(
+      (el, i) =>
+        (el.textContent = chartLevel(
+          SONGS[i],
+          settings.difficulty,
+          settings.lanes,
+        )),
+    );
   queueMicrotask(() => document.dispatchEvent(new Event('orvio:select-sync')));
   updateOptionReadout();
   clock?.setVolume(settings.volume);
@@ -589,7 +631,7 @@ function syncSettings() {
     b.setAttribute('aria-pressed', String(selected));
   });
   $('#chart-info').textContent =
-    `${makeChart(SONGS[songIndex], settings.difficulty, settings.lanes).length} ${t('notes')} · ${externalSource(SONGS[songIndex].id) ? 'YouTube' : t('original')}`;
+    `${makeChart(SONGS[songIndex], settings.difficulty, settings.lanes).length} ${t('notes')} · ${externalSource(SONGS[songIndex].id) ? 'YouTube' : t('original')} · ${ratingBasisText(settings.language)}`;
   const speed = $<HTMLSelectElement>('#speed');
   speed.innerHTML = Array.from({ length: 17 }, (_, i) => 1 + i / 2)
     .map((value) => `<option value="${value}">${value.toFixed(1)}×</option>`)
@@ -839,7 +881,7 @@ async function start() {
     $('#now-detail').textContent =
       `${playReplay ? REPLAY_LABELS[settings.language][1] + ' · ' : ''}${song.genre} · ${song.bpm} BPM`;
     $('#lane-detail').textContent =
-      `${settings.lanes} KEY · ${{ low: 'EASY', mid: 'NORMAL', high: 'HARD' }[settings.difficulty]}`;
+      `${settings.lanes} KEY · ${chartLevel(song, settings.difficulty, settings.lanes)}`;
     $('#keycaps').innerHTML = settings.keys[settings.lanes]
       .map((k) => `<span>${keyLabel(k)}</span>`)
       .join('');
@@ -1042,8 +1084,17 @@ function loop(now: number) {
       lastRecordedFader = settings.fader;
     }
     const before = engine.events.length;
+    const feverBefore = engine.fever.journal.length;
     engine.update(time);
-    if (engine.events.length !== before) recordOp([1, 0, time]);
+    if (
+      replayFrameChanged(
+        before,
+        engine.events.length,
+        feverBefore,
+        engine.fever.journal.length,
+      )
+    )
+      recordOp([1, 0, time]);
   }
   for (; seenEvents < engine.events.length; seenEvents++)
     judgment(engine.events[seenEvents]);
@@ -1272,19 +1323,13 @@ function resultOptions(result: UiResult) {
   resultArt.src = songArt(song.id);
   const count = makeChart(song, result.difficulty, result.lanes).length;
   $('#result-metadata').textContent =
-    `${song.genre} · ${song.bpm} BPM · ${count} ${t('notes')}`;
+    `${song.genre} · ${song.bpm} BPM · ${count} ${t('notes')} · ${ratingBasisText(settings.language)}`;
   $('#result-metadata').title = RESULT_LABELS[settings.language][2];
   syncResultPreview();
   syncReplayButton();
   $('#result-options').innerHTML = resultBadges(result, {
     keys: 'KEY',
-    difficulty: t(
-      result.difficulty === 'low'
-        ? 'easy'
-        : result.difficulty === 'mid'
-          ? 'normal'
-          : 'hard',
-    ),
+    difficulty: chartLevel(song, result.difficulty, result.lanes),
     speed: t('speed'),
     shuffle: t('shuffle'),
     fader: t('fader'),
@@ -1456,12 +1501,14 @@ window.addEventListener('keydown', (e) => {
     }
     if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
       e.preventDefault();
-      const levels: Difficulty[] = ['low', 'mid', 'high'];
+      const levels = (['low', 'mid', 'high', 'sc'] as Difficulty[]).filter(
+        (d) => makeChart(SONGS[songIndex], d, settings.lanes).length,
+      );
       settings.difficulty =
         levels[
           (levels.indexOf(settings.difficulty) +
-            (e.code === 'ArrowRight' ? 1 : 2)) %
-            3
+            (e.code === 'ArrowRight' ? 1 : levels.length - 1)) %
+            levels.length
         ];
       syncSettings();
       return;
@@ -2013,7 +2060,12 @@ function readRoute() {
   const lanes = parts[0] === 'play' ? parts[2] : q.get('lanes');
   const difficulty = parts[0] === 'play' ? parts[3] : q.get('difficulty');
   if (lanes === '5' || lanes === '7') settings.lanes = Number(lanes) as Lanes;
-  if (difficulty === 'low' || difficulty === 'mid' || difficulty === 'high')
+  if (
+    difficulty === 'low' ||
+    difficulty === 'mid' ||
+    difficulty === 'high' ||
+    difficulty === 'sc'
+  )
     settings.difficulty = difficulty;
   screen =
     parts[0] === 'play' ? 'ready' : parts[0] === 'select' ? 'select' : 'home';
@@ -2025,7 +2077,7 @@ function readRoute() {
   $('#game').classList.add('hidden');
   $('#ready-title').textContent = SONGS[songIndex].title;
   $('#ready-detail').textContent =
-    `${settings.lanes} KEY / ${t(settings.difficulty === 'low' ? 'easy' : settings.difficulty === 'mid' ? 'normal' : 'hard')} / ENTER`;
+    `${settings.lanes} KEY / ${chartLevel(SONGS[songIndex], settings.difficulty, settings.lanes)} / ENTER`;
   localize();
   songCards();
   selectedSong();
@@ -2156,7 +2208,7 @@ void initializeLibrary();
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.2.19',
+    version: '0.2.20',
     active,
     paused,
     fever: engine

@@ -4,7 +4,7 @@ import { SONGS } from '../../../../chart';
 export function getStaticPaths() {
   return SONGS.flatMap((song) =>
     ['5', '7'].flatMap((lanes) =>
-      ['low', 'mid', 'high'].map((difficulty) => ({
+      ['low', 'mid', 'high', 'sc'].map((difficulty) => ({
         params: { song: song.id, lanes, difficulty },
         props: { title: `${song.title} · ${lanes} KEY ${difficulty} · orvio` },
       })),

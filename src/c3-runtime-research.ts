@@ -48,6 +48,27 @@ export function generateC3Runtime(
       raw[key] = Core.decorateTier(base, tier, info, lanes);
       charts[key] = adaptDecoratedChart(raw[key], lanes, samples.length / rate);
     }
+    // A4 additive: SC = same proved high-tier onsets + inherited union-v3 lanes,
+    // special chord/hold-emphasis arrangement (C3_SC_PARAMS). Existing six charts
+    // are produced above on untouched code paths and stay byte-identical.
+    const scBase = high.map((time) => {
+      const lane = laneMap.get(time);
+      if (lane === undefined) throw Error('Missing inherited lane');
+      return { time, lane };
+    });
+    const scKey = `${lanes}:sc` as ChartKey;
+    raw[scKey] = Core.decorateTier(
+      scBase,
+      'sc',
+      info,
+      lanes,
+      Core.C3_SC_PARAMS,
+    );
+    charts[scKey] = adaptDecoratedChart(
+      raw[scKey],
+      lanes,
+      samples.length / rate,
+    );
   }
   return {
     raw,

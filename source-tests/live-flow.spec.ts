@@ -21,7 +21,7 @@ test('real origin backend to client analysis to atomic pin and revisit', async (
   expect(first.restored).toBe(false);
   expect(first.size).toBe(24056664);
   expect(first.record.sampleRate).toBe(48000);
-  expect(Object.keys(first.record.charts)).toHaveLength(6);
+  expect(Object.keys(first.record.charts)).toHaveLength(8);
   await page.reload();
   await page.addScriptTag({
     content: fs.readFileSync('source-harness/flow.iife.js', 'utf8'),

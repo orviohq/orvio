@@ -38,7 +38,7 @@ export function checkExternalReplay(raw: unknown): raw is ExternalReplay {
     r.judgments.some((v) => !Number.isInteger(v) || v < 0 || v > 10000)
   )
     return false;
-  const engine = new Engine(structuredClone(r.source.charts[r.chart].notes));
+  const engine = new Engine(structuredClone(r.source.charts[r.chart]!.notes));
   let wall = -Infinity;
   try {
     r.ops.forEach((op, sequence) => {

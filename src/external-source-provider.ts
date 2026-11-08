@@ -1,3 +1,4 @@
+import { difficultyForChart } from './chart-difficulty';
 import { parseWav, toMono, resampleLinear } from './canonical-pcm.mjs';
 import { analyzePcm } from './sample-analyzer.mjs';
 import { generateC3Runtime } from './c3-runtime-research';
@@ -23,10 +24,22 @@ export async function generateSourceRecord(
     // BPM remains a source summary, never a grid for the new note times.
     summary = analyzePcm(samples, 22050);
   const charts = {} as SourceRecord['charts'];
+  const chartMetadata: SourceRecord['chartMetadata'] = {};
   for (const lanes of [5, 7] as const)
-    for (const difficulty of ['low', 'mid', 'high'] as const) {
-      const notes = generated.charts[`${lanes}:${difficulty}`],
-        data = new TextEncoder().encode(JSON.stringify(notes)),
+    for (const difficulty of ['low', 'mid', 'high', 'sc'] as const) {
+      const notes = generated.charts[`${lanes}:${difficulty}`];
+      if (
+        difficulty === 'sc' &&
+        JSON.stringify(notes) ===
+          JSON.stringify(generated.charts[`${lanes}:high`])
+      )
+        continue;
+      chartMetadata[`${lanes}:${difficulty}`] = difficultyForChart(
+        notes,
+        generated.duration,
+        `${lanes}:${difficulty}`,
+      );
+      const data = new TextEncoder().encode(JSON.stringify(notes)),
         sha256 = Array.from(
           new Uint8Array(await crypto.subtle.digest('SHA-256', data)),
           (b) => b.toString(16).padStart(2, '0'),
@@ -54,8 +67,10 @@ export async function generateSourceRecord(
       tailClipMargin: 0.2,
       lanePlacement: 'shared-union-v3-gap0.15',
       highMode: 'c2',
+      sc: 'a4-sc-chordcap30-hold-emphasis-v1',
     }),
     charts,
+    chartMetadata,
   };
   record.chartSetSha256 = await chartSetHash(record);
   if (!(await verifyChartHashes(record)))

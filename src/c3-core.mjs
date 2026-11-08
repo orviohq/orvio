@@ -340,3 +340,20 @@ export function decorateTier(
   notes.forEach((n, i) => (n.id = i));
   return notes;
 }
+
+// --- A4 additive: SC family decoration (Orvio-own special chart arrangement) ---
+// SC uses the SAME proved onset times and inherited lanes as the high tier (union-v3
+// placement). Only decoration differs: chord/hold emphasis from the proved multi-band
+// (chord score ratio) and sustain channels. C3_DEFAULT_PARAMS is NOT mutated; the
+// existing low/mid/high outputs are byte-identical with or without this export.
+// Coefficients are Orvio's own estimates, not a DJMAX calibration.
+export const C3_SC_PARAMS = {
+  ...C3_DEFAULT_PARAMS,
+  chordRatio: C3_DEFAULT_PARAMS.chordRatio, // reuse proved multi-band onset evidence
+  chordSpacing: 0.3, // standard: 0.5
+  holdSpacing: 1.2, // standard: 2.0
+  chordCap: { low: 0.0, mid: 0.05, high: 0.15, sc: 0.3 },
+  holdTierStrengthMul: { low: 1.5, mid: 1.0, high: 0.7, sc: 0.5 },
+  holdMinSustain: { low: 0.6, mid: 0.3, high: 0.3, sc: 0.2 },
+  holdCapShare: { low: 0.1, mid: 0.15, high: 0.25, sc: 0.4 },
+};

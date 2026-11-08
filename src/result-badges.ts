@@ -35,7 +35,7 @@ export function resultBadges(
   ).join('');
   let out =
     badge('keys', svg(bars), n + 'K', labels.keys + ' ' + n) +
-    badge('difficulty', svg(diamond), '', labels.difficulty);
+    badge('difficulty', svg(diamond), labels.difficulty, labels.difficulty);
   if (!r.options) return out;
   const o = r.options;
   out += badge(

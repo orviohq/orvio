@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-test('real backend-artifact PCM48000 generates6 charts and pins exact source atomically', async ({
+test('real backend-artifact PCM48000 generates8 charts and pins exact source atomically', async ({
   page,
 }) => {
   await page.goto('/');
@@ -37,10 +37,12 @@ test('real backend-artifact PCM48000 generates6 charts and pins exact source ato
   expect(r.record).toEqual(r.saved);
   expect(r.record.sampleRate).toBe(48000);
   expect(r.record.frames).toBe(6014155);
-  expect(Object.keys(r.record.charts)).toHaveLength(6);
+  expect(Object.keys(r.record.charts)).toHaveLength(8);
   expect(
     Object.fromEntries(
-      Object.entries(r.record.charts).map(([k, v]) => [k, v.sha256]),
+      Object.entries(r.record.charts)
+        .filter(([k]) => !k.endsWith(':sc'))
+        .map(([k, v]) => [k, v.sha256]),
     ),
   ).toEqual({
     '5:low': '592c7f0de678f4b282f13a93a6ff7c0c280e1be451063d6c0e89b7256059a42d',
@@ -52,6 +54,12 @@ test('real backend-artifact PCM48000 generates6 charts and pins exact source ato
     '7:high':
       '0201939738d394b27945203dae387bda76ca21183b1c547287398963a7037436',
   });
+  for (const lanes of [5, 7]) {
+    expect(r.record.charts[`${lanes}:sc`].notes).not.toEqual(
+      r.record.charts[`${lanes}:high`].notes,
+    );
+    expect(r.record.chartMetadata[`${lanes}:sc`].family).toBe('SC');
+  }
   fs.mkdirSync('test-results', { recursive: true });
   fs.writeFileSync(
     'test-results/source48000-pin.json',

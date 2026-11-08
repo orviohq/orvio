@@ -1,5 +1,7 @@
 import { externalNotes, externalDuration } from './external-catalog';
-export type Difficulty = 'low' | 'mid' | 'high';
+export type Difficulty = 'low' | 'mid' | 'high' | 'sc';
+/** A4 additive: SC family key for the procedural generator. Existing IDs unchanged. */
+export type FamilyDifficulty = Difficulty | 'sc';
 export type Lanes = 5 | 7;
 export interface Song {
   id: string;
@@ -72,6 +74,7 @@ export function makeChart(
 ): Note[] {
   const saved = externalNotes(song.id, difficulty, lanes);
   if (saved) return saved;
+  if (difficulty === 'sc') return makeScChart(song, lanes);
   const beat = 60 / song.bpm;
   const notes: Note[] = [];
   const divisions = difficulty === 'low' ? 1 : difficulty === 'mid' ? 2 : 4;
@@ -113,4 +116,36 @@ export function makeChart(
 }
 export function duration(song: Song) {
   return externalDuration(song.id) ?? (song.bars * 4 * 60) / song.bpm + 2;
+}
+
+/** A4: SC family for built-in songs. Denser division grid, extra same-time accents,
+ *  more holds. low/mid/high outputs are produced by makeChart above, unchanged. */
+export function makeScChart(song: Song, lanes: Lanes): Note[] {
+  const beat = 60 / song.bpm;
+  const notes: Note[] = [];
+  const totalBeats = song.bars * 4;
+  for (let b = 4; b < totalBeats; b += 1 / 6) {
+    const step = Math.round(b * 6);
+    if (step % 6 !== 0 && (step * 5 + Math.floor(b / 4)) % 7 === 0) continue;
+    const lane =
+      (melodyIndex(Math.floor(b * 2), song) +
+        Math.floor(b / 8) * 2 +
+        (step % 3)) %
+      lanes;
+    notes.push({ id: notes.length, lane, time: b * beat });
+    if (step % 12 === 0) {
+      const other = (lane + Math.ceil(lanes / 2)) % lanes;
+      notes.push({ id: notes.length, lane: other, time: b * beat });
+    }
+  }
+  for (let i = 0; i < notes.length; i++) {
+    const n = notes[i];
+    if (i % 11 !== 2) continue;
+    const next = notes.slice(i + 1).find((x) => x.lane === n.lane);
+    const length = beat * 0.75;
+    if (!next || next.time - n.time > length + 0.3) n.end = n.time + length;
+  }
+  return notes
+    .sort((a, b) => a.time - b.time || a.lane - b.lane)
+    .map((n, id) => ({ ...n, id }));
 }

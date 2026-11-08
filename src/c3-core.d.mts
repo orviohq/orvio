@@ -21,7 +21,9 @@ export function denseHighSelection(
 ): Analysis['peaks'];
 export function decorateTier(
   notes: { time: number; lane: number }[],
-  tier: 'low' | 'mid' | 'high',
+  tier: 'low' | 'mid' | 'high' | 'sc',
   info: unknown,
   lanes: 5 | 7,
+  params?: unknown,
 ): DecoratedNote[];
+export const C3_SC_PARAMS: unknown;

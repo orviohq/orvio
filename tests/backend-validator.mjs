@@ -77,6 +77,7 @@ function melodyIndex(step, song) {
 }
 
 function makeChart(song, difficulty, lanes) {
+  if (difficulty === 'sc') return makeScChart(song, lanes);
   const beat = 60 / song.bpm;
   const notes = [];
   const divisions = difficulty === 'low' ? 1 : difficulty === 'mid' ? 2 : 4;
@@ -108,6 +109,36 @@ function makeChart(song, difficulty, lanes) {
     if (i % 17 !== 3) continue;
     const next = notes.slice(i + 1).find((x) => x.lane === n.lane);
     const length = beat * (difficulty === 'low' ? 1.5 : 0.75);
+    if (!next || next.time - n.time > length + 0.3) n.end = n.time + length;
+  }
+  return notes
+    .sort((a, b) => a.time - b.time || a.lane - b.lane)
+    .map((n, id) => ({ ...n, id }));
+}
+
+function makeScChart(song, lanes) {
+  const beat = 60 / song.bpm;
+  const notes = [];
+  const totalBeats = song.bars * 4;
+  for (let b = 4; b < totalBeats; b += 1 / 6) {
+    const step = Math.round(b * 6);
+    if (step % 6 !== 0 && (step * 5 + Math.floor(b / 4)) % 7 === 0) continue;
+    const lane =
+      (melodyIndex(Math.floor(b * 2), song) +
+        Math.floor(b / 8) * 2 +
+        (step % 3)) %
+      lanes;
+    notes.push({ id: notes.length, lane, time: b * beat });
+    if (step % 12 === 0) {
+      const other = (lane + Math.ceil(lanes / 2)) % lanes;
+      notes.push({ id: notes.length, lane: other, time: b * beat });
+    }
+  }
+  for (let i = 0; i < notes.length; i++) {
+    const n = notes[i];
+    if (i % 11 !== 2) continue;
+    const next = notes.slice(i + 1).find((x) => x.lane === n.lane);
+    const length = beat * 0.75;
     if (!next || next.time - n.time > length + 0.3) n.end = n.time + length;
   }
   return notes
@@ -265,7 +296,7 @@ function validateReplay(raw) {
     r.version !== 1 ||
     !SONGS.some((s) => s.id === r.song) ||
     ![5, 7].includes(r.lanes) ||
-    !['low', 'mid', 'high'].includes(r.difficulty) ||
+    !['low', 'mid', 'high', 'sc'].includes(r.difficulty) ||
     !r.options ||
     !Array.isArray(r.ops) ||
     r.ops.length > 12000 ||
@@ -531,7 +562,7 @@ export function validateFragmentSchema(fragment) {
   if (
     !Object.hasOwn(SHARED_SONGS, song) ||
     ![5, 7].includes(lanes) ||
-    !['low', 'mid', 'high'].includes(difficulty) ||
+    !['low', 'mid', 'high', 'sc'].includes(difficulty) ||
     !Number.isInteger(score) ||
     score < 0 ||
     score > 1000000 ||
