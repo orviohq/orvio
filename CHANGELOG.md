@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.47] - 2026-11-09
+
+- Isolate each whole-audio download's frozen identity, cancellation and returned buffer ownership. One caller cannot reuse another caller's WAV-dimension check, cancel its request or detach its bytes by transfer. These mutable owned buffers deliberately do not deduplicate concurrent requests; no full-WAV copy or persistent audio duplicate is added. Small JSON query caching and progressive playback are unchanged.
+
 ## [0.2.46] - 2026-11-09
 
 - Coordinate network data through TanStack Query, using typed identity keys, small-JSON persistence, explicit retry rules and non-retrying mutations. Progressive transport has independent per-play query ownership, no shared Response or stream reader, no retries, zero post-completion cache retention and no persistent audio duplication.
