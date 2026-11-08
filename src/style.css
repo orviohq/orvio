@@ -3673,16 +3673,16 @@ body.perf-enabled #fps {
 }
 
 /* A24: dedicated local replay collection page */
-#replays {
+:is(#replays, #cached-replays) {
   min-height: 0;
   overflow-y: auto;
   padding: 28px clamp(16px, 5vw, 56px) 56px;
 }
-#replays .replays-wrap {
+:is(#replays, #cached-replays) .replays-wrap {
   max-width: 720px;
   margin: 0 auto;
 }
-#replay-list {
+:is(#replay-list, #cached-replay-list) {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -3730,7 +3730,7 @@ body.perf-enabled #fps {
   margin-top: 28px;
 }
 @media (max-width: 640px) {
-  #replays {
+  :is(#replays, #cached-replays) {
     padding: 20px 16px 40px;
   }
   .replay-row {
@@ -3743,7 +3743,7 @@ body.perf-enabled #fps {
 }
 
 /* A32: a bounded archive viewport, independent of the song-selection shell. */
-#replays {
+:is(#replays, #cached-replays) {
   height: calc(100dvh - 70px);
   overflow: auto;
   overscroll-behavior: contain;
@@ -3752,17 +3752,17 @@ body.perf-enabled #fps {
   scroll-padding: 24px;
   background: radial-gradient(ellipse at 90% 0%, #132b3b99, transparent 65%);
 }
-#replays .replays-wrap {
+:is(#replays, #cached-replays) .replays-wrap {
   max-width: 1040px;
 }
-#replays .section-title {
+:is(#replays, #cached-replays) .section-title {
   margin: 0 0 24px;
 }
-#replays-title {
+:is(#replays-title, #cached-replays-title) {
   font-size: clamp(24px, 3vw, 34px);
   letter-spacing: 0.02em;
 }
-#replay-list {
+:is(#replay-list, #cached-replay-list) {
   gap: 12px;
 }
 .replay-row {
@@ -4046,7 +4046,7 @@ dialog .hint,
   :is(#results, #rpaint) :is(#judgment-list, #rp-judgment-list) div {
     font-size: 14px;
   }
-  #replays {
+  :is(#replays, #cached-replays) {
     height: calc(100dvh - 65px);
   }
 }
