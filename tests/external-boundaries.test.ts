@@ -48,6 +48,6 @@ it('all locale recovery messages distinguish busy from daily quota and duration 
     );
     expect(busy).toContain('30');
     expect(busy).not.toBe(quota);
-    expect(externalError(new AudioJobError('too_long'), lang)).toContain('2');
+    expect(externalError(new AudioJobError('too_long'), lang)).toContain('5');
   }
 });

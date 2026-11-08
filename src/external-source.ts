@@ -1,3 +1,4 @@
+import { AUDIO_MAX_SECONDS } from './audio-limits.mjs';
 import type { Note, Difficulty, Lanes } from './chart';
 import {
   validDifficultyMetadata,
@@ -48,7 +49,7 @@ export function validSourceRecord(raw: unknown): raw is SourceRecord {
     !Number.isInteger(r.sampleRate) ||
     r.sampleRate < 8000 ||
     r.sampleRate > 192000 ||
-    r.frames / r.sampleRate > 130 ||
+    r.frames / r.sampleRate > AUDIO_MAX_SECONDS ||
     typeof r.pipelineVersion !== 'string' ||
     !r.pipelineVersion ||
     r.pipelineVersion.length > 128 ||

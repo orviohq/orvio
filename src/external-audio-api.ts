@@ -1,3 +1,4 @@
+import { AUDIO_MAX_BYTES, AUDIO_MAX_SECONDS } from './audio-limits.mjs';
 export const AUDIO_BASE = 'https://orvio-share.pn-26f.workers.dev';
 const JOB = /^[A-Za-z0-9_-]{1,128}$/;
 const SHA = /^[a-f0-9]{64}$/;
@@ -75,12 +76,12 @@ async function readJob(response: Response): Promise<AudioJob> {
       !SHA.test(a.sha256) ||
       !Number.isSafeInteger(a.sizeBytes) ||
       a.sizeBytes < 44 ||
-      a.sizeBytes > 24056664 ||
+      a.sizeBytes > AUDIO_MAX_BYTES ||
       a.contentType !== 'audio/wav' ||
       a.contractVersion !== 'audio/1' ||
       !Number.isFinite(a.durationSec) ||
       a.durationSec <= 0 ||
-      a.durationSec > 130 ||
+      a.durationSec > AUDIO_MAX_SECONDS ||
       !(
         typeof a.expiresAt === 'number' &&
         Number.isFinite(a.expiresAt) &&
@@ -120,7 +121,17 @@ export async function loadAudio(
   expectedHash?: string,
   signal?: AbortSignal,
 ): Promise<ArrayBuffer> {
-  if (job.status !== 'done' || !job.audio || !JOB.test(job.jobId))
+  if (
+    job.status !== 'done' ||
+    !job.audio ||
+    !JOB.test(job.jobId) ||
+    !Number.isSafeInteger(job.audio.sizeBytes) ||
+    job.audio.sizeBytes < 44 ||
+    job.audio.sizeBytes > AUDIO_MAX_BYTES ||
+    job.audio.durationSec <= 0 ||
+    !Number.isFinite(job.audio.durationSec) ||
+    job.audio.durationSec > AUDIO_MAX_SECONDS
+  )
     throw new AudioJobError('unavailable');
   const response = await fetch(
     `${AUDIO_BASE}/v1/audio-jobs/${job.jobId}/audio`,
@@ -145,26 +156,20 @@ export async function loadAudio(
     throw new AudioJobError('source_changed');
   if (!response.body) throw new AudioJobError('unavailable');
   const reader = response.body.getReader(),
-    chunks: Uint8Array[] = [];
+    joined = new Uint8Array(job.audio.sizeBytes);
   let length = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    length += value.byteLength;
-    if (length > job.audio.sizeBytes || length > 24056664) {
+    if (length + value.byteLength > joined.byteLength) {
       await reader.cancel();
       throw new AudioJobError('integrity_failed');
     }
-    chunks.push(value);
-  }
-  const joined = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    joined.set(chunk, offset);
-    offset += chunk.byteLength;
+    joined.set(value, length);
+    length += value.byteLength;
   }
   const bytes = joined.buffer;
-  if (bytes.byteLength !== job.audio.sizeBytes || bytes.byteLength > 24056664)
+  if (length !== job.audio.sizeBytes || bytes.byteLength > AUDIO_MAX_BYTES)
     throw new AudioJobError('integrity_failed');
   const digest = Array.from(
     new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),

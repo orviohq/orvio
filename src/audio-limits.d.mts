@@ -1,0 +1,2 @@
+export const AUDIO_MAX_SECONDS: 300;
+export const AUDIO_MAX_BYTES: 57700000;

@@ -1,15 +1,20 @@
+import { AUDIO_MAX_SECONDS, AUDIO_MAX_BYTES } from './audio-limits.mjs';
 // canonical-pcm.mjs — Orvio canonical audio path helpers, no dependencies, no secrets.
 // Pipeline: server WAV bytes (hash-verified) -> parseWav -> toMono -> resampleLinear -> analyzePcm.
 // Deterministic across browsers: pure JS arithmetic only, no WebAudio decode, no native resampler.
 
 // Guarded RIFF/WAVE parser for PCM16 stereo at 44.1/48 kHz.
 // Returns {sampleRate, channels, bitsPerSample, frames, samples: Float32Array interleaved (-1..1)}.
-export function parseWav(buf) {
+export function inspectWav(buf) {
   const dv =
     buf instanceof DataView
       ? buf
       : new DataView(buf.buffer || buf, buf.byteOffset || 0, buf.byteLength);
-  if (dv.byteLength < 44 || dv.getUint32(4, true) + 8 !== dv.byteLength)
+  if (
+    dv.byteLength > AUDIO_MAX_BYTES ||
+    dv.byteLength < 44 ||
+    dv.getUint32(4, true) + 8 !== dv.byteLength
+  )
     throw Error('Invalid WAV length');
   if (dv.getUint32(0) !== 0x52494646 || dv.getUint32(8) !== 0x57415645)
     throw new Error('not RIFF/WAVE');
@@ -47,37 +52,50 @@ export function parseWav(buf) {
     ![44100, 48000].includes(fmt.sampleRate)
   )
     throw Error('Unsupported canonical format');
-  if (dataLen === 0 || dataLen % 4 || dataLen > fmt.sampleRate * 4 * 130)
+  if (
+    dataLen === 0 ||
+    dataLen % 4 ||
+    dataLen > fmt.sampleRate * 4 * AUDIO_MAX_SECONDS
+  )
     throw Error('Invalid canonical PCM length');
-  const bytesPer = fmt.bits >> 3;
-  const frames = Math.floor(dataLen / (bytesPer * fmt.channels));
-  const samples = new Float32Array(frames * fmt.channels);
-  for (let i = 0; i < frames * fmt.channels; i++) {
-    const o = dataOff + i * bytesPer;
-    let v;
-    if (fmt.format === 3 && fmt.bits === 32) v = dv.getFloat32(o, true);
-    else if (fmt.bits === 16) v = dv.getInt16(o, true) / 32768;
-    else if (fmt.bits === 8) v = (dv.getUint8(o) - 128) / 128;
-    else if (fmt.bits === 24) {
-      const b0 = dv.getUint8(o),
-        b1 = dv.getUint8(o + 1),
-        b2 = dv.getUint8(o + 2);
-      let x = b0 | (b1 << 8) | (b2 << 16);
-      if (x & 0x800000) x |= 0xff000000;
-      v = x / 8388608;
-    } else if (fmt.bits === 32 && fmt.format === 1)
-      v = dv.getInt32(o, true) / 2147483648;
-    else
-      throw new Error('unsupported wav format ' + fmt.format + '/' + fmt.bits);
-    samples[i] = v;
-  }
   return {
     sampleRate: fmt.sampleRate,
     channels: fmt.channels,
     bitsPerSample: fmt.bits,
-    frames,
+    frames: dataLen / 4,
+    view: dv,
+    dataOffset: dataOff,
+  };
+}
+
+// Keep the original interleaved API for callers that need its exact samples.
+export function parseWav(buf) {
+  const p = inspectWav(buf),
+    samples = new Float32Array(p.frames * p.channels);
+  for (let i = 0; i < samples.length; i++)
+    samples[i] = p.view.getInt16(p.dataOffset + i * 2, true) / 32768;
+  return {
+    sampleRate: p.sampleRate,
+    channels: p.channels,
+    bitsPerSample: p.bitsPerSample,
+    frames: p.frames,
     samples,
   };
+}
+
+// PCM16 values are exact binary fractions. This is byte-identical to
+// toMono(parseWav(buf)) without allocating the full stereo Float32 copy.
+export function parseWavMono(buf) {
+  const p = inspectWav(buf),
+    samples = new Float32Array(p.frames);
+  for (let i = 0; i < p.frames; i++) {
+    const o = p.dataOffset + i * 4;
+    samples[i] =
+      (p.view.getInt16(o, true) / 32768 +
+        p.view.getInt16(o + 2, true) / 32768) /
+      2;
+  }
+  return { sampleRate: p.sampleRate, frames: p.frames, samples };
 }
 
 // Channel average to mono. Deterministic: left-to-right accumulation.

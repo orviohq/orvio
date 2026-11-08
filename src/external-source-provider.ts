@@ -1,5 +1,5 @@
 import { difficultyForChart } from './chart-difficulty';
-import { parseWav, toMono, resampleLinear } from './canonical-pcm.mjs';
+import { parseWavMono, resampleLinear } from './canonical-pcm.mjs';
 import { analyzePcm } from './sample-analyzer.mjs';
 import { generateC3Runtime } from './c3-runtime-research';
 import {
@@ -18,8 +18,8 @@ export async function generateSourceRecord(
     (b) => b.toString(16).padStart(2, '0'),
   ).join('');
   if (actual !== audioSha256) throw Error('Source audio integrity failed');
-  const parsed = parseWav(bytes),
-    samples = resampleLinear(toMono(parsed), parsed.sampleRate, 22050),
+  const parsed = parseWavMono(bytes),
+    samples = resampleLinear(parsed.samples, parsed.sampleRate, 22050),
     generated = generateC3Runtime(samples, 22050, 'c2'),
     // BPM remains a source summary, never a grid for the new note times.
     summary = analyzePcm(samples, 22050);

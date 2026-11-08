@@ -54,14 +54,14 @@ it('rejects malformed or ambiguous notes instead of dropping, snapping or remapp
     expect(() => adaptDecoratedChart(n, 5, 3)).toThrow();
   }
 });
-it('old source cap remains 130s independently of research-only adaptation', () => {
+it('source cap accepts up to 300s without changing a saved chart', () => {
   const notes = adaptDecoratedChart(raw, 5, 187);
   const source = {
     version: 1,
     videoId: 'uXn-zOt68V8',
     audioSha256: 'a'.repeat(64),
     sampleRate: 48000,
-    frames: 48000 * 187,
+    frames: 48000 * 300,
     estimatedBpm: 144,
     pipelineVersion: 'v1',
     analyzerVersion: 'research-c3',
@@ -73,6 +73,8 @@ it('old source cap remains 130s independently of research-only adaptation', () =
       ]),
     ),
   };
+  expect(validSourceRecord(source)).toBe(true);
+  source.frames += 1;
   expect(validSourceRecord(source)).toBe(false);
 });
 it('source-bound replay keeps hold release and chart-clock pause independent of generator version', () => {

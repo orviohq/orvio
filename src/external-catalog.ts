@@ -1,6 +1,6 @@
 import type { Song, Note, Difficulty, Lanes } from './chart';
 import type { SourceRecord } from './external-source';
-import { parseWav } from './canonical-pcm.mjs';
+import { inspectWav } from './canonical-pcm.mjs';
 export interface ExternalSong {
   song: Song;
   record: SourceRecord;
@@ -58,11 +58,13 @@ export function externalDuration(id: string) {
 export function externalAudio(id: string, context: AudioContext): AudioBuffer {
   const item = sources.get(id);
   if (!item?.bytes) throw Error('Matching source audio unavailable');
-  const p = parseWav(item.bytes),
+  const p = inspectWav(item.bytes),
     buffer = context.createBuffer(p.channels, p.frames, p.sampleRate);
   for (let ch = 0; ch < p.channels; ch++) {
     const out = buffer.getChannelData(ch);
-    for (let i = 0; i < p.frames; i++) out[i] = p.samples[i * p.channels + ch];
+    for (let i = 0; i < p.frames; i++)
+      out[i] =
+        p.view.getInt16(p.dataOffset + (i * p.channels + ch) * 2, true) / 32768;
   }
   return buffer;
 }

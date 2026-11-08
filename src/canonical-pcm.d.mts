@@ -12,3 +12,12 @@ export function resampleLinear(
   fromRate: number,
   toRate: number,
 ): Float32Array;
+
+export interface WavInfo extends Omit<ParsedWav, 'samples'> {
+  view: DataView;
+  dataOffset: number;
+}
+export function inspectWav(buf: ArrayBuffer | Uint8Array): WavInfo;
+export function parseWavMono(
+  buf: ArrayBuffer | Uint8Array,
+): Pick<ParsedWav, 'sampleRate' | 'frames' | 'samples'>;

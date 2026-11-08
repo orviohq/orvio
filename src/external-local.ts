@@ -1,3 +1,4 @@
+import { AUDIO_MAX_BYTES } from './audio-limits.mjs';
 import { externalSource, sourceId, sourceAudioId } from './external-catalog';
 import {
   validSourceRecord,
@@ -10,7 +11,7 @@ import {
   type RuntimeReplay,
 } from './replay';
 import type { SharedResult } from './share';
-import { parseWav } from './canonical-pcm.mjs';
+import { inspectWav } from './canonical-pcm.mjs';
 type Result = Omit<SharedResult, 'song'> & { song: string };
 export interface LocalAsset {
   key: string;
@@ -104,7 +105,7 @@ export async function localAudio(
   if (!a) return null;
   if (
     !(a.bytes instanceof ArrayBuffer) ||
-    a.bytes.byteLength > 24056664 ||
+    a.bytes.byteLength > AUDIO_MAX_BYTES ||
     typeof a.title !== 'string' ||
     a.title.length > 300 ||
     typeof a.jobId !== 'string'
@@ -115,7 +116,7 @@ export async function localAudio(
     (x) => x.toString(16).padStart(2, '0'),
   ).join('');
   if (hash !== record.audioSha256) throw Error('Saved audio integrity failed');
-  const p = parseWav(a.bytes);
+  const p = inspectWav(a.bytes);
   if (p.sampleRate !== record.sampleRate || p.frames !== record.frames)
     throw Error('Saved audio format changed');
   return a;
