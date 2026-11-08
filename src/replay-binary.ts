@@ -27,7 +27,11 @@ export function packReplay(r: ReplayData): Uint8Array {
       r.options,
       r.end,
       r.ops.length,
-      ...(r.audioLeadIn !== undefined ? [r.audioLeadIn] : []),
+      ...(r.fever !== undefined
+        ? [r.audioLeadIn ?? null, r.fever]
+        : r.audioLeadIn !== undefined
+          ? [r.audioLeadIn]
+          : []),
     ]),
   );
   variable(BigInt(meta.length));
@@ -76,7 +80,9 @@ export function unpackReplay(bytes: Uint8Array): ReplayData {
     throw Error('Invalid replay header');
   const meta = JSON.parse(new TextDecoder().decode(bytes.subarray(p, p + len)));
   p += len;
-  const [song, lanes, difficulty, options, end, count, audioLeadIn] = meta;
+  const [song, lanes, difficulty, options, end, count, leadIn, fever] = meta;
+  const audioLeadIn =
+    leadIn === null && fever !== undefined ? undefined : leadIn;
   if (
     audioLeadIn !== undefined &&
     (typeof audioLeadIn !== 'number' || !Number.isFinite(audioLeadIn))
@@ -117,5 +123,6 @@ export function unpackReplay(bytes: Uint8Array): ReplayData {
     end,
     ops,
     ...(audioLeadIn !== undefined ? { audioLeadIn } : {}),
+    ...(fever !== undefined ? { fever } : {}),
   };
 }

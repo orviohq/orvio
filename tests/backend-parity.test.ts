@@ -1,6 +1,7 @@
 import { test, expect } from 'vitest';
 import { SONGS, makeChart } from '../src/chart';
 import { Engine } from '../src/engine';
+import { CURRENT_FEVER } from '../src/fever';
 import { transformChart, FADERS } from '../src/game-options';
 import {
   encodeReplay,
@@ -77,6 +78,8 @@ test('backend validator agrees on every chart/effect/shuffle with original float
             options,
             ops,
             end,
+            audioLeadIn: 4.2,
+            fever: { ...CURRENT_FEVER, auto: count % 2 === 0 },
           };
           const result = {
             song: r.song,
@@ -93,6 +96,7 @@ test('backend validator agrees on every chart/effect/shuffle with original float
           expect(replayMatches(r, result)).toBe(true);
           const text = await encodeReplay(r);
           expect(await decodeReplay(text)).toEqual(r);
+          expect(await __test__.decodeReplay(text)).toEqual(r);
           const p = resultParams(result);
           p.set('rp', '1');
           p.set('rn', String(text.length));

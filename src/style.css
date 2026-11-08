@@ -3156,3 +3156,48 @@ canvas {
     max-height: 55dvh;
   }
 }
+
+#fever-hud {
+  position: relative;
+  margin-top: 24px;
+  width: 140px;
+  max-width: 100%;
+  color: #c8baff;
+  font-size: 12px;
+  pointer-events: none;
+}
+.fever-track {
+  height: 5px;
+  margin-top: 5px;
+  background: #312a45;
+  overflow: hidden;
+}
+.fever-track i {
+  display: block;
+  height: 100%;
+  background: #a88bff;
+  transform-origin: left;
+  transition: transform 0.12s linear;
+}
+.fever-reduced .fever-track i {
+  transition: none;
+}
+
+#fever-hud[data-stage='5'] {
+  color: #e9c9ff;
+}
+.fever-rise strong {
+  display: inline-block;
+  animation: fever-rise 0.35s ease-out;
+}
+@keyframes fever-rise {
+  from {
+    transform: translateY(4px) scale(0.95);
+  }
+  to {
+    transform: none;
+  }
+}
+.fever-reduced strong {
+  animation: none;
+}

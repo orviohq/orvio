@@ -40,6 +40,23 @@ export const ALLOWED_KEYS = [
   'r',
 ];
 
+// A7 frozen fever replay metadata (port of the frontend's fever.ts). Optional on
+// replays; legacy replays without it stay byte-identical and unchanged.
+const FEVER_RULES_IDS = [
+  'legacy-off-v1',
+  'djmax-current-pending-v1',
+  'orvio-auto-v1',
+];
+function validFeverMetadata(raw) {
+  if (!raw || typeof raw !== 'object') return false;
+  const r = raw;
+  return (
+    r.version === 1 &&
+    FEVER_RULES_IDS.includes(r.rulesId) &&
+    typeof r.auto === 'boolean'
+  );
+}
+
 const SONGS = [
   { id: 'first-light', bpm: 110, root: 57, scale: [0, 2, 4, 7, 9], bars: 16 },
   { id: 'afterimage', bpm: 128, root: 50, scale: [0, 3, 5, 7, 10], bars: 20 },
@@ -244,6 +261,7 @@ function validateReplay(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw;
   if (
+    (r.fever !== undefined && !validFeverMetadata(r.fever)) ||
     r.version !== 1 ||
     !SONGS.some((s) => s.id === r.song) ||
     ![5, 7].includes(r.lanes) ||
@@ -253,7 +271,11 @@ function validateReplay(raw) {
     r.ops.length > 12000 ||
     !Number.isFinite(r.end) ||
     r.end < 0 ||
-    r.end > 600000
+    r.end > 600000 ||
+    (r.audioLeadIn !== undefined &&
+      (!Number.isFinite(r.audioLeadIn) ||
+        r.audioLeadIn < 0 ||
+        r.audioLeadIn > 10))
   )
     return null;
   const o = r.options;
@@ -278,7 +300,7 @@ function validateReplay(raw) {
       op[1] < prev ||
       op[1] > r.end ||
       !Number.isFinite(op[2]) ||
-      op[2] < -2 ||
+      op[2] < (r.audioLeadIn === undefined ? -2 : -(r.audioLeadIn + 1)) ||
       (op[2] > 600 &&
         !(op[0] === 1 && op[2] === 9999 && i === r.ops.length - 1))
     )
@@ -319,6 +341,10 @@ function validateReplay(raw) {
     },
     ops: r.ops.map((op) => [...op]),
     end: r.end,
+    ...(r.audioLeadIn !== undefined ? { audioLeadIn: r.audioLeadIn } : {}),
+    ...(r.fever !== undefined
+      ? { fever: { version: 1, rulesId: r.fever.rulesId, auto: r.fever.auto } }
+      : {}),
   };
 }
 
@@ -348,7 +374,18 @@ function unpackReplay(bytes) {
     throw Error('Invalid replay header');
   const meta = JSON.parse(new TextDecoder().decode(bytes.subarray(p, p + len)));
   p += len;
-  const [song, lanes, difficulty, options, end, count] = meta;
+  // A5: optional 7th element carries the recording's audio lead-in (pre-A5
+  // replays have 6 elements and stay byte-identical). A7: optional 8th element
+  // carries frozen fever metadata; the 7th is null when fever is present on a
+  // recording without a lead-in. Old decoders ignore the extra elements.
+  const [song, lanes, difficulty, options, end, count, leadIn, fever] = meta;
+  const audioLeadIn =
+    leadIn === null && fever !== undefined ? undefined : leadIn;
+  if (
+    audioLeadIn !== undefined &&
+    (typeof audioLeadIn !== 'number' || !Number.isFinite(audioLeadIn))
+  )
+    throw Error('Invalid replay audio lead-in');
   if (!Number.isInteger(count) || count < 0 || count > 12000)
     throw Error('Invalid replay count');
   const ops = [];
@@ -375,7 +412,17 @@ function unpackReplay(bytes) {
     } else throw Error('Unknown replay operation');
   }
   if (p !== bytes.length) throw Error('Trailing replay data');
-  return { version: 1, song, lanes, difficulty, options, end, ops };
+  return {
+    version: 1,
+    song,
+    lanes,
+    difficulty,
+    options,
+    end,
+    ops,
+    ...(audioLeadIn !== undefined ? { audioLeadIn } : {}),
+    ...(fever !== undefined ? { fever } : {}),
+  };
 }
 
 async function inflate(bytes) {
@@ -456,6 +503,8 @@ export const __test__ = {
   applyReplayOp,
   JUDGMENTS,
   replayMatches,
+  decodeReplay,
+  validFeverMetadata,
 };
 
 // Strict fragment validation per the frontend contract: the same criteria as the

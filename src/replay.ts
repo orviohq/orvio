@@ -1,3 +1,4 @@
+import { validFeverMetadata, type FeverReplayMetadata } from './fever';
 import { packReplay, unpackReplay } from './replay-binary';
 import { SONGS, makeChart, type Difficulty, type Lanes } from './chart';
 import { Engine } from './engine';
@@ -26,6 +27,7 @@ export interface ReplayData {
   // Seconds the audio anchor was held after session start when recorded.
   // Absent on pre-A5 replays, whose anchor was the fixed 0.15s lead-in.
   audioLeadIn?: number;
+  fever?: FeverReplayMetadata;
 }
 export type RuntimeReplay = Omit<ReplayData, 'song'> & { song: string };
 const faders: readonly string[] = FADERS;
@@ -42,6 +44,7 @@ export function validateRuntimeReplay(
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as RuntimeReplay;
   if (
+    (r.fever !== undefined && !validFeverMetadata(r.fever)) ||
     r.version !== 1 ||
     typeof r.song !== 'string' ||
     !allowed(r.song) ||
@@ -123,6 +126,15 @@ export function validateRuntimeReplay(
     ops: r.ops.map((op) => [...op] as ReplayOp),
     end: r.end,
     ...(r.audioLeadIn !== undefined ? { audioLeadIn: r.audioLeadIn } : {}),
+    ...(r.fever !== undefined
+      ? {
+          fever: {
+            version: 1 as const,
+            rulesId: r.fever.rulesId,
+            auto: r.fever.auto,
+          },
+        }
+      : {}),
   };
 }
 export function replayEngine(r: RuntimeReplay) {
@@ -137,6 +149,7 @@ export function replayEngine(r: RuntimeReplay) {
       r.options.shuffle,
       r.options.seed,
     ),
+    r.fever,
   );
 }
 export function applyReplayOp(engine: Engine, op: ReplayOp, sequence: number) {
