@@ -16,6 +16,8 @@ const ERRORS = [
   'source_changed',
   'integrity_failed',
   'unsupported_format',
+  'client_audio_not_cached',
+  'client_generation_disabled',
 ] as const;
 export type AudioErrorCode =
   (typeof ERRORS)[number] | 'network_error' | 'request_timeout';
