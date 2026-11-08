@@ -276,6 +276,7 @@ function waitForAudio(ms: number, signal?: AbortSignal) {
     signal?.addEventListener('abort', abort, { once: true });
   });
 }
+let ownedAudioRead = 0;
 export async function loadAudio(
   job: AudioJob,
   expectedVideoId: string,
@@ -300,13 +301,18 @@ export async function loadAudio(
       undefined,
       'response',
     );
-  // Query-coordinated transport: concurrent reads of the same finished
-  // job's bytes dedup onto one download. staleTime 0 keeps every call live
-  // and gcTime 0 drops the bytes the moment no caller holds them - the PCM
-  // is never retained by the query cache and never persisted.
+  // Each caller owns its returned buffer, identity checks and cancellation.
+  // A transferred buffer must never detach another consumer's audio.
   const doneJob = job as AudioJob & { audio: NonNullable<AudioJob['audio']> };
   return queryClient.fetchQuery({
-    queryKey: queryKeys.audioJobBytes(job.jobId, job.audio.sha256),
+    queryKey: [
+      ...queryKeys.audioJobBytes(job.jobId, job.audio.sha256),
+      expectedVideoId,
+      expectedHash,
+      job.audio.sizeBytes,
+      job.audio.durationSec,
+      ++ownedAudioRead,
+    ],
     retry: false,
     staleTime: 0,
     gcTime: 0,

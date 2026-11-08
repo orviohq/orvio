@@ -4,6 +4,7 @@ import { readAudioLimit } from './audio-limit-message';
 import { AUDIO_MAX_BYTES } from './audio-limits.mjs';
 import { inspectWav } from './canonical-pcm.mjs';
 import type { SourceRecord } from './external-source';
+let audioRead = 0;
 /** Read retained, pin-bound audio only. Never creates a job, extracts or saves partial bytes.
  * Missing-pin GET may run the server's existing canonical metadata repair; it cannot extract audio.
  */
@@ -17,12 +18,15 @@ export async function loadCanonicalAudio(
   )
     throw new AudioJobError('integrity_failed');
   signal?.throwIfAborted();
-  // Query-coordinated transport: concurrent reads of the same pin-bound
-  // audio dedup onto one download. staleTime 0 keeps every call live and
-  // gcTime 0 drops the bytes the moment no caller holds them - the PCM is
-  // never retained by the query cache and never persisted.
+  // Each caller owns its returned buffer, identity checks and cancellation.
+  // Do not dedup mutable buffers or copy a full WAV to preserve sharing.
   return queryClient.fetchQuery({
-    queryKey: queryKeys.canonicalAudioBytes(record.videoId, record.audioSha256),
+    queryKey: [
+      ...queryKeys.canonicalAudioBytes(record.videoId, record.audioSha256),
+      record.frames,
+      record.sampleRate,
+      ++audioRead,
+    ],
     retry: false,
     staleTime: 0,
     gcTime: 0,
