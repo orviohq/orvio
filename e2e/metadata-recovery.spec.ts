@@ -29,7 +29,7 @@ test('metadata fresh and existing cached recovery preserves identities and audio
           body: JSON.stringify({
             videoId: r.id,
             title: 'Recovered Song <text>',
-            author: 'Recovered Artist',
+            author: mode === 'titleonly' ? null : 'Recovered Artist',
             durationSec: 1,
             audioSha256: wrongBinding ? '0'.repeat(64) : fixture.sha,
             chartSetSha256: r.chartSet,
@@ -117,6 +117,28 @@ test('metadata fresh and existing cached recovery preserves identities and audio
         sessions: JSON.stringify(sessions),
       };
     });
+  if (mode === 'titleonly')
+    await page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const r = indexedDB.open('orvio.external-library.v1', 2);
+        r.onsuccess = () => resolve(r.result);
+        r.onerror = () => reject(r.error);
+      });
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(['audio', 'metadata'], 'readwrite');
+        for (const name of ['audio', 'metadata']) {
+          const store = tx.objectStore(name);
+          const request = store.getAll();
+          request.onsuccess = () => {
+            for (const row of request.result)
+              store.put({ ...row, author: 'Known Artist' });
+          };
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      db.close();
+    });
   const before = await snapshot();
   if (mode === 'existing') expect(JSON.parse(before.sessions)).toHaveLength(1);
   enabled = true;
@@ -133,7 +155,9 @@ test('metadata fresh and existing cached recovery preserves identities and audio
     return;
   }
   await expect(page.locator('#songs')).toContainText('Recovered Song <text>');
-  await expect(page.locator('#songs')).toContainText('Recovered Artist');
+  await expect(page.locator('#songs')).toContainText(
+    mode === 'titleonly' ? 'Known Artist' : 'Recovered Artist',
+  );
   expect(await snapshot()).toEqual(before);
   expect(requests.filter((x) => x.includes('/audio'))).toEqual([]);
   await page.locator('#songs>[data-song]').first().click();

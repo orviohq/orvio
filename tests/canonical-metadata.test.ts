@@ -28,8 +28,10 @@ it('accepts exact identity and rejects wrong or unsafe display metadata', () => 
     ['title', 'x'.repeat(301)],
     ['title', 'x\n'],
     ['author', 'x'.repeat(201)],
+    ['author', undefined],
+    ['author', 123],
     ['durationSec', 301],
-  ])
+  ] as [string, unknown][])
     expect(validCanonicalMetadata({ ...meta, [k]: v }, record)).toBe(false);
 });
 it('GET only, unavailable remains optional and bounded', async () => {
@@ -49,4 +51,18 @@ it('GET only, unavailable remains optional and bounded', async () => {
     vi.fn(async () => new Response(JSON.stringify(meta))),
   );
   expect(await readCanonicalMetadata(record)).toEqual(meta);
+});
+
+it('accepts explicit null author and normalizes blank author without inventing one', async () => {
+  expect(validCanonicalMetadata({ ...meta, author: null }, record)).toBe(true);
+  for (const author of [null, '', '  ']) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ ...meta, author }))),
+    );
+    expect(await readCanonicalMetadata(record)).toEqual({
+      ...meta,
+      author: null,
+    });
+  }
 });

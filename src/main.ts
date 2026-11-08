@@ -2881,7 +2881,8 @@ function recoverDisplayMetadata(
           item.record.chartSetSha256 === record.chartSetSha256
         ) {
           song.title = metadata.title;
-          song.subtitle = metadata.author || 'YouTube';
+          if (metadata.author !== null)
+            song.subtitle = metadata.author || song.subtitle;
         }
       }
       const pending = canonicalPending.get(record.videoId);
