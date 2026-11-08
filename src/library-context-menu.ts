@@ -17,6 +17,7 @@ export function libraryContextMenu(
   menu.append(button);
   document.body.append(menu);
   let anchor: HTMLElement | undefined, action: (() => void) | undefined;
+  let anchoredAt: { top: number; left: number } | undefined;
   function close(focus = false) {
     if (!menu.matches(':popover-open')) return;
     menu.hidePopover();
@@ -35,7 +36,9 @@ export function libraryContextMenu(
     menu.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + 'px';
     menu.style.top =
       Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
-    button.focus();
+    const anchorRect = row.getBoundingClientRect();
+    anchoredAt = { top: anchorRect.top, left: anchorRect.left };
+    button.focus({ preventScroll: true });
     return true;
   }
   button.onclick = () => {
@@ -75,6 +78,14 @@ export function libraryContextMenu(
     if (!menu.contains(e.target as Node)) close();
   });
   window.addEventListener('resize', () => close());
-  window.addEventListener('scroll', () => close(), true);
+  window.addEventListener(
+    'scroll',
+    () => {
+      if (!anchor || !anchoredAt) return;
+      const rect = anchor.getBoundingClientRect();
+      if (rect.top !== anchoredAt.top || rect.left !== anchoredAt.left) close();
+    },
+    true,
+  );
   return { close };
 }
