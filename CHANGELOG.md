@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.39] - 2026-11-09
+
+- Restore a small display-only saved library during HTML parsing, before module startup, IndexedDB hydration and background metadata refresh. Keep enlarged artwork, selection and scroll position.
+- Remove full audio reads from library first paint while retaining verified canonical chart/reference identity. Playback still verifies audio hashes and WAV shape; display cache never authorizes actions.
+- Add delayed-module/audio/metadata, offline, repeated-reload, invalid-cache and corrupted-audio checks, with cached/live row geometry matching. Pre-play wallpaper, result motion and fitted result cards are unchanged.
+
 ## [0.2.38] - 2026-11-09
 
 - Enlarge song-list artwork and clarify titles, metadata and selection, while keeping controls reachable on portrait and landscape screens.

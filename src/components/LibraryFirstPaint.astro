@@ -1,0 +1,62 @@
+---
+import restore from '../library-first-paint-bootstrap.js?raw';
+---
+
+<div
+  id="library-first-paint"
+  hidden
+  inert
+  aria-busy="true"
+  aria-label="Saved track selection"
+>
+  <header>
+    <a class="brand" href="/" aria-label="orvio home">
+      <img class="brand-symbol" src="/favicon.png" alt="" />
+      <img src="/wordmark.svg" alt="orvio" />
+    </a>
+    <span class="edition">RHYTHM SYSTEM</span>
+    <nav data-cached-nav></nav>
+  </header>
+  <div class="ambient" style="z-index: -1">
+    <div class="ambient-disc"></div>
+    <div class="scanlines"></div>
+  </div>
+  <main id="cached-lobby">
+    <section class="intro">
+      <div id="cached-selected-art" class="selected-art youtube-art"></div>
+      <div class="selected-meta">
+        <span id="cached-selected-genre" data-cached-genre></span>
+        <span id="cached-selected-bpm" data-cached-bpm></span>
+      </div>
+      <h1 id="cached-selected-title" data-cached-title></h1>
+      <p id="cached-selected-subtitle" data-cached-subtitle></p>
+      <div data-cached-preview></div>
+      <div data-cached-mobile></div>
+    </section>
+    <section class="library">
+      <div class="section-title">
+        <strong data-cached-label></strong>
+      </div>
+      <div id="cached-songs" class="cached-songs"></div>
+      <div data-cached-selection></div>
+      <div data-cached-start></div>
+    </section>
+    <div data-cached-footer></div>
+  </main>
+</div>
+<style is:inline>
+  #library-first-paint[hidden] {
+    display: none;
+  }
+  #library-first-paint {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    overflow: auto;
+    background: #070d15;
+  }
+  #library-first-paint .song-card {
+    cursor: default;
+  }
+</style>
+<script is:inline set:html={restore}></script>
