@@ -76,7 +76,7 @@ for (const mode of [
       mode === 'warmup'
     ) {
       await expect(page.locator('#song-loading')).toBeVisible();
-      if (mode === 'late-render')
+      if (['cancel', 'cancel-button', 'late-render'].includes(mode))
         await page.waitForFunction(
           () => typeof (window as any).releaseOld === 'function',
         );
