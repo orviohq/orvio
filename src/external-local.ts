@@ -1,4 +1,4 @@
-import { externalSource, sourceId } from './external-catalog';
+import { externalSource, sourceId, sourceAudioId } from './external-catalog';
 import {
   validSourceRecord,
   verifyChartHashes,
@@ -83,7 +83,11 @@ export async function saveLocalAudio(
         author: author?.slice(0, 100),
         jobId,
       };
-      tx.objectStore('audio').put({ ...meta, bytes });
+      tx.objectStore('audio').put({
+        ...meta,
+        key: sourceAudioId(record),
+        bytes,
+      });
       tx.objectStore('metadata').put(meta);
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
@@ -96,7 +100,7 @@ export async function saveLocalAudio(
 export async function localAudio(
   record: SourceRecord,
 ): Promise<LocalAsset | null> {
-  const a = await get('audio', sourceId(record));
+  const a = await get('audio', sourceAudioId(record));
   if (!a) return null;
   if (
     !(a.bytes instanceof ArrayBuffer) ||

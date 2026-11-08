@@ -10,6 +10,7 @@ export interface SourceRecord {
   pipelineVersion: string;
   analyzerVersion: string;
   config: string;
+  chartSetSha256?: string;
   charts: Record<ChartKey, { notes: Note[]; sha256: string }>;
 }
 const hash = /^[a-f0-9]{64}$/;
@@ -46,6 +47,7 @@ export function validSourceRecord(raw: unknown): raw is SourceRecord {
     r.analyzerVersion.length > 128 ||
     typeof r.config !== 'string' ||
     r.config.length > 4096 ||
+    (r.chartSetSha256 !== undefined && !hash.test(r.chartSetSha256)) ||
     !r.charts
   )
     return false;
@@ -87,9 +89,9 @@ export function validSourceRecord(raw: unknown): raw is SourceRecord {
   return true;
 }
 export function recordKey(
-  record: Pick<SourceRecord, 'videoId' | 'audioSha256'>,
+  record: Pick<SourceRecord, 'videoId' | 'audioSha256' | 'chartSetSha256'>,
 ) {
-  return `${record.videoId}:${record.audioSha256}`;
+  return `${record.videoId}:${record.audioSha256}${record.chartSetSha256 ? `:chart:${record.chartSetSha256}` : ''}`;
 }
 export type AudioMatch = 'exact' | 'source-changed';
 /** A changed artifact is never permission to regenerate or overwrite the saved chart. */
@@ -100,6 +102,11 @@ export async function verifyChartHashes(
   record: SourceRecord,
 ): Promise<boolean> {
   if (!validSourceRecord(record)) return false;
+  if (
+    record.chartSetSha256 !== undefined &&
+    record.chartSetSha256 !== (await chartSetHash(record))
+  )
+    return false;
   for (const key of keys) {
     const bytes = new TextEncoder().encode(
       JSON.stringify(record.charts[key].notes),
@@ -111,4 +118,19 @@ export async function verifyChartHashes(
     if (actual !== record.charts[key].sha256) return false;
   }
   return true;
+}
+
+/** Versioned chart identity does not change the source audio identity. */
+export async function chartSetHash(record: SourceRecord): Promise<string> {
+  const bytes = new TextEncoder().encode(
+    JSON.stringify({
+      analyzer: record.analyzerVersion,
+      config: record.config,
+      charts: keys.map((key) => [key, record.charts[key].sha256]),
+    }),
+  );
+  return Array.from(
+    new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
+    (b) => b.toString(16).padStart(2, '0'),
+  ).join('');
 }

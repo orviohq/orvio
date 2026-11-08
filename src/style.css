@@ -3122,3 +3122,37 @@ canvas {
     linear-gradient(90deg, rgba(5, 12, 21, 0.88), rgba(5, 12, 21, 0.84)),
     var(--play-wallpaper);
 }
+
+/* Library actions share one bounded row. The list scrolls before play controls move. */
+#library-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+#library-actions > button {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+  margin: 0;
+  min-height: 44px;
+  padding: 6px 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.library > :not(#songs) {
+  flex-shrink: 0;
+}
+#songs {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-left: 8px;
+  margin-left: -8px;
+  scrollbar-gutter: stable;
+}
+@media (max-width: 799px) {
+  #songs {
+    max-height: 55dvh;
+  }
+}

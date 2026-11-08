@@ -1,6 +1,11 @@
 import { parseWav, toMono, resampleLinear } from './canonical-pcm.mjs';
-import { analyzePcm, chartFromAnalysis } from './sample-analyzer.mjs';
-import { verifyChartHashes, type SourceRecord } from './external-source';
+import { analyzePcm } from './sample-analyzer.mjs';
+import { generateC3Runtime } from './c3-runtime-research';
+import {
+  verifyChartHashes,
+  chartSetHash,
+  type SourceRecord,
+} from './external-source';
 /** New-source creation only. Saved charts are read from the store, never regenerated here. */
 export async function generateSourceRecord(
   bytes: ArrayBuffer,
@@ -13,14 +18,14 @@ export async function generateSourceRecord(
   ).join('');
   if (actual !== audioSha256) throw Error('Source audio integrity failed');
   const parsed = parseWav(bytes),
-    analysis = analyzePcm(
-      resampleLinear(toMono(parsed), parsed.sampleRate, 22050),
-      22050,
-    );
+    samples = resampleLinear(toMono(parsed), parsed.sampleRate, 22050),
+    generated = generateC3Runtime(samples, 22050, 'c2'),
+    // BPM remains a source summary, never a grid for the new note times.
+    summary = analyzePcm(samples, 22050);
   const charts = {} as SourceRecord['charts'];
   for (const lanes of [5, 7] as const)
     for (const difficulty of ['low', 'mid', 'high'] as const) {
-      const notes = chartFromAnalysis(analysis, difficulty, lanes),
+      const notes = generated.charts[`${lanes}:${difficulty}`],
         data = new TextEncoder().encode(JSON.stringify(notes)),
         sha256 = Array.from(
           new Uint8Array(await crypto.subtle.digest('SHA-256', data)),
@@ -33,21 +38,26 @@ export async function generateSourceRecord(
     videoId,
     audioSha256,
     sampleRate: parsed.sampleRate,
-    estimatedBpm: analysis.bpm,
+    estimatedBpm: summary.bpm,
     frames: parsed.frames,
     pipelineVersion: 'pcm16-stereo44100-48000-linear-v1',
-    analyzerVersion: 'tuned-2026-11-07',
+    analyzerVersion: generated.analyzerVersion,
     config: JSON.stringify({
       mono: 'left-to-right-mean',
       analysisSampleRate: 22050,
       hop: 512,
       window: 1024,
-      smooth: 7,
-      merge: 0.12,
-      grid: '16th±.04s',
+      onset: 'table-stft-band-flux-c2',
+      selection: 'nested-c2-high-gap0.10-burst8',
+      grid: 'none',
+      decoration: 'm17c-band-sustain-hold-chord-tail20',
+      tailClipMargin: 0.2,
+      lanePlacement: 'shared-union-v3-gap0.15',
+      highMode: 'c2',
     }),
     charts,
   };
+  record.chartSetSha256 = await chartSetHash(record);
   if (!(await verifyChartHashes(record)))
     throw Error('Invalid generated chart');
   return record;

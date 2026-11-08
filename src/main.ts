@@ -1,3 +1,5 @@
+import { regenerateSource } from './external-regenerate';
+import { regenerationLabels } from './regeneration-labels';
 import { StartupAttempt } from './startup';
 import { songArt, ART_FALLBACK } from './song-art';
 import { AudioJobError } from './external-audio-api';
@@ -213,7 +215,7 @@ function persist() {
 const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.18</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.19</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
 <section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div class="eyebrow">${label('selected')} <span id="selection-number">01 / 03</span></div><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
 <section class="library" aria-label="Track selection"><div class="section-title"><strong>${label('select')}</strong><span>ORIGINALS / 001</span></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">${label('easy')} <small>01</small></button><button data-diff="mid">${label('normal')} <small>02</small></button><button data-diff="high">${label('hard')} <small>03</small></button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div><div class="under-start"><span id="chart-info"></span><span>${label('keyboard')}</span></div></section>
 <section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
@@ -235,11 +237,55 @@ app.insertAdjacentHTML(
 const addYoutube = document.createElement('button');
 addYoutube.id = 'add-youtube';
 addYoutube.className = 'quiet';
-$('#songs').before(addYoutube);
+const libraryActions = document.createElement('div');
+libraryActions.id = 'library-actions';
+$('#songs').before(libraryActions);
+libraryActions.append(addYoutube);
 const localReplayButton = document.createElement('button');
 localReplayButton.id = 'local-replay';
 localReplayButton.className = 'quiet hidden';
 addYoutube.after(localReplayButton);
+const regenerateButton = document.createElement('button');
+regenerateButton.id = 'regenerate-chart';
+regenerateButton.className = 'quiet hidden';
+localReplayButton.after(regenerateButton);
+let regenerating = false;
+regenerateButton.onclick = async () => {
+  const original = externalSource(SONGS[songIndex].id);
+  if (!original || regenerating || active || preparing) return;
+  regenerating = true;
+  regenerateButton.disabled = true;
+  regenerateButton.textContent = regenerationLabels(settings.language).busy;
+  // Paint the loading label before local analysis starts.
+  await new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+  );
+  try {
+    const next = await regenerateSource(original.record);
+    const item = installExternalSource(
+      next.record,
+      next.audio.title,
+      next.audio.bytes,
+      next.audio.jobId,
+      next.audio.author,
+    );
+    let index = SONGS.findIndex((s) => s.id === item.song.id);
+    if (index < 0) {
+      SONGS.push(item.song);
+      index = SONGS.length - 1;
+    }
+    regenerating = false;
+    songCards();
+    selectSong(index, false);
+    toast(externalLabels(settings.language).saved);
+  } catch {
+    toast(externalLabels(settings.language).failed);
+  } finally {
+    regenerating = false;
+    regenerateButton.disabled = false;
+    regenerateButton.textContent = regenerationLabels(settings.language).create;
+  }
+};
 localReplayButton.onclick = () => void openLocalSession(SONGS[songIndex].id);
 async function openLocalSession(id: string) {
   try {
@@ -354,6 +400,7 @@ function localize() {
   const external = externalLabels(settings.language);
   $('#add-youtube').textContent = external.add;
   $('#local-replay').textContent = external.replay;
+  regenerateButton.textContent = regenerationLabels(settings.language).create;
   $('#youtube-heading').textContent = external.add;
   $('#youtube-label').textContent = external.url;
   $('#youtube-submit').textContent = external.submit;
@@ -426,11 +473,16 @@ function selectedSong() {
       ? 'YOUTUBE'
       : 'ORVIO / ORIGINALS';
   $('#selected-subtitle').textContent = externalSource(song.id)
-    ? song.subtitle
+    ? song.subtitle +
+      ' · ' +
+      (externalSource(song.id)!.record.chartSetSha256
+        ? regenerationLabels(settings.language).current
+        : regenerationLabels(settings.language).original)
     : t(('subtitle' + songIndex) as Word);
   $('#selected-genre').textContent = song.genre;
   $('#selected-bpm').textContent = song.bpm + ' BPM';
   const selection = ++selectionVersion;
+  regenerateButton.classList.toggle('hidden', !externalSource(song.id));
   localReplayButton.classList.add('hidden');
   if (externalSource(song.id))
     void readLocalSession(song.id)
@@ -441,13 +493,14 @@ function selectedSong() {
       .catch(() => {});
 }
 function selectSong(index: number, audition = true) {
-  if (preparing || active) return;
+  if (preparing || active || regenerating) return;
   songIndex = (index + SONGS.length) % SONGS.length;
   stopPreview();
   rendered = cache.get(SONGS[songIndex].id);
   songCards();
   syncSettings();
   selectedSong();
+  $('#songs .song-card.selected').scrollIntoView({ block: 'nearest' });
   if (audition) void previewSong();
 }
 
@@ -464,7 +517,7 @@ function songCards() {
     : 'ORIGINALS / 001';
   $('#songs').innerHTML = SONGS.map(
     (s, i) =>
-      `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${externalSource(s.id) ? `<img class="youtube-cover" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle) : t(('subtitle' + i) as Word)}</span></span><span class="song-time">${Math.floor(duration(s) / 60)}:${Math.floor(
+      `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${externalSource(s.id) ? `<img class="youtube-cover" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle + ' · ' + (externalSource(s.id)!.record.chartSetSha256 ? regenerationLabels(settings.language).current : regenerationLabels(settings.language).original)) : t(('subtitle' + i) as Word)}</span></span><span class="song-time">${Math.floor(duration(s) / 60)}:${Math.floor(
         duration(s) % 60,
       )
         .toString()
@@ -634,7 +687,7 @@ async function start() {
     $('#home-start').click();
     return;
   }
-  if (preparing || active) return;
+  if (preparing || active || regenerating) return;
   if (matchMedia('(pointer: coarse)').matches && innerWidth < 900) {
     toast(t('unsupported'));
     return;
@@ -2063,7 +2116,7 @@ void initializeLibrary();
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.2.18',
+    version: '0.2.19',
     active,
     paused,
     sessionId,

@@ -37,7 +37,11 @@ export async function prepareExternalJob(
     job.audio!.sha256,
   );
   await pinSource(generated);
-  const record = await readPinnedSource(videoId, generated.audioSha256);
+  const record = await readPinnedSource(
+    videoId,
+    generated.audioSha256,
+    generated.chartSetSha256,
+  );
   if (!record) throw Error('Local chart save could not be confirmed');
   return { record, bytes, restored: false };
 }

@@ -82,7 +82,8 @@ test('original main imports exact source and uses original clock, key input and 
     ),
   ).toContain('i.ytimg.com');
   const d = await page.evaluate(() => (window as any).orvioDiagnostics);
-  expect(d.total).toBe(250);
+  expect(d.total).toBe(538);
+  expect(d.notes.some((s: any) => s.note.end !== undefined)).toBe(true);
   const n = d.notes.find((s: any) => s.note.time > 1).note;
   await page.waitForFunction(
     (t) => (window as any).orvioAudioTime >= t,

@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.2.19] - 2026-11-08
+
+### Changed
+
+- New YouTube charts follow multi-band spectral onsets instead of a regular beat grid, with supported holds and chords. Hard charts keep more detected attacks; shared lane placement avoids repeated heads within 150ms on the same lane in the evaluated set.
+- Saved source charts offer an explicit regenerate action. A new version appears beside the old chart; existing charts, results and replays keep their original notes and timing.
+- The source-chart list scrolls independently so its actions and Start remain visible with multiple versions.
+
+### Scope
+
+- Built-in charts, bindings, settings, countdown, judgments and score rules are unchanged. Difficulty ratings and FEVER are separate work.
+- Automatic analysis cannot guarantee a hand-authored chart's musical choices. The evaluation establishes source-signal alignment and playable hold/chord structure, not human listening quality.
+
 ## [0.2.18] - 2026-11-08
 
 ### Fixed

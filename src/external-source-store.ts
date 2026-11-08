@@ -52,6 +52,7 @@ export async function pinSource(
 export async function readPinnedSource(
   videoId: string,
   audioSha256: string,
+  chartSetSha256?: string,
 ): Promise<SourceRecord | null> {
   const db = await open();
   let raw: unknown;
@@ -60,7 +61,7 @@ export async function readPinnedSource(
       const request = db
         .transaction(STORE, 'readonly')
         .objectStore(STORE)
-        .get(`${videoId}:${audioSha256}`);
+        .get(recordKey({ videoId, audioSha256, chartSetSha256 }));
       request.onsuccess = () => resolve(request.result?.record ?? null);
       request.onerror = () => reject(request.error);
     });
@@ -72,6 +73,7 @@ export async function readPinnedSource(
     !validSourceRecord(raw) ||
     raw.videoId !== videoId ||
     raw.audioSha256 !== audioSha256 ||
+    raw.chartSetSha256 !== chartSetSha256 ||
     !(await verifyChartHashes(raw))
   )
     throw new Error('Saved chart integrity failed');

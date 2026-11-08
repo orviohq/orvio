@@ -9,6 +9,9 @@ export interface ExternalSong {
 }
 const sources = new Map<string, ExternalSong>();
 export function sourceId(r: SourceRecord) {
+  return `${sourceAudioId(r)}${r.chartSetSha256 ? `-c${r.chartSetSha256.slice(0, 16)}` : ''}`;
+}
+export function sourceAudioId(r: SourceRecord) {
   return `yt-${r.videoId}-${r.audioSha256.slice(0, 16)}`;
 }
 export function installExternalSource(
