@@ -1,3 +1,4 @@
+import { PATCH_V025 } from './patch-notes-v025';
 import { PATCH_V024 } from './patch-notes-v024';
 import { PATCH_V023 } from './patch-notes-v023';
 import { PATCH_V022 } from './patch-notes-v022';
@@ -502,6 +503,7 @@ export const PATCH_LABELS: Record<
   { title: string; back: string; scope: string }
 > = { ...BASE_PATCH_LABELS, ...EXTRA_PATCH_LABELS };
 export const PATCHES = [
+  PATCH_V025,
   PATCH_V024,
   PATCH_V023,
   PATCH_V022,

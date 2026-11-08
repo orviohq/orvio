@@ -1,3 +1,9 @@
+import { inspectDeviceAudio } from './device-audio-inspection';
+import {
+  deviceInspectionButton,
+  deviceInspectionChecking,
+  deviceInspectionMessage,
+} from './device-audio-labels';
 import { AUDIO_QUOTA_LABEL } from './audio-quota-label';
 import { audioAtStage } from './audio-error-stage';
 import {
@@ -252,7 +258,7 @@ function persist() {
 const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.24</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.25</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
 <section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div class="eyebrow">${label('selected')} <span id="selection-number">01 / 03</span></div><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
 <section class="library" aria-label="Track selection"><div class="section-title"><strong>${label('select')}</strong><span>ORIGINALS / 001</span></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">NM</button><button data-diff="mid">HD</button><button data-diff="high">MX</button><button data-diff="sc">SC</button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div><div class="under-start"><span id="chart-info"></span><span>${label('keyboard')}</span></div></section>
 <section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
@@ -311,32 +317,37 @@ app.insertAdjacentHTML(
   'beforeend',
   '<dialog id="remove-song-dialog" aria-labelledby="remove-song-title"><h2 id="remove-song-title"></h2><p id="remove-song-prompt"></p><strong id="remove-song-name"></strong><div class="remove-song-actions"><button id="remove-song-cancel" class="quiet"></button><button id="remove-song-confirm" class="primary"></button></div></dialog>',
 );
-let removingSongId: string | undefined;
-removeSongButton.onclick = () => {
-  if (active || preparing || !externalSource(SONGS[songIndex].id)) return;
-  removingSongId = SONGS[songIndex].id;
+let removingSongKey: string | undefined;
+function openSongRemoval(key: string, title: string) {
+  if (active || preparing) return;
+  removingSongKey = key;
   const labels = removalLabels(settings.language);
   $('#remove-song-title').textContent = labels.button;
   $('#remove-song-prompt').textContent = labels.prompt;
-  $('#remove-song-name').textContent = SONGS[songIndex].title;
+  $('#remove-song-name').textContent = title;
   $('#remove-song-cancel').textContent = labels.cancel;
   $('#remove-song-confirm').textContent = labels.confirm;
   $<HTMLDialogElement>('#remove-song-dialog').showModal();
   $('#remove-song-cancel').focus();
+}
+removeSongButton.onclick = () => {
+  const song = SONGS[songIndex];
+  if (!externalSource(song.id)) return;
+  openSongRemoval(libraryVideoKey(song.id), song.title);
 };
 $('#remove-song-cancel').onclick = () =>
   $<HTMLDialogElement>('#remove-song-dialog').close();
 $('#remove-song-confirm').onclick = () => {
-  if (!removingSongId || active || preparing) return;
+  if (!removingSongKey || active || preparing) return;
   const next = new Set(hiddenSongs);
-  next.add(libraryVideoKey(removingSongId));
+  next.add(removingSongKey);
   try {
     saveHiddenLibraryIds(next);
   } catch {
     toast(removalLabels(settings.language).failed);
     return;
   }
-  hiddenSongs.add(libraryVideoKey(removingSongId));
+  hiddenSongs.add(removingSongKey);
   $<HTMLDialogElement>('#remove-song-dialog').close();
   stopPreview();
   selectSong(visibleSongIndices()[0], false);
@@ -642,7 +653,7 @@ function songCards() {
     )
       continue;
     const element = document.createElement('div');
-    element.className = 'song-card import-pending';
+    element.className = 'song-card import-pending canonical-pending';
     element.dataset.canonicalVideo = row.videoId;
     element.dataset.state = row.state;
     element.setAttribute('role', 'group');
@@ -675,11 +686,41 @@ function songCards() {
       retry.onclick = () => void reconcileLibraryRow(row);
       element.append(retry);
     }
+    const inspect = document.createElement('button');
+    inspect.className = 'quiet';
+    inspect.textContent = deviceInspectionButton(settings.language);
+    inspect.onclick = async () => {
+      const dialog = document.createElement('dialog');
+      dialog.className = 'device-audio-dialog';
+      const title = document.createElement('h2');
+      title.textContent = deviceInspectionButton(settings.language);
+      const status = document.createElement('p');
+      status.setAttribute('role', 'status');
+      status.textContent = deviceInspectionChecking(settings.language);
+      const close = document.createElement('button');
+      close.className = 'quiet';
+      close.textContent = t('close');
+      close.onclick = () => dialog.close();
+      dialog.append(title, status, close);
+      dialog.onclose = () => dialog.remove();
+      document.body.append(dialog);
+      dialog.showModal();
+      close.focus();
+      const state = await inspectDeviceAudio(row.videoId);
+      status.textContent = deviceInspectionMessage(state, settings.language);
+      status.dataset.deviceAudio = state;
+    };
+    element.append(inspect);
     const history = document.createElement('button');
     history.className = 'quiet';
     history.textContent = externalLabels(settings.language).replay;
     history.onclick = () => void openVideoHistory(row.videoId);
     element.append(history);
+    const remove = document.createElement('button');
+    remove.className = 'quiet';
+    remove.textContent = removalLabels(settings.language).button;
+    remove.onclick = () => openSongRemoval('yt:' + row.videoId, row.title);
+    element.append(remove);
     $('#songs').append(element);
     void localVideoSessions(row.videoId)
       .then((sessions) => {
@@ -2761,7 +2802,7 @@ void initializeLibrary();
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.2.24',
+    version: '0.2.25',
     active,
     paused,
     fever: engine

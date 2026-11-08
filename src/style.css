@@ -3464,3 +3464,28 @@ body.perf-enabled #fps {
   white-space: normal;
   overflow-wrap: anywhere;
 }
+
+/* Unready songs retain per-song actions without requiring playable selection. */
+.canonical-pending,
+.canonical-pending[data-state='error'] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  opacity: 1;
+}
+.canonical-pending .song-copy {
+  grid-column: 1 / -1;
+}
+.canonical-pending button {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.device-audio-dialog {
+  max-width: min(520px, calc(100vw - 40px));
+}
+.device-audio-dialog p {
+  line-height: 1.8;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
