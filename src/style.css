@@ -4526,3 +4526,11 @@ html {
 #lobby .song-copy strong {
   overflow-wrap: anywhere;
 }
+@media (max-width: 650px) {
+  /* Genre/BPM may wrap on a narrow phone; reserve both rows for every song. */
+  #lobby .selected-meta {
+    height: 36px;
+    min-height: 36px;
+    overflow: hidden;
+  }
+}
