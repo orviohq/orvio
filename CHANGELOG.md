@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.37] - 2026-11-09
+
+- Animate the result score from zero, stamp the rank and reveal details in sequence without blocking actions.
+- Respect app and system reduced motion, finish interrupted reveals cleanly and preserve exact result, replay and session data.
+
 ## [0.2.36] - 2026-11-09
 
 - Size result cards to their contents on tall, landscape and touch screens instead of leaving oversized blank space below actions. Short screens retain scrolling.

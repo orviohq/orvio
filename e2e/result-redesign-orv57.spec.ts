@@ -7,6 +7,13 @@ test('redesigned report keeps rank with score and translated actions on same row
 }) => {
   await page.goto(result);
   await expect(page.locator('#results')).toBeVisible();
+  // Final-layout bounds exclude the intentional rank stamp transform.
+  await page.waitForFunction(
+    () =>
+      !document
+        .querySelector('#results')!
+        .hasAttribute('data-result-animating'),
+  );
   // Presentation-only replay availability; actual replay is tested separately.
   await page
     .locator('#watch-replay')
