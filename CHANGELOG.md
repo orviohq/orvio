@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.44] - 2026-11-09
+
+- Keep the selected song visible after returning from other screens, refreshing, changing tabs or rebuilding the library list. Preserve selection and the relevant nested/page scroll position.
+- Request persistent browser storage once after a successful audio save when supported. Refusal or unsupported storage never blocks playback, deletes songs or changes audio verification. Browser storage is still not a permanent backup.
+
 ## [0.2.43] - 2026-11-09
 
 - Remove the idle selection-preview hint in every language and from legacy saved-library projections, without changing preview playback.
