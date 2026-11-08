@@ -154,6 +154,20 @@ for (const viewport of [
     page,
   }) => {
     await page.setViewportSize(viewport);
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        value: {
+          write: async (items: ClipboardItem[]) => {
+            (window as any).__songClipboard = await (
+              await items[0].getType('text/plain')
+            ).text();
+          },
+          writeText: async (text: string) => {
+            (window as any).__songClipboard = text;
+          },
+        },
+      });
+    });
     const calls = await mock(page);
     await page.goto('/song/#' + fragment);
     await expect(page.locator('#song-add')).toBeEnabled();
@@ -224,15 +238,18 @@ for (const viewport of [
       path: `/downloads/orv56-menu-${viewport.width}.png`,
     });
     await page.locator('.library-context-menu [data-action=share]').click();
-    await expect(page.locator('.song-link-dialog textarea')).toBeVisible();
-    const link = await page.locator('.song-link-dialog textarea').inputValue();
+    await expect(page.locator('.song-link-dialog')).toHaveCount(0);
+    await expect(page.locator('[data-sonner-toast]')).toContainText(
+      '곡 링크를 복사했어요',
+    );
+    const link = await page.evaluate(() => (window as any).__songClipboard);
     expect(link).toContain('/song/#');
     expect(link).not.toMatch(/replay|jobId|score|title/);
     await page.screenshot({
       path: `/downloads/a40-proof/share-${viewport.width}.png`,
       fullPage: true,
     });
-    await page.locator('.song-link-dialog .quiet').click();
+
     await row.focus();
     await page.keyboard.press('Shift+F10');
     await expect(
@@ -243,6 +260,19 @@ for (const viewport of [
     await expect(page.locator('#remove-song-dialog')).toBeVisible();
     await page.locator('#remove-song-cancel').click();
     await expect(row).toBeVisible();
+    await page.evaluate(() => {
+      Object.defineProperty(navigator.clipboard, 'write', {
+        value: async () => {
+          throw Error('denied');
+        },
+      });
+    });
+    await row.click({ button: 'right' });
+    await page.locator('.library-context-menu [data-action=share]').click();
+    await expect(page.locator('[data-sonner-toast]').last()).toContainText(
+      '곡 링크를 복사할 수 없습니다',
+    );
+    await expect(page.locator('.song-link-dialog')).toHaveCount(0);
     expect(calls.every((x) => x.startsWith('GET '))).toBe(true);
   });
 for (const state of ['missing', 'pending', 'changed', 'invalid'])

@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.35] - 2026-11-09
+
+- Redesign the complete result screen with a grouped score and rank, clear metrics and judgments, and same-row text-labeled replay and share actions. Preserve saved results and replay behavior.
+- Copy song links directly from the song context menu without opening a dialog. Report clipboard failures without claiming success.
+
 ## [0.2.34] - 2026-11-09
 
 - Move song sharing to the song context menu and remove the duplicate preview action. Keyboard menu navigation and source-specific sharing are preserved.
