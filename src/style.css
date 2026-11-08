@@ -3237,3 +3237,29 @@ textarea,
   user-select: text !important;
   -webkit-user-drag: auto !important;
 }
+
+#remove-song-dialog {
+  max-width: min(500px, calc(100vw - 32px));
+}
+#remove-song-dialog p {
+  line-height: 1.7;
+  color: #b6b3c6;
+}
+#remove-song-name {
+  display: block;
+  overflow-wrap: anywhere;
+  margin: 20px 0;
+}
+.remove-song-actions {
+  display: flex;
+  gap: 12px;
+}
+.remove-song-actions button {
+  flex: 1;
+}
+#library-actions {
+  flex-wrap: wrap;
+}
+#library-actions > button {
+  flex-basis: 120px;
+}

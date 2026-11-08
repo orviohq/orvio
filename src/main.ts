@@ -1,3 +1,8 @@
+import {
+  hiddenLibraryIds,
+  saveHiddenLibraryIds,
+  removalLabels,
+} from './library-removal';
 import './scrollbars.css';
 import { replayFrameChanged } from './replay-frame';
 import {
@@ -262,6 +267,65 @@ const regenerateButton = document.createElement('button');
 regenerateButton.id = 'regenerate-chart';
 regenerateButton.className = 'quiet hidden';
 localReplayButton.after(regenerateButton);
+const hiddenSongs = hiddenLibraryIds();
+const visibleSongIndices = () =>
+  SONGS.map((_, i) => i).filter((i) => !hiddenSongs.has(SONGS[i].id));
+const removeSongButton = document.createElement('button');
+removeSongButton.id = 'remove-song';
+removeSongButton.className = 'quiet hidden';
+regenerateButton.after(removeSongButton);
+app.insertAdjacentHTML(
+  'beforeend',
+  '<dialog id="remove-song-dialog" aria-labelledby="remove-song-title"><h2 id="remove-song-title"></h2><p id="remove-song-prompt"></p><strong id="remove-song-name"></strong><div class="remove-song-actions"><button id="remove-song-cancel" class="quiet"></button><button id="remove-song-confirm" class="primary"></button></div></dialog>',
+);
+let removingSongId: string | undefined;
+removeSongButton.onclick = () => {
+  if (
+    active ||
+    preparing ||
+    regenerating ||
+    !externalSource(SONGS[songIndex].id)
+  )
+    return;
+  removingSongId = SONGS[songIndex].id;
+  const labels = removalLabels(settings.language);
+  $('#remove-song-title').textContent = labels.button;
+  $('#remove-song-prompt').textContent = labels.prompt;
+  $('#remove-song-name').textContent = SONGS[songIndex].title;
+  $('#remove-song-cancel').textContent = labels.cancel;
+  $('#remove-song-confirm').textContent = labels.confirm;
+  $<HTMLDialogElement>('#remove-song-dialog').showModal();
+  $('#remove-song-cancel').focus();
+};
+$('#remove-song-cancel').onclick = () =>
+  $<HTMLDialogElement>('#remove-song-dialog').close();
+$('#remove-song-confirm').onclick = () => {
+  if (!removingSongId || active || preparing || regenerating) return;
+  const next = new Set(hiddenSongs);
+  next.add(removingSongId);
+  try {
+    saveHiddenLibraryIds(next);
+  } catch {
+    toast(removalLabels(settings.language).failed);
+    return;
+  }
+  hiddenSongs.add(removingSongId);
+  $<HTMLDialogElement>('#remove-song-dialog').close();
+  stopPreview();
+  selectSong(visibleSongIndices()[0], false);
+  history.replaceState(null, '', selectionPath());
+  toast(removalLabels(settings.language).removed);
+};
+function restoreSongVersions(videoId: string) {
+  const next = new Set(hiddenSongs);
+  for (const song of SONGS)
+    if (externalSource(song.id)?.record.videoId === videoId)
+      next.delete(song.id);
+  if (next.size === hiddenSongs.size) return;
+  saveHiddenLibraryIds(next);
+  hiddenSongs.clear();
+  for (const id of next) hiddenSongs.add(id);
+}
 let regenerating = false;
 regenerateButton.onclick = async () => {
   const original = externalSource(SONGS[songIndex].id);
@@ -380,6 +444,7 @@ $('#youtube-form').onsubmit = async (e) => {
       SONGS.push(item.song);
       index = SONGS.length - 1;
     }
+    restoreSongVersions(r.prepared.record.videoId);
     songCards();
     selectSong(index, false);
     $<HTMLDialogElement>('#youtube-import').close();
@@ -482,7 +547,7 @@ function selectedSong() {
     `url("${songArt(song.id)}"), url("${ART_FALLBACK}")`;
   $('#selected-art .art-index').textContent = '0' + (songIndex + 1);
   $('#selection-number').textContent =
-    `0${songIndex + 1} / ${String(SONGS.length).padStart(2, '0')}`;
+    `${String(visibleSongIndices().indexOf(songIndex) + 1).padStart(2, '0')} / ${String(visibleSongIndices().length).padStart(2, '0')}`;
   $('#selected-title').textContent = song.title;
   const originLabel = document.querySelector<HTMLElement>(
     '#selected-art .art-mark',
@@ -502,6 +567,8 @@ function selectedSong() {
   $('#selected-bpm').textContent = song.bpm + ' BPM';
   const selection = ++selectionVersion;
   regenerateButton.classList.toggle('hidden', !externalSource(song.id));
+  removeSongButton.classList.toggle('hidden', !externalSource(song.id));
+  removeSongButton.textContent = removalLabels(settings.language).button;
   localReplayButton.classList.add('hidden');
   if (externalSource(song.id))
     void readLocalSession(song.id)
@@ -514,12 +581,13 @@ function selectedSong() {
 function selectSong(index: number, audition = true) {
   if (preparing || active || regenerating) return;
   songIndex = (index + SONGS.length) % SONGS.length;
+  if (hiddenSongs.has(SONGS[songIndex].id)) songIndex = visibleSongIndices()[0];
   stopPreview();
   rendered = cache.get(SONGS[songIndex].id);
   songCards();
   syncSettings();
   selectedSong();
-  $('#songs .song-card.selected').scrollIntoView({ block: 'nearest' });
+  $('#songs .song-card.selected')?.scrollIntoView({ block: 'nearest' });
   if (audition) void previewSong();
 }
 
@@ -548,13 +616,14 @@ function songCards() {
   )!.textContent = SONGS.some((s) => externalSource(s.id))
     ? externalLabels(settings.language).library
     : 'ORIGINALS / 001';
-  $('#songs').innerHTML = SONGS.map(
-    (s, i) =>
-      `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${externalSource(s.id) ? `<img class="youtube-cover" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle + ' · ' + (externalSource(s.id)!.record.chartSetSha256 ? regenerationLabels(settings.language).current : regenerationLabels(settings.language).original)) : t(('subtitle' + i) as Word)}</span></span><span class="song-time"><em class="song-level">${chartLevel(s, settings.difficulty, settings.lanes)}</em>${Math.floor(duration(s) / 60)}:${Math.floor(
-        duration(s) % 60,
-      )
-        .toString()
-        .padStart(2, '0')} <b>↗</b></span></button>`,
+  $('#songs').innerHTML = SONGS.map((s, i) =>
+    hiddenSongs.has(s.id)
+      ? ''
+      : `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${externalSource(s.id) ? `<img class="youtube-cover" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle + ' · ' + (externalSource(s.id)!.record.chartSetSha256 ? regenerationLabels(settings.language).current : regenerationLabels(settings.language).original)) : t(('subtitle' + i) as Word)}</span></span><span class="song-time"><em class="song-level">${chartLevel(s, settings.difficulty, settings.lanes)}</em>${Math.floor(duration(s) / 60)}:${Math.floor(
+          duration(s) % 60,
+        )
+          .toString()
+          .padStart(2, '0')} <b>↗</b></span></button>`,
   ).join('');
   document
     .querySelectorAll<HTMLImageElement>('.youtube-cover')
@@ -1373,6 +1442,7 @@ function editableTarget(target: EventTarget | null) {
   );
 }
 window.addEventListener('keydown', (e) => {
+  if ($<HTMLDialogElement>('#remove-song-dialog').open) return;
   const editable = editableTarget(e.target);
   if (editable && e.code !== 'Escape') {
     // Meta+A has no native select-all mapping in some embedded browser hosts.
@@ -1523,7 +1593,12 @@ window.addEventListener('keydown', (e) => {
       return;
     if (e.code === 'ArrowDown' || e.code === 'ArrowUp') {
       e.preventDefault();
-      selectSong(songIndex + (e.code === 'ArrowDown' ? 1 : -1));
+      const visible = visibleSongIndices();
+      const next =
+        (visible.indexOf(songIndex) +
+          (e.code === 'ArrowDown' ? 1 : visible.length - 1)) %
+        visible.length;
+      selectSong(visible[next]);
       return;
     }
     if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
@@ -2084,7 +2159,9 @@ function readRoute() {
       ? parts[1]
       : q.get('song');
   const idx = SONGS.findIndex((s) => s.id === id);
-  if (idx >= 0) songIndex = idx;
+  if (idx >= 0 && (shared || !hiddenSongs.has(SONGS[idx].id))) songIndex = idx;
+  else if (!shared && hiddenSongs.has(SONGS[songIndex].id))
+    songIndex = visibleSongIndices()[0];
   const lanes = parts[0] === 'play' ? parts[2] : q.get('lanes');
   const difficulty = parts[0] === 'play' ? parts[3] : q.get('difficulty');
   if (lanes === '5' || lanes === '7') settings.lanes = Number(lanes) as Lanes;
