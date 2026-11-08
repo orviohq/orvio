@@ -8,6 +8,7 @@ async function install(page: Page, mode = 'stall') {
     ({ mode }) => {
       const original = window.fetch.bind(window);
       (window as any).__streamCalls = [];
+      (window as any).__previewAborts = [];
       window.fetch = (input: any, init?: RequestInit) => {
         const url = String(input);
         if (
@@ -18,6 +19,10 @@ async function install(page: Page, mode = 'stall') {
           if (init?.method && init.method !== 'GET')
             throw Error('Unexpected mutation');
           (window as any).__streamCalls.push(url);
+          if (url.endsWith('/audio'))
+            init?.signal?.addEventListener('abort', () => {
+              (window as any).__previewAborts.push(url);
+            });
           return original(
             '/__test/' + url.split('/v1/chart-sources/')[1] + '?mode=' + mode,
             init,
@@ -249,8 +254,14 @@ test('verified canonical chart without hydrated audio starts progressively and m
     .filter({ hasText: fixture.record.videoId });
   await expect(row).toBeVisible();
   await row.click();
+  await page.waitForFunction(() =>
+    (window as any).__streamCalls.some((u: string) => u.endsWith('/audio')),
+  );
   expect(await audioRows(page)).toBe(0);
   await page.click('#start');
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__previewAborts.length))
+    .toBeGreaterThan(0);
   await page.waitForFunction(() => (window as any).orvioDiagnostics?.active);
   expect(await audioRows(page)).toBe(0);
   await page.waitForFunction(

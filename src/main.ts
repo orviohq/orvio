@@ -1177,6 +1177,8 @@ function syncSettings() {
 
 function stopPreview() {
   previewRequest++;
+  previewAbort?.abort();
+  previewAbort = undefined;
   try {
     preview?.stop();
   } catch {
@@ -1187,10 +1189,10 @@ function stopPreview() {
   $('#preview-status').textContent = t('previewReady');
   document.body.classList.remove('previewing');
 }
-async function ensureExternalBytes(id: string) {
+async function ensureExternalBytes(id: string, signal?: AbortSignal) {
   const external = externalSource(id);
   if (external && !external.bytes) {
-    await readSharedAudio(external);
+    await readSharedAudio(external, signal);
   }
 }
 async function prepare(attempt: StartupAttempt, joinGatePreload = false) {
@@ -2585,14 +2587,18 @@ $('#open-settings').onclick = () => {
 };
 $('#about-button').onclick = () => $<HTMLDialogElement>('#about').showModal();
 let previewRequest = 0;
+let previewAbort: AbortController | undefined;
 async function previewSong() {
   const request = ++previewRequest;
+  previewAbort?.abort();
+  const controller = new AbortController();
+  previewAbort = controller;
   const song = SONGS[songIndex];
   if (!clock) clock = new AudioClock();
   try {
     // resume is called during the selection key/click gesture, before rendering.
     await clock.activate();
-    await ensureExternalBytes(song.id);
+    await ensureExternalBytes(song.id, controller.signal);
     let track = cache.get(song.id);
     if (!track) {
       track = externalSource(song.id)
