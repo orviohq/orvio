@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.41] - 2026-11-09
+
+- Keep failed YouTube additions readable, with grouped retry/remove actions and a separate small-screen action row. Preserve explicit retry and removal behavior without automatic new requests.
+- Keep keyboard settings and reset controls within small and short screens across supported languages, without shrinking key targets or text.
+- Retain typed failure details for diagnosis. This layout update does not claim that an unverified upstream failure has been fixed.
+
 ## [0.2.40] - 2026-11-09
 
 - Keep the live YouTube add action inside the live app, not the temporary saved-library projection, so it survives refresh.
