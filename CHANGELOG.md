@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.25] - 2026-11-08
+
+- Add removal controls to unavailable YouTube song rows. Confirming removes only the list entry; saved audio, results and replays stay unchanged.
+- Add an on-demand, device-only saved-audio check for unavailable songs. Distinguish matching audio, unconfirmed charts, missing matching audio, invalid data and unreadable storage without uploading or deleting data.
+- Keep all 13 interface translations and licensed font subsets current. This release does not restore evicted server audio or silently replace archived charts.
+
 ## [0.2.24] - 2026-11-08
 
 - Show the existing audio request limit, up to 100 requests per IP per day, in the Add YouTube dialog in all 13 languages. No quota or service policy changes.
