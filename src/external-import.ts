@@ -3,7 +3,7 @@ import {
   readAudioJob,
   AudioJobError,
 } from './external-audio-api';
-import { listPinnedSources } from './external-source-store';
+import { refreshCanonical } from './canonical-library';
 import { localAudio } from './external-local';
 import { prepareExternalJob } from './external-source-flow';
 export function youtubeId(value: string) {
@@ -36,7 +36,8 @@ export async function importYoutube(
 ) {
   const id = youtubeId(input);
   if (!id) throw new AudioJobError('invalid_url');
-  const first = (await listPinnedSources(id))[0];
+  const lookup = await refreshCanonical(id, signal);
+  const first = lookup.state === 'ready' ? lookup.record : undefined;
   if (first) {
     const cached = await localAudio(first);
     if (cached)

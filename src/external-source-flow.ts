@@ -1,10 +1,5 @@
 import { readAudioJob, loadAudio, AudioJobError } from './external-audio-api';
-import { generateSourceOffThread } from './external-source-worker';
-import {
-  listPinnedSources,
-  pinSource,
-  readPinnedSource,
-} from './external-source-store';
+import { canonicalForJob } from './canonical-job';
 import type { SourceRecord } from './external-source';
 export interface PreparedSource {
   record: SourceRecord;
@@ -17,8 +12,6 @@ export async function prepareExternalJob(
   jobId: string,
   signal?: AbortSignal,
 ): Promise<PreparedSource> {
-  const pinned = await listPinnedSources(videoId);
-  const first = pinned[0];
   const job = await readAudioJob(jobId, signal);
   if (job.status !== 'done')
     throw new AudioJobError(
@@ -27,22 +20,7 @@ export async function prepareExternalJob(
         : 'unavailable',
       job.retryAfterSec,
     );
-  if (first && job.audio!.sha256 !== first.audioSha256)
-    throw new AudioJobError('source_changed');
-  const bytes = await loadAudio(job, videoId, first?.audioSha256, signal);
-  if (first) return { record: first, bytes, restored: true };
-  const generated = await generateSourceOffThread(
-    bytes,
-    videoId,
-    job.audio!.sha256,
-    signal,
-  );
-  await pinSource(generated);
-  const record = await readPinnedSource(
-    videoId,
-    generated.audioSha256,
-    generated.chartSetSha256,
-  );
-  if (!record) throw Error('Local chart save could not be confirmed');
+  const record = await canonicalForJob(videoId, job, signal);
+  const bytes = await loadAudio(job, videoId, record.audioSha256, signal);
   return { record, bytes, restored: false };
 }

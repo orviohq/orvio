@@ -1,8 +1,14 @@
 import {
+  verifiedLocalCanonical,
+  reconcileCanonical,
+  type CanonicalLibraryRow,
+} from './canonical-reconcile';
+import {
   hiddenLibraryIds,
   saveHiddenLibraryIds,
   removalLabels,
 } from './library-removal';
+import { canonicalPendingMessage } from './canonical-library-labels';
 import { importRetryLabel } from './import-labels';
 import { BackgroundImports } from './background-imports';
 import {
@@ -281,9 +287,14 @@ const libraryVideoKey = (id: string) => {
 };
 const isHiddenSong = (id: string) =>
   hiddenSongs.has(id) || hiddenSongs.has(libraryVideoKey(id));
+const canonicalPreferred = new Map<string, string>();
+const canonicalPending = new Map<string, CanonicalLibraryRow>();
 const visibleSongIndices = () => {
   const seen = new Set<string>();
   return SONGS.flatMap((song, i) => {
+    const source = externalSource(song.id);
+    if (source && canonicalPreferred.get(source.record.videoId) !== song.id)
+      return [];
     const key = libraryVideoKey(song.id);
     if (isHiddenSong(song.id) || seen.has(key)) return [];
     seen.add(key);
@@ -376,6 +387,8 @@ const backgroundImports = new BackgroundImports(
       r.author,
     );
     if (!SONGS.some((s) => s.id === item.song.id)) SONGS.push(item.song);
+    canonicalPreferred.set(r.prepared.record.videoId, item.song.id);
+    canonicalPending.delete(r.prepared.record.videoId);
     restoreLibraryVideo(r.prepared.record.videoId);
     if (!active && !preparing) {
       songCards();
@@ -509,7 +522,8 @@ function selectedSong() {
 function selectSong(index: number, audition = true) {
   if (preparing || active) return;
   songIndex = (index + SONGS.length) % SONGS.length;
-  if (isHiddenSong(SONGS[songIndex].id)) songIndex = visibleSongIndices()[0];
+  if (!visibleSongIndices().includes(songIndex))
+    songIndex = visibleSongIndices()[0];
   stopPreview();
   rendered = cache.get(SONGS[songIndex].id);
   songCards();
@@ -555,6 +569,53 @@ function songCards() {
           .toString()
           .padStart(2, '0')} <b>↗</b></span></button>`,
   ).join('');
+  for (const row of canonicalPending.values()) {
+    if (
+      backgroundImports.rows.has(row.videoId) ||
+      hiddenSongs.has('yt:' + row.videoId)
+    )
+      continue;
+    const element = document.createElement('div');
+    element.className = 'song-card import-pending';
+    element.dataset.canonicalVideo = row.videoId;
+    element.dataset.state = row.state;
+    element.setAttribute('role', 'group');
+    const copy = document.createElement('span');
+    copy.className = 'song-copy';
+    const title = document.createElement('strong');
+    title.textContent = row.title;
+    const status = document.createElement('span');
+    status.setAttribute('role', 'status');
+    status.textContent =
+      row.state === 'loading'
+        ? externalLabels(settings.language).preparing
+        : canonicalPendingMessage(settings.language);
+    copy.append(title, status);
+    element.append(copy);
+    if (row.state === 'loading') {
+      element.setAttribute('aria-busy', 'true');
+      const spinner = document.createElement('span');
+      spinner.className = 'youtube-spinner';
+      element.append(spinner);
+    } else {
+      const retry = document.createElement('button');
+      retry.className = 'quiet';
+      retry.textContent = importRetryLabel(settings.language);
+      retry.onclick = () => void reconcileLibraryRow(row);
+      element.append(retry);
+    }
+    const history = document.createElement('button');
+    history.className = 'quiet';
+    history.textContent = externalLabels(settings.language).replay;
+    history.onclick = () => void openLocalSession(row.archiveId);
+    element.append(history);
+    $('#songs').append(element);
+    void readLocalSession(row.archiveId)
+      .then((session) => {
+        if (!session) history.remove();
+      })
+      .catch(() => history.remove());
+  }
   for (const pending of backgroundImports.rows.values()) {
     const row = document.createElement('div');
     row.className = 'song-card import-pending';
@@ -792,6 +853,22 @@ async function start() {
     return;
   }
   if (preparing || active) return;
+  const external = externalSource(SONGS[songIndex].id);
+  if (
+    external &&
+    !playReplay &&
+    canonicalPreferred.get(external.record.videoId) !== SONGS[songIndex].id
+  ) {
+    const preferred = canonicalPreferred.get(external.record.videoId);
+    const index = preferred
+      ? SONGS.findIndex((song) => song.id === preferred)
+      : -1;
+    if (index < 0) {
+      toast(externalLabels(settings.language).preparing);
+      return;
+    }
+    songIndex = index;
+  }
   if (matchMedia('(pointer: coarse)').matches && innerWidth < 900) {
     toast(t('unsupported'));
     return;
@@ -2340,6 +2417,8 @@ function readRoute() {
         ) ?? idx);
   } else if (!shared && isHiddenSong(SONGS[songIndex].id))
     songIndex = visibleSongIndices()[0];
+  if (!shared && !externalShared && !visibleSongIndices().includes(songIndex))
+    songIndex = visibleSongIndices()[0];
   const lanes = parts[0] === 'play' ? parts[2] : q.get('lanes');
   const difficulty = parts[0] === 'play' ? parts[3] : q.get('difficulty');
   if (lanes === '5' || lanes === '7') settings.lanes = Number(lanes) as Lanes;
@@ -2483,6 +2562,45 @@ const deferredLibraryRoute =
   initialQuery.has('s') ||
   location.hash.startsWith('#v=5&d=');
 if (!deferredLibraryRoute) void readInitialRoute();
+async function reconcileLibraryRow(row: CanonicalLibraryRow) {
+  if ((row as CanonicalLibraryRow & { active?: boolean }).active) return;
+  const activeRow = row as CanonicalLibraryRow & { active?: boolean };
+  activeRow.active = true;
+  row.state = 'loading';
+  songCards();
+  try {
+    const result = await reconcileCanonical(row, AbortSignal.timeout(90000));
+    await saveLocalAudio(
+      result.record,
+      result.title,
+      result.jobId,
+      result.bytes,
+      result.author,
+    );
+    const item = installExternalSource(
+      result.record,
+      result.title,
+      result.bytes,
+      result.jobId,
+      result.author,
+    );
+    if (!SONGS.some((s) => s.id === item.song.id)) SONGS.push(item.song);
+    canonicalPreferred.set(row.videoId, item.song.id);
+    canonicalPending.delete(row.videoId);
+  } catch (error) {
+    row.state = 'error';
+    row.error =
+      error instanceof AudioJobError ? error : new AudioJobError('unavailable');
+  } finally {
+    activeRow.active = false;
+    songCards();
+    if (!active && !preparing && screen === 'select') {
+      if (!visibleSongIndices().includes(songIndex))
+        songIndex = visibleSongIndices()[0];
+      selectedSong();
+    }
+  }
+}
 async function initializeLibrary() {
   try {
     for (const record of await allPinnedSources()) {
@@ -2495,10 +2613,38 @@ async function initializeLibrary() {
         saved?.author,
       );
       if (!SONGS.some((s) => s.id === item.song.id)) SONGS.push(item.song);
+      if (!canonicalPending.has(record.videoId))
+        canonicalPending.set(record.videoId, {
+          videoId: record.videoId,
+          title: saved?.title ?? record.videoId,
+          archiveId: item.song.id,
+          jobId: saved?.jobId,
+          state: 'loading',
+        });
+    }
+    for (const row of [...canonicalPending.values()]) {
+      try {
+        const cached = await verifiedLocalCanonical(row.videoId);
+        if (cached) {
+          const item = installExternalSource(
+            cached.record,
+            cached.local.title,
+            cached.local.bytes,
+            cached.local.jobId,
+            cached.local.author,
+          );
+          if (!SONGS.some((s) => s.id === item.song.id)) SONGS.push(item.song);
+          canonicalPreferred.set(row.videoId, item.song.id);
+          canonicalPending.delete(row.videoId);
+        }
+      } catch {
+        /* Keep archive and pending recovery, never select an unverified chart. */
+      }
     }
   } catch {
     toast(externalLabels(settings.language).failed);
   }
+  for (const row of canonicalPending.values()) void reconcileLibraryRow(row);
   backgroundImports.resume();
   if (deferredLibraryRoute) await readInitialRoute();
   else if (screen === 'select' && !active) {

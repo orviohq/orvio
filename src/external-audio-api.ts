@@ -43,12 +43,26 @@ export interface AudioArtifact {
   contractVersion: 'audio/1';
   expiresAt: number;
 }
+export interface CanonicalJobStatus {
+  status:
+    | 'queued'
+    | 'generating'
+    | 'published'
+    | 'audio_changed'
+    | 'audio_expired'
+    | 'deferred';
+  retryAfterSec?: number;
+  attempts?: number;
+  audioSha256?: string;
+  chartSetSha256?: string;
+}
 export interface AudioJob {
   jobId: string;
   title?: string;
   author?: string;
   status: 'queued' | 'running' | 'done' | 'error';
   audio?: AudioArtifact;
+  canonical?: CanonicalJobStatus;
   error?: { code: AudioErrorCode };
   retryAfterSec?: number;
 }
@@ -115,6 +129,25 @@ async function readJob(response: Response): Promise<AudioJob> {
       throw new AudioJobError('unavailable');
   }
   if (body.status === 'error' && !ERRORS.includes(body.error?.code))
+    throw new AudioJobError('unavailable');
+  if (
+    body.canonical !== undefined &&
+    (!body.canonical ||
+      ![
+        'queued',
+        'generating',
+        'published',
+        'audio_changed',
+        'audio_expired',
+        'deferred',
+      ].includes(body.canonical.status) ||
+      (body.canonical.audioSha256 !== undefined &&
+        !SHA.test(body.canonical.audioSha256)) ||
+      (body.canonical.chartSetSha256 !== undefined &&
+        !SHA.test(body.canonical.chartSetSha256)) ||
+      (body.canonical.retryAfterSec !== undefined &&
+        seconds(body.canonical.retryAfterSec) === undefined))
+  )
     throw new AudioJobError('unavailable');
   return body;
 }
