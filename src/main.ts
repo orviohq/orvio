@@ -353,7 +353,67 @@ function restoreLibraryVideo(videoId: string) {
   hiddenSongs.clear();
   for (const id of next) hiddenSongs.add(id);
 }
-localReplayButton.onclick = () => void openLocalSession(SONGS[songIndex].id);
+async function localVideoSessions(videoId: string) {
+  const sessions = [];
+  for (const song of SONGS) {
+    if (externalSource(song.id)?.record.videoId !== videoId) continue;
+    try {
+      const session = await readLocalSession(song.id);
+      if (session) sessions.push(session);
+    } catch {
+      /* Keep corrupt archives untouched, never rewrite them. */
+    }
+  }
+  return sessions;
+}
+async function openVideoHistory(videoId: string) {
+  const sessions = await localVideoSessions(videoId);
+  if (sessions.length === 1) {
+    await openLocalSession(sessions[0].key);
+    return;
+  }
+  if (!sessions.length) {
+    toast(externalLabels(settings.language).failed);
+    return;
+  }
+  const dialog = document.createElement('dialog');
+  const heading = document.createElement('h2');
+  heading.textContent = externalLabels(settings.language).replay;
+  dialog.append(heading);
+  for (const session of sessions) {
+    const button = document.createElement('button');
+    button.className = 'quiet';
+    button.style.display = 'block';
+    button.style.marginBlock = '12px';
+    const key =
+      `${session.replay.lanes}:${session.replay.difficulty}` as keyof typeof session.source.charts;
+    const level =
+      session.source.chartMetadata?.[key] ??
+      difficultyForChart(
+        session.source.charts[key]!.notes,
+        session.source.frames / session.source.sampleRate,
+        key,
+      );
+    button.textContent = `${session.replay.lanes} KEY · ${difficultyText(level, settings.language)} · ${session.result.score.toLocaleString()}`;
+    button.onclick = () => {
+      dialog.close();
+      void openLocalSession(session.key);
+    };
+    dialog.append(button);
+  }
+  const close = document.createElement('button');
+  close.className = 'quiet';
+  close.textContent = externalLabels(settings.language).cancel;
+  close.onclick = () => dialog.close();
+  dialog.append(close);
+  dialog.onclose = () => dialog.remove();
+  document.body.append(dialog);
+  dialog.showModal();
+}
+localReplayButton.onclick = () => {
+  const videoId = externalSource(SONGS[songIndex].id)?.record.videoId;
+  if (videoId) void openVideoHistory(videoId);
+};
 async function openLocalSession(id: string) {
   try {
     const session = await readLocalSession(id);
@@ -515,10 +575,10 @@ function selectedSong() {
   removeSongButton.textContent = removalLabels(settings.language).button;
   localReplayButton.classList.add('hidden');
   if (externalSource(song.id))
-    void readLocalSession(song.id)
+    void localVideoSessions(externalSource(song.id)!.record.videoId)
       .then((r) => {
         if (selection === selectionVersion)
-          localReplayButton.classList.toggle('hidden', !r);
+          localReplayButton.classList.toggle('hidden', !r.length);
       })
       .catch(() => {});
 }
@@ -610,12 +670,12 @@ function songCards() {
     const history = document.createElement('button');
     history.className = 'quiet';
     history.textContent = externalLabels(settings.language).replay;
-    history.onclick = () => void openLocalSession(row.archiveId);
+    history.onclick = () => void openVideoHistory(row.videoId);
     element.append(history);
     $('#songs').append(element);
-    void readLocalSession(row.archiveId)
-      .then((session) => {
-        if (!session) history.remove();
+    void localVideoSessions(row.videoId)
+      .then((sessions) => {
+        if (!sessions.length) history.remove();
       })
       .catch(() => history.remove());
   }

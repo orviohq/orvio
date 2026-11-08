@@ -82,11 +82,23 @@ export async function readCanonicalSource(
           Math.min(86400, Math.ceil(body.retryAfterSec)),
         ),
       };
-    throw new AudioJobError('unavailable');
+    throw new AudioJobError(
+      'unavailable',
+      undefined,
+      undefined,
+      undefined,
+      'response',
+    );
   }
   if (response.status === 409) throw new AudioJobError('integrity_failed');
   if (!response.ok)
-    throw new AudioJobError('unavailable', undefined, response.status);
+    throw new AudioJobError(
+      'unavailable',
+      undefined,
+      response.status,
+      undefined,
+      'service',
+    );
   const expected = response.headers.get('X-SourceRecord-SHA256'),
     chartSet = response.headers.get('X-ChartSet-SHA256'),
     audio = response.headers.get('X-Canonical-Audio-SHA256');
