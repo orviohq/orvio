@@ -1,3 +1,4 @@
+import { audioAtStage } from './audio-error-stage';
 import { savedCanonical, refreshCanonical } from './canonical-library';
 import { localAudio, localMetadata } from './external-local';
 import { canonicalForJob } from './canonical-job';
@@ -12,9 +13,9 @@ export interface CanonicalLibraryRow {
   error?: AudioJobError;
 }
 export async function verifiedLocalCanonical(videoId: string) {
-  const record = await savedCanonical(videoId);
+  const record = await audioAtStage('storage', () => savedCanonical(videoId));
   if (!record) return null;
-  const local = await localAudio(record);
+  const local = await audioAtStage('storage', () => localAudio(record));
   return local ? { record, local } : null;
 }
 /** Reconcile an archived entry via GET only; never extract or regenerate. */
@@ -39,7 +40,7 @@ export async function reconcileCanonical(
       );
     record = await canonicalForJob(row.videoId, job, signal);
   }
-  const local = await localAudio(record);
+  const local = await audioAtStage('storage', () => localAudio(record));
   if (local)
     return {
       record,
@@ -54,7 +55,7 @@ export async function reconcileCanonical(
   if (job.audio?.sha256 !== record.audioSha256)
     throw new AudioJobError('source_changed');
   const bytes = await loadAudio(job, row.videoId, record.audioSha256, signal);
-  const meta = await localMetadata(record);
+  const meta = await audioAtStage('storage', () => localMetadata(record));
   return {
     record,
     bytes,

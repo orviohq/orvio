@@ -1,3 +1,4 @@
+import { audioAtStage } from './audio-error-stage';
 import { readAudioJob, loadAudio, AudioJobError } from './external-audio-api';
 import { canonicalForJob } from './canonical-job';
 import type { SourceRecord } from './external-source';
@@ -19,6 +20,9 @@ export async function prepareExternalJob(
         ? (job.error?.code ?? 'unavailable')
         : 'unavailable',
       job.retryAfterSec,
+      undefined,
+      undefined,
+      job.status === 'error' ? 'service' : 'response',
     );
   const record = await canonicalForJob(videoId, job, signal);
   const bytes = await loadAudio(job, videoId, record.audioSha256, signal);

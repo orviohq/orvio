@@ -2,6 +2,7 @@ import { readAudioLimit } from './audio-limit-message';
 import { importYoutube, youtubeId } from './external-import';
 import {
   AudioJobError,
+  validAudioFailureStage,
   validAudioErrorCode,
   type AudioErrorCode,
 } from './external-audio-api';
@@ -55,6 +56,9 @@ export class BackgroundImports {
                     undefined,
                     row.failure?.status,
                     readAudioLimit(row.failure?.limit),
+                    validAudioFailureStage(row.failure?.stage)
+                      ? row.failure.stage
+                      : undefined,
                   ),
                 }
               : {}),
@@ -65,10 +69,20 @@ export class BackgroundImports {
     }
   }
   private persist() {
-    const text = JSON.stringify([...this.rows.values()]);
-    this.storage.setItem(KEY, text);
-    if (this.storage.getItem(KEY) !== text)
-      throw Error('Pending import save failed');
+    try {
+      const text = JSON.stringify([...this.rows.values()]);
+      this.storage.setItem(KEY, text);
+      if (this.storage.getItem(KEY) !== text)
+        throw Error('Pending import save failed');
+    } catch {
+      throw new AudioJobError(
+        'unavailable',
+        undefined,
+        undefined,
+        undefined,
+        'storage',
+      );
+    }
   }
   enqueue(input: string) {
     const videoId = youtubeId(input);
@@ -155,13 +169,24 @@ export class BackgroundImports {
       this.changed();
     } catch (error) {
       row.state = 'error';
-      row.error = error instanceof AudioJobError ? error.code : 'unavailable';
+      row.error =
+        error instanceof AudioJobError
+          ? error.code
+          : error instanceof DOMException && error.name === 'TimeoutError'
+            ? 'request_timeout'
+            : 'unavailable';
       if (row.error === 'audio_expired' || row.error === 'not_found')
         row.jobId = undefined;
       row.failure =
         error instanceof AudioJobError
           ? error
-          : new AudioJobError('unavailable');
+          : new AudioJobError(
+              row.error,
+              undefined,
+              undefined,
+              undefined,
+              'browser',
+            );
       try {
         this.persist();
       } catch {}

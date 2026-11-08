@@ -1,3 +1,4 @@
+import { audioAtStage } from './audio-error-stage';
 import { readCanonicalSource } from './canonical-source-api';
 import { rememberCanonical } from './canonical-library';
 import {
@@ -32,14 +33,22 @@ export async function canonicalForJob(
     if (lookup.state === 'ready') {
       if (lookup.record.audioSha256 !== job.audio?.sha256)
         throw new AudioJobError('source_changed');
-      await rememberCanonical(lookup.record, lookup.recordSha256);
+      await audioAtStage('storage', () =>
+        rememberCanonical(lookup.record, lookup.recordSha256),
+      );
       return lookup.record;
     }
     if (performance.now() >= deadline)
       throw new AudioJobError('request_timeout');
     job = await readAudioJob(job.jobId, signal);
     if (job.status === 'error')
-      throw new AudioJobError(job.error?.code ?? 'unavailable');
+      throw new AudioJobError(
+        job.error?.code ?? 'unavailable',
+        undefined,
+        undefined,
+        undefined,
+        'service',
+      );
     if (job.status !== 'done') throw new AudioJobError('unavailable');
     if (job.canonical?.status === 'audio_changed')
       throw new AudioJobError('source_changed');

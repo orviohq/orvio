@@ -1,3 +1,4 @@
+import { audioAtStage } from './audio-error-stage';
 import { readCanonicalSource } from './canonical-source-api';
 import { pinSource, readPinnedSource } from './external-source-store';
 import { recordKey, type SourceRecord } from './external-source';
@@ -87,6 +88,8 @@ export const canonicalKey = (record: SourceRecord) => recordKey(record);
 export async function refreshCanonical(videoId: string, signal?: AbortSignal) {
   const lookup = await readCanonicalSource(videoId, signal);
   if (lookup.state !== 'ready') return lookup;
-  await rememberCanonical(lookup.record, lookup.recordSha256);
+  await audioAtStage('storage', () =>
+    rememberCanonical(lookup.record, lookup.recordSha256),
+  );
   return lookup;
 }
