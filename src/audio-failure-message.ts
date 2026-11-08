@@ -1,0 +1,142 @@
+import type { Language } from './i18n';
+import type { AudioErrorCode } from './external-audio-api';
+// Only typed facts become reasons. Unknown failures never imply a rights or region restriction.
+const copy: Record<Language, string[]> = {
+  en: [
+    'Audio preparation failed, but the service did not provide a specific cause. Open the video on YouTube to check it is playable; if it plays, try this link again later. No automatic retry is made.',
+    'The service reported a regional restriction. Check whether this video plays on YouTube in your region; use an accessible version you have permission to use.',
+    'This audio request could not be found. Add the same link again to create a new request.',
+    'The returned audio format is not supported. Your saved chart is unchanged; try preparing the same link again later.',
+    'The downloaded audio did not pass its integrity check and was not used. Your saved chart is unchanged; check your connection and try again.',
+    'The audio service could not be reached. Check your connection, then try again. A new request is not sent automatically.',
+    'Audio preparation did not finish within 90 seconds. It may still be running; wait before submitting the same link again.',
+  ],
+  ko: [
+    '음원 준비에 실패했지만 서비스가 구체적인 원인을 알려주지 않았습니다. YouTube에서 영상이 재생되는지 확인하세요. 재생된다면 잠시 뒤 같은 링크로 다시 시도하세요. 자동으로 재요청하지는 않습니다.',
+    '서비스에서 지역 제한을 알렸습니다. 현재 지역의 YouTube에서 영상이 재생되는지 확인하고, 사용 권한이 있는 재생 가능한 버전을 선택하세요.',
+    '이 음원 요청을 찾을 수 없습니다. 같은 링크를 다시 추가해 새로 요청하세요.',
+    '받은 음원 형식을 지원하지 않습니다. 저장된 채보는 유지됩니다. 잠시 뒤 같은 링크의 음원 준비를 다시 시도하세요.',
+    '받은 음원이 무결성 검사를 통과하지 못해 사용하지 않았습니다. 저장된 채보는 유지됩니다. 연결 상태를 확인하고 다시 시도하세요.',
+    '음원 서비스에 연결하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도하세요. 자동으로 새 요청을 보내지는 않습니다.',
+    '90초 안에 음원 준비가 끝나지 않았습니다. 서버에서 준비 중일 수 있으니 잠시 기다린 뒤 같은 링크를 다시 요청하세요.',
+  ],
+  zh: [
+    '音频准备失败，但服务未提供具体原因。请先在 YouTube 检查视频能否播放；若能播放，请稍后重试同一链接。不会自动重试。',
+    '服务报告地区限制。请检查视频在当地 YouTube 能否播放，并选择有权使用且可播放的版本。',
+    '找不到此音频请求。请重新添加相同链接以创建新请求。',
+    '收到的音频格式不受支持。已保存的谱面不变；请稍后重新准备相同链接。',
+    '下载的音频未通过完整性检查，未被使用。已保存的谱面不变；请检查网络后重试。',
+    '无法连接音频服务。请检查网络后重试，不会自动发送新请求。',
+    '音频准备在90秒内未完成，服务器可能仍在处理。请先等待，再重新提交相同链接。',
+  ],
+  ja: [
+    '音源の準備に失敗しましたが、サービスから詳しい原因は届いていません。YouTubeで再生できるか確認し、再生できる場合は後ほど同じリンクをお試しください。自動再送はしません。',
+    'サービスが地域制限を報告しました。現在の地域のYouTubeで再生できるか確認し、使用許可のある再生可能な版を選んでください。',
+    'この音源リクエストが見つかりません。同じリンクを追加して再リクエストしてください。',
+    '受信した音源形式に対応していません。保存済み譜面は保持されます。後ほど同じリンクをお試しください。',
+    '受信した音源が整合性検査に通らず使用されませんでした。保存済み譜面は保持されます。接続を確認して再試行してください。',
+    '音源サービスに接続できません。ネット接続を確認して再試行してください。自動で新規リクエストは送りません。',
+    '90秒以内に音源の準備が終わりませんでした。サーバーで処理中の可能性があります。少し待ってから同じリンクを再送してください。',
+  ],
+  es: [
+    'La preparación falló sin una causa concreta del servicio. Comprueba si el vídeo se reproduce en YouTube; si funciona, prueba este enlace más tarde. No se reintenta automáticamente.',
+    'El servicio indicó una restricción regional. Comprueba YouTube en tu región y elige una versión accesible que tengas permiso para usar.',
+    'No se encontró esta solicitud de audio. Añade el mismo enlace para crear otra.',
+    'El formato recibido no es compatible. Tu mapa se conserva; prueba el mismo enlace más tarde.',
+    'El audio no pasó la comprobación de integridad y no se usó. Tu mapa se conserva; comprueba la conexión y reintenta.',
+    'No se pudo conectar con el servicio de audio. Comprueba la conexión y reintenta. No se envía otra solicitud automáticamente.',
+    'La preparación no terminó en 90 segundos. Puede seguir en curso; espera antes de volver a enviar el enlace.',
+  ],
+  fr: [
+    'La préparation a échoué sans cause précise fournie par le service. Vérifiez la lecture sur YouTube ; si elle fonctionne, réessayez ce lien plus tard. Aucun nouvel essai automatique.',
+    'Le service signale une restriction régionale. Vérifiez YouTube dans votre région et choisissez une version accessible dont vous avez les droits.',
+    'Cette demande audio est introuvable. Ajoutez le même lien pour créer une nouvelle demande.',
+    'Le format reçu est incompatible. Votre partition est conservée ; réessayez ce lien plus tard.',
+    'Le fichier a échoué au contrôle d’intégrité et n’a pas été utilisé. Votre partition est conservée ; vérifiez la connexion et réessayez.',
+    'Connexion au service audio impossible. Vérifiez votre connexion et réessayez. Aucune nouvelle demande automatique.',
+    'La préparation dépasse 90 secondes. Elle peut encore être en cours ; patientez avant de renvoyer le lien.',
+  ],
+  de: [
+    'Die Vorbereitung ist fehlgeschlagen, ohne dass der Dienst einen genauen Grund nannte. Prüfe die Wiedergabe auf YouTube. Funktioniert sie, versuche diesen Link später erneut. Kein automatischer Neuversuch.',
+    'Der Dienst meldet eine regionale Sperre. Prüfe YouTube in deiner Region und wähle eine zugängliche Version, die du verwenden darfst.',
+    'Diese Audioanfrage wurde nicht gefunden. Füge denselben Link für eine neue Anfrage hinzu.',
+    'Das empfangene Audioformat wird nicht unterstützt. Deine Notenkarte bleibt erhalten; versuche denselben Link später erneut.',
+    'Das Audio hat die Integritätsprüfung nicht bestanden und wurde nicht verwendet. Deine Notenkarte bleibt erhalten; prüfe die Verbindung und versuche es erneut.',
+    'Der Audiodienst ist nicht erreichbar. Prüfe die Verbindung und versuche es erneut. Keine automatische neue Anfrage.',
+    'Die Vorbereitung dauerte länger als 90 Sekunden. Sie läuft möglicherweise noch; warte vor einer erneuten Anfrage.',
+  ],
+  pt: [
+    'A preparação falhou sem motivo específico informado pelo serviço. Verifique se o vídeo toca no YouTube; se tocar, tente este link mais tarde. Sem nova tentativa automática.',
+    'O serviço informou uma restrição regional. Verifique o YouTube na sua região e escolha uma versão acessível que tenha permissão para usar.',
+    'Este pedido de áudio não foi encontrado. Adicione o mesmo link para criar outro.',
+    'O formato recebido não é compatível. Seu mapa foi mantido; tente o mesmo link mais tarde.',
+    'O áudio falhou na verificação de integridade e não foi usado. Seu mapa foi mantido; verifique a conexão e tente novamente.',
+    'Não foi possível conectar ao serviço de áudio. Verifique a conexão e tente novamente. Não há novo pedido automático.',
+    'A preparação não terminou em 90 segundos. Pode continuar em andamento; aguarde antes de reenviar o link.',
+  ],
+  it: [
+    'Preparazione non riuscita senza una causa specifica dal servizio. Verifica la riproduzione su YouTube; se funziona, riprova questo link più tardi. Nessun nuovo tentativo automatico.',
+    'Il servizio segnala una restrizione regionale. Controlla YouTube nella tua regione e scegli una versione accessibile che puoi usare.',
+    'Questa richiesta audio non è stata trovata. Aggiungi lo stesso link per crearne una nuova.',
+    'Il formato ricevuto non è supportato. La mappa è conservata; riprova lo stesso link più tardi.',
+    'Il file non ha superato il controllo di integrità e non è stato usato. La mappa è conservata; controlla la connessione e riprova.',
+    'Impossibile raggiungere il servizio audio. Controlla la connessione e riprova. Nessuna nuova richiesta automatica.',
+    'La preparazione non è terminata entro 90 secondi. Potrebbe essere ancora in corso; attendi prima di inviare di nuovo il link.',
+  ],
+  ru: [
+    'Подготовка аудио не удалась, но сервис не сообщил точную причину. Проверьте воспроизведение на YouTube; если оно работает, повторите эту ссылку позже. Автоматического повтора нет.',
+    'Сервис сообщил о региональном ограничении. Проверьте YouTube в своём регионе и выберите доступную версию, которую вам разрешено использовать.',
+    'Этот запрос аудио не найден. Добавьте ту же ссылку для нового запроса.',
+    'Полученный формат не поддерживается. Сохранённая карта не изменена; повторите ту же ссылку позже.',
+    'Аудио не прошло проверку целостности и не использовалось. Карта сохранена; проверьте соединение и повторите.',
+    'Не удалось подключиться к аудиосервису. Проверьте соединение и повторите. Новый запрос не отправляется автоматически.',
+    'Подготовка не завершилась за 90 секунд. Она может ещё продолжаться; подождите перед повторной отправкой ссылки.',
+  ],
+  id: [
+    'Persiapan audio gagal tanpa penyebab khusus dari layanan. Periksa apakah video dapat diputar di YouTube; jika bisa, coba tautan ini nanti. Tidak ada percobaan ulang otomatis.',
+    'Layanan melaporkan batas wilayah. Periksa YouTube di wilayah Anda dan pilih versi yang dapat diakses serta boleh Anda gunakan.',
+    'Permintaan audio ini tidak ditemukan. Tambahkan tautan yang sama untuk membuat permintaan baru.',
+    'Format audio yang diterima tidak didukung. Chart tersimpan tidak berubah; coba tautan yang sama nanti.',
+    'Audio gagal pemeriksaan integritas dan tidak digunakan. Chart tersimpan tidak berubah; periksa koneksi lalu coba lagi.',
+    'Tidak dapat terhubung ke layanan audio. Periksa koneksi lalu coba lagi. Tidak ada permintaan baru otomatis.',
+    'Persiapan belum selesai dalam 90 detik. Proses mungkin masih berjalan; tunggu sebelum mengirim tautan yang sama lagi.',
+  ],
+  tr: [
+    'Ses hazırlığı başarısız oldu ancak hizmet kesin neden bildirmedi. Videonun YouTube’da oynadığını kontrol edin; oynuyorsa aynı bağlantıyı daha sonra deneyin. Otomatik yeniden deneme yapılmaz.',
+    'Hizmet bölgesel kısıtlama bildirdi. Bölgenizde YouTube oynatımını kontrol edin ve kullanma izniniz olan erişilebilir bir sürüm seçin.',
+    'Bu ses isteği bulunamadı. Yeni istek için aynı bağlantıyı ekleyin.',
+    'Gelen ses biçimi desteklenmiyor. Kayıtlı haritanız korunur; aynı bağlantıyı daha sonra deneyin.',
+    'Ses bütünlük kontrolünü geçmedi ve kullanılmadı. Kayıtlı haritanız korunur; bağlantıyı kontrol edip yeniden deneyin.',
+    'Ses hizmetine bağlanılamadı. Bağlantıyı kontrol edip yeniden deneyin. Otomatik yeni istek gönderilmez.',
+    'Ses hazırlığı 90 saniyede bitmedi. İşlem sürüyor olabilir; aynı bağlantıyı yeniden göndermeden önce bekleyin.',
+  ],
+  vi: [
+    'Chuẩn bị âm thanh thất bại nhưng dịch vụ không cung cấp nguyên nhân cụ thể. Kiểm tra video có phát trên YouTube không; nếu có, thử lại liên kết này sau. Không tự động thử lại.',
+    'Dịch vụ báo hạn chế khu vực. Kiểm tra YouTube tại khu vực của bạn và chọn bản có thể truy cập mà bạn được phép dùng.',
+    'Không tìm thấy yêu cầu âm thanh này. Thêm lại cùng liên kết để tạo yêu cầu mới.',
+    'Định dạng nhận được không được hỗ trợ. Bản nhạc đã lưu không đổi; thử lại cùng liên kết sau.',
+    'Âm thanh không qua kiểm tra tính toàn vẹn và không được dùng. Bản nhạc đã lưu không đổi; kiểm tra kết nối rồi thử lại.',
+    'Không kết nối được dịch vụ âm thanh. Kiểm tra kết nối rồi thử lại. Không tự gửi yêu cầu mới.',
+    'Chuẩn bị chưa xong trong 90 giây. Máy chủ có thể vẫn xử lý; hãy đợi trước khi gửi lại liên kết.',
+  ],
+};
+export function audioFailureMessage(
+  code: AudioErrorCode | undefined,
+  language: Language,
+) {
+  const index =
+    code === 'region_blocked'
+      ? 1
+      : code === 'not_found'
+        ? 2
+        : code === 'unsupported_format'
+          ? 3
+          : code === 'integrity_failed'
+            ? 4
+            : code === 'network_error'
+              ? 5
+              : code === 'request_timeout'
+                ? 6
+                : 0;
+  return copy[language][index];
+}

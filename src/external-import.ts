@@ -46,7 +46,8 @@ export async function importYoutube(input: string, signal: AbortSignal) {
   );
   const deadline = performance.now() + 90000;
   while (job.status === 'queued' || job.status === 'running') {
-    if (performance.now() > deadline) throw new AudioJobError('unavailable');
+    if (performance.now() > deadline)
+      throw new AudioJobError('request_timeout');
     await new Promise<void>((resolve, reject) => {
       const t = setTimeout(
         resolve,

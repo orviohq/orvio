@@ -15,7 +15,8 @@ const ERRORS = [
   'integrity_failed',
   'unsupported_format',
 ] as const;
-export type AudioErrorCode = (typeof ERRORS)[number];
+export type AudioErrorCode =
+  (typeof ERRORS)[number] | 'network_error' | 'request_timeout';
 export class AudioJobError extends Error {
   constructor(
     readonly code: AudioErrorCode,
@@ -47,6 +48,18 @@ function seconds(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
     ? Math.min(86400, Math.ceil(value))
     : undefined;
+}
+async function fetchAudio(input: string, init?: RequestInit) {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    if (
+      init?.signal?.aborted ||
+      (error instanceof DOMException && error.name === 'AbortError')
+    )
+      throw error;
+    throw new AudioJobError('network_error');
+  }
 }
 async function readJob(response: Response): Promise<AudioJob> {
   const body = await response.json().catch(() => null);
@@ -104,7 +117,7 @@ export async function createAudioJob(
 ): Promise<AudioJob> {
   if (youtubeUrl.length > 2048) throw new AudioJobError('invalid_url');
   return readJob(
-    await fetch(`${AUDIO_BASE}/v1/audio-jobs`, {
+    await fetchAudio(`${AUDIO_BASE}/v1/audio-jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ youtubeUrl }),
@@ -115,7 +128,7 @@ export async function createAudioJob(
 export async function readAudioJob(jobId: string, signal?: AbortSignal) {
   if (!JOB.test(jobId)) throw new AudioJobError('not_found');
   return readJob(
-    await fetch(`${AUDIO_BASE}/v1/audio-jobs/${jobId}`, { signal }),
+    await fetchAudio(`${AUDIO_BASE}/v1/audio-jobs/${jobId}`, { signal }),
   );
 }
 export async function loadAudio(
@@ -136,7 +149,7 @@ export async function loadAudio(
     job.audio.durationSec > AUDIO_MAX_SECONDS
   )
     throw new AudioJobError('unavailable');
-  const response = await fetch(
+  const response = await fetchAudio(
     `${AUDIO_BASE}/v1/audio-jobs/${job.jobId}/audio`,
     { signal },
   );

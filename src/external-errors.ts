@@ -1,3 +1,4 @@
+import { audioFailureMessage } from './audio-failure-message';
 import { audioLimitMessage } from './audio-limit-message';
 import { AudioJobError } from './external-audio-api';
 import type { Language } from './i18n';
@@ -140,6 +141,28 @@ export function externalError(error: unknown, language: Language) {
     error.limit
   )
     return audioLimitMessage(error.limit, language);
+  if (
+    !(error instanceof AudioJobError) ||
+    [
+      'unavailable',
+      'region_blocked',
+      'not_found',
+      'unsupported_format',
+      'integrity_failed',
+      'network_error',
+      'request_timeout',
+    ].includes(error.code)
+  ) {
+    if (!(
+      error instanceof AudioJobError &&
+      error.code === 'unavailable' &&
+      error.status === 429
+    ))
+      return audioFailureMessage(
+        error instanceof AudioJobError ? error.code : undefined,
+        language,
+      );
+  }
   let index = 4;
   if (error instanceof AudioJobError)
     index =
