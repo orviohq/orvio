@@ -272,7 +272,7 @@ function persist() {
 const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.30</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.31</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
 <section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><p class="mobile-playback-note"></p><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div class="eyebrow">${label('selected')} <span id="selection-number">01 / 03</span></div><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
 <section class="library" aria-label="Track selection"><p class="mobile-playback-note"></p><div class="section-title"><strong>${label('select')}</strong></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">NM</button><button data-diff="mid">HD</button><button data-diff="high">MX</button><button data-diff="sc">SC</button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div></section>
 <section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
@@ -1088,7 +1088,7 @@ async function ensureExternalBytes(id: string) {
 async function prepare(attempt: StartupAttempt) {
   if (!clock) clock = new AudioClock();
   const audio = clock;
-  await attempt.wait(audio.context.resume());
+  await attempt.wait(audio.activate());
   const song = SONGS[songIndex];
   await attempt.wait(ensureExternalBytes(song.id));
   let track =
@@ -1171,6 +1171,9 @@ async function start() {
   document.body.classList.add('playing');
   $('#start').setAttribute('disabled', '');
   try {
+    // iOS requires activation in the original click, before artwork awaits.
+    if (!clock) clock = new AudioClock();
+    await attempt.wait(clock.activate());
     try {
       let imageTimer: ReturnType<typeof setTimeout> | undefined;
       try {
@@ -2267,6 +2270,9 @@ async function watchReplay() {
     toast(REPLAY_LABELS[settings.language][2]);
     return;
   }
+  // Shared audio may need a network read; unlock while the click is still active.
+  if (!clock) clock = new AudioClock();
+  void clock.activate().catch(() => {});
   const watchHref = location.href,
     watchNavigation = navigationVersion;
   const replayToWatch = savedReplay,
@@ -2374,7 +2380,7 @@ async function previewSong() {
   if (!clock) clock = new AudioClock();
   try {
     // resume is called during the selection key/click gesture, before rendering.
-    await clock.context.resume();
+    await clock.activate();
     await ensureExternalBytes(song.id);
     let track = cache.get(song.id);
     if (!track) {
@@ -3071,7 +3077,7 @@ void initializeLibrary();
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.2.30',
+    version: '0.2.31',
     active,
     paused,
     fever: engine

@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.31] - 2026-11-09
+
+- Improve Safari preview and replay music playback with playback-session intent and activation during the original play gesture. Keep optional platform APIs optional.
+- Reject incompatible output timestamps so replay progress uses the existing audio-clock fallback instead of freezing. Preserve valid output timestamps, saved audio, charts and replay data.
+
 ## [0.2.30] - 2026-11-08
 
 - Replace the brief static result page with a reduced-motion-aware loading animation without added delay.

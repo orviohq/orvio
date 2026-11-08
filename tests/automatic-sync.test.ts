@@ -66,3 +66,26 @@ describe('long note visual lifetime', () => {
     expect(noteLayout(e.states[0], 528, 3.01, 500, 620).visible).toBe(false);
   });
 });
+
+it('falls back for future WebKit timestamps instead of freezing chart time', () => {
+  expect(
+    outputTime(19816, 19816, 19.022947, 7, 0.0029, 0, {
+      contextTime: 19.020045,
+      performanceTime: 38834,
+    }),
+  ).toBeCloseTo(12.020047);
+});
+it('falls back for stale or future-context timestamps', () => {
+  expect(
+    outputTime(5000, 5000, 5, 1, 0.01, 0.1, {
+      contextTime: 3,
+      performanceTime: 3000,
+    }),
+  ).toBeCloseTo(3.89);
+  expect(
+    outputTime(5000, 5000, 5, 1, 0.01, 0.1, {
+      contextTime: 9,
+      performanceTime: 5000,
+    }),
+  ).toBeCloseTo(3.89);
+});

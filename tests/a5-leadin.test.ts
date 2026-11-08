@@ -14,6 +14,7 @@ class FakeSource {
   stop() {}
 }
 class FakeContext {
+  state = 'running';
   currentTime = 1.25;
   baseLatency = 0;
   outputLatency = 0;

@@ -167,8 +167,25 @@ export class AudioClock {
     this.volume.gain.value = 0.7;
     this.volume.connect(this.context.destination);
   }
+  /** Call in the play gesture, before artwork, storage or network awaits. */
+  activate(): Promise<void> {
+    try {
+      const session = (
+        navigator as Navigator & {
+          audioSession?: { type: string };
+        }
+      ).audioSession;
+      if (session) session.type = 'playback';
+    } catch {
+      // Optional platform API. Audio still works on browsers without it.
+    }
+    return this.context.resume().then(() => {
+      if (this.context.state !== 'running')
+        throw new Error('Audio playback unavailable');
+    });
+  }
   async play(buffer: AudioBuffer, leadIn = 0.15, signal?: AbortSignal) {
-    await this.context.resume();
+    await this.activate();
     signal?.throwIfAborted();
     this.stop();
     this.source = this.context.createBufferSource();
@@ -196,7 +213,7 @@ export class AudioClock {
     await this.context.suspend();
   }
   async resume() {
-    await this.context.resume();
+    await this.activate();
     this.frozenTime = undefined;
   }
   get active() {

@@ -15,7 +15,12 @@ export function outputTime(
     Number.isFinite(stamp.contextTime) &&
     Number.isFinite(stamp.performanceTime) &&
     stamp.contextTime > 0 &&
-    stamp.performanceTime > 0
+    stamp.performanceTime > 0 &&
+    // Some WebKit outputs use an incompatible performance-time origin.
+    // Never map a future/stale output timestamp into the chart clock.
+    stamp.performanceTime <= sampledAt + 100 &&
+    sampledAt - stamp.performanceTime <= 1000 &&
+    stamp.contextTime <= currentTime + 0.1
   )
     return (
       stamp.contextTime +
