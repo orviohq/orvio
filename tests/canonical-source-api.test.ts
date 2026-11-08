@@ -128,3 +128,33 @@ it('rejects unknown pending protocol and never treats header audio cache hint as
     audioCached: false,
   });
 });
+it('preserves typed 429 scope/reset, does not invent an audio daily quota for untyped 429, and keeps 503 a service error', async () => {
+  for (const error of [
+    { code: 'rate_limited', limitScope: 'ip_10m', resetAtUnixSec: 1900000000 },
+    'rate_limited',
+  ]) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () => new Response(JSON.stringify({ error }), { status: 429 }),
+      ),
+    );
+    await expect(readCanonicalSource(video)).rejects.toMatchObject({
+      code: 'rate_limited',
+      status: 429,
+      limit:
+        typeof error === 'object'
+          ? { limitScope: 'ip_10m', resetAtUnixSec: 1900000000 }
+          : undefined,
+    });
+  }
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('{}', { status: 503 })),
+  );
+  await expect(readCanonicalSource(video)).rejects.toMatchObject({
+    code: 'unavailable',
+    status: 503,
+    stage: 'service',
+  });
+});

@@ -652,7 +652,12 @@ function songCards() {
     status.textContent =
       row.state === 'loading'
         ? externalLabels(settings.language).preparing
-        : canonicalPendingMessage(settings.language);
+        : [
+            row.error ? externalError(row.error, settings.language) : '',
+            canonicalPendingMessage(settings.language),
+          ]
+            .filter(Boolean)
+            .join(' ');
     copy.append(title, status);
     element.append(copy);
     if (row.state === 'loading') {

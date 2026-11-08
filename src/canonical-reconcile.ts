@@ -23,7 +23,40 @@ export async function reconcileCanonical(
   row: CanonicalLibraryRow,
   signal: AbortSignal,
 ) {
-  const lookup = await refreshCanonical(row.videoId, signal);
+  const deadline = performance.now() + 90000;
+  let lookup = await refreshCanonical(row.videoId, signal);
+  // A trusted server-cache repair does not require the old job to still exist.
+  while (lookup.state === 'pending' || lookup.state === 'replicating') {
+    signal.throwIfAborted();
+    if (performance.now() >= deadline)
+      throw new AudioJobError('request_timeout');
+    await new Promise<void>((resolve, reject) => {
+      const abort = () => {
+        clearTimeout(timer);
+        reject(signal.reason);
+      };
+      const timer = setTimeout(
+        () => {
+          signal.removeEventListener('abort', abort);
+          resolve();
+        },
+        Math.min(
+          30000,
+          Math.max(
+            1000,
+            lookup.state === 'pending' || lookup.state === 'replicating'
+              ? lookup.retryAfterSec * 1000
+              : 1000,
+          ),
+          Math.max(1, deadline - performance.now()),
+        ),
+      );
+      signal.addEventListener('abort', abort, { once: true });
+    });
+    lookup = await refreshCanonical(row.videoId, signal);
+  }
+  if (lookup.state === 'deferred')
+    throw new AudioJobError('request_timeout', lookup.retryAfterSec);
   let record: SourceRecord;
   if (lookup.state === 'ready') record = lookup.record;
   else {

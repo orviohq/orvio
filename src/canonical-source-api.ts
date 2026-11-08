@@ -1,3 +1,4 @@
+import { readAudioLimit } from './audio-limit-message';
 import { AUDIO_BASE, AudioJobError } from './external-audio-api';
 import {
   validSourceRecord,
@@ -88,6 +89,19 @@ export async function readCanonicalSource(
       undefined,
       undefined,
       'response',
+    );
+  }
+  if (response.status === 429) {
+    const body = await response.json().catch(() => null);
+    const retry = body?.error?.retryAfterSec ?? body?.retryAfterSec;
+    throw new AudioJobError(
+      'rate_limited',
+      Number.isFinite(retry) && retry >= 0
+        ? Math.min(86400, Math.ceil(retry))
+        : undefined,
+      429,
+      readAudioLimit(body?.error),
+      'service',
     );
   }
   if (response.status === 409) throw new AudioJobError('integrity_failed');

@@ -7,7 +7,7 @@
 - Keep unavailable songs visible with a read-only retry while other songs remain playable.
 - Add YouTube songs immediately as non-playable loading rows while preparation runs in the background.
 - Distinguish observed audio service, response, analysis and browser-storage failures without guessing unknown causes.
-- Existing imports can obtain a canonical chart through a known completed job when its exact audio is still cached. An expired job or unavailable service remains a pending recovery state; local archives are not silently replaced.
+- Existing imports can obtain a canonical chart from trusted server-cached audio even when their old job has expired. Pending server repair is checked without another extraction request. Songs with no trusted server audio still need an explicit source or re-import choice; local archives are not silently replaced.
 - This release does not claim a fix for the QWER upstream extraction failure, display ghosting, or a fully passing CI gate.
 
 ## [0.2.22] - 2026-11-08
