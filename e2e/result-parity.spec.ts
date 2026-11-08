@@ -1,10 +1,48 @@
+import { writeFile } from 'node:fs/promises';
 import { mockShare } from './share-mock';
 import { test, expect } from '@playwright/test';
 test('finished and reopened result are the same view, copy works without a link field', async ({
   page,
   context,
-}) => {
+}, testInfo) => {
   test.setTimeout(85000);
+  async function readyResult() {
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await Promise.all(
+        Array.from(
+          document.querySelectorAll<HTMLImageElement>('#results img'),
+          (image) => image.decode(),
+        ),
+      );
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+    });
+  }
+  async function layoutState() {
+    return page.evaluate(() => ({
+      dpr: devicePixelRatio,
+      viewport: [innerWidth, innerHeight],
+      focus: document.activeElement?.id,
+      elements: Array.from(
+        document.querySelectorAll<HTMLElement>('#results, #results *'),
+        (element) => {
+          const box = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return {
+            tag: element.tagName,
+            id: element.id,
+            classes: element.className,
+            box: { x: box.x, y: box.y, width: box.width, height: box.height },
+            font: style.font,
+            opacity: style.opacity,
+            transform: style.transform,
+          };
+        },
+      ),
+    }));
+  }
   const shared = await mockShare(context);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/play/first-light/5/low/');
@@ -14,8 +52,11 @@ test('finished and reopened result are the same view, copy works without a link 
   const url = page.url();
   expect(url).toContain('/result/#v=4&');
   await expect(page.locator('#result-url,#share-privacy')).toHaveCount(0);
-  await page.evaluate(() => document.fonts.ready);
-  const original = await page.locator('#results').screenshot();
+  await readyResult();
+  const originalState = await layoutState();
+  const original = await page
+    .locator('#results')
+    .screenshot({ path: testInfo.outputPath('result-original-raw.png') });
   await page.click('#share-result');
   await expect(page.locator('#toast')).toHaveText('링크를 복사했어요');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
@@ -29,8 +70,35 @@ test('finished and reopened result are the same view, copy works without a link 
   await page.reload();
   await expect(page.locator('#results')).toBeVisible();
   await expect(page.locator('#result-fever')).toContainText('FEVER MAX 0');
-  await page.evaluate(() => document.fonts.ready);
-  const reopened = await page.locator('#results').screenshot();
+  await readyResult();
+  const reopenedState = await layoutState();
+  const reopened = await page
+    .locator('#results')
+    .screenshot({ path: testInfo.outputPath('result-reopened-raw.png') });
+  await testInfo.attach('result-original-raw', {
+    body: original,
+    contentType: 'image/png',
+  });
+  await testInfo.attach('result-reopened-raw', {
+    body: reopened,
+    contentType: 'image/png',
+  });
+  await writeFile(
+    testInfo.outputPath('result-layout-pair.json'),
+    JSON.stringify(
+      { original: originalState, reopened: reopenedState },
+      null,
+      2,
+    ),
+  );
+  await testInfo.attach('result-layout-pair', {
+    body: JSON.stringify(
+      { original: originalState, reopened: reopenedState },
+      null,
+      2,
+    ),
+    contentType: 'application/json',
+  });
   // CI trace showed exactly one blue-channel antialiasing pixel (delta 4)
   // at the edge of the same text. Keep dimensions, content and all other pixels
   // strict; never allow moved labels, missing counts, focus or layout changes.
@@ -72,6 +140,14 @@ test('finished and reopened result are the same view, copy works without a link 
     },
     [original.toString('base64'), reopened.toString('base64')],
   );
+  await writeFile(
+    testInfo.outputPath('result-raw-comparison.json'),
+    JSON.stringify(comparison),
+  );
+  await testInfo.attach('result-raw-comparison', {
+    body: JSON.stringify(comparison),
+    contentType: 'application/json',
+  });
   expect(comparison.sameSize).toBe(true);
   expect(comparison.changed).toBeLessThanOrEqual(1);
   expect(comparison.maxChannel).toBeLessThanOrEqual(4);
