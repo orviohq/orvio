@@ -58,14 +58,18 @@ test('finished and reopened result are the same view, copy works without a link 
     .locator('#results')
     .screenshot({ path: testInfo.outputPath('result-original-raw.png') });
   await page.click('#share-result');
-  await expect(page.locator('#toast')).toHaveText('링크를 복사했어요');
+  await expect(page.locator('[data-sonner-toast]')).toHaveText(
+    '링크를 복사했어요',
+  );
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
     '/result/?s=',
   );
-  await expect(page.locator('#results #toast')).toBeVisible();
-  await expect(page.locator('#toast')).toHaveText('링크를 복사했어요');
+  await expect(page.locator('#results [data-sonner-toast]')).toBeVisible();
+  await expect(page.locator('[data-sonner-toast]')).toHaveText(
+    '링크를 복사했어요',
+  );
   await page.waitForFunction(
-    () => !document.querySelector('#toast')?.classList.contains('visible'),
+    () => !document.querySelector('[data-sonner-toast][data-removed="false"]'),
   );
   await page.reload();
   await expect(page.locator('#results')).toBeVisible();

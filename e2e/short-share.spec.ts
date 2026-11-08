@@ -12,7 +12,9 @@ test('only explicit share sends data; short URL copies once and opens same resul
   await expect(page.locator('#results')).toBeVisible();
   expect(mock.requests).toHaveLength(0);
   await page.click('#share-result');
-  await expect(page.locator('#toast')).toHaveText('링크를 복사했어요');
+  await expect(page.locator('[data-sonner-toast]')).toHaveText(
+    '링크를 복사했어요',
+  );
   const url = await page.evaluate(() => navigator.clipboard.readText());
   expect(url).toMatch(/\/result\/\?s=[A-Za-z0-9_-]{20,100}$/);
   expect(url.length).toBeLessThan(100);
@@ -83,7 +85,9 @@ test('sharing has no verification dialog or loading explanation, even with a slo
   await page.click('#share-result');
   await expect(page.locator('.share-verification')).toHaveCount(0);
   await expect(page.locator('#share-status')).toBeHidden();
-  await expect(page.locator('#toast')).toHaveText('링크를 복사했어요');
+  await expect(page.locator('[data-sonner-toast]')).toHaveText(
+    '링크를 복사했어요',
+  );
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
     '?s=share',
   );

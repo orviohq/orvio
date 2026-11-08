@@ -16,7 +16,7 @@ test('both key modes support consecutive keys, repeat rejection, cancel and inde
   await page.keyboard.up('s');
   await page.keyboard.press('a');
   await expect(slot(5, 2)).toHaveClass(/listening/);
-  await expect(page.locator('#toast')).toContainText('이미');
+  await expect(page.locator('[data-sonner-toast]')).toContainText('이미');
   for (const key of ['g', 'h', 'l']) await page.keyboard.press(key);
   await expect(page.locator('.listening')).toHaveCount(0);
   for (const [i, key] of ['A', 'S', 'G', 'H', 'L'].entries())

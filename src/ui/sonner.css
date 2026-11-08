@@ -1,0 +1,43 @@
+#toast-root {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  pointer-events: none;
+}
+#toast-root::backdrop {
+  background: transparent;
+  pointer-events: none;
+}
+#toast-root [data-sonner-toaster] {
+  --width: min(var(--orvio-toast-width, 356px), calc(100vw - 32px)) !important;
+  pointer-events: none;
+  font-family: inherit;
+}
+#toast-root .orvio-toast {
+  background: #101c28;
+  color: #eef2f7;
+  border: 1px solid #425461;
+  box-shadow: 0 8px 28px #0006;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+/* Notifications get a dedicated top rail while a modal is open. Fixed
+   top-center Sonner is outside the dialog's scroll/clip region via popover. */
+dialog[open][data-toast-rail] {
+  top: var(--toast-rail) !important;
+  max-height: calc(100dvh - var(--toast-rail) - 32px) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  #toast-root [data-sonner-toast] {
+    animation: none !important;
+    transition: none !important;
+  }
+}

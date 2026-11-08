@@ -57,7 +57,7 @@ test('mobile layout is browse-only, no overflow', async ({ browser }) => {
     ),
   ).toBeTruthy();
   await page.click('#start');
-  await expect(page.locator('#toast')).toContainText('데스크톱');
+  await expect(page.locator('[data-sonner-toast]')).toContainText('데스크톱');
   expect(
     await page.evaluate(() => (window as any).orvioDiagnostics.active),
   ).toBeFalsy();

@@ -9,7 +9,7 @@ test('wrong key, misses, late hit, bad hold, duplicate binding, positions and re
   await page.click('#open-settings');
   await page.click('[data-bind="0"]');
   await page.keyboard.press('f');
-  await expect(page.locator('#toast')).toContainText('이미');
+  await expect(page.locator('[data-sonner-toast]')).toContainText('이미');
   await expect(page.locator('[data-bind="1"]')).toHaveText('F');
   await page.keyboard.press('a');
   await expect(page.locator('[data-bind="0"]')).toHaveText('A');

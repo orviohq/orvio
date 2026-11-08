@@ -183,10 +183,10 @@ test('builtin save denied keeps watch and shows storage-specific recovery', asyn
   await page.goto('/play/first-light/5/low/');
   await page.keyboard.press('Enter');
   await expect(page.locator('#results')).toBeVisible({ timeout: 50000 });
-  await expect(page.locator('#toast')).toContainText(
+  await expect(page.locator('[data-sonner-toast]')).toContainText(
     '리플레이를 저장하지 못했습니다',
   );
-  await expect(page.locator('#toast')).not.toContainText('음원');
+  await expect(page.locator('[data-sonner-toast]')).not.toContainText('음원');
   await expect(page.locator('#watch-replay')).toBeEnabled();
   await page.click('#watch-replay');
   await page.waitForFunction(() =>

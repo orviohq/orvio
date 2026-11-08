@@ -40,7 +40,9 @@ test('original song loading precedes scoring and sends no result before explicit
     }),
   );
   await page.click('#share-result');
-  await expect(page.locator('#toast')).toHaveText('링크를 복사했어요');
+  await expect(page.locator('[data-sonner-toast]')).toHaveText(
+    '링크를 복사했어요',
+  );
   const url = await page.evaluate(() => navigator.clipboard.readText());
   expect(url).toContain('/result/?s=');
   expect(url.length).toBeLessThan(100);

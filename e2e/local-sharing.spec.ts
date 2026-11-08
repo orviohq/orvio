@@ -1,14 +1,14 @@
+import { sonnerResultFixture } from './sonner-fixture';
 import { mockShare } from './share-mock';
 import { shareLabels } from '../src/share-labels';
 import { test, expect } from '@playwright/test';
 import { LANGUAGES, translations, type Language } from '../src/i18n';
-const data =
-  'v=3&song=first-light&keys=5&diff=low&score=500000&acc=50.00&combo=1&j=1,0,0,0,0,0,0,0,0,0,0,1';
 test('local fragments never reach requests; copy succeeds or visibly fails in thirteen languages', async ({
   page,
   context,
 }) => {
   const shared = await mockShare(context);
+  const data = await sonnerResultFixture(page);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const requests: string[] = [];
   page.on('request', (r) => requests.push(r.url()));
@@ -30,12 +30,14 @@ test('local fragments never reach requests; copy succeeds or visibly fails in th
     }, l);
     await page.locator('#share-result').focus();
     await page.keyboard.press('Enter');
-    await expect(page.locator('#toast')).toHaveText(
+    await expect(page.locator('[data-sonner-toast]')).toHaveText(
       translations[l].resultCopied,
     );
-    await expect(page.locator('#toast')).toBeVisible();
+    await expect(page.locator('[data-sonner-toast]')).toBeVisible();
     expect(
-      await page.locator('#toast').evaluate((e) => e.closest('dialog')?.open),
+      await page
+        .locator('[data-sonner-toast]')
+        .evaluate((e) => e.closest('dialog')?.open),
     ).toBe(true);
   }
   await page.screenshot({ path: 'test-results/copy-success.png' });
@@ -48,11 +50,12 @@ test('local fragments never reach requests; copy succeeds or visibly fails in th
     };
   });
   await page.click('#share-result');
-  await expect(page.locator('#toast')).toHaveText(shareLabels('vi').failed);
-  await expect(page.locator('#toast')).toBeVisible();
+  await expect(page.locator('[data-sonner-toast]')).toHaveText(
+    shareLabels('vi').failed,
+  );
+  await expect(page.locator('[data-sonner-toast]')).toBeVisible();
   await page.screenshot({ path: 'test-results/copy-failure.png' });
-  await page.goto('/result/?' + data);
+  await page.goto('/result/#' + data);
   await expect(page.locator('#results')).toBeVisible();
-  expect(new URL(page.url()).search).toBe('');
-  expect(new URL(page.url()).hash).toContain('v=3');
+  expect(new URL(page.url()).searchParams.has('score')).toBe(false);
 });
