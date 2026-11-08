@@ -3,6 +3,9 @@ import { BackgroundImports } from '../src/background-imports';
 const api = vi.hoisted(() => ({
   import: vi.fn((..._args: unknown[]) => new Promise(() => {})),
 }));
+vi.mock('../src/early-youtube-metadata', () => ({
+  earlyYoutubeMetadata: vi.fn(async () => null),
+}));
 vi.mock('../src/external-import', () => ({
   importYoutube: api.import,
   youtubeId: (s: string) => {
@@ -157,4 +160,28 @@ it('manual re-add opts into confirmed terminal retry but reload resume does not'
     jobId: 'known-job',
     retryFailed: true,
   });
+});
+
+it('stage transitions reach saving before completion and remove row only after completion', async () => {
+  raf();
+  let finish!: () => void;
+  api.import.mockResolvedValueOnce({
+    prepared: {
+      record: { videoId: 'AAAAAAAAAAA' },
+      bytes: new ArrayBuffer(0),
+      restored: false,
+    },
+  } as never);
+  const complete = vi.fn(
+    () =>
+      new Promise<void>((r) => {
+        finish = r;
+      }),
+  );
+  const pending = new BackgroundImports(() => {}, complete, store());
+  pending.enqueue('AAAAAAAAAAA');
+  await vi.waitFor(() => expect(complete).toHaveBeenCalledTimes(1));
+  expect(pending.rows.get('AAAAAAAAAAA')?.stage).toBe('saving');
+  finish();
+  await vi.waitFor(() => expect(pending.rows.size).toBe(0));
 });

@@ -1,3 +1,4 @@
+import { earlyYoutubeMetadata } from './early-youtube-metadata';
 import { IMPORT_STAGES, type ImportStage } from './import-progress';
 import { readAudioLimit } from './audio-limit-message';
 import { importYoutube, youtubeId } from './external-import';
@@ -11,6 +12,7 @@ export interface PendingImport {
   videoId: string;
   jobId?: string;
   title?: string;
+  thumbnailUrl?: string;
   state: 'loading' | 'error';
   stage?: ImportStage;
   error?: AudioErrorCode;
@@ -112,6 +114,19 @@ export class BackgroundImports {
       throw error;
     }
     this.changed();
+    // Start optional display metadata immediately, without delaying admission.
+    void earlyYoutubeMetadata(videoId).then((metadata) => {
+      if (
+        !metadata ||
+        this.rows.get(videoId) !== row ||
+        row.state !== 'loading'
+      )
+        return;
+      // Job metadata, when already received, wins over this early display hint.
+      if (!row.title) row.title = metadata.title;
+      row.thumbnailUrl = metadata.thumbnailUrl;
+      this.changed();
+    });
     void this.run(row, previous?.state === 'error');
     return videoId;
   }

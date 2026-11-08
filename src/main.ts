@@ -920,7 +920,9 @@ function songCards() {
     thumbnail.className = 'youtube-cover';
     thumbnail.alt = '';
     thumbnail.referrerPolicy = 'no-referrer';
-    thumbnail.src = `https://i.ytimg.com/vi/${pending.videoId}/mqdefault.jpg`;
+    thumbnail.src =
+      pending.thumbnailUrl ??
+      `https://i.ytimg.com/vi/${pending.videoId}/mqdefault.jpg`;
     thumbnail.onerror = () => {
       thumbnail.onerror = null;
       thumbnail.src = ART_FALLBACK;
