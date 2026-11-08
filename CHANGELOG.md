@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.49] - 2026-11-09
+
+- Restore sharing for valid older score-only result links without inventing replay data. Missing required replays, corrupted replays and frozen chart mismatches still fail closed. Local result storage and current replay sharing are unchanged.
+
 ## [0.2.48] - 2026-11-09
 
 - Prepare charts for already-saved audio on the device in an owned Web Worker.

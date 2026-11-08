@@ -1,5 +1,8 @@
 import { it, expect } from 'vitest';
-import { builtinShareFragment } from '../src/builtin-share-fragment';
+import {
+  builtinShareFragment,
+  builtinScoreShareFragment,
+} from '../src/builtin-share-fragment';
 import { makeChart, SONGS } from '../src/chart';
 import {
   replayEngine,
@@ -44,4 +47,30 @@ it('fresh and local builtin archive produce valid nonempty public replay; change
   const changed = structuredClone(makeChart(SONGS[0], 'low', 5));
   changed[0].time += 0.1;
   await expect(builtinShareFragment(replay, result, changed)).rejects.toThrow();
+});
+
+it('valid legacy scores share without a fabricated replay; missing or corrupt required replays refuse', () => {
+  const result: SharedResult = {
+    song: 'first-light',
+    lanes: 5,
+    difficulty: 'low',
+    score: 500000,
+    accuracy: 50,
+    combo: 1,
+    judgments: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+  };
+  const state = { replayExpected: false, replayIssue: false };
+  const fragment = builtinScoreShareFragment(result, state);
+  expect(readResult(new URLSearchParams(fragment))).toEqual(result);
+  for (const key of ['r', 'rp', 'rn'])
+    expect(new URLSearchParams(fragment).has(key)).toBe(false);
+  for (const protectedState of [
+    { ...state, replayExpected: true },
+    { ...state, replayIssue: true },
+    { ...state, frozen: makeChart(SONGS[0], 'low', 5) },
+  ])
+    expect(() => builtinScoreShareFragment(result, protectedState)).toThrow();
+  expect(() =>
+    builtinScoreShareFragment({ ...result, score: 123 }, state),
+  ).toThrow();
 });

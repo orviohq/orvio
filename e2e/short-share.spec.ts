@@ -95,3 +95,22 @@ test('sharing has no verification dialog or loading explanation, even with a slo
     false,
   );
 });
+
+test('missing and malformed required replay never fall back to a score-only share', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const mock = await mockShare(context);
+  for (const replay of ['&rp=1&rn=200', '&rp=1&rn=3&r=bad']) {
+    await page.goto('/result/#' + fragment + replay);
+    await expect(page.locator('#results')).toBeVisible();
+    await page.evaluate(() => navigator.clipboard.writeText('unchanged'));
+    await page.click('#share-result');
+    await expect(page.locator('#share-status')).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      'unchanged',
+    );
+    expect(mock.requests).toHaveLength(0);
+  }
+});
