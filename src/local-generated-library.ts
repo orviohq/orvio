@@ -1,4 +1,8 @@
-import { pinSource, readPinnedSource } from './external-source-store';
+import {
+  pinSource,
+  readPinnedSource,
+  listPinnedSources,
+} from './external-source-store';
 import {
   verifyChartHashes,
   validSourceRecord,
@@ -83,6 +87,11 @@ async function publishLocalGenerated(
   const before = references().find((r) => r.videoId === record.videoId);
   if (before && JSON.stringify(before) !== JSON.stringify(ref))
     throw Error('Local source identity changed');
+  // IDB may have committed before a storage/quota failure or a tab crash.
+  // Such a pin is still an immutable identity, even without its projection.
+  const durable = await durableLocalGenerated(record.videoId);
+  if (durable && (await recordDigest(durable)) !== expectedDigest)
+    throw Error('Local source identity changed');
   signal?.throwIfAborted();
   await pinSource(record, signal);
   signal?.throwIfAborted();
@@ -98,16 +107,28 @@ async function publishLocalGenerated(
   if (localStorage.getItem(KEY) !== value)
     throw Error('Local source save failed');
 }
+async function durableLocalGenerated(videoId: string) {
+  const records = (await listPinnedSources(videoId)).filter(
+    (r) => r.sourceProvenance === 'local-current35-v1',
+  );
+  if (records.length > 1) throw Error('Local source identity changed');
+  return records[0] ?? null;
+}
 export async function savedLocalGenerated(videoId: string) {
+  const durable = await durableLocalGenerated(videoId);
   const ref = references().find((r) => r.videoId === videoId);
-  if (!ref) return null;
+  if (!ref) return durable;
   const record = await readPinnedSource(
     videoId,
     ref.audioSha256,
     ref.chartSetSha256,
   );
   if (!record) return null;
-  if ((await recordDigest(record)) !== ref.recordSha256)
+  if (
+    !durable ||
+    (await recordDigest(durable)) !== ref.recordSha256 ||
+    (await recordDigest(record)) !== ref.recordSha256
+  )
     throw Error('Local source integrity failed');
   return record;
 }

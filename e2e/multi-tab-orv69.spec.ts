@@ -116,6 +116,92 @@ test('two actual tabs reject a conflicting generated identity and keep the selec
     }, pair[0].videoId);
     expect(state.digest).toBe(state.ref.recordSha256);
   }
+  const interrupted = await a.evaluate(async (pair: any[]) => {
+    const { rememberLocalGenerated, recordDigest } = await import(
+      /* @vite-ignore */ String('/src/local-generated-library.ts')
+    );
+    const { listPinnedSources } = await import(
+      /* @vite-ignore */ String('/src/external-source-store.ts')
+    );
+    const one = { ...pair[0], videoId: 'SPLITPIN001' },
+      two = { ...pair[1], videoId: 'SPLITPIN001' };
+    const original = Storage.prototype.setItem;
+    let firstRejected = false;
+    Storage.prototype.setItem = function (k: string, v: string) {
+      if (k === 'orvio.local-generated-library.v1')
+        throw Error('storage-full-fixture');
+      return original.call(this, k, v);
+    };
+    try {
+      await rememberLocalGenerated(one, await recordDigest(one));
+    } catch {
+      firstRejected = true;
+    } finally {
+      Storage.prototype.setItem = original;
+    }
+    let secondSaved = false;
+    try {
+      await rememberLocalGenerated(two, await recordDigest(two));
+      secondSaved = true;
+    } catch {}
+    return {
+      firstRejected,
+      secondSaved,
+      pins: (await listPinnedSources('SPLITPIN001')).length,
+    };
+  }, records[0]);
+  console.log('SPLIT_PUBLICATION', JSON.stringify(interrupted));
+  expect(interrupted.firstRejected).toBe(true);
+  expect(interrupted.secondSaved).toBe(false);
+  expect(interrupted.pins).toBe(1);
+  await b.reload();
+  const recovered = await b.evaluate(async (pair: any[]) => {
+    const { rememberLocalGenerated, savedLocalGenerated, recordDigest } =
+      await import(
+        /* @vite-ignore */ String('/src/local-generated-library.ts')
+      );
+    const { listPinnedSources, pinSource } = await import(
+      /* @vite-ignore */ String('/src/external-source-store.ts')
+    );
+    const one = { ...pair[0], videoId: 'SPLITPIN001' };
+    const old = await savedLocalGenerated('SPLITPIN001');
+    const exact = (await recordDigest(old)) === (await recordDigest(one));
+    await rememberLocalGenerated(one, await recordDigest(one));
+    const projection = JSON.parse(
+      localStorage.getItem('orvio.local-generated-library.v1') || '[]',
+    ).find((r: any) => r.videoId === 'SPLITPIN001');
+    const pair2 = pair.map((r) => ({ ...r, videoId: 'OLDORPHAN01' }));
+    await pinSource(pair2[0]);
+    await pinSource(pair2[1]);
+    let readRejected = false,
+      writeRejected = false;
+    try {
+      await savedLocalGenerated('OLDORPHAN01');
+    } catch {
+      readRejected = true;
+    }
+    try {
+      await rememberLocalGenerated(pair2[0], await recordDigest(pair2[0]));
+    } catch {
+      writeRejected = true;
+    }
+    return {
+      exact,
+      projectionDigest: projection.recordSha256,
+      expected: await recordDigest(one),
+      singlePins: (await listPinnedSources('SPLITPIN001')).length,
+      readRejected,
+      writeRejected,
+      retainedConflictPins: (await listPinnedSources('OLDORPHAN01')).length,
+    };
+  }, records[0]);
+  expect(recovered.exact).toBe(true);
+  expect(recovered.projectionDigest).toBe(recovered.expected);
+  expect(recovered.singlePins).toBe(1);
+  expect(recovered.readRejected).toBe(true);
+  expect(recovered.writeRejected).toBe(true);
+  expect(recovered.retainedConflictPins).toBe(2);
+  console.log('ORPHAN_RECOVERY', JSON.stringify(recovered));
   const identical = { ...records[0][0], videoId: 'SAMEPIN0001' };
   expect(
     await Promise.all([publish(a, identical), publish(b, identical)]),
