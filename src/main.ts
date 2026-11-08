@@ -1,3 +1,4 @@
+import { importStageLabel } from './import-progress';
 import { showToast as toast } from './ui/sonner';
 import {
   readLibrarySelection,
@@ -877,14 +878,27 @@ function songCards() {
     state.setAttribute('role', 'status');
     state.textContent =
       pending.state === 'loading'
-        ? externalLabels(settings.language).preparing
+        ? importStageLabel(pending.stage ?? 'checking', settings.language)
         : externalError(
             pending.failure ??
               new AudioJobError(pending.error ?? 'unavailable'),
             settings.language,
           );
     copy.append(title, state);
-    row.append(copy);
+    const cover = document.createElement('span');
+    cover.className = 'cover import-cover';
+    const thumbnail = document.createElement('img');
+    thumbnail.className = 'youtube-cover';
+    thumbnail.alt = '';
+    thumbnail.referrerPolicy = 'no-referrer';
+    thumbnail.src = `https://i.ytimg.com/vi/${pending.videoId}/mqdefault.jpg`;
+    thumbnail.onerror = () => {
+      thumbnail.onerror = null;
+      thumbnail.src = ART_FALLBACK;
+    };
+    cover.append(thumbnail);
+    row.append(cover, copy);
+    if (pending.stage) row.dataset.importStage = pending.stage;
     if (pending.state === 'loading') {
       row.setAttribute('aria-disabled', 'true');
       row.setAttribute('aria-busy', 'true');

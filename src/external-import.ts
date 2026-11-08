@@ -1,3 +1,4 @@
+import { jobImportStage, type ImportStage } from './import-progress';
 import { loadCanonicalAudio } from './canonical-audio-api';
 import { audioAtStage } from './audio-error-stage';
 import {
@@ -7,7 +8,16 @@ import {
 } from './external-audio-api';
 import { refreshCanonical } from './canonical-library';
 import { localAudio } from './external-local';
-import { prepareExternalJob } from './external-source-flow';
+import {
+  prepareExternalJob,
+  type PreparedSource,
+} from './external-source-flow';
+export interface ImportResult {
+  prepared: PreparedSource;
+  jobId?: string;
+  title?: string;
+  author?: string;
+}
 export function youtubeId(value: string) {
   if (/^[A-Za-z0-9_-]{11}$/.test(value)) return value;
   try {
@@ -35,14 +45,17 @@ export async function importYoutube(
     /** Only the current explicit re-add may replace a confirmed terminal failure. */
     retryFailed?: boolean;
     jobId?: string;
+    onStage?: (stage: ImportStage) => void;
     onJob?: (job: import('./external-audio-api').AudioJob) => void;
   } = {},
-) {
+): Promise<ImportResult> {
   const id = youtubeId(input);
   if (!id) throw new AudioJobError('invalid_url');
+  options.onStage?.('checking');
   const lookup = await refreshCanonical(id, signal);
   if (lookup.state === 'ready') {
     const first = lookup.record;
+    options.onStage?.('downloading');
     const cached = await audioAtStage('storage', () => localAudio(first));
     if (cached)
       return {
@@ -77,6 +90,8 @@ export async function importYoutube(
   )
     job = await createAudioJob('https://www.youtube.com/watch?v=' + id, signal);
   options.onJob?.(job);
+  const stage = jobImportStage(job);
+  if (stage) options.onStage?.(stage);
   const deadline = performance.now() + 90000;
   while (job.status === 'queued' || job.status === 'running') {
     if (performance.now() > deadline)
@@ -97,6 +112,8 @@ export async function importYoutube(
     });
     job = await readAudioJob(job.jobId, signal);
     options.onJob?.(job);
+    const stage = jobImportStage(job);
+    if (stage) options.onStage?.(stage);
   }
   if (job.status === 'error')
     throw new AudioJobError(
@@ -107,7 +124,7 @@ export async function importYoutube(
       'service',
     );
   return {
-    prepared: await prepareExternalJob(id, job.jobId, signal),
+    prepared: await prepareExternalJob(id, job.jobId, signal, options.onStage),
     jobId: job.jobId,
     title: job.title,
     author: job.author,

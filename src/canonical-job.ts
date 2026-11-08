@@ -1,3 +1,4 @@
+import { jobImportStage, type ImportStage } from './import-progress';
 import { audioAtStage } from './audio-error-stage';
 import { readCanonicalSource } from './canonical-source-api';
 import { rememberCanonical } from './canonical-library';
@@ -25,9 +26,12 @@ export async function canonicalForJob(
   videoId: string,
   job: AudioJob,
   signal?: AbortSignal,
+  onStage?: (stage: ImportStage) => void,
 ) {
   const deadline = performance.now() + 90000;
   for (;;) {
+    const stage = jobImportStage(job);
+    if (stage) onStage?.(stage);
     signal?.throwIfAborted();
     const lookup = await readCanonicalSource(videoId, signal);
     if (lookup.state === 'ready') {

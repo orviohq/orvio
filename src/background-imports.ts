@@ -1,3 +1,4 @@
+import { IMPORT_STAGES, type ImportStage } from './import-progress';
 import { readAudioLimit } from './audio-limit-message';
 import { importYoutube, youtubeId } from './external-import';
 import {
@@ -11,6 +12,7 @@ export interface PendingImport {
   jobId?: string;
   title?: string;
   state: 'loading' | 'error';
+  stage?: ImportStage;
   error?: AudioErrorCode;
   failure?: AudioJobError;
 }
@@ -44,6 +46,9 @@ export class BackgroundImports {
               ? { title: row.title }
               : {}),
             state: row.state,
+            ...(IMPORT_STAGES.includes(row.stage)
+              ? { stage: row.stage as ImportStage }
+              : {}),
             ...(row.state === 'error'
               ? {
                   error: validAudioErrorCode(row.error)
@@ -94,6 +99,8 @@ export class BackgroundImports {
     const row: PendingImport = {
       videoId,
       state: 'loading',
+      stage: 'checking',
+      ...(previous?.title ? { title: previous.title } : {}),
       ...(previous?.jobId ? { jobId: previous.jobId } : {}),
     };
     this.rows.set(videoId, row);
@@ -148,9 +155,13 @@ export class BackgroundImports {
         {
           jobId: row.jobId,
           retryFailed,
+          onStage: (stage) => {
+            row.stage = stage;
+            this.changed();
+          },
           onJob: (job) => {
             row.jobId = job.status === 'error' ? undefined : job.jobId;
-            row.title = job.title;
+            if (job.title) row.title = job.title;
             try {
               this.persist();
             } catch {
@@ -160,7 +171,9 @@ export class BackgroundImports {
           },
         },
       );
-      await this.complete(result);
+      row.stage = 'saving';
+      this.changed();
+      await this.complete({ ...result, title: result.title ?? row.title });
       this.rows.delete(row.videoId);
       try {
         this.persist();
