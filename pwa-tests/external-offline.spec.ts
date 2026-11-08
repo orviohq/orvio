@@ -50,6 +50,18 @@ test('saved YouTube source starts from the built offline app without a new job',
   await page.click('#youtube-submit');
   await expect(page.locator('#youtube-import')).not.toBeVisible();
   const url = page.url();
+  const pinned = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve) => {
+      const r = indexedDB.open('orvio.external-sources.v1', 1);
+      r.onsuccess = () => resolve(r.result);
+    });
+    const rows = await new Promise<any[]>((resolve) => {
+      const r = db.transaction('records').objectStore('records').getAll();
+      r.onsuccess = () => resolve(r.result);
+    });
+    db.close();
+    return rows[0].record;
+  });
   await page.reload();
   await expect(page.locator('#selected-title')).toHaveText(
     'Monkeys Spinning Monkeys',
@@ -64,5 +76,10 @@ test('saved YouTube source starts from the built offline app without a new job',
   expect(posts).toBe(1);
   expect(
     (await page.evaluate(() => (window as any).orvioDiagnostics)).total,
-  ).toBe(137);
+  ).toBe(190);
+  expect(
+    (await page.evaluate(() => (window as any).orvioDiagnostics)).notes.map(
+      (s: any) => s.note,
+    ),
+  ).toEqual(pinned.charts['5:low'].notes);
 });

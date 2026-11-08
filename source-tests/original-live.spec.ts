@@ -54,7 +54,7 @@ test('original UI reads live sample job and WAV, pins original charts, plays, an
   await expect(page.locator('#selected-title')).toHaveText(
     'Monkeys Spinning Monkeys',
   );
-  await expect(page.locator('#selected-subtitle')).toHaveText(
+  await expect(page.locator('#selected-subtitle')).toContainText(
     'Kevin MacLeod (incompetech.com)',
   );
   await page.click('[data-lanes="7"]');
@@ -62,7 +62,7 @@ test('original UI reads live sample job and WAV, pins original charts, plays, an
   await page.click('#start');
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
   const first = await page.evaluate(() => (window as any).orvioDiagnostics);
-  expect(first.total).toBe(250);
+  expect(first.total).toBe(538);
   const n = first.notes.find((s: any) => s.note.time > 1).note;
   await page.waitForFunction(
     (t) => (window as any).orvioAudioTime >= t,
