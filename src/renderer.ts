@@ -383,6 +383,18 @@ export class Playfield {
     this.app.renderer.render({ container: this.app.stage, clear: true });
     this.work.push(performance.now() - begin);
   }
+  // Read-only window for the opt-in ?perf=1 overlay. Returns the raw recent
+  // samples; callers must not mutate them.
+  recentPerf() {
+    let visible = 0;
+    for (const v of this.noteSprites)
+      if (v.head.visible || v.body?.visible) visible++;
+    return {
+      intervals: this.frames.slice(-120),
+      works: this.work.slice(-120),
+      visible,
+    };
+  }
   stats() {
     const a = this.frames.slice(60).sort((a, b) => a - b);
     const cpu = this.work.slice(60).sort((a, b) => a - b);

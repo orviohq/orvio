@@ -75,6 +75,7 @@ import {
   type Fader,
   type Shuffle,
 } from './game-options';
+import { formatPerf } from './perf-overlay';
 import { LANGUAGES, translate, type Language, type Word } from './i18n';
 import './style.css';
 import {
@@ -894,6 +895,7 @@ async function start() {
     seenEvents = 0;
     sequence = 0;
     lastFeverActivations = 0;
+    $('#fps').hidden = !perfOverlay;
     if (!playReplay) {
       replayExpected = false;
       replayIssue = false;
@@ -1109,6 +1111,7 @@ function judgment(e: JudgmentEvent) {
 }
 let hudAt = 0;
 let lastFeverActivations = 0;
+let perfOverlay = false;
 // A5: countdown is anchored to the first note's fall start so notes
 // never appear before the countdown finishes, at any speed/BPM.
 let countdownFallAt = 0,
@@ -1213,10 +1216,13 @@ function loop(now: number) {
       Math.min(100, Math.max(0, (time / duration(SONGS[songIndex])) * 100)) +
       '%';
     const recent = field.frames.slice(-60);
-    $('#fps').textContent = recent.length
-      ? Math.round(1000 / (recent.reduce((a, b) => a + b, 0) / recent.length)) +
-        ' FPS'
-      : '-- FPS';
+    $('#fps').textContent = perfOverlay
+      ? formatPerf(field.recentPerf())
+      : recent.length
+        ? Math.round(
+            1000 / (recent.reduce((a, b) => a + b, 0) / recent.length),
+          ) + ' FPS'
+        : '-- FPS';
   }
   if (
     playReplay
@@ -2111,10 +2117,10 @@ $('#reset').onclick = () => {
 };
 function playPath() {
   if (externalSource(SONGS[songIndex].id)) return selectionPath();
-  return `/play/${SONGS[songIndex].id}/${settings.lanes}/${settings.difficulty}/?speed=${settings.speed.toFixed(1)}&fader=${settings.fader}&shuffle=${settings.shuffle}&seed=${shuffleSeed}`;
+  return `/play/${SONGS[songIndex].id}/${settings.lanes}/${settings.difficulty}/?speed=${settings.speed.toFixed(1)}&fader=${settings.fader}&shuffle=${settings.shuffle}&seed=${shuffleSeed}${perfOverlay ? '&perf=1' : ''}`;
 }
 function selectionPath() {
-  return `/select/?song=${SONGS[songIndex].id}&lanes=${settings.lanes}&difficulty=${settings.difficulty}&speed=${settings.speed.toFixed(1)}&fader=${settings.fader}&shuffle=${settings.shuffle}&seed=${shuffleSeed}`;
+  return `/select/?song=${SONGS[songIndex].id}&lanes=${settings.lanes}&difficulty=${settings.difficulty}&speed=${settings.speed.toFixed(1)}&fader=${settings.fader}&shuffle=${settings.shuffle}&seed=${shuffleSeed}${perfOverlay ? '&perf=1' : ''}`;
 }
 function readRoute() {
   readingRoute = true;
@@ -2129,6 +2135,9 @@ function readRoute() {
     settings.speed = Math.round(speed * 10) / 10;
   if ((FADERS as readonly string[]).includes(q.get('fader') || ''))
     settings.fader = q.get('fader') as Fader;
+  if (q.has('perf')) perfOverlay = q.get('perf') === '1';
+  document.body.classList.toggle('perf-enabled', perfOverlay);
+  $('#fps').hidden = !perfOverlay;
   if (['off', 'mirror', 'random'].includes(q.get('shuffle') || ''))
     settings.shuffle = q.get('shuffle') as Shuffle;
   const seed = Number(q.get('seed'));

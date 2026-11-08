@@ -3390,3 +3390,45 @@ textarea,
     width: 72px;
   }
 }
+
+/* Opt-in ?perf=1 diagnostics overlay (read-only, never shown by default) */
+#fps:not([hidden]) {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #9fd8ff;
+  background: rgba(8, 12, 24, 0.72);
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+body.perf-enabled .game-top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 2px;
+  height: auto;
+  min-height: 58px;
+  padding-bottom: 4px;
+}
+body.perf-enabled .song-now {
+  min-width: 0;
+  align-items: flex-end;
+  overflow: hidden;
+}
+body.perf-enabled .song-now strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.perf-enabled #fps {
+  grid-column: 1 / -1;
+  justify-self: end;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
