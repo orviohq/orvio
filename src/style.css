@@ -3993,3 +3993,36 @@ dialog .hint,
   letter-spacing: inherit;
   opacity: 1;
 }
+/* A31: keep a full report at laptop height; shorter screens scroll inside it. */
+#results {
+  max-height: calc(100dvh - 32px);
+  padding: 20px 28px;
+  scroll-padding: 20px;
+}
+#results #result-options {
+  margin: 4px 0 10px;
+}
+#results #result-fever {
+  margin: 8px 0;
+  font-size: 14px;
+}
+#results #result-badge {
+  font-size: 13px;
+  letter-spacing: 0.1em;
+}
+#results .result-actions {
+  padding-bottom: 8px;
+}
+#results .result-actions #retry {
+  gap: 20px;
+  flex-shrink: 0;
+  min-width: 220px;
+}
+@media (max-width: 540px) {
+  #results {
+    padding: 20px 22px;
+  }
+  #results .result-actions #retry {
+    min-width: 0;
+  }
+}
