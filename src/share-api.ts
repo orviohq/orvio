@@ -1,3 +1,7 @@
+import { V5_MAX_FRAGMENT_CHARS } from './external-share';
+function fragmentLimit(fragment: string) {
+  return fragment.startsWith('v=5&d=') ? V5_MAX_FRAGMENT_CHARS : 160000;
+}
 export const SHARE_API = 'https://orvio-share.pn-26f.workers.dev';
 export class ShareError extends Error {
   constructor(readonly status: number) {
@@ -5,7 +9,7 @@ export class ShareError extends Error {
   }
 }
 export async function saveSharedReplay(fragment: string) {
-  if (new TextEncoder().encode(fragment).length > 160000)
+  if (new TextEncoder().encode(fragment).length > fragmentLimit(fragment))
     throw new ShareError(413);
   const response = await fetch(SHARE_API + '/v1/replays', {
     method: 'POST',
@@ -32,7 +36,8 @@ export async function loadSharedReplay(id: string) {
   const data = await response.json();
   if (
     typeof data.fragment !== 'string' ||
-    new TextEncoder().encode(data.fragment).length > 160000 ||
+    new TextEncoder().encode(data.fragment).length >
+      fragmentLimit(data.fragment) ||
     !Number.isFinite(Date.parse(data.expiresAt))
   )
     throw new ShareError(502);

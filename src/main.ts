@@ -5,6 +5,13 @@ import {
 } from './library-removal';
 import { importRetryLabel } from './import-labels';
 import { BackgroundImports } from './background-imports';
+import {
+  encodeExternalShare,
+  decodeExternalShare,
+  type ExternalSharedReplay,
+} from './external-share';
+import { readSharedAudio, recoverSharedAudio } from './external-share-audio';
+import { sharedAudioLabels } from './shared-audio-labels';
 import './scrollbars.css';
 import { replayFrameChanged } from './replay-frame';
 import {
@@ -28,7 +35,7 @@ import {
 } from './external-local';
 import { externalLabels } from './external-labels';
 import { importYoutube } from './external-import';
-import { allPinnedSources } from './external-source-store';
+import { pinSource, allPinnedSources } from './external-source-store';
 import {
   externalSource,
   externalAudio,
@@ -168,6 +175,8 @@ let startup: StartupAttempt | undefined;
 type UiResult = Omit<SharedResult, 'song'> & { song: string };
 let lastResult: UiResult | undefined;
 let localSessionKey: string | undefined;
+let receivedShare: { fragment: string; data: ExternalSharedReplay } | undefined;
+let shareRouteRequest = 0;
 let sessionReplay: RuntimeReplay | undefined,
   savedReplay: RuntimeReplay | undefined,
   playReplay: RuntimeReplay | undefined;
@@ -749,9 +758,7 @@ function stopPreview() {
 async function ensureExternalBytes(id: string) {
   const external = externalSource(id);
   if (external && !external.bytes) {
-    const saved = await localAudio(external.record);
-    if (!saved) throw Error('Matching source audio unavailable');
-    external.bytes = saved.bytes;
+    await readSharedAudio(external);
   }
 }
 async function prepare(attempt: StartupAttempt) {
@@ -1293,6 +1300,8 @@ function finish() {
   });
 }
 function resultLink(result: UiResult) {
+  if (receivedShare?.data.result === result)
+    return new URL('/result/#' + receivedShare.fragment, location.origin).href;
   if (externalSource(result.song))
     return new URL(
       '/result/?local=' + encodeURIComponent(localSessionKey ?? result.song),
@@ -1325,7 +1334,7 @@ function showResult(result: UiResult) {
   stopPreview();
   $('#result-song').textContent =
     SONGS.find((s) => s.id === result.song)?.title ?? result.song;
-  $<HTMLButtonElement>('#share-result').hidden = !!externalSource(result.song);
+  $<HTMLButtonElement>('#share-result').hidden = false;
   resultOptions(result);
   $('#result-rank').textContent =
     result.accuracy >= 97
@@ -1807,8 +1816,8 @@ for (const id of ['fader', 'shuffle'] as const)
 let shareBusy = false;
 const shortCache = new Map<string, { id: string; expiresAt: string }>();
 $('#share-result').onclick = async () => {
-  if (lastResult && externalSource(lastResult.song)) return;
   if (!lastResult || shareBusy) return;
+  const sharedResult = lastResult;
   shareBusy = true;
   const button = $<HTMLButtonElement>('#share-result');
   button.disabled = true;
@@ -1820,9 +1829,19 @@ $('#share-result').onclick = async () => {
   // after the user's on-demand save, with no preview upload or long-link fallback.
   const link = (async () => {
     await replayEncoding;
+    if (lastResult !== sharedResult) throw new ShareError(400);
     if (replayExpected && (!savedReplay || !replayText || replayIssue))
       throw new ShareError(400);
-    const fragment = new URL(resultLink(lastResult!)).hash.slice(1);
+    const item = externalSource(lastResult!.song);
+    const fragment = item
+      ? await encodeExternalShare({
+          record: item.record,
+          replay: savedReplay!,
+          result: lastResult!,
+          title: item.song.title,
+          ...(item.jobId ? { jobId: item.jobId } : {}),
+        })
+      : new URL(resultLink(lastResult!)).hash.slice(1);
     let shared = shortCache.get(fragment);
     if (!shared || Date.parse(shared.expiresAt) <= Date.now())
       shared = await saveSharedReplay(fragment);
@@ -1859,11 +1878,33 @@ $('#share-result').onclick = async () => {
     button.disabled = false;
   }
 };
-$('#watch-replay').onclick = () => {
+$('#watch-replay').onclick = () => void watchReplay();
+async function watchReplay() {
   if (!savedReplay || !lastResult || !replayMatches(savedReplay, lastResult)) {
     toast(REPLAY_LABELS[settings.language][2]);
     return;
   }
+  const replayToWatch = savedReplay,
+    resultToWatch = lastResult;
+  const item = externalSource(savedReplay.song);
+  if (item && !item.bytes) {
+    const button = $<HTMLButtonElement>('#watch-replay');
+    button.disabled = true;
+    try {
+      await readSharedAudio(item);
+    } catch (error) {
+      showAudioRecovery(item, error);
+      return;
+    } finally {
+      button.disabled = false;
+    }
+  }
+  if (
+    savedReplay !== replayToWatch ||
+    lastResult !== resultToWatch ||
+    !$<HTMLDialogElement>('#results').open
+  )
+    return;
   playReplay = savedReplay;
   songIndex = SONGS.findIndex((s) => s.id === playReplay!.song);
   settings.lanes = playReplay.lanes;
@@ -1881,7 +1922,7 @@ $('#watch-replay').onclick = () => {
   );
   screen = 'select';
   void start();
-};
+}
 $('#start').onclick = () => void start();
 $('#exit').onclick = () => void pauseGame();
 $('#retry').onclick = () => {
@@ -2092,7 +2133,96 @@ function playPath() {
 function selectionPath() {
   return `/select/?song=${SONGS[songIndex].id}&lanes=${settings.lanes}&difficulty=${settings.difficulty}&speed=${settings.speed.toFixed(1)}&fader=${settings.fader}&shuffle=${settings.shuffle}&seed=${shuffleSeed}${perfOverlay ? '&perf=1' : ''}`;
 }
+
+function showAudioRecovery(
+  item: NonNullable<ReturnType<typeof externalSource>>,
+  error: unknown,
+) {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'share-error';
+  const text = document.createElement('p');
+  text.textContent =
+    externalError(error, settings.language) +
+    ' ' +
+    sharedAudioLabels(settings.language).explain;
+  const restore = document.createElement('button');
+  restore.className = 'primary';
+  restore.textContent = sharedAudioLabels(settings.language).restore;
+  const close = document.createElement('button');
+  close.textContent = t('close');
+  const controller = new AbortController();
+  close.onclick = () => {
+    controller.abort();
+    dialog.close();
+    dialog.remove();
+  };
+  dialog.addEventListener('cancel', () => controller.abort());
+  dialog.addEventListener('close', () => {
+    controller.abort();
+    dialog.remove();
+  });
+  restore.onclick = async () => {
+    restore.disabled = true;
+    restore.textContent = externalLabels(settings.language).preparing;
+    try {
+      await recoverSharedAudio(
+        item,
+        AbortSignal.any([controller.signal, AbortSignal.timeout(90000)]),
+      );
+      dialog.close();
+      dialog.remove();
+      await watchReplay();
+    } catch (e) {
+      if (!controller.signal.aborted)
+        text.textContent =
+          externalError(e, settings.language) +
+          ' ' +
+          sharedAudioLabels(settings.language).explain;
+    } finally {
+      restore.disabled = false;
+      restore.textContent = sharedAudioLabels(settings.language).restore;
+    }
+  };
+  dialog.append(text, restore, close);
+  document.body.append(dialog);
+  dialog.showModal();
+}
+async function openExternalShare(fragment: string) {
+  const request = ++shareRouteRequest;
+  const href = location.href;
+  const data = await decodeExternalShare(fragment);
+  if (request !== shareRouteRequest || location.href !== href) return;
+  await pinSource(data.record);
+  if (request !== shareRouteRequest || location.href !== href) return;
+  const item = installExternalSource(
+    data.record,
+    data.title,
+    undefined,
+    data.jobId,
+  );
+  if (!SONGS.some((s) => s.id === item.song.id)) SONGS.push(item.song);
+  receivedShare = { fragment, data };
+  savedReplay = data.replay;
+  lastResult = data.result;
+  replayExpected = false;
+  replayIssue = false;
+  replayText = '';
+  readRoute();
+}
+
 function readRoute() {
+  const fragment = location.hash.slice(1);
+  if (
+    location.pathname === '/result/' &&
+    fragment.startsWith('v=5&d=') &&
+    receivedShare?.fragment !== fragment
+  ) {
+    void openExternalShare(fragment).catch(() => {
+      toast(shareLabels(settings.language).invalid);
+      document.documentElement.removeAttribute('data-result-pending');
+    });
+    return;
+  }
   readingRoute = true;
   document
     .querySelectorAll<HTMLDialogElement>('dialog[open]')
@@ -2118,13 +2248,18 @@ function readRoute() {
     seed <= 4294967295
   )
     shuffleSeed = seed;
+  const externalShared =
+    parts[0] === 'result' && receivedShare?.fragment === fragment
+      ? receivedShare.data
+      : undefined;
   const shared =
-    parts[0] === 'result'
+    externalShared?.result ??
+    (parts[0] === 'result'
       ? readResult(
           location.hash ? new URLSearchParams(location.hash.slice(1)) : q,
         )
-      : null;
-  if (shared) {
+      : null);
+  if (shared && !externalShared) {
     lastResult = shared;
     const replayParams = new URLSearchParams(location.hash.slice(1));
     const encoded = replayParams.get('r');
@@ -2157,6 +2292,12 @@ function readRoute() {
     }
     settings.lanes = shared.lanes;
     settings.difficulty = shared.difficulty;
+  }
+  if (externalShared) {
+    savedReplay = externalShared.replay;
+    lastResult = externalShared.result;
+    settings.lanes = externalShared.replay.lanes;
+    settings.difficulty = externalShared.replay.difficulty;
   }
   const id = shared
     ? shared.song
@@ -2233,6 +2374,15 @@ window.addEventListener('popstate', () => {
 async function readInitialRoute() {
   const id = new URLSearchParams(location.search).get('s');
   if (!id) {
+    if (location.hash.startsWith('#v=5&d=')) {
+      try {
+        await openExternalShare(location.hash.slice(1));
+      } catch {
+        toast(shareLabels(settings.language).invalid);
+        document.documentElement.removeAttribute('data-result-pending');
+      }
+      return;
+    }
     readRoute();
     await replayEncoding;
     document.documentElement.removeAttribute('data-result-pending');
@@ -2242,6 +2392,12 @@ async function readInitialRoute() {
   try {
     const loaded = await loadSharedReplay(id),
       params = new URLSearchParams(loaded.fragment);
+    if (params.get('v') === '5') {
+      shortCache.set(loaded.fragment, { id, expiresAt: loaded.expiresAt });
+      history.replaceState(null, '', '/result/#' + loaded.fragment);
+      await openExternalShare(loaded.fragment);
+      return;
+    }
     if (!readResult(params)) throw new ShareError(400);
     const encoded = params.get('r');
     if (
@@ -2287,7 +2443,9 @@ const initialQuery = new URLSearchParams(location.search);
 const deferredLibraryRoute =
   location.pathname.includes('/yt-') ||
   initialQuery.get('song')?.startsWith('yt-') ||
-  initialQuery.has('local');
+  initialQuery.has('local') ||
+  initialQuery.has('s') ||
+  location.hash.startsWith('#v=5&d=');
 if (!deferredLibraryRoute) void readInitialRoute();
 async function initializeLibrary() {
   try {
