@@ -4036,3 +4036,58 @@ dialog .hint,
 #chart-info {
   display: none;
 }
+/* A31: small gameplay labels remain readable without enlarging the note field. */
+#now-detail {
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+}
+#keycaps > span {
+  font-size: 14px;
+}
+#lane-detail {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+.option-chip b {
+  font-size: 14px;
+}
+.option-readout kbd {
+  font-size: 12px;
+}
+.score-block > .eyebrow,
+.track-block > .eyebrow {
+  font-size: 12px;
+}
+.selected-meta,
+#selected-genre,
+#selected-bpm {
+  font-size: 12px;
+  line-height: 1.5;
+}
+/* Missing replay artwork has a neutral music tile, never another song's art. */
+.replay-art-frame {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16/9;
+  overflow: hidden;
+  background: #0a141f;
+  border: 1px solid #263c4d;
+  border-radius: 3px;
+}
+.replay-art-frame > * {
+  grid-area: 1/1;
+}
+.replay-art-placeholder {
+  font-size: 28px;
+  color: #5b9bb5;
+}
+.replay-art-frame:has(img:not([hidden])) .replay-art-placeholder {
+  visibility: hidden;
+}
+.replay-art {
+  display: block;
+}
+.replay-art[hidden] {
+  display: none;
+}

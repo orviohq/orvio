@@ -1,5 +1,20 @@
+import fs from 'node:fs';
 import { test, expect } from '@playwright/test';
-const languages = ['ko', 'en', 'de', 'fr', 'ru', 'vi', 'ja', 'zh'];
+const languages = [
+  'ko',
+  'en',
+  'de',
+  'fr',
+  'ru',
+  'vi',
+  'ja',
+  'zh',
+  'es',
+  'pt',
+  'it',
+  'id',
+  'tr',
+];
 test('A31 actions and settings remain readable and reachable across narrow and long locales', async ({
   page,
 }) => {
@@ -64,16 +79,18 @@ test('A31 actions and settings remain readable and reachable across narrow and l
     await page.keyboard.press('Escape');
   }
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto('/play/first-light/5/low/');
-  await page.keyboard.press('Enter');
-  await expect(page.locator('#results')).toBeVisible({ timeout: 50000 });
+  const fragment = JSON.parse(
+    fs.readFileSync('/downloads/v027-public-proof.json', 'utf8'),
+  )[0].shareCaptures[0].fragment;
+  await page.goto('/result/#' + fragment);
+  await expect(page.locator('#results')).toBeVisible();
   for (const [width, height] of [
     [1280, 720],
     [390, 844],
     [320, 568],
   ]) {
     await page.setViewportSize({ width, height });
-    for (const lang of ['en', 'ko', 'de']) {
+    for (const lang of languages) {
       await page.evaluate((l) => {
         Object.defineProperty(navigator, 'languages', {
           get: () => [l],

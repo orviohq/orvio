@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.29] - 2026-11-08
+
+- A30: Continue long-note hit effects while held, stop after release, honor reduced motion. Judgments and timing unchanged.
+- A31: Correct undersized translated action labels and menus. Keep full results visible at laptop height and all content reachable on small screens.
+- A32: Add replay artwork, exact song duration and new-session play timestamps; mark legacy missing times honestly. Improve archive cards and wheel/keyboard/touch scrolling.
+- A33/A34: Remove duplicate top removal action and redundant library/keyboard copy. Preserve contextual and keyboard removal.
+- A36: Keep stable selected-song identity and list scroll when returning.
+- A38: Show current key-mode/difficulty note counts within each song row, remove bottom provenance/count line.
+- Clarify that audio-capacity errors refer to the server limit, not device storage.
+
 ## [0.2.28] - 2026-11-08
 
 - Recover YouTube song titles and artists from identity-bound saved metadata for fresh and already-added songs, without re-adding or re-extracting audio. Keep saved audio, charts and replays unchanged.

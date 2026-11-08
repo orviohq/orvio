@@ -1,3 +1,4 @@
+import { externalSource } from './external-catalog';
 import { SONGS, duration } from './chart';
 import { songArt, ART_FALLBACK } from './song-art';
 import type { Language } from './i18n';
@@ -115,11 +116,20 @@ function renderRow(
   art.loading = 'lazy';
   art.referrerPolicy = 'no-referrer';
   art.dataset.songArt = session.replay.song;
-  art.src = songArt(session.replay.song);
+  const artwork = songArt(session.replay.song);
+  art.hidden =
+    !!externalSource(session.replay.song) && artwork === ART_FALLBACK;
+  art.src = artwork;
   art.onerror = () => {
-    art.onerror = null;
-    art.src = ART_FALLBACK;
+    art.hidden = true;
   };
+  const artFrame = document.createElement('span');
+  artFrame.className = 'replay-art-frame';
+  const placeholder = document.createElement('span');
+  placeholder.className = 'replay-art-placeholder';
+  placeholder.textContent = '♪';
+  placeholder.setAttribute('aria-hidden', 'true');
+  artFrame.append(placeholder, art);
   const copy = document.createElement('span');
   copy.className = 'replay-copy';
   const title = document.createElement('strong');
@@ -156,7 +166,7 @@ function renderRow(
   open.textContent = '▶';
   open.setAttribute('aria-hidden', 'true');
   score.append(value, stats);
-  row.append(art, copy, score, open);
+  row.append(artFrame, copy, score, open);
   row.onclick = () => onOpen(session.key);
   return row;
 }

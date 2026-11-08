@@ -67,6 +67,9 @@ test('A33 A34 A36 A38 stable selection contextual removal and current per-song c
   ).toHaveCount(0);
   await page.screenshot({ path: '/downloads/a36-a38-selection-desktop.png' });
   // A canonical row is new-first, so count labels must bind dataset identity, not DOM position.
+  await page.route('https://i.ytimg.com/**', (r) =>
+    r.fulfill({ status: 404, body: '' }),
+  );
   const f = JSON.parse(
     fs.readFileSync('/downloads/v027-synthetic-fixture.json', 'utf8'),
   );
@@ -122,6 +125,13 @@ test('A33 A34 A36 A38 stable selection contextual removal and current per-song c
   await expect(page.locator('.song-card.selected strong')).toContainText(
     'AAAAAAAAAAA',
   );
+  await page.click('#open-replays');
+  await expect(page.locator('.replay-row')).toHaveCount(1);
+  await expect(page.locator('.replay-mode')).toContainText('0:01');
+  await expect(page.locator('.replay-time')).toHaveAttribute('datetime', /.+/);
+  await expect(page.locator('.replay-art')).toBeHidden();
+  await expect(page.locator('.replay-art-placeholder')).toBeVisible();
+  await page.click('#replays-back');
   await page.setViewportSize({ width: 1280, height: 480 });
   await page.locator('[data-song="2"]').click();
   const scroll = await page.locator('#songs').evaluate((e) => e.scrollTop);
