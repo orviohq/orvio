@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.24] - 2026-11-08
+
+- Show the existing audio request limit, up to 100 requests per IP per day, in the Add YouTube dialog in all 13 languages. No quota or service policy changes.
+
 ## [0.2.23] - 2026-11-08
 
 - Use one verified chart set and difficulty per YouTube video across clients; keep archived charts and saved play history unchanged.
