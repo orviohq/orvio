@@ -1,3 +1,4 @@
+import './scrollbars.css';
 import { replayFrameChanged } from './replay-frame';
 import {
   difficultyForChart,
