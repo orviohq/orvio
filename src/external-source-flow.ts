@@ -1,4 +1,3 @@
-import { audioAtStage } from './audio-error-stage';
 import { readAudioJob, loadAudio, AudioJobError } from './external-audio-api';
 import { canonicalForJob } from './canonical-job';
 import type { SourceRecord } from './external-source';
@@ -7,7 +6,7 @@ export interface PreparedSource {
   bytes: ArrayBuffer;
   restored: boolean;
 }
-/** Preparation from an explicit job. Does not POST, poll, substitute source, or change the original catalog. */
+/** Known-job GET preparation, including bounded canonical-status GETs. Never extracts via POST, generates locally, or substitutes an archive. */
 export async function prepareExternalJob(
   videoId: string,
   jobId: string,
