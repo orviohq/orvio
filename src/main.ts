@@ -177,6 +177,7 @@ let lastResult: UiResult | undefined;
 let localSessionKey: string | undefined;
 let receivedShare: { fragment: string; data: ExternalSharedReplay } | undefined;
 let shareRouteRequest = 0;
+let navigationVersion = 0;
 let sessionReplay: RuntimeReplay | undefined,
   savedReplay: RuntimeReplay | undefined,
   playReplay: RuntimeReplay | undefined;
@@ -1884,7 +1885,8 @@ async function watchReplay() {
     toast(REPLAY_LABELS[settings.language][2]);
     return;
   }
-  const watchHref = location.href;
+  const watchHref = location.href,
+    watchNavigation = navigationVersion;
   const replayToWatch = savedReplay,
     resultToWatch = lastResult;
   const item = externalSource(savedReplay.song);
@@ -1895,6 +1897,7 @@ async function watchReplay() {
       await readSharedAudio(item);
     } catch (error) {
       if (
+        navigationVersion === watchNavigation &&
         location.href === watchHref &&
         savedReplay === replayToWatch &&
         lastResult === resultToWatch &&
@@ -1907,6 +1910,7 @@ async function watchReplay() {
     }
   }
   if (
+    navigationVersion !== watchNavigation ||
     location.href !== watchHref ||
     savedReplay !== replayToWatch ||
     lastResult !== resultToWatch ||
@@ -2146,7 +2150,8 @@ function showAudioRecovery(
   item: NonNullable<ReturnType<typeof externalSource>>,
   error: unknown,
 ) {
-  const recoveryHref = location.href;
+  const recoveryHref = location.href,
+    recoveryNavigation = navigationVersion;
   const recoveryReplay = savedReplay,
     recoveryResult = lastResult;
   const dialog = document.createElement('dialog');
@@ -2181,6 +2186,7 @@ function showAudioRecovery(
         AbortSignal.any([controller.signal, AbortSignal.timeout(90000)]),
       );
       const stillCurrent =
+        navigationVersion === recoveryNavigation &&
         location.href === recoveryHref &&
         savedReplay === recoveryReplay &&
         lastResult === recoveryResult &&
@@ -2228,6 +2234,8 @@ async function openExternalShare(fragment: string) {
 }
 
 function readRoute() {
+  if (location.pathname !== '/result/')
+    document.documentElement.removeAttribute('data-result-pending');
   const fragment = location.hash.slice(1);
   if (
     location.pathname === '/result/' &&
@@ -2383,6 +2391,7 @@ $('#ready-start').onclick = () => {
   void start();
 };
 window.addEventListener('popstate', () => {
+  navigationVersion++;
   if (startup) {
     startup.cancel();
     return;
@@ -2390,12 +2399,17 @@ window.addEventListener('popstate', () => {
   readRoute();
 });
 async function readInitialRoute() {
+  let expectedHref = location.href;
+  const initialNavigation = navigationVersion;
+  const stillInitial = () =>
+    navigationVersion === initialNavigation && location.href === expectedHref;
   const id = new URLSearchParams(location.search).get('s');
   if (!id) {
     if (location.hash.startsWith('#v=5&d=')) {
       try {
         await openExternalShare(location.hash.slice(1));
       } catch {
+        if (!stillInitial()) return;
         toast(shareLabels(settings.language).invalid);
         document.documentElement.removeAttribute('data-result-pending');
       }
@@ -2408,11 +2422,13 @@ async function readInitialRoute() {
   }
   const labels = shareLabels(settings.language);
   try {
-    const loaded = await loadSharedReplay(id),
-      params = new URLSearchParams(loaded.fragment);
+    const loaded = await loadSharedReplay(id);
+    if (!stillInitial()) return;
+    const params = new URLSearchParams(loaded.fragment);
     if (params.get('v') === '5') {
       shortCache.set(loaded.fragment, { id, expiresAt: loaded.expiresAt });
       history.replaceState(null, '', '/result/#' + loaded.fragment);
+      expectedHref = location.href;
       await openExternalShare(loaded.fragment);
       return;
     }
@@ -2426,6 +2442,7 @@ async function readInitialRoute() {
       throw new ShareError(400);
     if (encoded) {
       const replay = await decodeReplay(encoded);
+      if (!stillInitial()) return;
       if (!replay || !replayMatches(replay, readResult(params)!))
         throw new ShareError(400);
     }
@@ -2434,6 +2451,7 @@ async function readInitialRoute() {
     history.replaceState(null, '', '/result/#' + loaded.fragment);
     readRoute();
   } catch (error) {
+    if (!stillInitial()) return;
     readRoute();
     const dialog = document.createElement('dialog');
     dialog.className = 'share-error';
