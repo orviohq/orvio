@@ -1,4 +1,5 @@
 import { AUDIO_BASE, AudioJobError } from './external-audio-api';
+import { queryClient, queryKeys } from './query-client';
 import { readAudioLimit } from './audio-limit-message';
 import { AUDIO_MAX_BYTES } from './audio-limits.mjs';
 import { inspectWav } from './canonical-pcm.mjs';
@@ -16,6 +17,28 @@ export async function loadCanonicalAudio(
   )
     throw new AudioJobError('integrity_failed');
   signal?.throwIfAborted();
+  // Query-coordinated transport: concurrent reads of the same pin-bound
+  // audio dedup onto one download. staleTime 0 keeps every call live and
+  // gcTime 0 drops the bytes the moment no caller holds them - the PCM is
+  // never retained by the query cache and never persisted.
+  return queryClient.fetchQuery({
+    queryKey: queryKeys.canonicalAudioBytes(record.videoId, record.audioSha256),
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+    queryFn: ({ signal: querySignal }) =>
+      downloadCanonicalAudio(
+        record,
+        signal ? AbortSignal.any([querySignal, signal]) : querySignal,
+        signal,
+      ),
+  });
+}
+async function downloadCanonicalAudio(
+  record: SourceRecord,
+  signal: AbortSignal,
+  callerSignal?: AbortSignal,
+): Promise<ArrayBuffer> {
   let response: Response;
   try {
     response = await fetch(
@@ -23,7 +46,7 @@ export async function loadCanonicalAudio(
       { signal },
     );
   } catch (error) {
-    if (signal?.aborted) throw error;
+    if (callerSignal?.aborted || signal.aborted) throw error;
     throw new AudioJobError(
       'network_error',
       undefined,
@@ -85,7 +108,7 @@ export async function loadCanonicalAudio(
   let offset = 0;
   try {
     for (;;) {
-      signal?.throwIfAborted();
+      signal.throwIfAborted();
       const { value, done } = await reader.read();
       if (done) break;
       if (offset + value.byteLength > size)
@@ -94,7 +117,12 @@ export async function loadCanonicalAudio(
       offset += value.byteLength;
     }
   } catch (error) {
-    if (signal?.aborted || error instanceof AudioJobError) throw error;
+    if (
+      callerSignal?.aborted ||
+      signal.aborted ||
+      error instanceof AudioJobError
+    )
+      throw error;
     throw new AudioJobError(
       'network_error',
       undefined,
@@ -105,7 +133,7 @@ export async function loadCanonicalAudio(
   } finally {
     await reader.cancel().catch(() => {});
   }
-  signal?.throwIfAborted();
+  signal.throwIfAborted();
   if (offset !== size) throw new AudioJobError('integrity_failed');
   const sha = Array.from(
     new Uint8Array(await crypto.subtle.digest('SHA-256', joined)),
@@ -119,6 +147,6 @@ export async function loadCanonicalAudio(
   } catch {
     throw new AudioJobError('integrity_failed');
   }
-  signal?.throwIfAborted();
+  signal.throwIfAborted();
   return joined.buffer;
 }

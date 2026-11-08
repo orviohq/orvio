@@ -1,0 +1,119 @@
+---
+import restore from '../result-first-paint-bootstrap.js?raw';
+---
+
+<div id="result-first-paint" hidden inert aria-busy="true">
+  <div id="rpaint" role="dialog" aria-labelledby="rp-song">
+    <div class="result-system">
+      ORVIO <span class="rp-system-right">SESSION REPORT</span>
+    </div>
+    <div class="result-heading">
+      <img id="rp-art" alt="" />
+      <div class="result-track">
+        <h2 id="rp-song"></h2>
+        <p id="rp-metadata"></p>
+        <button
+          id="rp-preview"
+          class="quiet"
+          type="button"
+          tabindex="-1"
+          aria-pressed="false"
+        ></button>
+      </div>
+    </div>
+    <p id="rp-options"></p>
+    <div class="result-summary">
+      <div class="result-score-block">
+        <div id="rp-badge"></div>
+        <div class="result-score-caption rp-score-caption"></div>
+        <div class="result-score" id="rp-score"></div>
+      </div>
+      <div class="result-rank-block">
+        <span class="result-rank-caption">RANK</span>
+        <span id="rp-rank"></span>
+      </div>
+    </div>
+    <div class="result-stats">
+      <div>
+        <span></span>
+        <strong id="rp-rate"></strong>
+      </div>
+      <div>
+        <span></span>
+        <strong id="rp-combo"></strong>
+      </div>
+      <div>
+        <span></span>
+        <strong id="rp-break"></strong>
+      </div>
+    </div>
+    <p id="rp-fever" class="hint hidden"></p>
+    <div id="rp-judgment-list"></div>
+    <div class="result-tools">
+      <button
+        id="rp-watch-replay"
+        class="quiet hidden"
+        type="button"
+        tabindex="-1"
+      ></button>
+      <button id="rp-share-result" class="quiet" type="button" tabindex="-1">
+        <svg
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M12 15V3m-4 4 4-4 4 4M5 12v8h14v-8" />
+        </svg>
+        <span data-rp-share-label></span>
+      </button>
+    </div>
+    <p class="mobile-playback-note" data-rp-mobile-note></p>
+    <div class="result-actions">
+      <button id="rp-back" class="quiet" type="button" tabindex="-1"></button>
+      <button
+        id="rp-retry"
+        class="primary"
+        type="button"
+        tabindex="-1"
+      ></button>
+    </div>
+  </div>
+</div>
+<style is:inline>
+  #result-first-paint[hidden] {
+    display: none;
+  }
+  #result-first-paint {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: grid;
+    place-items: center;
+    padding: 20px 24px;
+    box-sizing: border-box;
+    overflow: auto;
+    background: #14131a;
+  }
+  #result-first-paint #rpaint {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+  }
+  #result-first-paint button {
+    cursor: default;
+  }
+</style>
+
+<script is:inline>
+  document
+    .getElementById('result-first-paint')
+    ?.classList.toggle(
+      'mobile-playback-only',
+      matchMedia('(hover: none) and (pointer: coarse)').matches,
+    );
+</script>
+<script is:inline set:html={restore}></script>

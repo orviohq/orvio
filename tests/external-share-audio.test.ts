@@ -5,12 +5,14 @@ vi.mock('../src/canonical-audio-api', () => ({ loadCanonicalAudio: vi.fn() }));
 import { readCanonicalSource } from '../src/canonical-source-api';
 import { loadCanonicalAudio } from '../src/canonical-audio-api';
 import { AudioJobError } from '../src/external-audio-api';
-import { it, expect, vi, afterEach } from 'vitest';
+import { it, expect, vi, afterEach, beforeEach } from 'vitest';
 import {
   readSharedAudio,
   recoverSharedAudio,
 } from '../src/external-share-audio';
 import { type ExternalSong } from '../src/external-catalog';
+import { queryClient } from '../src/query-client';
+beforeEach(() => queryClient.clear());
 const store = vi.hoisted(() => ({
   local: vi.fn(async () => null),
   save: vi.fn(async () => {}),

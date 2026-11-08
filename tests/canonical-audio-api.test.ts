@@ -1,6 +1,8 @@
-import { it, expect, vi, afterEach } from 'vitest';
+import { it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { loadCanonicalAudio } from '../src/canonical-audio-api';
 import type { SourceRecord } from '../src/external-source';
+import { queryClient } from '../src/query-client';
+beforeEach(() => queryClient.clear());
 const wav = new ArrayBuffer(192044),
   v = new DataView(wav);
 for (const [offset, word] of [

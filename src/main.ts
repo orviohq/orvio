@@ -3,6 +3,11 @@ import {
   rememberLibraryFirstPaint,
   finishLibraryFirstPaint,
 } from './library-first-paint';
+import {
+  rememberResultFirstPaint,
+  finishResultFirstPaint,
+  resultIdentityKey,
+} from './result-first-paint';
 import { savedCanonical } from './canonical-library';
 import { importStageLabel } from './import-progress';
 import { showToast as toast } from './ui/sonner';
@@ -78,6 +83,7 @@ import {
 } from './external-catalog';
 import { FULLSCREEN_WARNING } from './fullscreen-labels';
 import { saveSharedReplay, loadSharedReplay, ShareError } from './share-api';
+import { queryClient, queryKeys, queryReady } from './query-client';
 import { shareLabels } from './share-labels';
 import { ScoreDisplay } from './score-display';
 import { REPLAY_LABELS, REPLAY_PLAYING } from './replay-labels';
@@ -97,7 +103,7 @@ import {
   requestGameFullscreen,
   fullscreenEscapeStatus,
 } from './fullscreen-escape';
-import { resultBadges } from './result-badges';
+import { resultBadgeData, resultBadges } from './result-badges';
 import { enhanceSelects } from './select-ui';
 import './select-ui.css';
 import { cachedAudio, saveAudio } from './audio-cache';
@@ -1819,6 +1825,8 @@ function resultLink(result: UiResult) {
   return new URL('/result/#' + p, location.origin).href;
 }
 function showResult(result: UiResult) {
+  const arrivalKey = initialArrivalKey ?? resultIdentityKey(location.href);
+  initialArrivalKey = null;
   $('#retry').innerHTML =
     `${label(ownResults.has(result) ? 'retry' : 'start')} ↵`;
   screen = 'select';
@@ -1828,6 +1836,7 @@ function showResult(result: UiResult) {
   lastResult = result;
   const sharedURL = resultLink(result);
   history.replaceState(null, '', sharedURL);
+  const canonicalKey = resultIdentityKey(location.href);
   document.body.classList.remove('home-screen', 'ready-screen');
   document.body.classList.add('results-screen');
   $('#share-result').innerHTML =
@@ -1840,7 +1849,7 @@ function showResult(result: UiResult) {
   $('#result-song').textContent =
     SONGS.find((s) => s.id === result.song)?.title ?? result.song;
   $<HTMLButtonElement>('#share-result').hidden = false;
-  resultOptions(result);
+  const resultBadgeList = resultOptions(result);
   $('#result-rank').textContent =
     result.accuracy >= 97
       ? 'S'
@@ -1888,7 +1897,19 @@ function showResult(result: UiResult) {
   document.documentElement.removeAttribute('data-result-pending');
   resultDialog.focus({ preventScroll: true });
   resultDialog.scrollTop = 0;
-  resultMotion.play(result.score, settings.reducedMotion);
+  const projected = finishResultFirstPaint(result, [arrivalKey, canonicalKey]);
+  // A result that arrived through a share carries the share's verified
+  // expiry onto every identity the projection is written under, so an
+  // expired share can never paint before the app rejects it.
+  const shared = shortCache.get(
+    sharedURL.slice(sharedURL.indexOf('#') + 1),
+  );
+  rememberResultFirstPaint([arrivalKey, canonicalKey], result, {
+    ...(shared ? { expiresAt: Date.parse(shared.expiresAt) } : {}),
+    badges: resultBadgeList,
+    locale: settings.language,
+  });
+  resultMotion.play(result.score, settings.reducedMotion || projected);
 }
 
 const resultMotion = new ResultMotion($<HTMLDialogElement>('#results'));
@@ -1917,13 +1938,15 @@ function resultOptions(result: UiResult) {
   $('#result-metadata').title = RESULT_LABELS[settings.language][2];
   syncResultPreview();
   syncReplayButton();
-  $('#result-options').innerHTML = resultBadges(result, {
+  const badgeLabels = {
     keys: 'KEY',
     difficulty: chartLevel(song, result.difficulty, result.lanes),
     speed: t('speed'),
     shuffle: t('shuffle'),
     fader: t('fader'),
-  });
+  };
+  $('#result-options').innerHTML = resultBadges(result, badgeLabels);
+  return resultBadgeData(result, badgeLabels);
 }
 function exit() {
   playReplay = undefined;
@@ -3020,7 +3043,28 @@ window.addEventListener('popstate', () => {
   }
   readRoute();
 });
+/** Warm-cache-first shared replay load: identical identity (replay id),
+ * expiry enforced locally exactly as the network path does. */
+async function resolveSharedReplay(
+  id: string,
+): Promise<{ fragment: string; expiresAt: string }> {
+  await queryReady;
+  const key = queryKeys.sharedReplay(id);
+  const cached = queryClient.getQueryData<{
+    fragment: string;
+    expiresAt: string;
+  }>(key);
+  if (cached) {
+    if (Date.parse(cached.expiresAt) > Date.now()) return cached;
+    queryClient.removeQueries({ queryKey: key });
+  }
+  return loadSharedReplay(id);
+}
+let initialArrivalKey: string | null = null;
 async function readInitialRoute() {
+  // The ?s= flow replaceStates to the fragment form before rendering; keep
+  // the arrival identity so the projection is written under both.
+  initialArrivalKey = resultIdentityKey(location.href);
   let expectedHref = location.href;
   const initialNavigation = navigationVersion;
   const stillInitial = () =>
@@ -3032,6 +3076,7 @@ async function readInitialRoute() {
         await openExternalShare(location.hash.slice(1));
       } catch {
         if (!stillInitial()) return;
+        finishResultFirstPaint(null);
         toast(shareLabels(settings.language).invalid);
         document.documentElement.removeAttribute('data-result-pending');
       }
@@ -3051,7 +3096,10 @@ async function readInitialRoute() {
   }
   const labels = shareLabels(settings.language);
   try {
-    const loaded = await loadSharedReplay(id);
+    // ORV-62: the restored IndexedDB query cache is awaited (fast local
+    // read) so a previously fetched result renders instantly with no
+    // network wait. Only a cold or expired cache reaches the network.
+    const loaded = await resolveSharedReplay(id);
     if (!stillInitial()) return;
     const params = new URLSearchParams(loaded.fragment);
     if (params.get('v') === '5') {
@@ -3081,6 +3129,7 @@ async function readInitialRoute() {
     readRoute();
   } catch (error) {
     if (!stillInitial()) return;
+    finishResultFirstPaint(null);
     readRoute();
     const dialog = document.createElement('dialog');
     dialog.className = 'share-error';
@@ -3290,7 +3339,9 @@ async function initializeLibrary() {
       settings.difficulty = session.replay.difficulty;
       showResult(session.result);
     } catch {
+      finishResultFirstPaint(null);
       toast(REPLAY_READ_ERROR[settings.language]);
+      document.documentElement.removeAttribute('data-result-pending');
     }
   }
 }

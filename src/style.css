@@ -792,25 +792,25 @@ dialog .segmented button {
   font-size: 24px;
   font-weight: 400;
 }
-#result-badge {
+:is(#result-badge, #rp-badge) {
   font-size: 10px;
   letter-spacing: 2px;
   color: #43e4ff;
 }
-#judgment-list {
+:is(#judgment-list, #rp-judgment-list) {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 13px;
   margin: 25px 0;
 }
-#judgment-list div {
+:is(#judgment-list, #rp-judgment-list) div {
   font-size: 9px;
   color: #9c8cab;
   display: flex;
   justify-content: space-between;
   gap: 5px;
 }
-#judgment-list b {
+:is(#judgment-list, #rp-judgment-list) b {
   color: #ddd0ec;
   font-weight: 400;
 }
@@ -1571,7 +1571,7 @@ dialog input[type='checkbox'] {
   font-weight: 600;
   letter-spacing: 1px;
 }
-#results {
+:is(#results, #rpaint) {
   width: min(780px, calc(100% - 30px));
   padding: 35px 45px;
   background: #0b1724;
@@ -1598,10 +1598,10 @@ dialog input[type='checkbox'] {
 .result-stats {
   border-color: #ffffff22;
 }
-#result-badge {
+:is(#result-badge, #rp-badge) {
   color: #ffdc4a;
 }
-#judgment-list {
+:is(#judgment-list, #rp-judgment-list) {
   grid-template-columns: repeat(4, 1fr);
 }
 @keyframes perfect-hit {
@@ -1864,7 +1864,7 @@ dialog input[type='checkbox'] {
   .score-block {
     display: none;
   }
-  #results {
+  :is(#results, #rpaint) {
     padding: 25px;
   }
   .result-heading > span {
@@ -1873,7 +1873,7 @@ dialog input[type='checkbox'] {
   .result-score {
     font-size: 54px;
   }
-  #judgment-list {
+  :is(#judgment-list, #rp-judgment-list) {
     grid-template-columns: repeat(3, 1fr);
   }
 }
@@ -1925,7 +1925,7 @@ dialog input[type='checkbox'] {
     0 0 20px #ffd21d,
     0 0 35px #ffad1f;
 }
-#results {
+:is(#results, #rpaint) {
   background: #0b1724;
 }
 
@@ -2066,7 +2066,7 @@ dialog input[type='checkbox'] {
 .song-card.selected {
   background: #163144;
 }
-#results {
+:is(#results, #rpaint) {
   background: #101c28;
 }
 #home-screen,
@@ -2271,7 +2271,7 @@ dialog input[type='checkbox'] {
   font-size: 14px;
 }
 
-#share-result {
+:is(#share-result, #rp-share-result) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2281,7 +2281,7 @@ dialog input[type='checkbox'] {
   border-radius: 8px;
   color: #29d8ff;
 }
-#share-result svg {
+:is(#share-result, #rp-share-result) svg {
   width: 24px;
   height: 24px;
 }
@@ -2434,11 +2434,11 @@ dialog input[type='checkbox'] {
     gap: 12px;
     align-items: center;
   }
-  .result-actions #share-result {
+  .result-actions :is(#share-result, #rp-share-result) {
     grid-column: 1;
     grid-row: 1;
   }
-  .result-actions #back {
+  .result-actions :is(#back, #rp-back) {
     grid-column: 2;
     grid-row: 1;
     min-width: 0;
@@ -2446,7 +2446,7 @@ dialog input[type='checkbox'] {
     word-break: normal;
     overflow-wrap: anywhere;
   }
-  .result-actions #retry {
+  .result-actions :is(#retry, #rp-retry) {
     grid-column: 1/-1;
     grid-row: 2;
     width: 100%;
@@ -2475,7 +2475,7 @@ body.results-screen {
 .results-screen #app > header {
   display: none !important;
 }
-.results-screen #results::backdrop {
+.results-screen :is(#results, #rpaint)::backdrop {
   background: #14131a;
   backdrop-filter: none;
 }
@@ -2619,29 +2619,29 @@ body.results-screen {
     margin-top: 8px;
   }
 }
-#results .result-stats span {
+:is(#results, #rpaint) .result-stats span {
   font-size: 12px;
   letter-spacing: 0.5px;
 }
-#judgment-list {
+:is(#judgment-list, #rp-judgment-list) {
   font-size: 12px;
   line-height: 1.7;
   gap: 12px 16px;
 }
-#judgment-list b {
+:is(#judgment-list, #rp-judgment-list) b {
   font-size: 14px;
 }
 @media (max-width: 540px) {
-  #judgment-list {
+  :is(#judgment-list, #rp-judgment-list) {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px 14px;
     font-size: 11px;
   }
-  #results .result-stats span {
+  :is(#results, #rpaint) .result-stats span {
     font-size: 11px;
     letter-spacing: 0;
   }
-  #judgment-list b {
+  :is(#judgment-list, #rp-judgment-list) b {
     font-size: 13px;
   }
 }
@@ -2653,11 +2653,11 @@ body.results-screen {
 .result-system {
   display: none !important;
 }
-#judgment-list div {
+:is(#judgment-list, #rp-judgment-list) div {
   font-size: 12px;
 }
 @media (max-width: 540px) {
-  #judgment-list div {
+  :is(#judgment-list, #rp-judgment-list) div {
     font-size: 11px;
   }
 }
@@ -2671,7 +2671,7 @@ canvas {
   -webkit-user-select: none;
   -webkit-user-drag: none;
 }
-#result-options {
+:is(#result-options, #rp-options) {
   font-size: 13px;
   line-height: 1.7;
   color: #b2b8c4;
@@ -2711,7 +2711,7 @@ canvas {
 }
 
 /* Result-only option badges: a compact report strip, not gameplay controls. */
-#result-options {
+:is(#result-options, #rp-options) {
   display: flex;
   align-items: stretch;
   gap: 10px;
@@ -2757,32 +2757,32 @@ canvas {
 .result-option-fader {
   color: #a8c4ed;
 }
-#result-rate {
+:is(#result-rate, #rp-rate) {
   color: #6ce5ed;
 }
-#result-combo {
+:is(#result-combo, #rp-combo) {
   color: #ffe074;
 }
-#result-break {
+:is(#result-break, #rp-break) {
   color: #ff6479;
 }
-#results .result-stats span {
+:is(#results, #rpaint) .result-stats span {
   font-size: 14px;
   color: #bbc8d4;
 }
-#judgment-list div {
+:is(#judgment-list, #rp-judgment-list) div {
   font-size: 14px;
   border-left: 3px solid var(--grade-color);
   padding-left: 9px;
   color: var(--grade-color);
 }
-#judgment-list b {
+:is(#judgment-list, #rp-judgment-list) b {
   color: var(--grade-color);
   font-size: 17px;
   font-weight: 600;
 }
 @media (max-width: 540px) {
-  #result-options {
+  :is(#result-options, #rp-options) {
     gap: 6px;
   }
   .result-option {
@@ -2798,58 +2798,58 @@ canvas {
   .result-option b {
     font-size: 14px;
   }
-  #judgment-list {
+  :is(#judgment-list, #rp-judgment-list) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 9px 16px;
   }
-  #judgment-list div {
+  :is(#judgment-list, #rp-judgment-list) div {
     font-size: 13px;
   }
-  #judgment-list b {
+  :is(#judgment-list, #rp-judgment-list) b {
     font-size: 16px;
   }
-  #results .result-stats span {
+  :is(#results, #rpaint) .result-stats span {
     font-size: 12px;
   }
 }
-#results {
+:is(#results, #rpaint) {
   padding: 24px 32px;
 }
-#results .result-heading h2 {
+:is(#results, #rpaint) .result-heading h2 {
   margin: 12px 0;
 }
-#results .result-heading > span {
+:is(#results, #rpaint) .result-heading > span {
   font-size: 72px;
 }
-#results .result-score {
+:is(#results, #rpaint) .result-score {
   font-size: 76px;
   line-height: 1.12;
   margin: 8px 0 18px;
 }
-#results .result-stats {
+:is(#results, #rpaint) .result-stats {
   padding: 14px 0;
 }
-#results .result-stats div {
+:is(#results, #rpaint) .result-stats div {
   gap: 6px;
 }
-#results #judgment-list {
+:is(#results, #rpaint) :is(#judgment-list, #rp-judgment-list) {
   margin: 18px 0;
 }
-#results .result-actions {
+:is(#results, #rpaint) .result-actions {
   margin-top: 16px;
 }
 @media (max-width: 540px) {
-  #results {
+  :is(#results, #rpaint) {
     padding: 20px 24px;
   }
-  #results .result-heading > span {
+  :is(#results, #rpaint) .result-heading > span {
     font-size: 66px;
   }
-  #results .result-score {
+  :is(#results, #rpaint) .result-score {
     font-size: 54px;
     margin: 8px 0 16px;
   }
-  #result-options {
+  :is(#result-options, #rp-options) {
     gap: 5px;
   }
   .result-option {
@@ -2864,7 +2864,7 @@ canvas {
   .result-option b {
     font-size: 14px;
   }
-  #results .result-actions {
+  :is(#results, #rpaint) .result-actions {
     margin-top: 12px;
   }
 }
@@ -2878,11 +2878,11 @@ canvas {
 .selected-art .art-core {
   display: none;
 }
-#results .result-heading {
+:is(#results, #rpaint) .result-heading {
   gap: 18px;
   align-items: center;
 }
-#result-art {
+:is(#result-art, #rp-art) {
   width: 128px;
   aspect-ratio: 16/10;
   object-fit: cover;
@@ -2894,46 +2894,46 @@ canvas {
   flex: 1;
   min-width: 0;
 }
-#results .result-track h2 {
+:is(#results, #rpaint) .result-track h2 {
   font-size: 25px;
   margin: 0 0 7px;
 }
-#result-metadata {
+:is(#result-metadata, #rp-metadata) {
   font-size: 12px;
   line-height: 1.55;
   color: #c5d2df;
   margin: 0 0 5px;
 }
-#result-preview {
+:is(#result-preview, #rp-preview) {
   font-size: 12px;
   padding: 7px 0;
   color: #8bdcea;
 }
 @media (max-width: 540px) {
-  #results .result-heading {
+  :is(#results, #rpaint) .result-heading {
     gap: 10px;
     flex-wrap: wrap;
   }
-  #result-art {
+  :is(#result-art, #rp-art) {
     width: 84px;
   }
   .result-track {
     min-width: 130px;
   }
-  #results .result-track h2 {
+  :is(#results, #rpaint) .result-track h2 {
     font-size: 22px;
   }
-  #result-metadata {
+  :is(#result-metadata, #rp-metadata) {
     font-size: 11px;
   }
-  #results .result-heading > span {
+  :is(#results, #rpaint) .result-heading > span {
     font-size: 48px;
   }
-  #results .result-score {
+  :is(#results, #rpaint) .result-score {
     font-size: 50px;
   }
 }
-#watch-replay {
+:is(#watch-replay, #rp-watch-replay) {
   display: block;
   min-height: 42px;
   margin: 0 0 12px;
@@ -2942,7 +2942,7 @@ canvas {
   color: #8ce4ef;
   font-size: 14px;
 }
-#watch-replay.hidden {
+:is(#watch-replay, #rp-watch-replay).hidden {
   display: none;
 }
 .replay-view #now-detail {
@@ -2951,14 +2951,14 @@ canvas {
 .replay-view #play-options {
   opacity: 0.65;
 }
-#result-metadata {
+:is(#result-metadata, #rp-metadata) {
   font-size: 13px;
 }
-#result-preview {
+:is(#result-preview, #rp-preview) {
   font-size: 13px;
 }
 @media (max-width: 540px) {
-  #result-metadata {
+  :is(#result-metadata, #rp-metadata) {
     font-size: 12px;
     line-height: 1.45;
   }
@@ -2966,33 +2966,33 @@ canvas {
 
 /* Opening a result focuses the neutral report, not an action button.
    Tab still shows the normal focus ring on each control. */
-#results:focus {
+:is(#results, #rpaint):focus {
   outline: none;
 }
 
 /* Keep the full action row and a quiet bottom margin visible at laptop height.
    Shorter/narrower screens retain the result dialog's own scrolling. */
-#results .result-actions {
+:is(#results, #rpaint) .result-actions {
   padding-bottom: 8px;
 }
 @media (min-width: 700px) and (max-height: 760px) {
-  #results {
+  :is(#results, #rpaint) {
     padding: 18px 28px 24px;
   }
-  #results .result-score {
+  :is(#results, #rpaint) .result-score {
     font-size: 64px;
     margin: 5px 0 10px;
   }
-  #results .result-stats {
+  :is(#results, #rpaint) .result-stats {
     padding: 10px 0;
   }
-  #results #judgment-list {
+  :is(#results, #rpaint) :is(#judgment-list, #rp-judgment-list) {
     margin: 12px 0;
   }
-  #results .result-actions {
+  :is(#results, #rpaint) .result-actions {
     margin-top: 10px;
   }
-  #watch-replay {
+  :is(#watch-replay, #rp-watch-replay) {
     margin-bottom: 6px;
   }
 }
@@ -3069,17 +3069,17 @@ canvas {
   transform-origin: left center;
   font-variant-numeric: tabular-nums;
 }
-#share-status,
-#replay-status {
+:is(#share-status, #rp-share-status),
+:is(#replay-status, #rp-replay-status) {
   overflow-wrap: anywhere;
 }
-#results .result-actions {
+:is(#results, #rpaint) .result-actions {
   padding-bottom: 18px;
 }
-#results .result-actions button {
+:is(#results, #rpaint) .result-actions button {
   scroll-margin-bottom: 18px;
 }
-#results {
+:is(#results, #rpaint) {
   scroll-padding-bottom: 18px;
 }
 :is(#add-youtube, #cached-add-youtube) {
@@ -3129,7 +3129,7 @@ canvas {
   width: 100%;
   margin-top: 12px;
 }
-#share-result[hidden] {
+:is(#share-result, #rp-share-result)[hidden] {
   display: none;
 }
 #local-replay {
@@ -3457,7 +3457,7 @@ textarea,
 .youtube-cover {
   object-fit: contain;
 }
-#result-art[data-external] {
+:is(#result-art, #rp-art)[data-external] {
   aspect-ratio: 16 / 9;
   object-fit: contain;
   background: #0b1018;
@@ -3629,7 +3629,7 @@ body.perf-enabled #fps {
   aspect-ratio: 16 / 9;
   clip-path: none;
 }
-#result-art:not([data-external]) {
+:is(#result-art, #rp-art):not([data-external]) {
   aspect-ratio: 16 / 9;
   object-fit: contain;
   background: #0b1018;
@@ -3868,7 +3868,7 @@ header nav .quiet {
 .primary > span {
   font-size: 12px;
 }
-#results .result-actions #retry {
+:is(#results, #rpaint) .result-actions :is(#retry, #rp-retry) {
   font-size: 20px;
   min-height: 54px;
   min-width: 0;
@@ -3876,21 +3876,21 @@ header nav .quiet {
   white-space: normal;
   overflow-wrap: anywhere;
 }
-#results .result-actions #back,
-#watch-replay,
-#result-preview {
+:is(#results, #rpaint) .result-actions :is(#back, #rp-back),
+:is(#watch-replay, #rp-watch-replay),
+:is(#result-preview, #rp-preview) {
   font-size: 15px;
   min-height: 44px;
   line-height: 1.5;
 }
-#results .result-actions {
+:is(#results, #rpaint) .result-actions {
   gap: 14px;
 }
-#results #result-metadata {
+:is(#results, #rpaint) :is(#result-metadata, #rp-metadata) {
   font-size: 14px;
 }
-#results .result-stats span,
-#results #judgment-list div {
+:is(#results, #rpaint) .result-stats span,
+:is(#results, #rpaint) :is(#judgment-list, #rp-judgment-list) div {
   font-size: 14px;
 }
 dialog label,
@@ -3990,8 +3990,8 @@ dialog .hint,
   font-size: 16px;
   min-height: 44px;
 }
-#share-status,
-#replay-status {
+:is(#share-status, #rp-share-status),
+:is(#replay-status, #rp-replay-status) {
   font-size: 14px;
   line-height: 1.6;
 }
@@ -4015,11 +4015,11 @@ dialog .hint,
   #settings .binding-keys .key-bind {
     font-size: 14px;
   }
-  #results .result-actions #retry {
+  :is(#results, #rpaint) .result-actions :is(#retry, #rp-retry) {
     width: 100%;
   }
-  #results .result-stats span,
-  #results #judgment-list div {
+  :is(#results, #rpaint) .result-stats span,
+  :is(#results, #rpaint) :is(#judgment-list, #rp-judgment-list) div {
     font-size: 14px;
   }
   #replays {
@@ -4054,35 +4054,35 @@ dialog .hint,
   opacity: 1;
 }
 /* A31: keep a full report at laptop height; shorter screens scroll inside it. */
-#results {
+:is(#results, #rpaint) {
   max-height: calc(100dvh - 32px);
   padding: 20px 28px;
   scroll-padding: 20px;
 }
-#results #result-options {
+:is(#results, #rpaint) :is(#result-options, #rp-options) {
   margin: 4px 0 10px;
 }
-#results #result-fever {
+:is(#results, #rpaint) :is(#result-fever, #rp-fever) {
   margin: 8px 0;
   font-size: 14px;
 }
-#results #result-badge {
+:is(#results, #rpaint) :is(#result-badge, #rp-badge) {
   font-size: 13px;
   letter-spacing: 0.1em;
 }
-#results .result-actions {
+:is(#results, #rpaint) .result-actions {
   padding-bottom: 8px;
 }
-#results .result-actions #retry {
+:is(#results, #rpaint) .result-actions :is(#retry, #rp-retry) {
   gap: 20px;
   flex-shrink: 0;
   min-width: 220px;
 }
 @media (max-width: 540px) {
-  #results {
+  :is(#results, #rpaint) {
     padding: 20px 22px;
   }
-  #results .result-actions #retry {
+  :is(#results, #rpaint) .result-actions :is(#retry, #rp-retry) {
     min-width: 0;
   }
 }
@@ -4209,11 +4209,11 @@ dialog .hint,
   opacity: 0.45;
   cursor: not-allowed;
 }
-.mobile-playback-only #results #retry {
+.mobile-playback-only :is(#results, #rpaint) :is(#retry, #rp-retry) {
   display: none;
 }
 @media (max-width: 900px), (hover: none) and (pointer: coarse) {
-  #results {
+  :is(#results, #rpaint) {
     position: fixed;
     inset: 0;
     margin: 0;
@@ -4234,90 +4234,90 @@ dialog .hint,
     overflow-x: hidden;
     overscroll-behavior: contain;
   }
-  #results .result-heading {
+  :is(#results, #rpaint) .result-heading {
     display: grid;
     grid-template-columns: 80px minmax(0, 1fr) auto;
     gap: 14px;
     align-items: start;
   }
-  #results #result-art {
+  :is(#results, #rpaint) :is(#result-art, #rp-art) {
     width: 80px;
     height: auto;
     max-height: 80px;
   }
-  #results .result-track {
+  :is(#results, #rpaint) .result-track {
     min-width: 0;
   }
-  #results #result-song {
+  :is(#results, #rpaint) :is(#result-song, #rp-song) {
     font-size: 22px;
     line-height: 1.3;
     overflow-wrap: anywhere;
   }
-  #results #result-metadata {
+  :is(#results, #rpaint) :is(#result-metadata, #rp-metadata) {
     font-size: 13px;
     overflow-wrap: anywhere;
     line-height: 1.5;
   }
-  #results #result-rank {
+  :is(#results, #rpaint) :is(#result-rank, #rp-rank) {
     font-size: 46px;
     line-height: 1;
   }
-  #results #result-options {
+  :is(#results, #rpaint) :is(#result-options, #rp-options) {
     display: flex;
     flex-wrap: wrap;
     gap: 7px;
     margin-top: 16px;
   }
-  #results .result-stats {
+  :is(#results, #rpaint) .result-stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
-  #results .result-stats strong {
+  :is(#results, #rpaint) .result-stats strong {
     font-size: 25px;
     overflow-wrap: anywhere;
   }
-  #results .result-stats span {
+  :is(#results, #rpaint) .result-stats span {
     font-size: 13px;
     overflow-wrap: anywhere;
   }
-  #results #judgment-list {
+  :is(#results, #rpaint) :is(#judgment-list, #rp-judgment-list) {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 9px 14px;
     margin: 18px 0;
   }
-  #results #watch-replay {
+  :is(#results, #rpaint) :is(#watch-replay, #rp-watch-replay) {
     width: 100%;
     min-height: 48px;
     font-size: 16px;
     margin: 14px 0;
   }
-  #results .result-actions {
+  :is(#results, #rpaint) .result-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
     margin-top: 12px;
     padding-bottom: 0;
   }
-  #results #back {
+  :is(#results, #rpaint) :is(#back, #rp-back) {
     flex: 1;
     min-height: 46px;
   }
-  #results .result-actions #retry {
+  :is(#results, #rpaint) .result-actions :is(#retry, #rp-retry) {
     width: 100%;
     min-width: 0;
   }
 }
 @media (max-width: 380px) {
-  #results .result-heading {
+  :is(#results, #rpaint) .result-heading {
     grid-template-columns: 65px minmax(0, 1fr);
     gap: 12px;
   }
-  #results #result-art {
+  :is(#results, #rpaint) :is(#result-art, #rp-art) {
     width: 65px;
   }
-  #results #result-rank {
+  :is(#results, #rpaint) :is(#result-rank, #rp-rank) {
     grid-column: 1 / -1;
     font-size: 42px;
   }
@@ -4328,7 +4328,7 @@ dialog .hint,
   min-width: 64px;
   padding: 10px 8px;
 }
-.mobile-playback-only #results #back {
+.mobile-playback-only :is(#results, #rpaint) :is(#back, #rp-back) {
   min-height: 48px;
 }
 
@@ -4371,13 +4371,13 @@ html {
 .library .section-title :is(#library-actions, #cached-library-actions) {
   margin: 0;
 }
-#results .result-heading {
+:is(#results, #rpaint) .result-heading {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 14px 24px;
 }
-#results #result-art {
+:is(#results, #rpaint) :is(#result-art, #rp-art) {
   grid-column: 1 / -1;
   width: min(100%, 360px);
   height: auto;
@@ -4386,13 +4386,13 @@ html {
   object-fit: contain;
   background: #070f19;
 }
-#results .result-track {
+:is(#results, #rpaint) .result-track {
   min-width: 0;
 }
-#results #result-song {
+:is(#results, #rpaint) :is(#result-song, #rp-song) {
   overflow-wrap: anywhere;
 }
-#results #result-rank {
+:is(#results, #rpaint) :is(#result-rank, #rp-rank) {
   grid-column: 2;
   grid-row: 2;
 }
@@ -4411,7 +4411,7 @@ html {
   :is(#lobby, #cached-lobby) .preview-status {
     grid-column: 2;
   }
-  #results #result-art {
+  :is(#results, #rpaint) :is(#result-art, #rp-art) {
     width: 100%;
   }
 }
@@ -4436,20 +4436,20 @@ html {
   max-height: 3.8em;
 }
 @media (min-width: 901px) and (hover: hover) and (pointer: fine) {
-  #results .result-heading {
+  :is(#results, #rpaint) .result-heading {
     grid-template-columns: 240px minmax(0, 1fr);
     gap: 8px 24px;
   }
-  #results #result-art {
+  :is(#results, #rpaint) :is(#result-art, #rp-art) {
     grid-column: 1;
     grid-row: 1 / 3;
     width: 240px;
   }
-  #results .result-track {
+  :is(#results, #rpaint) .result-track {
     grid-column: 2;
     grid-row: 1;
   }
-  #results #result-rank {
+  :is(#results, #rpaint) :is(#result-rank, #rp-rank) {
     grid-column: 2;
     grid-row: 2;
     font-size: 52px;
@@ -4457,35 +4457,35 @@ html {
   }
 }
 @media (min-width: 901px) and (hover: hover) and (pointer: fine) and (max-height: 760px) {
-  #results .result-heading {
+  :is(#results, #rpaint) .result-heading {
     grid-template-columns: 216px minmax(0, 1fr);
     gap: 4px 24px;
   }
-  #results #result-art {
+  :is(#results, #rpaint) :is(#result-art, #rp-art) {
     width: 216px;
   }
-  #results #result-song {
+  :is(#results, #rpaint) :is(#result-song, #rp-song) {
     margin: 0 0 4px;
   }
-  #results #result-preview {
+  :is(#results, #rpaint) :is(#result-preview, #rp-preview) {
     padding: 4px 0;
   }
-  #results #result-rank {
+  :is(#results, #rpaint) :is(#result-rank, #rp-rank) {
     font-size: 38px;
   }
-  #results .result-score {
+  :is(#results, #rpaint) .result-score {
     font-size: 60px;
     margin: 4px 0 8px;
   }
-  #results .result-stats {
+  :is(#results, #rpaint) .result-stats {
     padding: 8px 0;
   }
-  #results #judgment-list {
+  :is(#results, #rpaint) :is(#judgment-list, #rp-judgment-list) {
     margin: 8px 0;
   }
 }
 @media (min-width: 901px) and (hover: hover) and (pointer: fine) and (max-height: 760px) {
-  #results {
+  :is(#results, #rpaint) {
     padding-bottom: 12px;
   }
 }

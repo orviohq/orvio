@@ -1,5 +1,6 @@
 ---
 import LibraryFirstPaint from '../components/LibraryFirstPaint.astro';
+import ResultFirstPaint from '../components/ResultFirstPaint.astro';
 const resultEntry = Astro.url.pathname.startsWith('/result');
 ---
 
@@ -91,6 +92,7 @@ const resultEntry = Astro.url.pathname.startsWith('/result');
         <div class="result-spinner"></div>
       </div>
     )}
+    {resultEntry && <ResultFirstPaint />}
     <LibraryFirstPaint />
     <div id="app"></div>
     <script src="../main.ts"></script>

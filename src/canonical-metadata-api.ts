@@ -1,5 +1,9 @@
 import { AUDIO_BASE } from './external-audio-api';
 import type { SourceRecord } from './external-source';
+import { queryClient, queryKeys } from './query-client';
+/** Internal sentinel: an unavailable/missing metadata read never becomes
+ * cached data; it surfaces as the original null at the call site. */
+class MetadataUnavailable extends Error {}
 export interface CanonicalMetadata {
   videoId: string;
   title: string;
@@ -36,6 +40,34 @@ export function validCanonicalMetadata(
 }
 /** Optional display-only recovery. Never changes canonical identity or starts extraction. */
 export async function readCanonicalMetadata(
+  record: SourceRecord,
+  signal?: AbortSignal,
+): Promise<CanonicalMetadata | null> {
+  // Keyed by video + chart set so metadata validated against one record
+  // can never be served for another. Persisted; a validated entry is
+  // immutable, while an unavailable/missing read keeps the original
+  // one-fetch-per-call semantics (errors are never cached as data).
+  return queryClient
+    .fetchQuery({
+      queryKey: queryKeys.canonicalMetadata(
+        record.videoId,
+        record.chartSetSha256 ?? '',
+      ),
+      queryFn: async () => {
+        const data = await fetchCanonicalMetadata(record, signal);
+        if (data === null) throw new MetadataUnavailable();
+        return data;
+      },
+      staleTime: Infinity,
+      gcTime: Infinity,
+      retry: false,
+    })
+    .catch((error) => {
+      if (error instanceof MetadataUnavailable) return null;
+      throw error;
+    });
+}
+async function fetchCanonicalMetadata(
   record: SourceRecord,
   signal?: AbortSignal,
 ): Promise<CanonicalMetadata | null> {

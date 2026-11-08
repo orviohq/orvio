@@ -1,6 +1,6 @@
 /* Result report: track, score + rank, detail, then two clear action rows.
    Scope every rule to the dialog; playback and session behavior stay separate. */
-#results {
+:is(#results, #rpaint) {
   box-sizing: border-box;
   width: min(820px, calc(100% - 48px));
   max-width: none;
@@ -16,7 +16,7 @@
   overflow-x: hidden;
   scroll-padding: 24px;
 }
-#results .result-system {
+:is(#results, #rpaint) .result-system {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -28,16 +28,16 @@
   letter-spacing: 0.16em;
   color: #87a5b7;
 }
-#results .result-system > span {
+:is(#results, #rpaint) .result-system > span {
   color: #6b8396;
 }
-#results .result-heading {
+:is(#results, #rpaint) .result-heading {
   display: grid;
   grid-template-columns: 136px minmax(0, 1fr);
   gap: 20px;
   align-items: center;
 }
-#results #result-art {
+:is(#results, #rpaint) :is(#result-art, #rp-art) {
   grid-column: 1;
   grid-row: 1;
   display: block;
@@ -50,12 +50,12 @@
   border-radius: 4px;
   background: #071019;
 }
-#results .result-track {
+:is(#results, #rpaint) .result-track {
   grid-column: 2;
   grid-row: 1;
   min-width: 0;
 }
-#results #result-song {
+:is(#results, #rpaint) :is(#result-song, #rp-song) {
   margin: 0 0 6px;
   font-size: 24px;
   line-height: 1.25;
@@ -63,25 +63,25 @@
   letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
-#results #result-metadata {
+:is(#results, #rpaint) :is(#result-metadata, #rp-metadata) {
   margin: 0;
   color: #91a6b6;
   font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
-#results #result-preview {
+:is(#results, #rpaint) :is(#result-preview, #rp-preview) {
   min-height: 30px;
   padding: 4px 0;
   font-size: 12px;
 }
-#results #result-options {
+:is(#results, #rpaint) :is(#result-options, #rp-options) {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
   margin: 16px 0 0;
 }
-#results .result-summary {
+:is(#results, #rpaint) .result-summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 112px;
   gap: 24px;
@@ -90,22 +90,22 @@
   padding: 20px 0;
   border-block: 1px solid #293746;
 }
-#results .result-score-block {
+:is(#results, #rpaint) .result-score-block {
   min-width: 0;
 }
-#results #result-badge {
+:is(#results, #rpaint) :is(#result-badge, #rp-badge) {
   margin: 0 0 10px;
   color: #68dce3;
   font-size: 12px;
   line-height: 1.4;
   letter-spacing: 0.06em;
 }
-#results .result-score-caption {
+:is(#results, #rpaint) .result-score-caption {
   color: #91a6b6;
   font-size: 11px;
   letter-spacing: 0.12em;
 }
-#results #result-score {
+:is(#results, #rpaint) :is(#result-score, #rp-score) {
   margin: 0;
   color: #f3f7fa;
   font-size: clamp(42px, 5.5vw, 62px);
@@ -115,7 +115,7 @@
   line-height: 1.1;
   letter-spacing: -0.045em;
 }
-#results .result-rank-block {
+:is(#results, #rpaint) .result-rank-block {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -126,12 +126,12 @@
   border: 1px solid #39566a;
   border-radius: 8px;
 }
-#results .result-rank-caption {
+:is(#results, #rpaint) .result-rank-caption {
   color: #8faabb;
   font-size: 10px;
   letter-spacing: 0.18em;
 }
-#results #result-rank {
+:is(#results, #rpaint) :is(#result-rank, #rp-rank) {
   font-size: 60px;
   line-height: 1;
   font-weight: 600;
@@ -139,7 +139,7 @@
   color: #74e0e5;
   text-shadow: none;
 }
-#results .result-stats {
+:is(#results, #rpaint) .result-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
@@ -147,7 +147,7 @@
   padding: 0;
   border: 0;
 }
-#results .result-stats > div {
+:is(#results, #rpaint) .result-stats > div {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -156,17 +156,17 @@
   border-left: 1px solid #293746;
   min-width: 0;
 }
-#results .result-stats > div:first-child {
+:is(#results, #rpaint) .result-stats > div:first-child {
   padding-left: 0;
   border-left: 0;
 }
-#results .result-stats span {
+:is(#results, #rpaint) .result-stats span {
   color: #91a6b6;
   font-size: 12px;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
-#results .result-stats strong {
+:is(#results, #rpaint) .result-stats strong {
   color: #eaf1f5;
   font-size: 26px;
   font-style: normal;
@@ -174,12 +174,12 @@
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
-#results #result-fever {
+:is(#results, #rpaint) :is(#result-fever, #rp-fever) {
   margin: 12px 0 0;
   font-size: 12px;
   color: #91a6b6;
 }
-#results #judgment-list {
+:is(#results, #rpaint) :is(#judgment-list, #rp-judgment-list) {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px 20px;
@@ -187,7 +187,7 @@
   padding: 16px 0;
   border-block: 1px solid #293746;
 }
-#results #judgment-list > div {
+:is(#results, #rpaint) :is(#judgment-list, #rp-judgment-list) > div {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -198,20 +198,20 @@
   font-size: 11px;
   line-height: 1.6;
 }
-#results #judgment-list b {
+:is(#results, #rpaint) :is(#judgment-list, #rp-judgment-list) b {
   font-size: 13px;
   font-weight: 600;
   color: #eaf1f5;
   font-variant-numeric: tabular-nums;
 }
-#results .result-tools {
+:is(#results, #rpaint) .result-tools {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
-#results .result-tools > button,
-#results #watch-replay,
-#results #share-result {
+:is(#results, #rpaint) .result-tools > button,
+:is(#results, #rpaint) :is(#watch-replay, #rp-watch-replay),
+:is(#results, #rpaint) :is(#share-result, #rp-share-result) {
   display: flex;
   width: 100%;
   min-width: 0;
@@ -230,28 +230,29 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
-#results .result-tools > button:hover {
+:is(#results, #rpaint) .result-tools > button:hover {
   background: #1d3448;
   border-color: #6bbacb;
 }
-#results .result-tools > button.hidden,
-#results #watch-replay.hidden {
+:is(#results, #rpaint) .result-tools > button.hidden,
+:is(#results, #rpaint) :is(#watch-replay, #rp-watch-replay).hidden {
   display: none;
 }
-#results .result-tools:has(#watch-replay.hidden) {
+:is(#results, #rpaint)
+  .result-tools:has(:is(#watch-replay, #rp-watch-replay).hidden) {
   grid-template-columns: 1fr;
 }
-#results #share-result svg {
+:is(#results, #rpaint) :is(#share-result, #rp-share-result) svg {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
 }
-#results .result-tools [data-i18n] {
+:is(#results, #rpaint) .result-tools [data-i18n] {
   font-size: inherit;
   opacity: 1;
   letter-spacing: 0;
 }
-#results .result-actions {
+:is(#results, #rpaint) .result-actions {
   display: flex;
   flex-wrap: nowrap;
   justify-content: space-between;
@@ -260,14 +261,14 @@
   margin: 16px 0 0;
   padding: 0;
 }
-#results .result-actions #back {
+:is(#results, #rpaint) .result-actions :is(#back, #rp-back) {
   flex: 1;
   min-height: 44px;
   padding: 10px 0;
   font-size: 13px;
   text-align: left;
 }
-#results .result-actions #retry {
+:is(#results, #rpaint) .result-actions :is(#retry, #rp-retry) {
   width: auto;
   flex: 1;
   min-width: 0;
@@ -277,18 +278,18 @@
   justify-content: center;
   gap: 8px;
 }
-#results #share-status,
-#results #replay-status {
+:is(#results, #rpaint) :is(#share-status, #rp-share-status),
+:is(#results, #rpaint) :is(#replay-status, #rp-replay-status) {
   margin: 10px 0 0;
   font-size: 12px;
   line-height: 1.5;
 }
-#results .mobile-playback-note {
+:is(#results, #rpaint) .mobile-playback-note {
   margin: 12px 0 0;
   font-size: 12px;
 }
 @media (max-width: 650px), (hover: none) and (pointer: coarse) {
-  #results {
+  :is(#results, #rpaint) {
     position: fixed;
     inset: 0;
     width: 100%;
@@ -303,119 +304,119 @@
       max(24px, env(safe-area-inset-bottom))
       max(20px, env(safe-area-inset-left));
   }
-  #results .result-heading {
+  :is(#results, #rpaint) .result-heading {
     grid-template-columns: 88px minmax(0, 1fr);
     gap: 14px;
   }
-  #results #result-art {
+  :is(#results, #rpaint) :is(#result-art, #rp-art) {
     width: 88px;
   }
-  #results #result-song {
+  :is(#results, #rpaint) :is(#result-song, #rp-song) {
     font-size: 20px;
   }
-  #results #result-metadata {
+  :is(#results, #rpaint) :is(#result-metadata, #rp-metadata) {
     font-size: 11px;
   }
-  #results .result-summary {
+  :is(#results, #rpaint) .result-summary {
     grid-template-columns: minmax(0, 1fr) 86px;
     gap: 16px;
     margin: 18px 0;
     padding: 18px 0;
   }
-  #results .result-rank-block {
+  :is(#results, #rpaint) .result-rank-block {
     min-height: 96px;
   }
-  #results #result-rank {
+  :is(#results, #rpaint) :is(#result-rank, #rp-rank) {
     font-size: 48px;
   }
-  #results #result-score {
+  :is(#results, #rpaint) :is(#result-score, #rp-score) {
     font-size: clamp(36px, 10vw, 48px);
   }
-  #results .result-stats > div {
+  :is(#results, #rpaint) .result-stats > div {
     padding: 0 10px;
   }
-  #results .result-stats strong {
+  :is(#results, #rpaint) .result-stats strong {
     font-size: 22px;
   }
-  #results .result-stats span {
+  :is(#results, #rpaint) .result-stats span {
     font-size: 11px;
   }
-  #results #judgment-list {
+  :is(#results, #rpaint) :is(#judgment-list, #rp-judgment-list) {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px 14px;
     margin: 20px 0;
   }
-  #results #judgment-list > div {
+  :is(#results, #rpaint) :is(#judgment-list, #rp-judgment-list) > div {
     font-size: 10px;
   }
-  #results #judgment-list b {
+  :is(#results, #rpaint) :is(#judgment-list, #rp-judgment-list) b {
     font-size: 12px;
   }
-  #results .result-tools {
+  :is(#results, #rpaint) .result-tools {
     gap: 10px;
   }
-  #results .result-tools > button,
-  #results #watch-replay,
-  #results #share-result {
+  :is(#results, #rpaint) .result-tools > button,
+  :is(#results, #rpaint) :is(#watch-replay, #rp-watch-replay),
+  :is(#results, #rpaint) :is(#share-result, #rp-share-result) {
     font-size: 13px;
   }
 }
 @media (max-width: 350px) {
-  #results {
+  :is(#results, #rpaint) {
     padding-inline: 16px;
   }
-  #results .result-heading {
+  :is(#results, #rpaint) .result-heading {
     grid-template-columns: 72px minmax(0, 1fr);
     gap: 12px;
   }
-  #results #result-art {
+  :is(#results, #rpaint) :is(#result-art, #rp-art) {
     width: 72px;
   }
-  #results #result-song {
+  :is(#results, #rpaint) :is(#result-song, #rp-song) {
     font-size: 18px;
   }
-  #results .result-summary {
+  :is(#results, #rpaint) .result-summary {
     grid-template-columns: minmax(0, 1fr) 72px;
     gap: 10px;
   }
-  #results #result-score {
+  :is(#results, #rpaint) :is(#result-score, #rp-score) {
     font-size: 34px;
   }
-  #results .result-tools > button,
-  #results #watch-replay,
-  #results #share-result {
+  :is(#results, #rpaint) .result-tools > button,
+  :is(#results, #rpaint) :is(#watch-replay, #rp-watch-replay),
+  :is(#results, #rpaint) :is(#share-result, #rp-share-result) {
     padding-inline: 8px;
     font-size: 12px;
   }
 }
 @media (min-width: 901px) and (min-height: 640px) and (max-height: 760px) and (hover: hover) and (pointer: fine) {
-  #results {
+  :is(#results, #rpaint) {
     padding: 22px 28px 20px;
   }
-  #results .result-summary {
+  :is(#results, #rpaint) .result-summary {
     margin: 16px 0;
     padding: 16px 0;
   }
-  #results #judgment-list {
+  :is(#results, #rpaint) :is(#judgment-list, #rp-judgment-list) {
     margin: 18px 0;
     padding: 12px 0;
   }
 }
 @media (min-width: 901px) and (min-height: 640px) and (max-height: 760px) and (hover: hover) and (pointer: fine) {
-  #results .result-rank-block {
+  :is(#results, #rpaint) .result-rank-block {
     min-height: 96px;
   }
-  #results #result-rank {
+  :is(#results, #rpaint) :is(#result-rank, #rp-rank) {
     font-size: 52px;
   }
-  #results #result-score {
+  :is(#results, #rpaint) :is(#result-score, #rp-score) {
     font-size: 56px;
   }
-  #results .result-summary {
+  :is(#results, #rpaint) .result-summary {
     margin: 14px 0;
     padding: 14px 0;
   }
-  #results #judgment-list {
+  :is(#results, #rpaint) :is(#judgment-list, #rp-judgment-list) {
     margin: 16px 0;
   }
 }
