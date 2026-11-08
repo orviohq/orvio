@@ -197,3 +197,90 @@ test('focus loss during a cold replay aborts without stale resume; a later verif
   await expect(page.locator('#results')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('verified canonical chart without hydrated audio starts progressively and manual pause dominates guard completion', async ({
+  page,
+}) => {
+  await install(page);
+  await page.goto('/select/');
+  await page.evaluate(
+    async ({ record, recordSha }) => {
+      const key = `${record.videoId}:${record.audioSha256}:chart:${record.chartSetSha256}`;
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const q = indexedDB.open('orvio.external-sources.v1', 1);
+        q.onupgradeneeded = () =>
+          q.result.createObjectStore('records', { keyPath: 'key' });
+        q.onsuccess = () => resolve(q.result);
+        q.onerror = () => reject(q.error);
+      });
+      await new Promise<void>((resolve, reject) => {
+        const t = db.transaction('records', 'readwrite');
+        t.objectStore('records').put({ key, record, pinnedAt: Date.now() });
+        t.oncomplete = () => resolve();
+        t.onerror = () => reject(t.error);
+      });
+      db.close();
+      const bytes = new TextEncoder().encode(JSON.stringify(record)),
+        hash = Array.from(
+          new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
+          (b) => b.toString(16).padStart(2, '0'),
+        ).join('');
+      localStorage.setItem(
+        'orvio.canonical-library.v1',
+        JSON.stringify([
+          {
+            videoId: record.videoId,
+            audioSha256: record.audioSha256,
+            chartSetSha256: record.chartSetSha256,
+            recordSha256: recordSha,
+            localRecordSha256: hash,
+          },
+        ]),
+      );
+    },
+    {
+      record: fixture.record,
+      recordSha: fixture.recordHeaders['X-SourceRecord-SHA256'],
+    },
+  );
+  await page.reload();
+  const row = page
+    .locator('#songs .song-card[data-song]')
+    .filter({ hasText: fixture.record.videoId });
+  await expect(row).toBeVisible();
+  await row.click();
+  expect(await audioRows(page)).toBe(0);
+  await page.click('#start');
+  await page.waitForFunction(() => (window as any).orvioDiagnostics?.active);
+  expect(await audioRows(page)).toBe(0);
+  await page.waitForFunction(
+    () => (window as any).orvioDiagnostics.clock > 0.3,
+  );
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#pause')).toBeVisible();
+  const clock = await page.evaluate(
+    () => (window as any).orvioDiagnostics.clock,
+  );
+  await expect.poll(() => audioRows(page), { timeout: 10000 }).toBe(1);
+  await page.waitForTimeout(300);
+  expect(
+    await page.evaluate(
+      () => (window as any).orvioDiagnostics.audioContextState,
+    ),
+  ).toBe('suspended');
+  expect(
+    Math.abs(
+      (await page.evaluate(() => (window as any).orvioDiagnostics.clock)) -
+        clock,
+    ),
+  ).toBeLessThan(0.001);
+  await expect(page.locator('#pause')).toBeVisible();
+  await page.click('#resume');
+  await page.waitForFunction(
+    (c) => (window as any).orvioDiagnostics.clock > c + 0.2,
+    clock,
+  );
+  await page.keyboard.press('Escape');
+  await page.click('#pause-exit');
+  await expect(page.locator('#lobby')).toBeVisible();
+});
