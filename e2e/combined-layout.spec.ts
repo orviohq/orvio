@@ -19,9 +19,13 @@ test('combined artwork stays fixed for short long and unbroken titles across des
         );
         SONGS[1].title = title;
       }, title);
-      await page.locator('[data-song="1"]').evaluate((e) => e.click());
+      await page
+        .locator('[data-song="1"]')
+        .evaluate((e) => (e as HTMLElement).click());
       expect(await page.locator('#selected-art').boundingBox()).toEqual(b);
-      await page.locator('[data-song="0"]').evaluate((e) => e.click());
+      await page
+        .locator('[data-song="0"]')
+        .evaluate((e) => (e as HTMLElement).click());
     }
     console.log('FIXED_ART', w, b);
     await page.screenshot({ path: info.outputPath(`layout-${w}.png`) });

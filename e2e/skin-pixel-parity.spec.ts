@@ -36,6 +36,7 @@ test('default skin preserves actual renderer pixels against v032 across holds an
     for (const t of [1.8, 2.25, 2.6, 3.05]) {
       const a = new Engine(structuredClone(notes)),
         b = new Engine(structuredClone(notes));
+      for (const engine of [a, b]) engine.states[1].held = t >= 2.2 && t < 3;
       old.setup(a, 5, 0x29d8ff);
       next.setup(b, 5, 0x29d8ff);
       old.reducedMotion = false;
