@@ -50,7 +50,6 @@ export const it = {
     '↑ ↓ BRANO / ← → DIFFICOLTÀ / 5 7 TASTI / INVIO INIZIA / F2 OPZIONI',
   selected: 'BRANO SELEZIONATO',
   nowPlaying: 'ANTEPRIMA IN CORSO',
-  previewReady: 'SCEGLI UN BRANO PER ASCOLTARLO',
   preparing: 'PREPARAZIONE AUDIO',
   previewBlocked: "Seleziona di nuovo un brano per attivare l'audio.",
   original: 'MUSICA ORIGINALE',

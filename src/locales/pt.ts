@@ -50,7 +50,6 @@ export const pt = {
     '↑ ↓ MÚSICA / ← → DIFICULDADE / 5 7 TECLAS / ENTER INICIAR / F2 OPÇÕES',
   selected: 'MÚSICA SELECIONADA',
   nowPlaying: 'PRÉVIA EM REPRODUÇÃO',
-  previewReady: 'ESCOLHA UMA MÚSICA PARA OUVIR',
   preparing: 'PREPARANDO ÁUDIO',
   previewBlocked: 'Escolha a música novamente para ativar o som.',
   original: 'TRILHA ORIGINAL',

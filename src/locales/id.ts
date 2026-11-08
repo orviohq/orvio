@@ -50,7 +50,6 @@ export const id = {
     '↑ ↓ LAGU / ← → KESULITAN / 5 7 TOMBOL / ENTER MULAI / F2 PENGATURAN',
   selected: 'LAGU TERPILIH',
   nowPlaying: 'PRATINJAU DIPUTAR',
-  previewReady: 'PILIH LAGU UNTUK MENDENGAR PRATINJAU',
   preparing: 'MENYIAPKAN AUDIO',
   previewBlocked: 'Pilih lagu lagi untuk mengaktifkan suara.',
   original: 'MUSIK ORISINAL',

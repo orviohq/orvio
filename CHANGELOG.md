@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.43] - 2026-11-09
+
+- Remove the idle selection-preview hint in every language and from legacy saved-library projections, without changing preview playback.
+- Match loading YouTube cards to the standard library artwork size, spacing, rounded edges and title hierarchy at desktop and mobile widths. Keep progress distinct and loading tracks unplayable.
+- Preserve explicit failed-import retry/removal and retained failure diagnostics.
+
 ## [0.2.42] - 2026-11-09
 
 - Start supported shared tracks from verified audio segments before the whole download finishes, retaining the normal countdown and wallpaper presentation.

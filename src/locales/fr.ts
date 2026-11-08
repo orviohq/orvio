@@ -50,7 +50,6 @@ export const fr = {
     '↑ ↓ MORCEAU / ← → DIFFICULTÉ / 5 7 TOUCHES / ENTRÉE JOUER / F2 OPTIONS',
   selected: 'MORCEAU CHOISI',
   nowPlaying: 'EXTRAIT EN COURS',
-  previewReady: 'CHOISISSEZ UN MORCEAU POUR ÉCOUTER',
   preparing: 'PRÉPARATION AUDIO',
   previewBlocked: 'Choisissez à nouveau un morceau pour activer le son.',
   original: 'MUSIQUE ORIGINALE',
