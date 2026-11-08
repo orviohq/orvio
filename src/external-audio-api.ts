@@ -131,6 +131,25 @@ export async function readAudioJob(jobId: string, signal?: AbortSignal) {
     await fetchAudio(`${AUDIO_BASE}/v1/audio-jobs/${jobId}`, { signal }),
   );
 }
+function waitForAudio(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const done = () => {
+      signal?.removeEventListener('abort', abort);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    const abort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    signal?.addEventListener('abort', abort, { once: true });
+  });
+}
 export async function loadAudio(
   job: AudioJob,
   expectedVideoId: string,
@@ -149,15 +168,43 @@ export async function loadAudio(
     job.audio.durationSec > AUDIO_MAX_SECONDS
   )
     throw new AudioJobError('unavailable');
-  const response = await fetchAudio(
-    `${AUDIO_BASE}/v1/audio-jobs/${job.jobId}/audio`,
-    { signal },
-  );
-  if (!response.ok) {
+  const deadline = Date.now() + 90000;
+  let response: Response;
+  for (;;) {
+    response = await fetchAudio(
+      `${AUDIO_BASE}/v1/audio-jobs/${job.jobId}/audio`,
+      { signal },
+    );
+    if (response.ok) break;
     const raw = await response.json().catch(() => null);
+    const retry = seconds(raw?.error?.retryAfterSec);
+    // Only the existing artifact GET can retry. Never create a replacement job.
+    if (
+      response.status === 409 &&
+      raw?.error?.code === 'unavailable' &&
+      retry !== undefined &&
+      retry > 0 &&
+      retry <= 30
+    ) {
+      const delay = retry * 1000;
+      if (Date.now() + delay > deadline)
+        throw new AudioJobError('request_timeout');
+      await waitForAudio(delay, signal);
+      continue;
+    }
     throw new AudioJobError(
-      response.status === 410 ? 'audio_expired' : 'unavailable',
-      seconds(raw?.error?.retryAfterSec),
+      response.status === 410
+        ? 'audio_expired'
+        : response.status === 404
+          ? 'not_found'
+          : ERRORS.includes(raw?.error?.code)
+            ? raw.error.code
+            : 'unavailable',
+      retry,
+      response.status,
+      raw?.error?.code === 'rate_limited'
+        ? readAudioLimit(raw?.error)
+        : undefined,
     );
   }
   const hash = response.headers.get('X-Content-SHA256');
