@@ -78,7 +78,7 @@ const identity = {
 };
 const fragment = new URLSearchParams(identity).toString();
 const title =
-  'Night Drive / 아주 긴 곡 제목으로 모바일 줄바꿈도 확인하는 테스트';
+  'Night Drive / 꿈 아주 긴 곡 제목으로 모바일 줄바꿈도 확인하는 테스트';
 async function mock(page: Page, mode = 'ready') {
   const calls: string[] = [];
   await page.route(
@@ -161,6 +161,9 @@ for (const viewport of [
     expect(await snapshot(page)).toEqual({ local: {}, dbs: [] });
     expect(calls).toHaveLength(2);
     await page.evaluate(() => document.fonts.ready);
+    expect(
+      await page.evaluate(() => document.fonts.check('24px OrvioKR', '꿈')),
+    ).toBe(true);
     mkdirSync('/downloads/a40-proof', { recursive: true });
     await page.screenshot({
       path: `/downloads/a40-proof/invitation-${viewport.width}.png`,
