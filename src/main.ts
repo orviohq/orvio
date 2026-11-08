@@ -1285,7 +1285,7 @@ function showResult(result: UiResult) {
     const verified = replayEngine(savedReplay);
     savedReplay.ops.forEach((op, i) => applyReplayOp(verified, op, i));
     verified.update(9999);
-    resultFever.textContent = `FEVER MAX ${verified.fever.maxDisplayCombo} · ${FEVER_LABELS[settings.language].rules}`;
+    resultFever.textContent = `FEVER MAX ${verified.fever.maxDisplayCombo}`;
     resultFever.classList.remove('hidden');
   }
 
@@ -1323,7 +1323,7 @@ function resultOptions(result: UiResult) {
   resultArt.src = songArt(song.id);
   const count = makeChart(song, result.difficulty, result.lanes).length;
   $('#result-metadata').textContent =
-    `${song.genre} · ${song.bpm} BPM · ${count} ${t('notes')} · ${ratingBasisText(settings.language)}`;
+    `${song.genre} · ${song.bpm} BPM · ${count} ${t('notes')}`;
   $('#result-metadata').title = RESULT_LABELS[settings.language][2];
   syncResultPreview();
   syncReplayButton();
@@ -2083,7 +2083,16 @@ function readRoute() {
   selectedSong();
   syncSettings();
   readingRoute = false;
-  if (shared) showResult(shared);
+  if (shared) {
+    // A verified replay owns its FEVER summary. Do not paint an incomplete
+    // result while decoding and then leave that row missing after reload.
+    const encoded = new URLSearchParams(location.hash.slice(1)).get('r');
+    if (encoded)
+      void replayEncoding.then(() => {
+        if (lastResult === shared) showResult(shared);
+      });
+    else showResult(shared);
+  }
 }
 $('#home-start').onclick = () => {
   // Keep the document alive so the gesture's fullscreen survives routing.
@@ -2109,6 +2118,7 @@ async function readInitialRoute() {
   const id = new URLSearchParams(location.search).get('s');
   if (!id) {
     readRoute();
+    await replayEncoding;
     document.documentElement.removeAttribute('data-result-pending');
     return;
   }

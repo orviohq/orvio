@@ -21,15 +21,17 @@ test('result art, original metadata and head-note counts match each song and cha
         await expect(page.locator('#result-metadata')).toContainText(
           String(makeChart(song, diff, lanes).length),
         );
-        expect(
-          await page
-            .locator('#result-art')
-            .evaluate(
-              (e) =>
-                (e as HTMLImageElement).complete &&
-                (e as HTMLImageElement).naturalWidth > 0,
-            ),
-        ).toBe(true);
+        await expect
+          .poll(() =>
+            page
+              .locator('#result-art')
+              .evaluate(
+                (e) =>
+                  (e as HTMLImageElement).complete &&
+                  (e as HTMLImageElement).naturalWidth > 0,
+              ),
+          )
+          .toBe(true);
       }
 });
 test('result preview is explicit, toggles, stops on retry and is available on a direct shared result', async ({

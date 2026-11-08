@@ -10,6 +10,7 @@ test('finished and reopened result are the same view, copy works without a link 
   await page.goto('/play/first-light/5/low/');
   await page.keyboard.press('Enter');
   await expect(page.locator('#results')).toBeVisible({ timeout: 50000 });
+  await expect(page.locator('#result-fever')).toContainText('FEVER MAX 0');
   const url = page.url();
   expect(url).toContain('/result/#v=4&');
   await expect(page.locator('#result-url,#share-privacy')).toHaveCount(0);
@@ -27,6 +28,7 @@ test('finished and reopened result are the same view, copy works without a link 
   );
   await page.reload();
   await expect(page.locator('#results')).toBeVisible();
+  await expect(page.locator('#result-fever')).toContainText('FEVER MAX 0');
   await page.evaluate(() => document.fonts.ready);
   const reopened = await page.locator('#results').screenshot();
   // CI trace showed exactly one blue-channel antialiasing pixel (delta 4)
