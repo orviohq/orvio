@@ -200,12 +200,12 @@ test('expired pending row diagnostic and confirmed list removal preserve bytes/c
   ).toHaveAttribute('data-device-audio', 'legacy_audio');
   expect(requests).toEqual([]);
   await page.screenshot({
-    path: '/downloads/orvio-device-desktop.png',
+    path: test.info().outputPath('device-desktop.png'),
     fullPage: true,
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
-    path: '/downloads/orvio-device-mobile.png',
+    path: test.info().outputPath('device-mobile.png'),
     fullPage: true,
   });
   await page.locator('.device-audio-dialog button').click();
@@ -237,7 +237,7 @@ test('expired pending row diagnostic and confirmed list removal preserve bytes/c
   await page.click('#remove-song-cancel');
   await row.scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: '/downloads/orvio-remove-mobile.png',
+    path: test.info().outputPath('remove-mobile.png'),
     fullPage: true,
   });
   await row.getByRole('button', { name: '목록에서 삭제', exact: true }).click();
