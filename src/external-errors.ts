@@ -1,3 +1,4 @@
+import { audioLimitMessage } from './audio-limit-message';
 import { AudioJobError } from './external-audio-api';
 import type { Language } from './i18n';
 const errors: Record<Language, string[]> = {
@@ -133,6 +134,12 @@ const errors: Record<Language, string[]> = {
   ],
 };
 export function externalError(error: unknown, language: Language) {
+  if (
+    error instanceof AudioJobError &&
+    error.code === 'rate_limited' &&
+    error.limit
+  )
+    return audioLimitMessage(error.limit, language);
   let index = 4;
   if (error instanceof AudioJobError)
     index =

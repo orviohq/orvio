@@ -1,4 +1,5 @@
 import { AUDIO_MAX_BYTES, AUDIO_MAX_SECONDS } from './audio-limits.mjs';
+import { readAudioLimit, type AudioLimit } from './audio-limit-message';
 export const AUDIO_BASE = 'https://orvio-share.pn-26f.workers.dev';
 const JOB = /^[A-Za-z0-9_-]{1,128}$/;
 const SHA = /^[a-f0-9]{64}$/;
@@ -20,6 +21,7 @@ export class AudioJobError extends Error {
     readonly code: AudioErrorCode,
     readonly retryAfterSec?: number,
     readonly status?: number,
+    readonly limit?: AudioLimit,
   ) {
     super(code);
   }
@@ -54,6 +56,7 @@ async function readJob(response: Response): Promise<AudioJob> {
       ERRORS.includes(code) ? code : 'unavailable',
       seconds(body?.error?.retryAfterSec ?? body?.retryAfterSec),
       response.status,
+      code === 'rate_limited' ? readAudioLimit(body?.error) : undefined,
     );
   }
   if (
