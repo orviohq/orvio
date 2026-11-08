@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { AUDIO_MAX_SECONDS } from '../src/audio-limits.mjs';
 test('all 13 import dialogs translate and show distinct invalid, duration, busy and quota recovery without library mutation', async ({
   browser,
 }) => {
@@ -45,7 +46,7 @@ test('all 13 import dialogs translate and show distinct invalid, duration, busy 
     await expect(page.locator('#youtube-status')).not.toHaveText(invalid!);
     await expect(page.locator('#youtube-submit')).toBeEnabled();
     const duration = await page.locator('#youtube-status').textContent();
-    expect(duration).toMatch(/2/);
+    expect(duration).toContain(String(AUDIO_MAX_SECONDS / 60));
     code = 'unavailable';
     status = 429;
     await page.click('#youtube-submit');
