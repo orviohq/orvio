@@ -76,12 +76,15 @@ for (const mode of [
       mode === 'warmup'
     ) {
       await expect(page.locator('#song-loading')).toBeVisible();
-      if (['cancel', 'cancel-button', 'late-render'].includes(mode))
+      if (
+        ['cancel', 'cancel-button', 'second-resume', 'late-render'].includes(
+          mode,
+        )
+      )
         await page.waitForFunction(
           () => typeof (window as any).releaseOld === 'function',
         );
       if (mode === 'warmup') await page.waitForTimeout(3000);
-      if (mode === 'second-resume') await page.waitForTimeout(3000);
       if (mode === 'cancel-button') await page.click('#cancel-startup');
       else await page.keyboard.press('Escape');
     }
