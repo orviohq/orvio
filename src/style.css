@@ -3784,3 +3784,212 @@ body.perf-enabled #fps {
     justify-self: center;
   }
 }
+
+/* A31: readable action text at normal zoom, including translated dialogs. */
+header nav,
+header nav .quiet {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.quiet,
+.select-trigger,
+.select-item,
+.library-context-menu button {
+  font-size: 14px;
+  line-height: 1.45;
+}
+.primary {
+  font-size: 18px;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  min-height: 48px;
+}
+.primary > span {
+  font-size: 12px;
+}
+#results .result-actions #retry {
+  font-size: 20px;
+  min-height: 54px;
+  min-width: 0;
+  padding: 15px 22px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#results .result-actions #back,
+#watch-replay,
+#result-preview {
+  font-size: 15px;
+  min-height: 44px;
+  line-height: 1.5;
+}
+#results .result-actions {
+  gap: 14px;
+}
+#results #result-metadata {
+  font-size: 14px;
+}
+#results .result-stats span,
+#results #judgment-list div {
+  font-size: 14px;
+}
+dialog label,
+dialog .hint,
+#settings #bind-hint,
+#settings #reset,
+.settings-tabs button,
+#about p,
+#about a {
+  font-size: 14px;
+  line-height: 1.6;
+}
+#settings .segmented button,
+#settings .key-bind {
+  font-size: 14px;
+  line-height: 1.4;
+  min-height: 40px;
+}
+#settings #position button {
+  min-height: 52px;
+}
+#settings .position-preview {
+  height: 35px;
+}
+#settings .binding-keys .key-bind {
+  height: 40px;
+}
+#settings .binding-row > span {
+  font-size: 14px;
+}
+#game-options .icon-options button {
+  font-size: 14px;
+  min-height: 72px;
+}
+#game-options .icon-options button b,
+#game-options .icon-options button span {
+  font-size: 14px;
+}
+#game-options .icon-options-speed button {
+  font-size: 16px;
+}
+#youtube-form label,
+#youtube-form input,
+#youtube-error,
+#youtube-warning {
+  font-size: 16px;
+  line-height: 1.5;
+}
+#youtube-help,
+.device-audio-dialog p,
+#remove-song-prompt {
+  font-size: 14px;
+  line-height: 1.7;
+}
+#remove-song-dialog button {
+  min-height: 44px;
+  font-size: 15px;
+  white-space: normal;
+}
+#difficulty button,
+#lanes button {
+  font-size: 14px;
+  min-height: 44px;
+  padding: 10px 12px;
+}
+.song-copy > span,
+.song-time {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.song-copy small {
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+}
+.song-time .song-level {
+  font-size: 14px;
+}
+#selected-subtitle,
+#preview-status {
+  font-size: 14px;
+  line-height: 1.5;
+}
+#chart-info {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.footer-strip a,
+.footer-strip button,
+.footer-strip > span {
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+#pause .quiet,
+#restart-options .quiet {
+  font-size: 16px;
+  min-height: 44px;
+}
+#toast,
+#share-status,
+#replay-status {
+  font-size: 14px;
+  line-height: 1.6;
+}
+@media (max-width: 699px) {
+  header nav {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px 12px;
+    min-width: 0;
+  }
+  header nav .quiet {
+    font-size: 13px;
+    padding: 4px 0;
+  }
+  #settings .settings-tabs button {
+    font-size: 14px;
+  }
+  #settings .binding-keys {
+    gap: 4px;
+  }
+  #settings .binding-keys .key-bind {
+    font-size: 14px;
+  }
+  #results .result-actions #retry {
+    width: 100%;
+  }
+  #results .result-stats span,
+  #results #judgment-list div {
+    font-size: 14px;
+  }
+  #replays {
+    height: calc(100dvh - 65px);
+  }
+}
+@media (max-width: 480px) {
+  #difficulty {
+    flex: 1;
+  }
+  #difficulty button,
+  #lanes button {
+    font-size: 13px;
+    padding: 10px 8px;
+  }
+  .selection {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  #lanes {
+    margin-left: auto;
+  }
+  .footer-strip {
+    height: auto;
+    min-height: 54px;
+  }
+}
+/* Translated action labels inherit the action size, not the shortcut caption. */
+.primary > [data-i18n] {
+  font-size: inherit;
+  letter-spacing: inherit;
+  opacity: 1;
+}
