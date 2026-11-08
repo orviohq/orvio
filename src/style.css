@@ -1406,8 +1406,9 @@ nav {
   box-shadow: 0 0 30px 5px #35dcff;
 }
 .break-impact {
-  background: #0b1724;
-  box-shadow: inset 0 0 45px #ff184744;
+  /* Keep the note corridor unchanged. Miss feedback lives at its edge. */
+  background: transparent;
+  box-shadow: inset 0 0 0 3px #ff384f99;
   animation: impact-light 0.45s ease-out;
 }
 #highway-wrap.danger {
@@ -4268,11 +4269,13 @@ html {
 #judge {
   filter: none;
 }
-/* Stable artwork anchor, independent of the selected title's line count. */
+/* Stable artwork anchor, independent of the selected title's line count.
+   The group stays vertically centered as before, while the fixed
+   title/subtitle heights below keep the artwork from shifting. */
 #lobby .intro {
-  justify-content: flex-start;
-  align-content: start;
-  padding-top: 14px;
+  justify-content: center;
+  padding-top: 0;
+  min-width: 0;
 }
 #lobby .selected-art {
   flex-shrink: 0;
@@ -4319,8 +4322,7 @@ html {
   }
   #lobby .selected-art {
     grid-column: 1;
-    grid-row: 1 / 5;
-    align-self: start;
+    grid-row: 2 / 6;
   }
   #lobby .selected-meta,
   #lobby #selected-title,
@@ -4337,6 +4339,7 @@ html {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
+  overflow-wrap: anywhere;
   line-height: 1.3;
   height: 2.6em;
   min-height: 2.6em;
@@ -4347,6 +4350,7 @@ html {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
+  overflow-wrap: anywhere;
   min-height: 3.8em;
   max-height: 3.8em;
 }
