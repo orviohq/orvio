@@ -50,6 +50,34 @@ test('WebKit real preview/replay graph and gesture activation before artwork', a
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/select/');
+  const artTop = await page
+    .locator('#selected-art')
+    .evaluate((e) => e.getBoundingClientRect().top);
+  await page.evaluate(async () => {
+    const { SONGS } = await import(/* @vite-ignore */ String('/src/chart.ts'));
+    SONGS[1].title =
+      'A very long selected track title that wraps onto several lines without moving artwork';
+  });
+  await page
+    .locator('[data-song="1"]')
+    .evaluate((e) => (e as HTMLElement).click());
+  expect(
+    await page
+      .locator('#selected-art')
+      .evaluate((e) => e.getBoundingClientRect().top),
+  ).toBe(artTop);
+  expect(await page.locator('#selection-number').count()).toBe(0);
+  const heading = await page.locator('.library .section-title').boundingBox();
+  const button = await page.locator('#add-youtube').boundingBox();
+  expect(button!.y).toBeGreaterThanOrEqual(heading!.y);
+  expect(button!.y + button!.height).toBeLessThanOrEqual(
+    heading!.y + heading!.height + 1,
+  );
+  await page.screenshot({ path: testInfo.outputPath('selection-stable.png') });
+  await page.click('#add-youtube');
+  expect(await page.locator('#youtube-rights').innerText()).toContain('5');
+  await page.screenshot({ path: testInfo.outputPath('import-dialog.png') });
+  await page.click('#youtube-cancel');
   const fragment = await page.evaluate(async () => {
     const { replayEngine } = await import(
       /* @vite-ignore */ String('/src/replay.ts')
@@ -86,6 +114,12 @@ test('WebKit real preview/replay graph and gesture activation before artwork', a
   });
   await page.goto('/result/#' + fragment);
   await page.locator('#results').waitFor({ state: 'visible' });
+  const resultArt = await page.locator('#result-art').boundingBox();
+  const resultTitle = await page.locator('#result-song').boundingBox();
+  expect(resultArt!.width).toBeGreaterThan(200);
+  expect(resultTitle!.y).toBeGreaterThanOrEqual(
+    resultArt!.y + resultArt!.height,
+  );
   await page.click('#result-preview');
   await page.waitForFunction(() => {
     const p = (window as any).__probe;
@@ -159,6 +193,9 @@ test('WebKit real preview/replay graph and gesture activation before artwork', a
     throw e;
   }
   await expect(page.locator('#game')).toBeVisible();
+  const bounds = await page.locator('#game').boundingBox();
+  expect(bounds!.y).toBe(0);
+  expect(bounds!.height).toBe(844);
   await page.screenshot({ path: testInfo.outputPath('webkit-replay.png') });
   expect(errors).toEqual([]);
   console.log(

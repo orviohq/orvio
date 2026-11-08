@@ -21,7 +21,6 @@ import {
   deviceInspectionChecking,
   deviceInspectionMessage,
 } from './device-audio-labels';
-import { AUDIO_QUOTA_LABEL } from './audio-quota-label';
 import { audioAtStage } from './audio-error-stage';
 import {
   verifiedLocalCanonical,
@@ -203,6 +202,7 @@ let startup: StartupAttempt | undefined;
 type UiResult = Omit<SharedResult, 'song'> & { song: string };
 let lastResult: UiResult | undefined;
 let localSessionKey: string | undefined;
+const ownResults = new WeakSet<UiResult>();
 let receivedShare: { fragment: string; data: ExternalSharedReplay } | undefined;
 let shareRouteRequest = 0;
 let navigationVersion = 0;
@@ -272,8 +272,8 @@ function persist() {
 const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.31</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
-<section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><p class="mobile-playback-note"></p><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div class="eyebrow">${label('selected')} <span id="selection-number">01 / 03</span></div><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.32</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><p class="mobile-playback-note"></p><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
 <section class="library" aria-label="Track selection"><p class="mobile-playback-note"></p><div class="section-title"><strong>${label('select')}</strong></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">NM</button><button data-diff="mid">HD</button><button data-diff="high">MX</button><button data-diff="sc">SC</button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div></section>
 <section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
 <section id="game" class="hidden" aria-label="Rhythm game"><div class="game-top"><button id="exit" class="quiet">ESC ${label('exit')}</button><div class="song-now"><span id="replay-playing" role="status"></span><strong id="now-title"></strong><span id="now-detail"></span></div><span id="fps" hidden></span></div><div id="progress"><div></div></div><div id="arena" data-position="center"><aside class="score-block"><span class="eyebrow">${label('score')}</span><strong id="score">0000000</strong><div><b id="rate">100.00</b><span>% ${label('accuracy')}</span></div><section id="fever-hud" class="hidden" aria-live="off"></section></aside><div id="highway-wrap"><div id="highway"></div><div id="impact" aria-hidden="true"></div><div id="fever-burst" aria-hidden="true"></div><div id="judge" aria-live="off"></div><div id="combo"></div><div id="keycaps"></div><button id="play-options" class="quiet option-readout"></button><div id="countdown"></div></div><aside class="track-block"><div class="orb-mini"></div><span class="eyebrow">ORVIO ORIGINALS</span><h2 id="side-title"></h2><div id="lane-detail"></div></aside></div><div class="game-footer"></div></section>
@@ -298,7 +298,7 @@ addYoutube.innerHTML =
   '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="5.5" width="17" height="13" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m9 9 5 3-5 3Z" fill="currentColor"/><path d="M19 2v6M16 5h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
 const libraryActions = document.createElement('div');
 libraryActions.id = 'library-actions';
-$('#songs').before(libraryActions);
+$('.library .section-title').append(libraryActions);
 libraryActions.append(addYoutube);
 const hiddenSongs = hiddenLibraryIds();
 const libraryVideoKey = (id: string) => {
@@ -528,6 +528,7 @@ async function openLocalSession(id: string) {
     replayIssue = false;
     lastResult = session.result;
     localSessionKey = session.key;
+    ownResults.add(session.result);
     showResult(session.result);
   } catch {
     toast(REPLAY_READ_ERROR[settings.language]);
@@ -649,14 +650,10 @@ function localize() {
   $('#youtube-heading').textContent = external.add;
   $('#youtube-label').textContent = external.url;
   $('#youtube-submit').textContent = external.submit;
-  $('#youtube-rights').textContent =
-    externalError(new AudioJobError('too_long'), settings.language) +
-    ' ' +
-    external.rights +
-    ' ' +
-    external.saved +
-    ' ' +
-    AUDIO_QUOTA_LABEL[settings.language];
+  $('#youtube-rights').textContent = externalError(
+    new AudioJobError('too_long'),
+    settings.language,
+  );
   $('#youtube-cancel').setAttribute('aria-label', external.cancel);
   queueMicrotask(() => document.dispatchEvent(new Event('orvio:select-sync')));
   document.documentElement.lang = settings.language;
@@ -709,9 +706,8 @@ function selectedSong() {
   $('#selected-art').style.backgroundImage =
     `url("${songArt(song.id)}"), url("${ART_FALLBACK}")`;
   $('#selected-art .art-index').textContent = '0' + (songIndex + 1);
-  $('#selection-number').textContent =
-    `${String(visibleSongIndices().indexOf(songIndex) + 1).padStart(2, '0')} / ${String(visibleSongIndices().length).padStart(2, '0')}`;
   $('#selected-title').textContent = song.title;
+  $('#selected-title').title = song.title;
   const originLabel = document.querySelector<HTMLElement>(
     '#selected-art .art-mark',
   );
@@ -735,7 +731,16 @@ function selectSong(index: number, audition = true) {
   songCards();
   syncSettings();
   selectedSong();
-  $('#songs .song-card.selected')?.scrollIntoView({ block: 'nearest' });
+  const list = $('#songs');
+  const selected = list.querySelector<HTMLElement>('.song-card.selected');
+  // Keep keyboard selection visible inside the list without scrolling the
+  // page or moving the artwork on touch layouts.
+  if (selected && list.scrollHeight > list.clientHeight + 1) {
+    const row = selected.getBoundingClientRect();
+    const box = list.getBoundingClientRect();
+    if (row.top < box.top) list.scrollTop += row.top - box.top;
+    else if (row.bottom > box.bottom) list.scrollTop += row.bottom - box.bottom;
+  }
   rememberLibrarySelection();
   if (audition) void previewSong();
 }
@@ -1308,12 +1313,13 @@ async function start() {
     );
     attempt.check();
     $('#song-loading').classList.add('hidden');
-    // Reserve the longest supported travel window (1x), regardless of the
-    // starting speed. Live speed changes cannot bring a note onto the field
-    // before this countdown ends. No hidden-note gate or shifted chart times.
+    // Reserve this field's longest visible travel window (1x), including
+    // the note-entry margin. Live speed changes cannot bring a note onto the
+    // field before countdown ends. No hidden-note gate or shifted chart times.
     const cd = startupCountdownTiming(
       song.bpm,
       engine!.states[0]?.note.time ?? (4 * 60) / song.bpm,
+      field.startupTravel,
     );
     countdownFallAt = cd.firstFall;
     countdownBeat = cd.beat;
@@ -1401,11 +1407,9 @@ function judgment(e: JudgmentEvent) {
             {
               transform: 'scale(1.48) skewX(-8deg)',
               opacity: 1,
-              filter: 'brightness(2)',
             },
             {
               transform: 'scale(.98) skewX(-3deg)',
-              filter: 'brightness(1.2)',
               offset: 0.35,
             },
             { transform: 'scale(1)', opacity: 1 },
@@ -1505,6 +1509,14 @@ function loop(now: number) {
   for (; seenEvents < engine.events.length; seenEvents++)
     judgment(engine.events[seenEvents]);
   const visualTime = clock.now(now);
+  if (!countdownLegacy) {
+    // A resize may reveal more of the field. Clear the countdown no later
+    // than the first visible note, without hiding notes or shifting replay ops.
+    countdownFallAt = Math.min(
+      countdownFallAt,
+      (engine.states[0]?.note.time ?? Infinity) - field.startupTravel,
+    );
+  }
   $('#countdown').textContent = countdownLegacy
     ? visualTime < 0
       ? 'READY'
@@ -1608,6 +1620,7 @@ function finish() {
     (v) => engine!.events.filter((e) => e.value === v).length,
   );
   const completed = lastResult;
+  ownResults.add(completed);
   replayExpected = true;
   replayEncoding = (async () => {
     if (externalSource(completed.song)) {
@@ -1674,6 +1687,8 @@ function resultLink(result: UiResult) {
   return new URL('/result/#' + p, location.origin).href;
 }
 function showResult(result: UiResult) {
+  $('#retry').innerHTML =
+    `${label(ownResults.has(result) ? 'retry' : 'start')} ↵`;
   screen = 'select';
   delete $('#share-status').dataset.message;
   $('#share-status').textContent = '';
@@ -3064,6 +3079,7 @@ async function initializeLibrary() {
       replayIssue = false;
       songIndex = SONGS.findIndex((s) => s.id === session.replay.song);
       localSessionKey = session.key;
+      ownResults.add(session.result);
       settings.lanes = session.replay.lanes;
       settings.difficulty = session.replay.difficulty;
       showResult(session.result);
@@ -3077,7 +3093,7 @@ void initializeLibrary();
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.2.31',
+    version: '0.2.32',
     active,
     paused,
     fever: engine

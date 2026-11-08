@@ -70,6 +70,7 @@ export const GROUP_LABELS: Record<
 export function patchGroups(version: string, lang: Language, notes: string[]) {
   const extra = !['en', 'ko', 'zh', 'ja', 'es'].includes(lang);
   const fixes: Record<string, number[]> = {
+    '0.2.32': [0, 1, 2],
     '0.2.31': [0, 1],
     '0.2.14': [0],
     '0.2.13': [1],

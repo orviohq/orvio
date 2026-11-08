@@ -83,6 +83,16 @@ export function countdownText(
 /** All supported live speeds are >=1. Reserve 1x travel up front so changing
  * speed cannot make a note visible during the countdown. The renderer keeps
  * its actual speed throughout; this is not a hidden-note visibility gate. */
-export function startupCountdownTiming(bpm: number, firstNoteTime: number) {
-  return countdownTiming(bpm, 1, firstNoteTime);
+export function startupCountdownTiming(
+  bpm: number,
+  firstNoteTime: number,
+  maximumTravel = 2,
+) {
+  const beat = 60 / bpm;
+  const firstFall = firstNoteTime - maximumTravel;
+  return {
+    leadIn: Math.max(0.15, 5 * beat - firstFall + 0.15),
+    firstFall,
+    beat,
+  };
 }

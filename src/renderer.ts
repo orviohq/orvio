@@ -1,6 +1,7 @@
 import { VisualClock } from './visual-clock';
 import { blinkAlpha, fadeAlpha, type Fader } from './game-options';
 import { noteLayout } from './note-layout';
+import { JUDGMENT_INSET, scrollPixels, visibleTravel } from './note-scroll';
 import { Application, Graphics, Container, Sprite, Texture } from 'pixi.js';
 import type { Engine } from './engine';
 interface NoteVisual {
@@ -35,6 +36,11 @@ export class Playfield {
   private pixelStep = 1;
   width = 440;
   height = 620;
+  get startupTravel() {
+    return visibleTravel(
+      Math.max(this.hostHeight, this.host?.clientHeight ?? 0),
+    );
+  }
   frames: number[] = [];
   work: number[] = [];
   private lastFrame = 0;
@@ -208,7 +214,7 @@ export class Playfield {
     this.width = this.app.screen.width;
     this.height = this.app.screen.height;
     const w = this.width / lanes;
-    const y = this.height - 92;
+    const y = this.height - JUDGMENT_INSET;
     this.grid.clear();
     this.grid
       .rect(0, 0, this.width, this.height)
@@ -285,8 +291,8 @@ export class Playfield {
       this.fog.height = this.height * 0.5;
     }
     const width = this.width / lanes;
-    const target = this.height - 92;
-    const px = target / travel;
+    const target = this.height - JUDGMENT_INSET;
+    const px = scrollPixels(travel);
     const spatialFade = ['out', 'out2'].includes(this.fader);
     if (this.fadeMaskMode !== this.fader) {
       this.notes.mask = null;

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.32] - 2026-11-09
+
+- Use a fixed CSS-pixel note-scroll reference across devices. Reserve the actual visible travel window for countdowns and retain saved replay timing.
+- Fill the mobile play viewport, avoid stacked filters in judgment glow and suppress double-tap zoom without disabling pinch zoom.
+- Enlarge result artwork, stabilize selection artwork and title space, align the YouTube action and shorten import instructions.
+- Distinguish shared-result start controls from locally played-result retry controls.
+
 ## [0.2.31] - 2026-11-09
 
 - Improve Safari preview and replay music playback with playback-session intent and activation during the original play gesture. Keep optional platform APIs optional.
