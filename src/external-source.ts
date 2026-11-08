@@ -10,6 +10,8 @@ export interface SourceRecord {
   version: 1;
   videoId: string;
   audioSha256: string;
+  /** Optional new-pin binding; absent on immutable legacy records. */
+  manifestSha256?: string;
   sampleRate: number;
   estimatedBpm: number;
   frames: number;
@@ -44,6 +46,8 @@ export function validSourceRecord(raw: unknown): raw is SourceRecord {
     r.estimatedBpm > 400 ||
     !/^[A-Za-z0-9_-]{11}$/.test(r.videoId) ||
     !hash.test(r.audioSha256) ||
+    (r.manifestSha256 !== undefined &&
+      (typeof r.manifestSha256 !== 'string' || !hash.test(r.manifestSha256))) ||
     !Number.isInteger(r.frames) ||
     r.frames <= 0 ||
     !Number.isInteger(r.sampleRate) ||
