@@ -2566,7 +2566,7 @@ body.results-screen {
     line-height: 1.6;
   }
 }
-@media (max-width: 699px) and (max-height: 759px) {
+@media (max-width: 699px) and (max-height: 900px) {
   .settings-tabs {
     display: flex;
     border-bottom: 1px solid #ffffff22;
@@ -2590,7 +2590,7 @@ body.results-screen {
     display: none;
   }
 }
-@media (max-width: 699px) and (max-height: 759px) {
+@media (max-width: 699px) and (max-height: 900px) {
   #settings {
     padding: 16px 20px;
   }
@@ -3537,14 +3537,38 @@ body.perf-enabled #fps {
   }
 }
 
+/* Error rows keep the standard flex card layout: cover | copy | actions.
+   The previous 3-column grid misplaced the fourth child (dismiss) onto its
+   own row and squeezed the cover and title. */
 .import-pending[data-state='error'] {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  display: flex;
+  align-items: center;
 }
 .import-pending[data-state='error'] .song-copy strong {
   font-size: 16px;
   white-space: normal;
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.import-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.import-actions .import-dismiss {
+  min-width: 32px;
+}
+@media (max-width: 560px) {
+  .import-actions {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
 }
 
 /* Unready songs retain per-song actions without requiring playable selection. */
@@ -4691,5 +4715,74 @@ html {
   :is(#lobby:not(.hidden) #songs, #cached-songs) {
     min-height: 200px;
     max-height: 55dvh;
+  }
+}
+
+@media (max-width: 699px) and (max-height: 900px) {
+  #settings {
+    padding: 12px;
+  }
+  #settings .dialog-title {
+    margin-bottom: 2px;
+  }
+  #settings .settings-tabs {
+    margin: 4px 0;
+  }
+  #settings .settings-tabs button {
+    padding: 6px 4px;
+  }
+  #settings label {
+    margin-top: 6px;
+    margin-bottom: 4px;
+  }
+  #settings #bind-hint {
+    line-height: 1.45;
+  }
+}
+@media (max-height: 759px) {
+  #settings #bindings {
+    gap: 4px;
+  }
+  #settings .binding-row {
+    gap: 4px;
+  }
+  #settings #bind-hint {
+    margin-top: 6px;
+    line-height: 1.45;
+  }
+  #settings #reset {
+    margin-top: 4px;
+  }
+}
+/* Narrow failure cards keep readable text beside art, with one action row. */
+@media (max-width: 560px) {
+  .song-card.import-pending[data-state='error'] {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 10px 12px;
+    align-items: start;
+  }
+  .song-card.import-pending[data-state='error'] .cover {
+    width: 64px;
+    height: 64px;
+    min-width: 0;
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .song-card.import-pending[data-state='error'] .song-copy {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+  }
+  .song-card.import-pending[data-state='error'] .import-actions {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    flex-direction: row;
+    justify-content: flex-end;
+    margin: 0;
+  }
+  .song-card.import-pending[data-state='error'] .import-actions button {
+    min-height: 40px;
+    min-width: 40px;
   }
 }
