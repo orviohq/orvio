@@ -47,28 +47,24 @@ import { LANGUAGES, type Language } from '../i18n';
                   lang as Language,
                   p.notes[lang as Language],
                 ),
-              ).map(([group, notes]) => (
-                <section data-patch-group={group}>
-                  <h3>
-                    {
-                      GROUP_LABELS[lang as Language][
-                        group as 'features' | 'fixes'
-                      ]
-                    }
-                  </h3>
-                  {notes.length ? (
+              )
+                .filter(([, notes]) => notes.length > 0)
+                .map(([group, notes]) => (
+                  <section data-patch-group={group}>
+                    <h3>
+                      {
+                        GROUP_LABELS[lang as Language][
+                          group as 'features' | 'fixes'
+                        ]
+                      }
+                    </h3>
                     <ul>
                       {notes.map((text) => (
                         <li>{text}</li>
                       ))}
                     </ul>
-                  ) : (
-                    <p class="empty-group">
-                      {GROUP_LABELS[lang as Language].none}
-                    </p>
-                  )}
-                </section>
-              ))}
+                  </section>
+                ))}
             </article>
           ))}
         </div>

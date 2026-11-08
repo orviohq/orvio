@@ -2,19 +2,19 @@
 
 ## [0.2.30] - 2026-11-08
 
-- A37 (result transition, separate request): Replace the brief static result page with a reduced-motion-aware loading animation without added delay.
-- A38 (shared-result title, separate request): Preserve source/song object identity and useful titles through reload; refresh only identity-bound result display metadata. Saved audio, charts, replays and shared fragments remain unchanged.
-- A39: Full-screen responsive mobile results, touch-friendly navigation and actual game-view replay playback. Direct gameplay stays desktop-only, including retry and deep-link starts.
+- Replace the brief static result page with a reduced-motion-aware loading animation without added delay.
+- Preserve source/song object identity and useful titles through reload; refresh only identity-bound result display metadata. Saved audio, charts, replays and shared fragments remain unchanged.
+- Full-screen responsive mobile results, touch-friendly navigation and actual game-view replay playback. Direct gameplay stays desktop-only, including retry and deep-link starts.
 
 ## [0.2.29] - 2026-11-08
 
-- A30: Continue long-note hit effects while held, stop after release, honor reduced motion. Judgments and timing unchanged.
-- A31: Correct undersized translated action labels and menus. Keep full results visible at laptop height and all content reachable on small screens.
-- A32: Add replay artwork, exact song duration and new-session play timestamps; mark legacy missing times honestly. Improve archive cards and wheel/keyboard/touch scrolling.
-- A33/A34: Remove duplicate top removal action and redundant library/keyboard copy. Preserve contextual and keyboard removal.
-- A36: Keep stable selected-song identity and list scroll when returning.
-- A36 (replay indicator, separate request): Clearly label replay playback above the song title; hide on return or completion.
-- A38: Show current key-mode/difficulty note counts within each song row, remove bottom provenance/count line.
+- Continue long-note hit effects while held, stop after release, honor reduced motion. Judgments and timing unchanged.
+- Correct undersized translated action labels and menus. Keep full results visible at laptop height and all content reachable on small screens.
+- Add replay artwork, exact song duration and new-session play timestamps; mark legacy missing times honestly. Improve archive cards and wheel/keyboard/touch scrolling.
+- Remove duplicate top removal action and redundant library/keyboard copy. Preserve contextual and keyboard removal.
+- Keep stable selected-song identity and list scroll when returning.
+- Clearly label replay playback above the song title; hide on return or completion.
+- Show current key-mode/difficulty note counts within each song row, remove bottom provenance/count line.
 - Clarify that audio-capacity errors refer to the server limit, not device storage.
 
 ## [0.2.28] - 2026-11-08
