@@ -96,15 +96,24 @@ export function resultBadgeData(
     label: labels.shuffle + ' ' + o.shuffle.toUpperCase(),
     icon: badge32(shuffle),
   });
-  const special = ['blink', 'blink2', 'fog', 'pixel', 'pixel2', 'blind'].includes(
-    o.fader,
-  );
+  const special = [
+    'blink',
+    'blink2',
+    'fog',
+    'pixel',
+    'pixel2',
+    'blind',
+  ].includes(o.fader);
   const fade: OptionIconElement[] = Array.from({ length: 4 }, (_, i) => ({
     type: 'path',
     d: `M10 ${5 + i * 7}h12`,
     strokeWidth: 3,
     opacity:
-      o.fader === 'off' ? 1 : o.fader.startsWith('in') ? (i + 1) / 4 : (4 - i) / 4,
+      o.fader === 'off'
+        ? 1
+        : o.fader.startsWith('in')
+          ? (i + 1) / 4
+          : (4 - i) / 4,
   }));
   out.push({
     kind: 'fader',
@@ -117,7 +126,11 @@ export function resultBadgeData(
           : 'I',
     label: labels.fader + ' ' + o.fader.toUpperCase(),
     icon: special
-      ? { viewBox: 24, strokeWidth: 1.7, elements: optionIconElements('fader', o.fader) }
+      ? {
+          viewBox: 24,
+          strokeWidth: 1.7,
+          elements: optionIconElements('fader', o.fader),
+        }
       : badge32([
           { type: 'path', d: 'M5 3v26M27 3v26', opacity: 0.2 },
           ...fade,

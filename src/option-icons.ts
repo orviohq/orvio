@@ -17,7 +17,10 @@ export function optionIconElements(
   kind: 'speed' | 'shuffle' | 'fader',
   state = 'off',
 ): OptionIconElement[] {
-  const p = (d: string, extra?: Partial<OptionIconElement>): OptionIconElement => ({
+  const p = (
+    d: string,
+    extra?: Partial<OptionIconElement>,
+  ): OptionIconElement => ({
     type: 'path',
     d,
     ...extra,
@@ -26,13 +29,12 @@ export function optionIconElements(
     return [p('m7 11 5-5 5 5M7 18l5-5 5 5'), p('M5 21h14', { opacity: 0.35 })];
   if (kind === 'shuffle')
     return state === 'mirror'
-      ? [
-          p('M12 3v18', { dash: '2 3' }),
-          p('m8 7-5 5 5 5M16 7l5 5-5 5'),
-        ]
+      ? [p('M12 3v18', { dash: '2 3' }), p('m8 7-5 5 5 5M16 7l5 5-5 5')]
       : state === 'random'
         ? [
-            p('M3 6h3c5 0 7 12 12 12h3M17 14l4 4-4 3M3 18h3c2 0 3-2 4-4M14 8c1-1 2-2 4-2h3M17 3l4 3-4 4'),
+            p(
+              'M3 6h3c5 0 7 12 12 12h3M17 14l4 4-4 3M3 18h3c2 0 3-2 4-4M14 8c1-1 2-2 4-2h3M17 3l4 3-4 4',
+            ),
           ]
         : [p('M6 4v16'), p('M12 4v16'), p('M18 4v16')];
   if (state.startsWith('blink'))
@@ -71,9 +73,10 @@ function renderElements(elements: OptionIconElement[]): string {
     Number.isFinite(v) ? v : fallback;
   return elements
     .map((el) => {
-      const opacity = el.opacity !== undefined && el.opacity < 1
-        ? ` opacity="${String(el.opacity).replace('0.', '.')}"`
-        : '';
+      const opacity =
+        el.opacity !== undefined && el.opacity < 1
+          ? ` opacity="${String(el.opacity).replace('0.', '.')}"`
+          : '';
       const dash = el.dash ? ` stroke-dasharray="${el.dash}"` : '';
       if (el.type === 'circle')
         return `<circle cx="${num(el.cx, 0)}" cy="${num(el.cy, 0)}" r="${num(el.r, 0)}"${opacity}${dash}/>`;

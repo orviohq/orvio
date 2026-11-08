@@ -21,11 +21,13 @@
         const c = value.charCodeAt(i);
         a1 = Math.imul(a1 ^ c, 0x01000193) >>> 0;
         a2 =
-          (a2 + ((a2 << 1) + (a2 << 4) + (a2 << 7) + (a2 << 8) + (a2 << 24))) >>>
+          (a2 +
+            ((a2 << 1) + (a2 << 4) + (a2 << 7) + (a2 << 8) + (a2 << 24))) >>>
           0;
         b1 = Math.imul(b1 ^ (c ^ 0x9e3779b9), 0x01000193) >>> 0;
         b2 =
-          (b2 + ((b2 << 3) + (b2 << 5) + (b2 << 11) + (b2 << 16) + (b2 << 22))) >>>
+          (b2 +
+            ((b2 << 3) + (b2 << 5) + (b2 << 11) + (b2 << 16) + (b2 << 22))) >>>
           0;
       }
       return (
@@ -175,7 +177,9 @@
                   el.r > 0 &&
                   el.r <= 32)) &&
               (el.opacity === undefined ||
-                (Number.isFinite(el.opacity) && el.opacity >= 0 && el.opacity <= 1)) &&
+                (Number.isFinite(el.opacity) &&
+                  el.opacity >= 0 &&
+                  el.opacity <= 1)) &&
               (el.dash === undefined ||
                 (typeof el.dash === 'string' &&
                   el.dash.length <= 24 &&
@@ -199,7 +203,10 @@
         span.setAttribute('aria-label', text(b.label, 120));
         span.title = text(b.label, 120);
         const svgEl = document.createElementNS(SVGNS, 'svg');
-        svgEl.setAttribute('viewBox', '0 0 ' + b.icon.viewBox + ' ' + b.icon.viewBox);
+        svgEl.setAttribute(
+          'viewBox',
+          '0 0 ' + b.icon.viewBox + ' ' + b.icon.viewBox,
+        );
         svgEl.setAttribute('fill', 'none');
         svgEl.setAttribute('stroke', 'currentColor');
         svgEl.setAttribute('stroke-width', String(b.icon.strokeWidth || 1.7));

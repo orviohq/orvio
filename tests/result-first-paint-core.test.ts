@@ -49,8 +49,7 @@ describe('fnv128', () => {
       'v=3&song=a',
       'v=3&song=b',
     ];
-    for (const value of corpus)
-      expect(bootstrapFnv(value)).toBe(fnv128(value));
+    for (const value of corpus) expect(bootstrapFnv(value)).toBe(fnv128(value));
   });
 
   it('hashes the full fragment (no prefix truncation)', () => {
@@ -62,20 +61,28 @@ describe('fnv128', () => {
 
 describe('resultIdentityKey', () => {
   it('derives share, local and fragment identities', () => {
-    expect(resultIdentityKey('https://orvio.pages.dev/result/?s=replay0000000000000000aa')).toBe(
-      's:replay0000000000000000aa',
-    );
+    expect(
+      resultIdentityKey(
+        'https://orvio.pages.dev/result/?s=replay0000000000000000aa',
+      ),
+    ).toBe('s:replay0000000000000000aa');
     expect(
       resultIdentityKey('https://orvio.pages.dev/result/?local=builtin:1234'),
     ).toBe('local:builtin:1234');
-    expect(resultIdentityKey('https://orvio.pages.dev/result/#v=3&song=x')).toBe(
-      'h:' + fnv128('v=3&song=x'),
-    );
+    expect(
+      resultIdentityKey('https://orvio.pages.dev/result/#v=3&song=x'),
+    ).toBe('h:' + fnv128('v=3&song=x'));
   });
   it('rejects non-result routes and malformed identities', () => {
-    expect(resultIdentityKey('https://orvio.pages.dev/select/?s=abcDef12')).toBeNull();
-    expect(resultIdentityKey('https://orvio.pages.dev/result/?s=bad!chars')).toBeNull();
-    expect(resultIdentityKey('https://orvio.pages.dev/result/?s=short')).toBeNull();
+    expect(
+      resultIdentityKey('https://orvio.pages.dev/select/?s=abcDef12'),
+    ).toBeNull();
+    expect(
+      resultIdentityKey('https://orvio.pages.dev/result/?s=bad!chars'),
+    ).toBeNull();
+    expect(
+      resultIdentityKey('https://orvio.pages.dev/result/?s=short'),
+    ).toBeNull();
     expect(resultIdentityKey('https://orvio.pages.dev/result/')).toBeNull();
     expect(resultIdentityKey('not a url')).toBeNull();
   });
@@ -95,15 +102,15 @@ describe('resultFingerprint', () => {
   it('is stable for the same result and sensitive to every displayed field', () => {
     const fp = resultFingerprint(RESULT as never);
     expect(resultFingerprint({ ...RESULT } as never)).toBe(fp);
-    expect(
-      resultFingerprint({ ...RESULT, accuracy: 1.8 } as never),
-    ).not.toBe(fp);
+    expect(resultFingerprint({ ...RESULT, accuracy: 1.8 } as never)).not.toBe(
+      fp,
+    );
     expect(resultFingerprint({ ...RESULT, score: 17858 } as never)).not.toBe(
       fp,
     );
-    expect(
-      resultFingerprint({ ...RESULT, options: null } as never),
-    ).not.toBe(fp);
+    expect(resultFingerprint({ ...RESULT, options: null } as never)).not.toBe(
+      fp,
+    );
     expect(
       resultFingerprint({
         ...RESULT,
@@ -129,9 +136,9 @@ describe('evictResultDisplayEntries', () => {
   const entry = (pad: number) => ({ title: 'x'.repeat(pad) });
   it('keeps everything under budget', () => {
     const entries = { a: entry(10), b: entry(10) };
-    expect(
-      evictResultDisplayEntries(entries, new Set(['b']), 100000),
-    ).toEqual(entries);
+    expect(evictResultDisplayEntries(entries, new Set(['b']), 100000)).toEqual(
+      entries,
+    );
   });
   it('evicts oldest first until the store fits, never the just-written keys', () => {
     const entries = { a: entry(100), b: entry(100), c: entry(100) };

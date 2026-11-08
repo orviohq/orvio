@@ -18,9 +18,12 @@ export function fnv128(value: string): string {
   for (let i = 0; i < value.length; i++) {
     const c = value.charCodeAt(i);
     a1 = Math.imul(a1 ^ c, 0x01000193) >>> 0;
-    a2 = (a2 + ((a2 << 1) + (a2 << 4) + (a2 << 7) + (a2 << 8) + (a2 << 24))) >>> 0;
+    a2 =
+      (a2 + ((a2 << 1) + (a2 << 4) + (a2 << 7) + (a2 << 8) + (a2 << 24))) >>> 0;
     b1 = Math.imul(b1 ^ (c ^ 0x9e3779b9), 0x01000193) >>> 0;
-    b2 = (b2 + ((b2 << 3) + (b2 << 5) + (b2 << 11) + (b2 << 16) + (b2 << 22))) >>> 0;
+    b2 =
+      (b2 + ((b2 << 3) + (b2 << 5) + (b2 << 11) + (b2 << 16) + (b2 << 22))) >>>
+      0;
   }
   return (
     a1.toString(16).padStart(8, '0') +

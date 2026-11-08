@@ -11,7 +11,10 @@ import {
   resultIdentityKey,
 } from './result-first-paint-core';
 
-export { resultIdentityKey, resultFingerprint } from './result-first-paint-core';
+export {
+  resultIdentityKey,
+  resultFingerprint,
+} from './result-first-paint-core';
 
 type UiResult = Omit<SharedResult, 'song'> & { song: string };
 
@@ -91,8 +94,7 @@ export function rememberResultFirstPaint(
       statsLabels: [
         ...document.querySelectorAll('#results .result-stats > div > span'),
       ].map((n) => n.textContent ?? ''),
-      judgments:
-        result.judgments?.length === 12 ? [...result.judgments] : null,
+      judgments: result.judgments?.length === 12 ? [...result.judgments] : null,
       fever: {
         text: feverNode?.textContent ?? '',
         hidden:
@@ -101,8 +103,8 @@ export function rememberResultFirstPaint(
           (feverNode as HTMLElement).hidden === true,
       },
       note:
-        document.querySelector('#results .mobile-playback-note')
-          ?.textContent ?? '',
+        document.querySelector('#results .mobile-playback-note')?.textContent ??
+        '',
       backLabel: $('#back')?.textContent ?? '',
       retryLabel: $('#retry')?.textContent ?? '',
       retryDisabled: $<HTMLButtonElement>('#retry')?.disabled === true,
@@ -164,8 +166,8 @@ export function finishResultFirstPaint(
       __resultFirstPaint?: { key: string; fp: string };
     }
   ).__resultFirstPaint;
-  const paintedAt = document.getElementById('result-first-paint')?.dataset
-    .paintedAt;
+  const paintedAt =
+    document.getElementById('result-first-paint')?.dataset.paintedAt;
   document.getElementById('result-first-paint')?.remove();
   if (typeof window !== 'undefined')
     delete (window as unknown as { __resultFirstPaint?: unknown })
@@ -177,8 +179,9 @@ export function finishResultFirstPaint(
     painted!.fp === resultFingerprint(result!);
   // Read-only outcome marker for verification tooling: records whether the
   // verified render consumed a projection, and when that projection painted.
-  (window as unknown as { __resultFirstPaintOutcome?: unknown })
-    .__resultFirstPaintOutcome = {
+  (
+    window as unknown as { __resultFirstPaintOutcome?: unknown }
+  ).__resultFirstPaintOutcome = {
     painted: !!painted,
     matched,
     paintedAt: paintedAt ? Number(paintedAt) : null,

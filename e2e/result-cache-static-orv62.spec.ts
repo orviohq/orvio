@@ -220,9 +220,9 @@ test('ORV-62 static: warm ?s= projection is visible with typed badges BEFORE mod
   await expect(page.locator('#result-first-paint')).toBeVisible();
   await expect(page.locator('#rp-score')).toHaveText('500,000');
   await expect(page.locator('#rp-song')).toHaveText('First Light');
-  await expect(
-    page.locator('#rp-options .result-option-keys b'),
-  ).toHaveText('5K');
+  await expect(page.locator('#rp-options .result-option-keys b')).toHaveText(
+    '5K',
+  );
   await expect(
     page.locator('#rp-options .result-option-difficulty b'),
   ).toHaveText('NM 2');
@@ -238,9 +238,9 @@ test('ORV-62 static: warm ?s= projection is visible with typed badges BEFORE mod
   expect(outcome.matched).toBe(true);
   const fcp = await page.evaluate(
     () =>
-      performance.getEntriesByType('paint').find(
-        (e) => e.name === 'first-contentful-paint',
-      )?.startTime ?? null,
+      performance
+        .getEntriesByType('paint')
+        .find((e) => e.name === 'first-contentful-paint')?.startTime ?? null,
   );
   console.log(
     `ORV62 static pre-module: paintedAt=${outcome.paintedAt}ms fcp=${Math.round(fcp ?? -1)}ms moduleDelay=${MODULE_DELAY}ms`,
@@ -304,7 +304,9 @@ test('ORV-62 static: an expired share projection never paints (zero expired pain
 test('ORV-62 static: invalid fragment paints nothing and clears the pending state', async ({
   page,
 }) => {
-  await page.goto('/result/#v=3&song=no-such-song&keys=5&diff=low&score=1&acc=0.10&combo=0&j=0,0,0,0,0,0,0,0,0,0,0,1');
+  await page.goto(
+    '/result/#v=3&song=no-such-song&keys=5&diff=low&score=1&acc=0.10&combo=0&j=0,0,0,0,0,0,0,0,0,0,0,1',
+  );
   await page.waitForTimeout(500);
   await expect(page.locator('#result-first-paint')).toHaveCount(0);
   await expect(page.locator('#results')).not.toBeVisible();
@@ -317,7 +319,9 @@ test('ORV-62 static: invalid fragment paints nothing and clears the pending stat
 test('ORV-62 static: missing local session clears the pending state instead of loading forever', async ({
   page,
 }) => {
-  await page.goto('/result/?local=' + encodeURIComponent('builtin:missing-key'));
+  await page.goto(
+    '/result/?local=' + encodeURIComponent('builtin:missing-key'),
+  );
   await page.waitForTimeout(500);
   await expect(page.locator('#result-first-paint')).toHaveCount(0);
   await expect(page.locator('#results')).not.toBeVisible();
