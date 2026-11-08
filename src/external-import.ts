@@ -32,6 +32,8 @@ export async function importYoutube(
   input: string,
   signal: AbortSignal,
   options: {
+    /** Only the current explicit re-add may replace a confirmed terminal failure. */
+    retryFailed?: boolean;
     jobId?: string;
     onJob?: (job: import('./external-audio-api').AudioJob) => void;
   } = {},
@@ -63,6 +65,17 @@ export async function importYoutube(
   let job = options.jobId
     ? await readAudioJob(options.jobId, signal)
     : await createAudioJob('https://www.youtube.com/watch?v=' + id, signal);
+  // A timeout/network failure can still own a live job. Read it first, never
+  // discard an uncertain handle or create a duplicate while it is running.
+  // Only a fresh manual re-add may replace a confirmed terminal unavailable
+  // job, once. Reload/resume/poll paths never opt into this branch.
+  if (
+    options.jobId &&
+    options.retryFailed &&
+    job.status === 'error' &&
+    job.error?.code === 'unavailable'
+  )
+    job = await createAudioJob('https://www.youtube.com/watch?v=' + id, signal);
   options.onJob?.(job);
   const deadline = performance.now() + 90000;
   while (job.status === 'queued' || job.status === 'running') {

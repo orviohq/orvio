@@ -111,3 +111,89 @@ for (const state of ['pending', 'replicating', 'deferred'] as const)
     expect(readAudioJob).not.toHaveBeenCalled();
     expect(loadCanonicalAudio).not.toHaveBeenCalled();
   });
+
+it('only an explicit re-add replaces a confirmed terminal unavailable job, exactly once', async () => {
+  vi.mocked(refreshCanonical).mockResolvedValue({ state: 'missing' });
+  vi.mocked(readAudioJob).mockResolvedValue({
+    jobId: 'old-job',
+    status: 'error',
+    error: { code: 'unavailable' },
+  });
+  vi.mocked(createAudioJob).mockResolvedValue({
+    jobId: 'new-job',
+    status: 'error',
+    error: { code: 'unavailable' },
+  });
+  await expect(
+    importYoutube(record.videoId, new AbortController().signal, {
+      jobId: 'old-job',
+      retryFailed: true,
+    }),
+  ).rejects.toMatchObject({ code: 'unavailable' });
+  expect(readAudioJob).toHaveBeenCalledTimes(1);
+  expect(createAudioJob).toHaveBeenCalledTimes(1);
+});
+it('automatic known-job resume never replaces terminal failure', async () => {
+  vi.mocked(refreshCanonical).mockResolvedValue({ state: 'missing' });
+  vi.mocked(readAudioJob).mockResolvedValue({
+    jobId: 'old-job',
+    status: 'error',
+    error: { code: 'unavailable' },
+  });
+  await expect(
+    importYoutube(record.videoId, new AbortController().signal, {
+      jobId: 'old-job',
+    }),
+  ).rejects.toMatchObject({ code: 'unavailable' });
+  expect(createAudioJob).not.toHaveBeenCalled();
+});
+it('an uncertain old job GET failure never becomes a replacement extraction', async () => {
+  vi.mocked(refreshCanonical).mockResolvedValue({ state: 'missing' });
+  vi.mocked(readAudioJob).mockRejectedValue(new AudioJobError('network_error'));
+  await expect(
+    importYoutube(record.videoId, new AbortController().signal, {
+      jobId: 'old-job',
+      retryFailed: true,
+    }),
+  ).rejects.toMatchObject({ code: 'network_error' });
+  expect(createAudioJob).not.toHaveBeenCalled();
+});
+it('an explicit re-add never replaces a known completed job', async () => {
+  vi.mocked(refreshCanonical).mockResolvedValue({ state: 'missing' });
+  vi.mocked(readAudioJob).mockResolvedValue({
+    jobId: 'old-job',
+    status: 'done',
+  });
+  vi.mocked(prepareExternalJob).mockResolvedValue({
+    record,
+    bytes,
+    restored: false,
+  });
+  await importYoutube(record.videoId, new AbortController().signal, {
+    jobId: 'old-job',
+    retryFailed: true,
+  });
+  expect(createAudioJob).not.toHaveBeenCalled();
+});
+for (const code of [
+  'rate_limited',
+  'region_blocked',
+  'too_long',
+  'source_changed',
+  'integrity_failed',
+] as const)
+  it(`manual re-add does not turn ${code} into a new extraction`, async () => {
+    vi.mocked(refreshCanonical).mockResolvedValue({ state: 'missing' });
+    vi.mocked(readAudioJob).mockResolvedValue({
+      jobId: 'old-job',
+      status: 'error',
+      error: { code },
+    });
+    await expect(
+      importYoutube(record.videoId, new AbortController().signal, {
+        jobId: 'old-job',
+        retryFailed: true,
+      }),
+    ).rejects.toMatchObject({ code });
+    expect(createAudioJob).not.toHaveBeenCalled();
+  });

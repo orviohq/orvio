@@ -134,3 +134,27 @@ it('restores only known failure stages, retaining cause classification across re
   expect(pending.rows.get('BBBBBBBBBBB')?.failure?.stage).toBeUndefined();
   expect(api.import).not.toHaveBeenCalled();
 });
+
+it('manual re-add opts into confirmed terminal retry but reload resume does not', async () => {
+  raf();
+  const pending = new BackgroundImports(
+    () => {},
+    async () => {},
+    store(
+      JSON.stringify([
+        {
+          videoId: 'AAAAAAAAAAA',
+          jobId: 'known-job',
+          state: 'error',
+          error: 'unavailable',
+        },
+      ]),
+    ),
+  );
+  pending.enqueue('AAAAAAAAAAA');
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(1));
+  expect(api.import.mock.calls[0][2]).toMatchObject({
+    jobId: 'known-job',
+    retryFailed: true,
+  });
+});

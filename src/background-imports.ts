@@ -105,7 +105,7 @@ export class BackgroundImports {
       throw error;
     }
     this.changed();
-    void this.run(row);
+    void this.run(row, previous?.state === 'error');
     return videoId;
   }
   resume() {
@@ -134,7 +134,7 @@ export class BackgroundImports {
     }
     this.changed();
   }
-  private async run(row: PendingImport) {
+  private async run(row: PendingImport, retryFailed = false) {
     if (this.active.has(row.videoId)) return;
     this.active.add(row.videoId);
     try {
@@ -147,6 +147,7 @@ export class BackgroundImports {
         AbortSignal.timeout(90000),
         {
           jobId: row.jobId,
+          retryFailed,
           onJob: (job) => {
             row.jobId = job.status === 'error' ? undefined : job.jobId;
             row.title = job.title;
