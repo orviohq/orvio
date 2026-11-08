@@ -43,10 +43,13 @@ for (const mode of [
       } else if (mode === 'warmup') {
         const native = window.requestAnimationFrame;
         w.savedRaf = native;
-        window.requestAnimationFrame = (cb) =>
-          document.querySelector('#song-loading:not(.hidden)')
-            ? 987654321
-            : native(cb);
+        window.requestAnimationFrame = (cb) => {
+          if (document.querySelector('#song-loading:not(.hidden)')) {
+            w.warmupBlocked = true;
+            return 987654321;
+          }
+          return native(cb);
+        };
         w.releaseOld = () => {
           window.requestAnimationFrame = native;
         };
@@ -84,7 +87,12 @@ for (const mode of [
         await page.waitForFunction(
           () => typeof (window as any).releaseOld === 'function',
         );
-      if (mode === 'warmup') await page.waitForTimeout(3000);
+      if (mode === 'warmup')
+        await page.waitForFunction(
+          () => (window as any).warmupBlocked === true,
+          null,
+          { polling: 10 },
+        );
       if (mode === 'cancel-button') await page.click('#cancel-startup');
       else await page.keyboard.press('Escape');
     }
@@ -94,7 +102,11 @@ for (const mode of [
     if (mode === 'warmup')
       await page.evaluate(() => (window as any).releaseOld());
     await page.click('#start');
-    await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
+    await page.waitForFunction(
+      () => (window as any).orvioDiagnostics.active,
+      null,
+      { polling: 10 },
+    );
     const session = await page.evaluate(
       () => (window as any).orvioDiagnostics.sessionId,
     );
