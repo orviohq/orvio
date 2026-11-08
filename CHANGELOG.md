@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.23] - 2026-11-08
+
+- Use one verified chart set and difficulty per YouTube video across clients; keep archived charts and saved play history unchanged.
+- Share the exact external-song replay, loading its verified audio only when watching.
+- Keep unavailable songs visible with a read-only retry while other songs remain playable.
+- Add YouTube songs immediately as non-playable loading rows while preparation runs in the background.
+- Distinguish observed audio service, response, analysis and browser-storage failures without guessing unknown causes.
+- Existing imports can obtain a canonical chart through a known completed job when its exact audio is still cached. An expired job or unavailable service remains a pending recovery state; local archives are not silently replaced.
+- This release does not claim a fix for the QWER upstream extraction failure, display ghosting, or a fully passing CI gate.
+
 ## [0.2.22] - 2026-11-08
 
 - Remove a song from the library without deleting its audio, results or replay archive. Show one entry per video and remove old/new chart and migration controls.
