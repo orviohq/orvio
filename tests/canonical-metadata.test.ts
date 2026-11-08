@@ -4,6 +4,7 @@ import {
   validCanonicalMetadata,
 } from '../src/canonical-metadata-api';
 import type { SourceRecord } from '../src/external-source';
+import { queryClient } from '../src/query-client';
 const record = {
   videoId: 'AAAAAAAAAAA',
   audioSha256: 'a'.repeat(64),
@@ -16,7 +17,12 @@ const meta = {
   durationSec: 173,
   source: 'audio-manifest',
 };
-afterEach(() => vi.unstubAllGlobals());
+// The ORV-62 query cache persists successes across calls by design; tests
+// that re-stub fetch scenarios must start from an empty cache.
+afterEach(() => {
+  vi.unstubAllGlobals();
+  queryClient.clear();
+});
 it('accepts exact identity and rejects wrong or unsafe display metadata', () => {
   expect(validCanonicalMetadata(meta, record)).toBe(true);
   for (const [k, v] of [

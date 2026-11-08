@@ -4,6 +4,11 @@ import {
   rememberLibraryFirstPaint,
   finishLibraryFirstPaint,
 } from './library-first-paint';
+import {
+  rememberResultFirstPaint,
+  finishResultFirstPaint,
+  resultIdentityKey,
+} from './result-first-paint';
 import { savedCanonical } from './canonical-library';
 import { importStageLabel } from './import-progress';
 import { showToast as toast } from './ui/sonner';
@@ -79,6 +84,7 @@ import {
 } from './external-catalog';
 import { FULLSCREEN_WARNING } from './fullscreen-labels';
 import { saveSharedReplay, loadSharedReplay, ShareError } from './share-api';
+import { queryClient, queryKeys, queryReady } from './query-client';
 import { shareLabels } from './share-labels';
 import { ScoreDisplay } from './score-display';
 import { REPLAY_LABELS, REPLAY_PLAYING } from './replay-labels';
@@ -98,7 +104,7 @@ import {
   requestGameFullscreen,
   fullscreenEscapeStatus,
 } from './fullscreen-escape';
-import { resultBadges } from './result-badges';
+import { resultBadgeData, resultBadges } from './result-badges';
 import { enhanceSelects } from './select-ui';
 import './select-ui.css';
 import { cachedAudio, saveAudio } from './audio-cache';
@@ -318,7 +324,7 @@ function persist() {
 const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.45</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.46</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
 <section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><p class="mobile-playback-note"></p><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status"></span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
 <section class="library" aria-label="Track selection"><p class="mobile-playback-note"></p><div class="section-title"><strong>${label('select')}</strong></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">NM</button><button data-diff="mid">HD</button><button data-diff="high">MX</button><button data-diff="sc">SC</button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div></section>
 <section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
@@ -1235,7 +1241,11 @@ function syncSettings() {
       }),
   );
   persist();
-  if (!readingRoute && screen === 'select')
+  if (
+    !readingRoute &&
+    screen === 'select' &&
+    !$<HTMLDialogElement>('#results').open
+  )
     history.replaceState(null, '', selectionPath());
   if (libraryHydrated && screen === 'select')
     rememberLibraryFirstPaint(
@@ -1945,6 +1955,10 @@ function resultLink(result: UiResult) {
   return new URL('/result/#' + p, location.origin).href;
 }
 function showResult(result: UiResult) {
+  const arrivalKey = initialArrivalKey ?? resultIdentityKey(location.href);
+  const arrivalFragment = initialArrivalFragment;
+  initialArrivalKey = null;
+  initialArrivalFragment = null;
   $('#retry').innerHTML =
     `${label(ownResults.has(result) ? 'retry' : 'start')} ↵`;
   screen = 'select';
@@ -1954,6 +1968,7 @@ function showResult(result: UiResult) {
   lastResult = result;
   const sharedURL = resultLink(result);
   history.replaceState(null, '', sharedURL);
+  const canonicalKey = resultIdentityKey(location.href);
   document.body.classList.remove('home-screen', 'ready-screen');
   document.body.classList.add('results-screen');
   $('#share-result').innerHTML =
@@ -1966,7 +1981,7 @@ function showResult(result: UiResult) {
   $('#result-song').textContent =
     SONGS.find((s) => s.id === result.song)?.title ?? result.song;
   $<HTMLButtonElement>('#share-result').hidden = false;
-  resultOptions(result);
+  const resultBadgeList = resultOptions(result);
   $('#result-rank').textContent =
     result.accuracy >= 97
       ? 'S'
@@ -2014,7 +2029,18 @@ function showResult(result: UiResult) {
   document.documentElement.removeAttribute('data-result-pending');
   resultDialog.focus({ preventScroll: true });
   resultDialog.scrollTop = 0;
-  resultMotion.play(result.score, settings.reducedMotion);
+  const projected = finishResultFirstPaint(result, [arrivalKey, canonicalKey]);
+  // A result that arrived through a share carries the share's verified
+  // expiry onto every identity the projection is written under, so an
+  // expired share can never paint before the app rejects it.
+  const shared = shortCache.get(sharedURL.slice(sharedURL.indexOf('#') + 1));
+  rememberResultFirstPaint([arrivalKey, canonicalKey], result, {
+    ...(shared ? { expiresAt: Date.parse(shared.expiresAt) } : {}),
+    badges: resultBadgeList,
+    locale: settings.language,
+    arrivalFragment: arrivalFragment ?? undefined,
+  });
+  resultMotion.play(result.score, settings.reducedMotion || projected);
 }
 
 const resultMotion = new ResultMotion($<HTMLDialogElement>('#results'));
@@ -2043,13 +2069,15 @@ function resultOptions(result: UiResult) {
   $('#result-metadata').title = RESULT_LABELS[settings.language][2];
   syncResultPreview();
   syncReplayButton();
-  $('#result-options').innerHTML = resultBadges(result, {
+  const badgeLabels = {
     keys: 'KEY',
     difficulty: chartLevel(song, result.difficulty, result.lanes),
     speed: t('speed'),
     shuffle: t('shuffle'),
     fader: t('fader'),
-  });
+  };
+  $('#result-options').innerHTML = resultBadges(result, badgeLabels);
+  return resultBadgeData(result, badgeLabels);
 }
 function exit() {
   playReplay = undefined;
@@ -2759,7 +2787,11 @@ $('#reduced-motion').onchange = (e) => {
   settings.reducedMotion = (e.target as HTMLInputElement).checked;
   localize();
   persist();
-  if (!readingRoute && screen === 'select')
+  if (
+    !readingRoute &&
+    screen === 'select' &&
+    !$<HTMLDialogElement>('#results').open
+  )
     history.replaceState(null, '', selectionPath());
 };
 $('#fullscreen').onclick = () => {
@@ -3161,7 +3193,31 @@ window.addEventListener('popstate', () => {
   }
   readRoute();
 });
+/** Warm-cache-first shared replay load: identical identity (replay id),
+ * expiry enforced locally exactly as the network path does. */
+async function resolveSharedReplay(
+  id: string,
+): Promise<{ fragment: string; expiresAt: string }> {
+  await queryReady;
+  const key = queryKeys.sharedReplay(id);
+  const cached = queryClient.getQueryData<{
+    fragment: string;
+    expiresAt: string;
+  }>(key);
+  if (cached) {
+    if (Date.parse(cached.expiresAt) > Date.now()) return cached;
+    queryClient.removeQueries({ queryKey: key });
+  }
+  return loadSharedReplay(id);
+}
+let initialArrivalKey: string | null = null;
+let initialArrivalFragment: string | null = null;
 async function readInitialRoute() {
+  // The ?s= flow replaceStates to the fragment form before rendering; keep
+  // the arrival identity so the projection is written under both.
+  initialArrivalKey = resultIdentityKey(location.href);
+  initialArrivalFragment =
+    location.hash.length > 1 ? location.hash.slice(1) : null;
   let expectedHref = location.href;
   const initialNavigation = navigationVersion;
   const stillInitial = () =>
@@ -3173,6 +3229,7 @@ async function readInitialRoute() {
         await openExternalShare(location.hash.slice(1));
       } catch {
         if (!stillInitial()) return;
+        finishResultFirstPaint(null);
         toast(shareLabels(settings.language).invalid);
         document.documentElement.removeAttribute('data-result-pending');
       }
@@ -3192,7 +3249,10 @@ async function readInitialRoute() {
   }
   const labels = shareLabels(settings.language);
   try {
-    const loaded = await loadSharedReplay(id);
+    // ORV-62: the restored IndexedDB query cache is awaited (fast local
+    // read) so a previously fetched result renders instantly with no
+    // network wait. Only a cold or expired cache reaches the network.
+    const loaded = await resolveSharedReplay(id);
     if (!stillInitial()) return;
     const params = new URLSearchParams(loaded.fragment);
     if (params.get('v') === '5') {
@@ -3222,6 +3282,7 @@ async function readInitialRoute() {
     readRoute();
   } catch (error) {
     if (!stillInitial()) return;
+    finishResultFirstPaint(null);
     readRoute();
     const dialog = document.createElement('dialog');
     dialog.className = 'share-error';
@@ -3433,7 +3494,9 @@ async function initializeLibrary() {
       settings.difficulty = session.replay.difficulty;
       showResult(session.result);
     } catch {
+      finishResultFirstPaint(null);
       toast(REPLAY_READ_ERROR[settings.language]);
+      document.documentElement.removeAttribute('data-result-pending');
     }
   }
 }
@@ -3442,7 +3505,7 @@ void initializeLibrary();
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.2.45',
+    version: '0.2.46',
     active,
     paused,
     fever: engine

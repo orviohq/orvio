@@ -1,3 +1,4 @@
+import { queryClient } from './query-client';
 import type { SourceRecord } from './external-source';
 import { readCanonicalSource } from './canonical-source-api';
 import { readProgressiveManifest } from './progressive-manifest-api';
@@ -43,6 +44,7 @@ export interface ProgressiveRun {
   done: Promise<ArrayBuffer>;
   stop: () => void;
 }
+let progressiveRun = 0;
 export function beginProgressivePlayback(
   record: SourceRecord,
   context: AudioContext,
@@ -62,42 +64,62 @@ export function beginProgressivePlayback(
     rejectReady = reject;
   });
   let response: Response | undefined;
-  const done = (async () => {
-    try {
-      const accepted = await acceptedProgressiveManifest(
-        record,
-        controller.signal,
-      );
-      if (!accepted) throw new AudioJobError('integrity_failed');
-      await clock.begin(leadIn);
-      controller.signal.throwIfAborted();
-      response = await fetch(
-        `${AUDIO_BASE}/v1/chart-sources/${record.videoId}/audio`,
-        { signal: controller.signal },
-      );
-      const result = await playProgressive({
-        record,
-        pin: accepted.anchor,
-        manifest: accepted.manifest,
-        response,
-        clock,
-        signal: controller.signal,
-        onEvent: (event: string) => {
-          if (event === 'first-segment') resolveReady();
-        },
-      });
-      controller.signal.throwIfAborted();
-      return result.bytes as ArrayBuffer;
-    } catch (error) {
-      clock.stop();
-      rejectReady(error);
-      if (response && !response.bodyUsed)
-        await response.body?.cancel().catch(() => {});
-      throw error;
-    } finally {
-      signal.removeEventListener('abort', abort);
-    }
-  })();
+  // Query owns one complete play transport, not a reusable Response/reader.
+  // A unique run identity prevents sharing single-consumer stream bodies.
+  const done = queryClient.fetchQuery({
+    queryKey: [
+      'progressive-play',
+      record.videoId,
+      record.audioSha256,
+      record.chartSetSha256,
+      record.manifestSha256,
+      ++progressiveRun,
+    ],
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+    queryFn: async ({ signal: querySignal }) => {
+      const queryAbort = () => controller.abort(querySignal.reason);
+      querySignal.addEventListener('abort', queryAbort, { once: true });
+      if (querySignal.aborted) queryAbort();
+      try {
+        controller.signal.throwIfAborted();
+        const accepted = await acceptedProgressiveManifest(
+          record,
+          controller.signal,
+        );
+        if (!accepted) throw new AudioJobError('integrity_failed');
+        await clock.begin(leadIn);
+        controller.signal.throwIfAborted();
+        response = await fetch(
+          `${AUDIO_BASE}/v1/chart-sources/${record.videoId}/audio`,
+          { signal: controller.signal },
+        );
+        const result = await playProgressive({
+          record,
+          pin: accepted.anchor,
+          manifest: accepted.manifest,
+          response,
+          clock,
+          signal: controller.signal,
+          onEvent: (event: string) => {
+            if (event === 'first-segment') resolveReady();
+          },
+        });
+        controller.signal.throwIfAborted();
+        return result.bytes as ArrayBuffer;
+      } catch (error) {
+        clock.stop();
+        rejectReady(error);
+        if (response && !response.bodyUsed)
+          await response.body?.cancel().catch(() => {});
+        throw error;
+      } finally {
+        querySignal.removeEventListener('abort', queryAbort);
+        signal.removeEventListener('abort', abort);
+      }
+    },
+  });
   // Consumers attach their own completion handler; no rejected background promise
   // may become an unhandled rejection while first-segment startup is awaited.
   void done.catch(() => {});

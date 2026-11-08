@@ -1,5 +1,7 @@
-import { it, expect, vi } from 'vitest';
+import { it, expect, vi, beforeEach } from 'vitest';
 import { loadAudio, type AudioJob } from '../src/external-audio-api';
+import { queryClient } from '../src/query-client';
+beforeEach(() => queryClient.clear());
 const bytes = new Uint8Array(44),
   hash = Array.from(
     new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),

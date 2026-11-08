@@ -53,7 +53,7 @@ export async function prepareClientJob(
     throw new AudioJobError('integrity_failed');
   onStage?.('downloading');
   const bytes = await loadAudio(job, videoId, job.audio.sha256, signal);
-  // This download has an existing, approved GET recovery route. It has never been
+  // This download uses the existing audio GET route. It has never been
   // attached to catalog/playback state; the worker takes sole ownership, no copy.
   onStage?.('charting');
   const generated = await audioAtStage('analysis', () =>

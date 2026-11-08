@@ -1,0 +1,50 @@
+---
+import restore from '../replay-first-paint-bootstrap.js?raw';
+---
+
+<div id="replay-first-paint" hidden inert aria-busy="true" aria-label="replays">
+  <header>
+    <a class="brand" href="/" aria-label="orvio home">
+      <img class="brand-symbol" src="/favicon.png" alt="" />
+      <img src="/wordmark.svg" alt="orvio" />
+    </a>
+    <span class="edition">RHYTHM SYSTEM</span>
+    <nav data-cached-nav></nav>
+  </header>
+  <div class="ambient" style="z-index: -1">
+    <div class="ambient-disc"></div>
+    <div class="scanlines"></div>
+  </div>
+  <section id="cached-replays">
+    <div class="replays-wrap">
+      <div class="section-title">
+        <strong id="cached-replays-title" data-cached-title></strong>
+      </div>
+      <div id="cached-replay-list" data-cached-rows></div>
+      <div class="replays-foot">
+        <button
+          class="quiet"
+          type="button"
+          tabindex="-1"
+          data-cached-back
+        ></button>
+      </div>
+    </div>
+  </section>
+</div>
+<style is:inline>
+  #replay-first-paint[hidden] {
+    display: none;
+  }
+  #replay-first-paint {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    overflow: hidden;
+    background: #070d15;
+  }
+  #replay-first-paint .replay-row {
+    cursor: default;
+  }
+</style>
+<script is:inline set:html={restore} />

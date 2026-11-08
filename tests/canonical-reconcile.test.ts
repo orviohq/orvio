@@ -1,6 +1,6 @@
 vi.mock('../src/canonical-audio-api', () => ({ loadCanonicalAudio: vi.fn() }));
 import { loadCanonicalAudio } from '../src/canonical-audio-api';
-import { it, expect, vi, afterEach } from 'vitest';
+import { it, expect, vi, afterEach, beforeEach } from 'vitest';
 import type { SourceRecord } from '../src/external-source';
 vi.mock('../src/canonical-library', () => ({
   refreshCanonical: vi.fn(),
@@ -15,6 +15,8 @@ import { refreshCanonical } from '../src/canonical-library';
 import { localAudio } from '../src/external-local';
 import { canonicalForJob } from '../src/canonical-job';
 import { reconcileCanonical } from '../src/canonical-reconcile';
+import { queryClient } from '../src/query-client';
+beforeEach(() => queryClient.clear());
 const row = {
   videoId: 'E2EFIXTURE1',
   title: 'Fixture',

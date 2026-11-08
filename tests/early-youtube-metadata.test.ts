@@ -3,6 +3,7 @@ import {
   earlyYoutubeMetadata,
   validEarlyMetadata,
 } from '../src/early-youtube-metadata';
+import { queryClient } from '../src/query-client';
 const id = 'WGm2HmXeeRI',
   raw = {
     videoId: id,
@@ -11,7 +12,12 @@ const id = 'WGm2HmXeeRI',
     thumbnailUrl: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
     source: 'youtube-oembed',
   };
-afterEach(() => vi.unstubAllGlobals());
+// The ORV-62 query cache persists successes across calls by design; tests
+// that re-stub fetch scenarios must start from an empty cache.
+afterEach(() => {
+  vi.unstubAllGlobals();
+  queryClient.clear();
+});
 it('accepts bounded display metadata only with exact id/source/fixed thumbnail', () => {
   expect(validEarlyMetadata(raw, id)).toBe(true);
   for (const delta of [
@@ -33,11 +39,13 @@ it('GET only, unavailable and oversized metadata are nonfatal', async () => {
   expect(await earlyYoutubeMetadata(id)).toEqual(raw);
   expect(fetch.mock.calls[0][0]).toContain('/v1/youtube-metadata/' + id);
   expect(fetch.mock.calls[0][1]).toMatchObject({ credentials: 'omit' });
+  queryClient.clear();
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => new Response('{}', { status: 503 })),
   );
   expect(await earlyYoutubeMetadata(id)).toBeNull();
+  queryClient.clear();
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => new Response('x'.repeat(17000))),

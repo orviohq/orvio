@@ -1,5 +1,6 @@
 import { readAudioLimit } from './audio-limit-message';
 import { AUDIO_BASE, AudioJobError } from './external-audio-api';
+import { queryClient, queryKeys } from './query-client';
 import {
   validSourceRecord,
   verifyChartHashes,
@@ -50,13 +51,35 @@ export async function readCanonicalSource(
 ): Promise<CanonicalLookup> {
   if (!/^[A-Za-z0-9_-]{11}$/.test(videoId))
     throw new AudioJobError('invalid_url');
+  // Query-coordinated for in-flight dedup only: pending/missing states are
+  // never reused (staleTime 0), large chart records stay out of the
+  // persisted snapshot (canonical IDB owns them), and rate-limit/error
+  // timing stays with the callers' own retryAfterSec loops (no retries).
+  return queryClient.fetchQuery({
+    queryKey: queryKeys.canonicalSource(videoId),
+    retry: false,
+    queryFn: ({ signal: querySignal }) =>
+      fetchCanonicalSource(
+        videoId,
+        signal ? AbortSignal.any([querySignal, signal]) : querySignal,
+        signal,
+      ),
+    staleTime: 0,
+    gcTime: 5 * 60 * 1000,
+  });
+}
+async function fetchCanonicalSource(
+  videoId: string,
+  signal: AbortSignal | undefined,
+  callerSignal: AbortSignal | undefined,
+): Promise<CanonicalLookup> {
   let response: Response;
   try {
     response = await fetch(`${AUDIO_BASE}/v1/chart-sources/${videoId}`, {
       signal,
     });
   } catch (error) {
-    if (signal?.aborted) throw error;
+    if (callerSignal?.aborted || signal?.aborted) throw error;
     throw new AudioJobError('network_error');
   }
   if (response.status === 404 || response.status === 202) {

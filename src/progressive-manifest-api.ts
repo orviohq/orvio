@@ -1,3 +1,4 @@
+import { queryClient } from './query-client';
 import { AUDIO_BASE, AudioJobError } from './external-audio-api';
 import type { SourceRecord } from './external-source';
 /** Anchor must come from a separately accepted pin contract, never this response. */
@@ -9,7 +10,7 @@ export interface ProgressivePinAnchor {
 }
 const SHA = /^[a-f0-9]{64}$/;
 /** No anchor means legacy whole-file playback, with no additional request. */
-export async function readProgressiveManifest(
+async function fetchProgressiveManifest(
   record: SourceRecord,
   anchor?: ProgressivePinAnchor,
   signal?: AbortSignal,
@@ -91,4 +92,35 @@ export async function readProgressiveManifest(
     signal?.removeEventListener('abort', abort);
     await reader.cancel().catch(() => {});
   }
+}
+
+// Each play has independent cancellation and must recheck the current pin.
+// Never share a first caller's AbortSignal or persist an accepted manifest.
+let manifestRequest = 0;
+export async function readProgressiveManifest(
+  record: SourceRecord,
+  anchor?: ProgressivePinAnchor,
+  signal?: AbortSignal,
+): Promise<{ manifest: unknown; anchor: ProgressivePinAnchor } | null> {
+  if (!anchor) return null;
+  signal?.throwIfAborted();
+  return queryClient.fetchQuery({
+    queryKey: [
+      'progressive-manifest',
+      record.videoId,
+      record.audioSha256,
+      record.chartSetSha256,
+      anchor.manifestSha256,
+      ++manifestRequest,
+    ],
+    queryFn: ({ signal: querySignal }) =>
+      fetchProgressiveManifest(
+        record,
+        anchor,
+        signal ? AbortSignal.any([signal, querySignal]) : querySignal,
+      ),
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+  });
 }

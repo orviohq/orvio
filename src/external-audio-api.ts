@@ -1,5 +1,6 @@
 import { AUDIO_MAX_BYTES, AUDIO_MAX_SECONDS } from './audio-limits.mjs';
 import { readAudioLimit, type AudioLimit } from './audio-limit-message';
+import { queryClient, queryKeys, runMutation } from './query-client';
 export const AUDIO_BASE = 'https://orvio-share.pn-26f.workers.dev';
 const JOB = /^[A-Za-z0-9_-]{1,128}$/;
 const SHA = /^[a-f0-9]{64}$/;
@@ -217,23 +218,58 @@ export async function createAudioJob(
   generationMode?: 'client',
 ): Promise<AudioJob> {
   if (youtubeUrl.length > 2048) throw new AudioJobError('invalid_url');
-  return readJob(
-    await fetchAudio(`${AUDIO_BASE}/v1/audio-jobs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        youtubeUrl,
-        ...(generationMode ? { generationMode } : {}),
-      }),
-      signal,
-    }),
+  return runMutation(
+    ['create-audio-job', generationMode ?? 'server'],
+    async () =>
+      readJob(
+        await fetchAudio(`${AUDIO_BASE}/v1/audio-jobs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            youtubeUrl,
+            ...(generationMode ? { generationMode } : {}),
+          }),
+          signal,
+        }),
+      ),
   );
 }
 export async function readAudioJob(jobId: string, signal?: AbortSignal) {
   if (!JOB.test(jobId)) throw new AudioJobError('not_found');
-  return readJob(
-    await fetchAudio(`${AUDIO_BASE}/v1/audio-jobs/${jobId}`, { signal }),
-  );
+  // Always live (staleTime 0): job status drives polling loops that own
+  // their retryAfterSec handling, so the query layer never retries here —
+  // it only dedups concurrent same-tick reads.
+  return queryClient.fetchQuery({
+    queryKey: queryKeys.audioJob(jobId),
+    retry: false,
+    queryFn: async ({ signal: querySignal }) =>
+      readJob(
+        await fetchAudioSignal(
+          `${AUDIO_BASE}/v1/audio-jobs/${jobId}`,
+          signal ? AbortSignal.any([querySignal, signal]) : querySignal,
+          signal,
+        ),
+      ),
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+async function fetchAudioSignal(
+  input: string,
+  signal: AbortSignal,
+  callerSignal?: AbortSignal,
+): Promise<Response> {
+  try {
+    return await fetch(input, { signal });
+  } catch (error) {
+    if (
+      callerSignal?.aborted ||
+      signal.aborted ||
+      (error instanceof DOMException && error.name === 'AbortError')
+    )
+      throw error;
+    throw new AudioJobError('network_error');
+  }
 }
 function waitForAudio(ms: number, signal?: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
@@ -278,6 +314,31 @@ export async function loadAudio(
       undefined,
       'response',
     );
+  // Query-coordinated transport: concurrent reads of the same finished
+  // job's bytes dedup onto one download. staleTime 0 keeps every call live
+  // and gcTime 0 drops the bytes the moment no caller holds them - the PCM
+  // is never retained by the query cache and never persisted.
+  const doneJob = job as AudioJob & { audio: NonNullable<AudioJob['audio']> };
+  return queryClient.fetchQuery({
+    queryKey: queryKeys.audioJobBytes(job.jobId, job.audio.sha256),
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+    queryFn: ({ signal: querySignal }) =>
+      downloadJobAudio(
+        doneJob,
+        expectedVideoId,
+        signal ? AbortSignal.any([querySignal, signal]) : querySignal,
+        expectedHash,
+      ),
+  });
+}
+async function downloadJobAudio(
+  job: AudioJob & { audio: NonNullable<AudioJob['audio']> },
+  expectedVideoId: string,
+  signal: AbortSignal,
+  expectedHash?: string,
+): Promise<ArrayBuffer> {
   const deadline = Date.now() + 90000;
   let response: Response;
   for (;;) {

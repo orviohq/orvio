@@ -1,7 +1,7 @@
 vi.mock('../src/local-generated-library', () => ({
   savedLocalGenerated: vi.fn(),
 }));
-import { it, expect, vi, afterEach } from 'vitest';
+import { it, expect, vi, afterEach, beforeEach } from 'vitest';
 vi.mock('../src/canonical-library', () => ({ refreshCanonical: vi.fn() }));
 vi.mock('../src/external-local', () => ({
   localAudio: vi.fn(),
@@ -34,6 +34,8 @@ import {
 } from '../src/external-audio-api';
 import { prepareExternalJob } from '../src/external-source-flow';
 import type { SourceRecord } from '../src/external-source';
+import { queryClient } from '../src/query-client';
+beforeEach(() => queryClient.clear());
 const record = {
   videoId: '1-xGerv5FOk',
   audioSha256: 'a'.repeat(64),

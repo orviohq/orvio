@@ -1,4 +1,8 @@
 import { AUDIO_BASE } from './external-audio-api';
+import { queryClient, queryKeys } from './query-client';
+/** Internal sentinel: a failed/missing read never becomes cached data;
+ * it surfaces as the original null at the call site. */
+class EarlyMetadataUnavailable extends Error {}
 export interface EarlyYoutubeMetadata {
   videoId: string;
   title: string;
@@ -32,6 +36,30 @@ export async function earlyYoutubeMetadata(
   signal?: AbortSignal,
 ): Promise<EarlyYoutubeMetadata | null> {
   if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return null;
+  // Display metadata is cache-first and persisted; a real title refreshes
+  // in the background after 6h, while a failed/missing read keeps the
+  // original one-fetch-per-call semantics (errors never cache as data).
+  return queryClient
+    .fetchQuery({
+      queryKey: queryKeys.earlyMetadata(id),
+      queryFn: async () => {
+        const data = await fetchEarlyMetadata(id, signal);
+        if (data === null) throw new EarlyMetadataUnavailable();
+        return data;
+      },
+      staleTime: 6 * 60 * 60 * 1000,
+      gcTime: Infinity,
+      retry: false,
+    })
+    .catch((error) => {
+      if (error instanceof EarlyMetadataUnavailable) return null;
+      throw error;
+    });
+}
+async function fetchEarlyMetadata(
+  id: string,
+  signal?: AbortSignal,
+): Promise<EarlyYoutubeMetadata | null> {
   try {
     const r = await fetch(`${AUDIO_BASE}/v1/youtube-metadata/${id}`, {
       signal: signal ?? AbortSignal.timeout(4000),
