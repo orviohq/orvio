@@ -1,3 +1,8 @@
+import {
+  beginProgressivePlayback,
+  type ProgressiveRun,
+} from './progressive-playback';
+import type { SourceRecord } from './external-source';
 import { outputTime } from './timing';
 import { duration, melodyIndex, type Song } from './chart';
 const midi = (n: number) => 440 * 2 ** ((n - 69) / 12);
@@ -156,6 +161,48 @@ export async function renderSong(song: Song): Promise<Soundtrack> {
   return { buffer, peak };
 }
 export class AudioClock {
+  private progressive?: ProgressiveRun;
+  private progressiveVerified = false;
+  get buffering() {
+    return !!this.progressive?.clock.frozen;
+  }
+  get verificationPending() {
+    return !!this.progressive && !this.progressiveVerified;
+  }
+  async playProgressive(
+    record: SourceRecord,
+    leadIn: number,
+    signal: AbortSignal,
+    onComplete: (bytes: ArrayBuffer) => Promise<void>,
+    onFailure: (error: unknown) => void,
+    onBuffering: (value: boolean) => void,
+  ) {
+    this.stop();
+    await this.activate();
+    signal.throwIfAborted();
+    const run = beginProgressivePlayback(
+      record,
+      this.context,
+      leadIn,
+      signal,
+      onBuffering,
+    );
+    this.progressive = run;
+    this.progressiveVerified = false;
+    run.clock.setVolume(this.volume.gain.value);
+    void run.done
+      .then(async (bytes) => {
+        if (this.progressive !== run) return;
+        this.progressiveVerified = true;
+        await onComplete(bytes);
+      })
+      .catch((error) => {
+        if (this.progressive === run && !signal.aborted) onFailure(error);
+      });
+    await run.ready;
+    signal.throwIfAborted();
+  }
+
   readonly context = new AudioContext({ latencyHint: 'interactive' });
   private source?: AudioBufferSourceNode;
   private anchor = 0;
@@ -196,6 +243,7 @@ export class AudioClock {
     this.started = true;
   }
   now(performanceTime = performance.now()): number {
+    if (this.progressive) return this.progressive.clock.now(performanceTime);
     if (this.frozenTime !== undefined) return this.frozenTime;
     return outputTime(
       performanceTime,
@@ -209,17 +257,23 @@ export class AudioClock {
   }
 
   async pause() {
+    if (this.progressive) return this.progressive.clock.pause();
     this.frozenTime = this.now();
     await this.context.suspend();
   }
   async resume() {
+    if (this.progressive) return this.progressive.clock.resume();
     await this.activate();
     this.frozenTime = undefined;
   }
   get active() {
-    return this.started;
+    return this.progressive ? this.progressive.clock.active : this.started;
   }
   stop() {
+    const run = this.progressive;
+    this.progressive = undefined;
+    run?.stop();
+    this.progressiveVerified = false;
     try {
       this.source?.stop();
     } catch {
@@ -234,6 +288,7 @@ export class AudioClock {
     void this.context.close().catch(() => {});
   }
   setVolume(v: number) {
+    this.progressive?.clock.setVolume(v);
     this.volume.gain.setTargetAtTime(
       Math.max(0, Math.min(1, v)),
       this.context.currentTime,

@@ -288,6 +288,12 @@ async function preloadTrack(id: string): Promise<Soundtrack | undefined> {
   try {
     preloadContext ??= new OfflineAudioContext(1, 1, 44100);
     if (externalSource(id)) {
+      const item = externalSource(id)!;
+      if (item.record.manifestSha256 && !item.bytes) {
+        const local = await localAudio(item.record);
+        if (local) item.bytes = local.bytes;
+        else return undefined;
+      }
       await ensureExternalBytes(id);
       return { buffer: externalAudio(id, preloadContext), peak: 1 };
     }
@@ -1192,6 +1198,15 @@ async function prepare(attempt: StartupAttempt, joinGatePreload = false) {
   const audio = clock;
   await attempt.wait(audio.activate());
   const song = SONGS[songIndex];
+  const external = externalSource(song.id);
+  if (external?.record.manifestSha256 && !external.bytes) {
+    const local = await attempt.wait(localAudio(external.record));
+    if (local) external.bytes = local.bytes;
+    else {
+      rendered = undefined;
+      return { progressive: external, warm: false } as const;
+    }
+  }
   await attempt.wait(ensureExternalBytes(song.id));
   let track = cache.get(song.id);
   if (!track && joinGatePreload && preloading.has(song.id)) {
@@ -1459,13 +1474,48 @@ async function start() {
     // New recordings stamp their exact lead-in; watching a pre-A5 replay
     // restores the fixed 0.15s anchor its wall-scheduled ops were made on.
     if (sessionReplay) sessionReplay.audioLeadIn = cd.leadIn;
-    await attempt.wait(
-      clock.play(
-        track.buffer,
-        playReplay ? (playReplay.audioLeadIn ?? 0.15) : cd.leadIn,
-        attempt.signal,
-      ),
-    );
+    const leadIn = playReplay ? (playReplay.audioLeadIn ?? 0.15) : cd.leadIn;
+    let bufferingAt: number | undefined;
+    if ('progressive' in track && track.progressive) {
+      const item = track.progressive;
+      const playingClock = clock;
+      await attempt.wait(
+        clock.playProgressive(
+          item.record,
+          leadIn,
+          attempt.signal,
+          async (bytes) => {
+            // Terminal whole-SHA/WAV gate passed; only now may these bytes persist.
+            item.bytes = bytes;
+            await saveLocalAudio(
+              item.record,
+              item.song.title,
+              item.jobId,
+              bytes,
+              item.song.subtitle,
+            );
+          },
+          (error) => {
+            if (clock !== playingClock) return;
+            if (active) {
+              exit();
+              toast(externalError(error, settings.language));
+            }
+          },
+          (buffering) => {
+            if (!active) return;
+            if (buffering) {
+              bufferingAt ??= performance.now();
+              if (!playReplay) recordOp([2, 0, clock.now(), 1]);
+            } else if (bufferingAt !== undefined) {
+              if (playReplay) sessionWallAt += performance.now() - bufferingAt;
+              else recordOp([2, 0, clock.now(), 0]);
+              bufferingAt = undefined;
+            }
+          },
+        ),
+      );
+    } else await attempt.wait(clock.play(track.buffer, leadIn, attempt.signal));
     sessionWallAt = performance.now();
     active = true;
     if (document.hidden || !document.hasFocus()) {
@@ -1588,6 +1638,10 @@ let countdownLegacy = false;
 function loop(now: number) {
   if (!active || !engine || paused) return;
   const time = clock.now();
+  if (clock.buffering) {
+    frame = requestAnimationFrame(loop);
+    return;
+  }
   if (playReplay) {
     const elapsed = performance.now() - sessionWallAt;
     while (
@@ -1699,9 +1753,10 @@ function loop(now: number) {
         : '-- FPS';
   }
   if (
-    playReplay
+    !clock.verificationPending &&
+    (playReplay
       ? performance.now() - sessionWallAt >= playReplay.end
-      : time >= duration(SONGS[songIndex])
+      : time >= duration(SONGS[songIndex]))
   ) {
     finish();
     return;
@@ -2196,7 +2251,7 @@ window.addEventListener('keydown', (e) => {
     }
     return;
   }
-  if (!active || !engine || e.repeat) return;
+  if (!active || !engine || e.repeat || clock.buffering) return;
   const lane = settings.keys[settings.lanes].indexOf(e.code);
   if (lane < 0) return;
   e.preventDefault();
@@ -2206,7 +2261,7 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
   if (editableTarget(e.target)) return;
   if (playReplay) return;
-  if (!active || !engine) return;
+  if (!active || !engine || clock.buffering) return;
   const lane = settings.keys[settings.lanes].indexOf(e.code);
   if (lane < 0) return;
   e.preventDefault();
@@ -2434,7 +2489,7 @@ async function watchReplay() {
   const replayToWatch = savedReplay,
     resultToWatch = lastResult;
   const item = externalSource(savedReplay.song);
-  if (item && !item.bytes) {
+  if (item && !item.bytes && !item.record.manifestSha256) {
     const button = $<HTMLButtonElement>('#watch-replay');
     button.disabled = true;
     try {
