@@ -7,6 +7,8 @@ import {
 } from './chart-difficulty';
 export type ChartKey = `${Lanes}:${Difficulty}`;
 export interface SourceRecord {
+  /** Local-worker provenance, not a server/official derivation attestation. */
+  sourceProvenance?: 'local-current35-v1';
   version: 1;
   videoId: string;
   audioSha256: string;
@@ -40,6 +42,8 @@ export function validSourceRecord(raw: unknown): raw is SourceRecord {
   if (!raw || typeof raw !== 'object') return false;
   const r = raw as SourceRecord;
   if (
+    (r.sourceProvenance !== undefined &&
+      r.sourceProvenance !== 'local-current35-v1') ||
     r.version !== 1 ||
     !Number.isFinite(r.estimatedBpm) ||
     r.estimatedBpm < 0 ||

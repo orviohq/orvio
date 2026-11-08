@@ -1,3 +1,5 @@
+import { prepareClientJob } from './prepare-local-job';
+import { savedLocalGenerated } from './local-generated-library';
 import { jobImportStage, type ImportStage } from './import-progress';
 import { loadCanonicalAudio } from './canonical-audio-api';
 import { audioAtStage } from './audio-error-stage';
@@ -73,11 +75,31 @@ export async function importYoutube(
       author: undefined,
     };
   }
+  const localGenerated =
+    lookup.state === 'missing' ? await savedLocalGenerated(id) : null;
+  if (localGenerated) {
+    const audio = await localAudio(localGenerated);
+    if (audio)
+      return {
+        prepared: {
+          record: localGenerated,
+          bytes: audio.bytes,
+          restored: true,
+        },
+        jobId: audio.jobId,
+        title: audio.title,
+        author: audio.author,
+      };
+  }
   if (lookup.state !== 'missing')
     throw new AudioJobError('request_timeout', lookup.retryAfterSec);
   let job = options.jobId
     ? await readAudioJob(options.jobId, signal)
-    : await createAudioJob('https://www.youtube.com/watch?v=' + id, signal);
+    : await createAudioJob(
+        'https://www.youtube.com/watch?v=' + id,
+        signal,
+        'client',
+      );
   // A timeout/network failure can still own a live job. Read it first, never
   // discard an uncertain handle or create a duplicate while it is running.
   // Only a fresh manual re-add may replace a confirmed terminal unavailable
@@ -88,7 +110,11 @@ export async function importYoutube(
     job.status === 'error' &&
     job.error?.code === 'unavailable'
   )
-    job = await createAudioJob('https://www.youtube.com/watch?v=' + id, signal);
+    job = await createAudioJob(
+      'https://www.youtube.com/watch?v=' + id,
+      signal,
+      'client',
+    );
   options.onJob?.(job);
   const stage = jobImportStage(job);
   if (stage) options.onStage?.(stage);
@@ -124,7 +150,9 @@ export async function importYoutube(
       'service',
     );
   return {
-    prepared: await prepareExternalJob(id, job.jobId, signal, options.onStage),
+    prepared:
+      (await prepareClientJob(id, job.jobId, signal, options.onStage)) ??
+      (await prepareExternalJob(id, job.jobId, signal, options.onStage)),
     jobId: job.jobId,
     title: job.title,
     author: job.author,

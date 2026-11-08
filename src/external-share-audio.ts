@@ -1,4 +1,4 @@
-import { loadCanonicalAudio } from './canonical-audio-api';
+import { loadCanonicalAudio, loadRetainedAudio } from './canonical-audio-api';
 import {
   createAudioJob,
   readAudioJob,
@@ -61,11 +61,13 @@ export async function readSharedAudio(
     item.jobId = local.jobId;
     return local.bytes;
   }
-  // The stable audio route verifies the server's canonical pin. Its response
-  // must match the frozen share's video/hash, and loadCanonicalAudio verifies
-  // the complete body hash and WAV frame/rate before returning any bytes.
-  // A second full chart-record GET adds latency but no extra audio authority.
-  const bytes = await loadCanonicalAudio(item.record, signal);
+  // Read by exact frozen video+audio SHA, without trusting a client chart as a
+  // global canonical pin. Verify the entire WAV/hash before local persistence.
+  // Existing progressive playback still uses its canonical manifest path.
+  const bytes =
+    item.record.sourceProvenance === 'local-current35-v1'
+      ? await loadRetainedAudio(item.record, signal)
+      : await loadCanonicalAudio(item.record, signal);
   await saveLocalAudio(item.record, item.song.title, item.jobId, bytes);
   item.bytes = bytes;
   return bytes;

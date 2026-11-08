@@ -84,6 +84,10 @@ it('an explicit add of a truly missing canonical still creates exactly one norma
     jobId: 'new-job',
     status: 'done',
   });
+  vi.mocked(readAudioJob).mockResolvedValue({
+    jobId: 'new-job',
+    status: 'done',
+  });
   vi.mocked(prepareExternalJob).mockResolvedValue({
     record,
     bytes,
@@ -162,6 +166,10 @@ it('an explicit re-add never replaces a known completed job', async () => {
   vi.mocked(refreshCanonical).mockResolvedValue({ state: 'missing' });
   vi.mocked(readAudioJob).mockResolvedValue({
     jobId: 'old-job',
+    status: 'done',
+  });
+  vi.mocked(readAudioJob).mockResolvedValue({
+    jobId: 'new-job',
     status: 'done',
   });
   vi.mocked(prepareExternalJob).mockResolvedValue({

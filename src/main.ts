@@ -1,3 +1,4 @@
+import { savedLocalGenerated } from './local-generated-library';
 import { youtubeAddIcon } from './library-actions';
 import {
   rememberLibraryFirstPaint,
@@ -3305,7 +3306,9 @@ async function initializeLibrary() {
     }
     for (const row of [...canonicalPending.values()]) {
       try {
-        const record = await savedCanonical(row.videoId);
+        const record =
+          (await savedCanonical(row.videoId)) ??
+          (await savedLocalGenerated(row.videoId));
         const saved = record ? await localMetadata(record) : null;
         if (record) {
           const item = installExternalSource(

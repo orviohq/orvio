@@ -68,13 +68,15 @@ export interface CanonicalJobStatus {
     | 'published'
     | 'audio_changed'
     | 'audio_expired'
-    | 'deferred';
+    | 'deferred'
+    | 'client_generation';
   retryAfterSec?: number;
   attempts?: number;
   audioSha256?: string;
   chartSetSha256?: string;
 }
 export interface AudioJob {
+  generationMode?: 'server' | 'client';
   jobId: string;
   title?: string;
   author?: string;
@@ -185,6 +187,7 @@ async function readJob(response: Response): Promise<AudioJob> {
         'audio_changed',
         'audio_expired',
         'deferred',
+        'client_generation',
       ].includes(body.canonical.status) ||
       (body.canonical.audioSha256 !== undefined &&
         !SHA.test(body.canonical.audioSha256)) ||
@@ -200,19 +203,28 @@ async function readJob(response: Response): Promise<AudioJob> {
       undefined,
       'response',
     );
+  if (
+    body.generationMode !== undefined &&
+    !['server', 'client'].includes(body.generationMode)
+  )
+    throw new AudioJobError('unavailable');
   return body;
 }
 /** Explicit user submission only; callers never auto-rePOST a failed or expired job. */
 export async function createAudioJob(
   youtubeUrl: string,
   signal?: AbortSignal,
+  generationMode?: 'client',
 ): Promise<AudioJob> {
   if (youtubeUrl.length > 2048) throw new AudioJobError('invalid_url');
   return readJob(
     await fetchAudio(`${AUDIO_BASE}/v1/audio-jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ youtubeUrl }),
+      body: JSON.stringify({
+        youtubeUrl,
+        ...(generationMode ? { generationMode } : {}),
+      }),
       signal,
     }),
   );

@@ -9,6 +9,7 @@ import type { SourceRecord } from './external-source';
 export async function loadCanonicalAudio(
   record: SourceRecord,
   signal?: AbortSignal,
+  route: 'canonical' | 'retained' = 'canonical',
 ): Promise<ArrayBuffer> {
   if (
     !/^[A-Za-z0-9_-]{11}$/.test(record.videoId) ||
@@ -19,7 +20,9 @@ export async function loadCanonicalAudio(
   let response: Response;
   try {
     response = await fetch(
-      `${AUDIO_BASE}/v1/chart-sources/${record.videoId}/audio`,
+      route === 'retained'
+        ? `${AUDIO_BASE}/v1/audio-sources/${record.videoId}/${record.audioSha256}/audio`
+        : `${AUDIO_BASE}/v1/chart-sources/${record.videoId}/audio`,
       { signal },
     );
   } catch (error) {
@@ -122,3 +125,7 @@ export async function loadCanonicalAudio(
   signal?.throwIfAborted();
   return joined.buffer;
 }
+
+/** Immutable retained audio, independent of transient jobs and server chart pins. */
+export const loadRetainedAudio = (record: SourceRecord, signal?: AbortSignal) =>
+  loadCanonicalAudio(record, signal, 'retained');
