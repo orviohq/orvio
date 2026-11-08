@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.42] - 2026-11-09
+
+- Start supported shared tracks from verified audio segments before the whole download finishes, retaining the normal countdown and wallpaper presentation.
+- Pause safely at the buffered boundary, resume with verified data, and cancel pending playback on exit or focus loss. Save audio only after the whole file and WAV checks pass.
+- Cancel an unfinished preview download when starting the selected track, avoiding a duplicate full download.
+- Preserve cached playback and fall back to full verification for tracks without a supported progressive manifest.
+
 ## [0.2.41] - 2026-11-09
 
 - Keep failed YouTube additions readable, with grouped retry/remove actions and a separate small-screen action row. Preserve explicit retry and removal behavior without automatic new requests.
