@@ -1914,9 +1914,7 @@ function showResult(result: UiResult) {
   // A result that arrived through a share carries the share's verified
   // expiry onto every identity the projection is written under, so an
   // expired share can never paint before the app rejects it.
-  const shared = shortCache.get(
-    sharedURL.slice(sharedURL.indexOf('#') + 1),
-  );
+  const shared = shortCache.get(sharedURL.slice(sharedURL.indexOf('#') + 1));
   rememberResultFirstPaint([arrivalKey, canonicalKey], result, {
     ...(shared ? { expiresAt: Date.parse(shared.expiresAt) } : {}),
     badges: resultBadgeList,
