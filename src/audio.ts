@@ -237,4 +237,45 @@ export class AudioClock {
     o.start();
     o.stop(this.context.currentTime + 0.03);
   }
+  /** A11: original synthesized fever-activation burst (no sampled audio).
+   * Short sub thump + rising sweep + three ascending sparkles, all routed
+   * through the user volume node like every other effect. */
+  feverBurst() {
+    const t = this.context.currentTime;
+    const sub = this.context.createOscillator();
+    const subGain = this.context.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(160, t);
+    sub.frequency.exponentialRampToValueAtTime(55, t + 0.22);
+    subGain.gain.setValueAtTime(0.5, t);
+    subGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+    sub.connect(subGain);
+    subGain.connect(this.volume);
+    sub.start(t);
+    sub.stop(t + 0.28);
+    const sweep = this.context.createOscillator();
+    const sweepGain = this.context.createGain();
+    sweep.type = 'sawtooth';
+    sweep.frequency.setValueAtTime(420, t);
+    sweep.frequency.exponentialRampToValueAtTime(1700, t + 0.18);
+    sweepGain.gain.setValueAtTime(0.16, t);
+    sweepGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+    sweep.connect(sweepGain);
+    sweepGain.connect(this.volume);
+    sweep.start(t);
+    sweep.stop(t + 0.26);
+    [660, 880, 1320].forEach((freq, i) => {
+      const at = t + 0.06 + i * 0.07;
+      const o = this.context.createOscillator();
+      const g = this.context.createGain();
+      o.type = 'square';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.14, at);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.09);
+      o.connect(g);
+      g.connect(this.volume);
+      o.start(at);
+      o.stop(at + 0.1);
+    });
+  }
 }

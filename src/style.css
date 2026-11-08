@@ -3183,6 +3183,97 @@ canvas {
   transition: none;
 }
 
+/* A11: fever activation feedback (all effects gated off under reducedMotion in JS) */
+#fever-burst {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  opacity: 0;
+}
+
+#fever-burst::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 180px;
+  height: 180px;
+  margin: -90px 0 0 -90px;
+  border: 3px solid rgba(255, 220, 120, 0.9);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+#fever-burst.fever-burst-on {
+  animation: fever-burst-flash 0.62s ease-out;
+}
+
+#fever-burst.fever-burst-on::before {
+  animation: fever-burst-ring 0.62s ease-out;
+}
+
+@keyframes fever-burst-flash {
+  0% {
+    opacity: 0.85;
+    background: radial-gradient(
+      circle at 50% 45%,
+      rgba(255, 214, 110, 0.32),
+      rgba(255, 214, 110, 0) 62%
+    );
+  }
+  100% {
+    opacity: 0;
+    background: radial-gradient(
+      circle at 50% 45%,
+      rgba(255, 214, 110, 0),
+      rgba(255, 214, 110, 0) 62%
+    );
+  }
+}
+
+@keyframes fever-burst-ring {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.35);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.3);
+  }
+}
+
+@keyframes combo-fever-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.45);
+    color: #ffd76a;
+    text-shadow: 0 0 18px rgba(255, 200, 80, 0.85);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+#combo.combo-fever-pop {
+  transform-origin: center center;
+  animation: combo-fever-pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+/* Persistent subtle fever-stage tint on the combo number while a stage is active */
+#combo[data-fever-stage='2'],
+#combo[data-fever-stage='3'],
+#combo[data-fever-stage='4'] {
+  color: #ffe9ad;
+}
+
+#combo[data-fever-stage='5'] {
+  color: #ffd76a;
+  text-shadow: 0 0 12px rgba(255, 200, 80, 0.6);
+}
+
 #fever-hud[data-stage='5'] {
   color: #e9c9ff;
 }
