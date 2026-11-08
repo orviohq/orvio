@@ -74,7 +74,10 @@ export function externalDuration(id: string) {
   const r = sources.get(id)?.record;
   return r ? r.frames / r.sampleRate : undefined;
 }
-export function externalAudio(id: string, context: AudioContext): AudioBuffer {
+export function externalAudio(
+  id: string,
+  context: BaseAudioContext,
+): AudioBuffer {
   const item = sources.get(id);
   if (!item?.bytes) throw Error('Matching source audio unavailable');
   const p = inspectWav(item.bytes),

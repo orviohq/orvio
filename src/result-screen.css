@@ -5,7 +5,7 @@
   width: min(820px, calc(100% - 48px));
   max-width: none;
   max-height: calc(100dvh - 40px);
-  height: auto;
+  height: fit-content;
   margin: auto;
   padding: 28px 32px 22px;
   border: 1px solid #304252;
@@ -292,11 +292,12 @@
     position: fixed;
     inset: 0;
     width: 100%;
-    height: 100dvh;
-    max-height: 100dvh;
-    margin: 0;
-    border: 0;
-    border-radius: 0;
+    height: fit-content;
+    max-height: calc(100dvh - 24px);
+    margin: auto;
+    width: calc(100% - 24px);
+    border: 1px solid #304252;
+    border-radius: 12px;
     padding: max(24px, env(safe-area-inset-top))
       max(20px, env(safe-area-inset-right))
       max(24px, env(safe-area-inset-bottom))

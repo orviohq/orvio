@@ -188,6 +188,10 @@ const t = (word: Word) => translate(settings.language, word);
 const label = (word: Word) => `<span data-i18n="${word}">${t(word)}</span>`;
 let songIndex = 0;
 let screen: 'home' | 'select' | 'ready' | 'play' | 'replays' = 'select';
+// A37: a direct /play/ load paints the loading overlay (not the ready
+// screen's start button) and the first Enter/click gesture starts through
+// the normal path; audio activation still requires that gesture.
+let readyAutostart = false;
 let readingRoute = false;
 let engine: Engine | null = null;
 let clock: AudioClock;
@@ -266,6 +270,30 @@ let originalSeed = shuffleSeed;
 let sessionId = '';
 let latestMetrics: unknown;
 const cache = new Map<string, Soundtrack>();
+// A37: while a refreshed play route awaits its first gesture, the song
+// renders ahead (OfflineAudioContext needs no gesture) and the artwork
+// decodes, so the start that follows is warm instead of a visible wait.
+const preloading = new Map<string, Promise<Soundtrack | undefined>>();
+let armedWallpaperAt = 0;
+// Buffer assembly (createBuffer/copyToChannel) and IndexedDB reads need no
+// activated AudioContext, so the gate hydrates through a throwaway context.
+let preloadContext: OfflineAudioContext | undefined;
+async function preloadTrack(id: string): Promise<Soundtrack | undefined> {
+  try {
+    preloadContext ??= new OfflineAudioContext(1, 1, 44100);
+    if (externalSource(id)) {
+      await ensureExternalBytes(id);
+      return { buffer: externalAudio(id, preloadContext), peak: 1 };
+    }
+    const cached = await cachedAudio(id, preloadContext);
+    if (cached) return cached;
+    const track = await renderSong(SONGS.find((s) => s.id === id)!);
+    void saveAudio(id, track);
+    return track;
+  } catch {
+    return undefined;
+  }
+}
 function persist() {
   try {
     localStorage.setItem('orvio.settings.v1', JSON.stringify(settings));
@@ -277,7 +305,7 @@ function persist() {
 const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.35</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.36</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
 <section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><p class="mobile-playback-note"></p><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
 <section class="library" aria-label="Track selection"><p class="mobile-playback-note"></p><div class="section-title"><strong>${label('select')}</strong></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">NM</button><button data-diff="mid">HD</button><button data-diff="high">MX</button><button data-diff="sc">SC</button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div></section>
 <section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
@@ -1130,17 +1158,22 @@ async function ensureExternalBytes(id: string) {
     await readSharedAudio(external);
   }
 }
-async function prepare(attempt: StartupAttempt) {
+async function prepare(attempt: StartupAttempt, joinGatePreload = false) {
   if (!clock) clock = new AudioClock();
   const audio = clock;
   await attempt.wait(audio.activate());
   const song = SONGS[songIndex];
   await attempt.wait(ensureExternalBytes(song.id));
-  let track =
-    cache.get(song.id) ??
-    (externalSource(song.id)
-      ? { buffer: externalAudio(song.id, audio.context), peak: 1 }
-      : await attempt.wait(cachedAudio(song.id, audio.context)));
+  let track = cache.get(song.id);
+  if (!track && joinGatePreload && preloading.has(song.id)) {
+    // A gate preload already renders this song; join it instead of
+    // rendering a second copy alongside it.
+    await attempt.wait(preloading.get(song.id)!);
+    track = cache.get(song.id);
+  }
+  track ??= externalSource(song.id)
+    ? { buffer: externalAudio(song.id, audio.context), peak: 1 }
+    : await attempt.wait(cachedAudio(song.id, audio.context));
   const warm = !!track;
   if (!track) {
     $('#start').textContent = t('preparing');
@@ -1153,7 +1186,20 @@ async function prepare(attempt: StartupAttempt) {
   $('#start').innerHTML = `${t('start')} <span>ENTER ↵</span>`;
   return { ...track, warm };
 }
-$('#cancel-startup').onclick = () => startup?.cancel();
+$('#cancel-startup').onclick = () => {
+  if (readyAutostart) {
+    readyAutostart = false;
+    history.pushState(null, '', '/select/');
+    readRoute();
+    return;
+  }
+  startup?.cancel();
+};
+$('#song-loading').addEventListener('click', (e) => {
+  if (!readyAutostart || preparing || active) return;
+  if ((e.target as HTMLElement).closest('#cancel-startup')) return;
+  $('#ready-start').click();
+});
 async function start() {
   if (!playReplay && mobilePlaybackOnly()) {
     toast(t('unsupported'));
@@ -1185,17 +1231,28 @@ async function start() {
     songIndex = index;
   }
   if (!playReplay) rememberLibrarySelection();
+  const fromGate = readyAutostart;
+  readyAutostart = false;
+  $('#song-loading').classList.remove('awaiting-start');
   preparing = true;
   const attempt = new StartupAttempt();
   startup = attempt;
   const loadingSong = SONGS[songIndex];
   const wallpaper = $<HTMLImageElement>('#loading-wallpaper');
-  // Changing src may leave the last decoded image painted until the new decode.
-  // Hide it before the overlay can be visible, then reveal only the new image.
-  wallpaper.hidden = true;
-  wallpaper.referrerPolicy = 'no-referrer';
-  wallpaper.dataset.songArt = loadingSong.id;
-  wallpaper.src = songArt(loadingSong.id);
+  // A refreshed play route can already show this song's artwork from the
+  // pre-gesture gate; re-decoding it would only re-add the wait it removed.
+  const gateShown =
+    wallpaper.dataset.songArt === loadingSong.id &&
+    !wallpaper.hidden &&
+    armedWallpaperAt > 0;
+  if (!gateShown) {
+    // Changing src may leave the last decoded image painted until the new decode.
+    // Hide it before the overlay can be visible, then reveal only the new image.
+    wallpaper.hidden = true;
+    wallpaper.referrerPolicy = 'no-referrer';
+    wallpaper.dataset.songArt = loadingSong.id;
+    wallpaper.src = songArt(loadingSong.id);
+  }
   $('#loading-title').textContent = loadingSong.title;
   $('#loading-title').previousElementSibling!.textContent = externalSource(
     loadingSong.id,
@@ -1219,31 +1276,33 @@ async function start() {
     // iOS requires activation in the original click, before artwork awaits.
     if (!clock) clock = new AudioClock();
     await attempt.wait(clock.activate());
-    try {
-      let imageTimer: ReturnType<typeof setTimeout> | undefined;
+    if (!gateShown) {
       try {
-        await attempt.wait(
-          Promise.race([
-            wallpaper.decode(),
-            new Promise<never>((_, reject) => {
-              imageTimer = setTimeout(
-                () => reject(new Error('Artwork unavailable')),
-                3000,
-              );
-            }),
-          ]),
-        );
-      } finally {
-        clearTimeout(imageTimer);
+        let imageTimer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await attempt.wait(
+            Promise.race([
+              wallpaper.decode(),
+              new Promise<never>((_, reject) => {
+                imageTimer = setTimeout(
+                  () => reject(new Error('Artwork unavailable')),
+                  3000,
+                );
+              }),
+            ]),
+          );
+        } finally {
+          clearTimeout(imageTimer);
+        }
+      } catch {
+        attempt.check();
+        wallpaper.src = ART_FALLBACK;
+        await attempt.wait(wallpaper.decode());
       }
-    } catch {
-      attempt.check();
-      wallpaper.src = ART_FALLBACK;
-      await attempt.wait(wallpaper.decode());
+      wallpaper.hidden = false;
     }
-    wallpaper.hidden = false;
-    const wallpaperAt = performance.now();
-    const track = await prepare(attempt);
+    armedWallpaperAt = 0;
+    const track = await prepare(attempt, fromGate);
     $('#lobby').classList.add('hidden');
     $('#replays').classList.add('hidden');
     $('#game').classList.remove('hidden');
@@ -1343,14 +1402,9 @@ async function start() {
     await attempt.wait(
       field.warmup(engine, settings.lanes, 2 / settings.speed),
     );
-    await attempt.wait(
-      new Promise((resolve) =>
-        setTimeout(
-          resolve,
-          Math.max(0, 1200 - (performance.now() - wallpaperAt)),
-        ),
-      ),
-    );
+    // Readiness, not a presentation timer, owns startup. A local/warm track
+    // has already been verified and decoded; renderer warmup above is the
+    // final required work. Cold paths still await their real IO/rendering.
     attempt.check();
     $('#song-loading').classList.add('hidden');
     // Reserve this field's longest visible travel window (1x), including
@@ -1992,6 +2046,11 @@ window.addEventListener('keydown', (e) => {
   }
   if (!active) {
     if (screen === 'home' || screen === 'ready') {
+      if (readyAutostart && e.code === 'Escape' && !e.repeat) {
+        e.preventDefault();
+        $('#cancel-startup').click();
+        return;
+      }
       if (
         e.code === 'Enter' &&
         !e.repeat &&
@@ -2686,7 +2745,7 @@ async function openExternalShare(fragment: string) {
   readRoute();
 }
 
-function readRoute() {
+function readRoute(initial = false) {
   localBuiltinNotes = undefined;
   if (location.pathname !== '/result/')
     document.documentElement.removeAttribute('data-result-pending');
@@ -2819,10 +2878,14 @@ function readRoute() {
           ? 'replays'
           : 'home';
   if (screen === 'select' && !id) restoreLibrarySelection();
+  readyAutostart = initial && screen === 'ready' && !mobilePlaybackOnly();
   document.body.classList.toggle('home-screen', screen === 'home');
   document.body.classList.toggle('ready-screen', screen === 'ready');
   $('#home-screen').classList.toggle('hidden', screen !== 'home');
-  $('#ready-screen').classList.toggle('hidden', screen !== 'ready');
+  $('#ready-screen').classList.toggle(
+    'hidden',
+    screen !== 'ready' || readyAutostart,
+  );
   $('#lobby').classList.toggle('hidden', screen !== 'select');
   $('#replays').classList.toggle('hidden', screen !== 'replays');
   if (screen === 'replays') void showReplays();
@@ -2830,6 +2893,50 @@ function readRoute() {
   $('#ready-title').textContent = SONGS[songIndex].title;
   $('#ready-detail').textContent =
     `${settings.lanes} KEY / ${chartLevel(SONGS[songIndex], settings.difficulty, settings.lanes)} / ENTER`;
+  if (readyAutostart) {
+    const loadingSong = SONGS[songIndex];
+    const wallpaper = $<HTMLImageElement>('#loading-wallpaper');
+    armedWallpaperAt = 0;
+    wallpaper.hidden = true;
+    wallpaper.referrerPolicy = 'no-referrer';
+    wallpaper.dataset.songArt = loadingSong.id;
+    wallpaper.src = songArt(loadingSong.id);
+    void wallpaper
+      .decode()
+      .then(() => {
+        if (wallpaper.dataset.songArt !== loadingSong.id) return;
+        wallpaper.hidden = false;
+        if (!armedWallpaperAt) armedWallpaperAt = performance.now();
+      })
+      .catch(() => {});
+    if (!cache.get(loadingSong.id) && !preloading.has(loadingSong.id))
+      preloading.set(
+        loadingSong.id,
+        preloadTrack(loadingSong.id)
+          .then((track) => {
+            if (track) cache.set(loadingSong.id, track);
+            return track;
+          })
+          .finally(() => preloading.delete(loadingSong.id)),
+      );
+    $('#loading-title').textContent = loadingSong.title;
+    $('#loading-title').previousElementSibling!.textContent = externalSource(
+      loadingSong.id,
+    )
+      ? 'YOUTUBE'
+      : 'ORVIO ORIGINALS';
+    $('#loading-detail').textContent =
+      `${loadingSong.genre} · ${loadingSong.bpm} BPM · ${settings.lanes} KEY`;
+    $('#loading-status').textContent = `${t('start')} · ENTER ↵`;
+    $('#cancel-startup').textContent =
+      externalLabels(settings.language).cancel + ' · ESC';
+    $('#song-loading').classList.remove('hidden');
+    $('#song-loading').classList.add('awaiting-start');
+  } else if (!preparing) {
+    armedWallpaperAt = 0;
+    $('#song-loading').classList.add('hidden');
+    $('#song-loading').classList.remove('awaiting-start');
+  }
   localize();
   songCards();
   selectedSong();
@@ -2889,7 +2996,14 @@ async function readInitialRoute() {
       }
       return;
     }
-    readRoute();
+    // A37: a play fallback can boot the app for a source the local library
+    // no longer holds; recover honestly instead of readying another song.
+    const playId = location.pathname.match(/^\/play\/([^/]+)\//)?.[1];
+    if (playId && !SONGS.some((s) => s.id === playId)) {
+      history.replaceState(null, '', '/select/');
+      toast(shareLabels(settings.language).missing);
+    }
+    readRoute(true);
     await replayEncoding;
     document.documentElement.removeAttribute('data-result-pending');
     return;
@@ -2956,6 +3070,13 @@ const deferredLibraryRoute =
   initialQuery.has('local') ||
   initialQuery.has('s') ||
   location.hash.startsWith('#v=5&d=');
+// A37: until the library hydrate finishes and the initial route is read, no
+// screen owns this route; the default markup would paint the home screen's
+// start button under the user's refresh.
+if (deferredLibraryRoute) {
+  $('#home-screen').classList.add('hidden');
+  $('#lobby').classList.add('hidden');
+}
 if (!deferredLibraryRoute) void readInitialRoute();
 async function reconcileLibraryRow(row: CanonicalLibraryRow) {
   if ((row as CanonicalLibraryRow & { active?: boolean }).active) return;
@@ -3134,7 +3255,7 @@ void initializeLibrary();
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.2.35',
+    version: '0.2.36',
     active,
     paused,
     fever: engine

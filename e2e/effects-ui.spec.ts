@@ -35,7 +35,7 @@ test('patch notes use a new tab; icon radio options, terms, all effects and song
   ).toContain('/wallpapers/first-light.png');
   await page.screenshot({ path: 'test-results/012-wallpaper-playing.png' });
 });
-test('every warm start still shows decoded wallpaper for 1.2s, before the clock', async ({
+test('warm starts keep decoded wallpaper without a forced presentation dwell', async ({
   page,
 }) => {
   await page.goto('/play/afterimage/5/low/');
@@ -45,13 +45,10 @@ test('every warm start still shows decoded wallpaper for 1.2s, before the clock'
   await page.click('#pause-exit');
   const at = await page.evaluate(() => performance.now());
   await page.keyboard.press('Enter');
-  await expect(page.locator('#song-loading')).toBeVisible();
-  await page.waitForTimeout(600);
-  expect(
-    await page.evaluate(() => (window as any).orvioDiagnostics.active),
-  ).toBe(false);
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
-  expect(
-    (await page.evaluate(() => performance.now())) - at,
-  ).toBeGreaterThanOrEqual(1180);
+  expect((await page.evaluate(() => performance.now())) - at).toBeLessThan(
+    1100,
+  );
+  await expect(page.locator('#song-loading')).toBeHidden();
+  await expect(page.locator('#game')).toBeVisible();
 });

@@ -1,12 +1,75 @@
 <!doctype html>
 <html lang="en">
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width" />
-  <title>Not found · orvio</title>
-  <body style="background:#07111b;color:white;font:20px sans-serif;padding:10vw">
-    <h1>Track not found</h1>
-    <a style="color:#29d8ff" href="/select/">
-      Choose a track
-    </a>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Not found · orvio</title>
+    <style is:inline>
+      .not-found {
+        background: #07111b;
+        color: white;
+        font: 20px sans-serif;
+        padding: 10vw;
+        position: relative;
+        z-index: 1000;
+      }
+      .not-found a {
+        color: #29d8ff;
+      }
+      html[data-play-fallback] body {
+        padding: 0;
+        background: #14131a;
+      }
+      html[data-play-fallback] .not-found {
+        display: none;
+      }
+    </style>
+    <script is:inline>
+      // A37: the static host serves this 404 page for a valid local external
+      // play URL. Recognize the exact source-id shape (yt-<videoId>-<sha16>
+      // [-c<sha16>]) before first paint so the game, not this notice, renders.
+      // Anything else keeps the plain 404 and never loads the game bundle.
+      if (
+        /^\/play\/yt-[A-Za-z0-9_-]{11}-[0-9a-f]{16}(-c[0-9a-f]{16})?(-x[0-9a-f]{64})?\/(5|7)\/(low|mid|high|sc)\/$/.test(
+          location.pathname,
+        )
+      ) {
+        document.documentElement.dataset.playFallback = '';
+        // This must run inline: the module itself may fail to load.
+        setTimeout(() => {
+          if (!document.querySelector('#app #home-screen'))
+            delete document.documentElement.dataset.playFallback;
+        }, 10000);
+      }
+    </script>
+  </head>
+  <body>
+    <div class="not-found">
+      <h1>Track not found</h1>
+      <a href="/select/"> Choose a track </a>
+    </div>
+    <script>
+      if ('playFallback' in document.documentElement.dataset) {
+        document.documentElement.lang = 'ko';
+        const app = document.createElement('div');
+        app.id = 'app';
+        document.body.append(app);
+        // A failed or stalled bundle must leave a visible recovery route.
+        const recovery = setTimeout(() => {
+          delete document.documentElement.dataset.playFallback;
+        }, 10000);
+        try {
+          const { registerApp } = await import('../pwa');
+          registerApp();
+          await import('../main.ts');
+          document.documentElement.dataset.playFallback = '';
+        } catch {
+          app.remove();
+          delete document.documentElement.dataset.playFallback;
+        } finally {
+          clearTimeout(recovery);
+        }
+      }
+    </script>
   </body>
 </html>

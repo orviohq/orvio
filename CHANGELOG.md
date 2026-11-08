@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.36] - 2026-11-09
+
+- Size result cards to their contents on tall, landscape and touch screens instead of leaving oversized blank space below actions. Short screens retain scrolling.
+
+- Prefer memory and saved audio before rendering, prepare cached tracks before the play gesture, and remove artificial startup presentation delay. Cold rendering or unavailable audio still waits for real readiness.
+- Restore saved local song play URLs on a static-host refresh without flashing the wrong start screen. Preserve missing-song recovery, startup cancellation and desktop-only gameplay.
+
 ## [0.2.35] - 2026-11-09
 
 - Redesign the complete result screen with a grouped score and rank, clear metrics and judgments, and same-row text-labeled replay and share actions. Preserve saved results and replay behavior.

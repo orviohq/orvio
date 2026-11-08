@@ -12,6 +12,8 @@ test('redesigned report keeps rank with score and translated actions on same row
     .locator('#watch-replay')
     .evaluate((e) => e.classList.remove('hidden'));
   for (const [width, height] of [
+    [979, 1173],
+    [1173, 979],
     [1280, 800],
     [1280, 720],
     [768, 480],
