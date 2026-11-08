@@ -3263,3 +3263,39 @@ textarea,
 #library-actions > button {
   flex-basis: 120px;
 }
+
+/* Keep the complete external artwork, without the 4:3 thumbnail wrapper or cut corners. */
+.selected-art.youtube-art {
+  height: auto;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  clip-path: none;
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+.song-card .cover:has(.youtube-cover) {
+  width: 88px;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
+  clip-path: none;
+  background: #0b1018;
+}
+.youtube-cover {
+  object-fit: contain;
+}
+#result-art[data-external] {
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: #0b1018;
+}
+.playing #game[data-song^='yt-'] {
+  background-size: cover, contain, contain;
+  background-repeat: no-repeat;
+  background-color: #050c15;
+}
+@media (max-width: 540px) {
+  .song-card .cover:has(.youtube-cover) {
+    width: 72px;
+  }
+}

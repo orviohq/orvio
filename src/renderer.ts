@@ -1,5 +1,10 @@
 import { VisualClock } from './visual-clock';
-import { blinkAlpha, fadeAlpha, type Fader } from './game-options';
+import {
+  blinkAlpha,
+  fadeAlpha,
+  fadeOutLimit,
+  type Fader,
+} from './game-options';
 import { noteLayout } from './note-layout';
 import { Application, Graphics, Container, Sprite, Texture } from 'pixi.js';
 import type { Engine } from './engine';
@@ -342,15 +347,26 @@ export class Playfield {
         v.tail.visible = visible;
         if (visible) {
           v.body.tint = layout.failed ? 0x66747e : this.noteColor;
-          v.body.alpha = layout.failed ? 0.2 : 0.36;
+          // Fade the body out with its leading edge (or with its tail while
+          // held) instead of slicing it at the fade line at constant alpha.
+          const bodyTrueBottom = endY + layout.bodyHeight;
+          const bodyFadePos = s.held ? endY : bodyTrueBottom;
+          v.body.alpha =
+            (layout.failed ? 0.2 : 0.36) *
+            (this.fader.startsWith('out')
+              ? fadeAlpha(this.fader, bodyFadePos / target)
+              : 1);
           v.tail.tint = layout.failed ? 0x88949b : 0xe5faff;
           v.tail.alpha =
             (layout.failed ? 0.45 : 1) * fadeAlpha(this.fader, endY / target);
           v.body.x = x + nw * 0.23;
           const bodyTop = Math.max(endY, startY);
+          // Clip at the point where the body alpha has already reached 0, so
+          // the clip is never visible as a hard cut.
+          const outLimit = fadeOutLimit(this.fader);
           const bodyBottom = Math.min(
-            endY + layout.bodyHeight,
-            this.fader.startsWith('out') ? target * edge : this.height,
+            bodyTrueBottom,
+            outLimit === null ? this.height : target * outLimit,
           );
           v.body.y = bodyTop;
           v.body.width = nw * 0.54;

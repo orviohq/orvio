@@ -55,6 +55,10 @@ export function transformChart(
   const order = laneOrder(lanes, shuffle, seed);
   return notes.map((n) => ({ ...n, lane: order[n.lane] }));
 }
+// Half-width of the fade band used by fadeAlpha: alpha reaches 0/1 at
+// edge +/- FADE_HALF_BAND of the note's progress along the highway.
+export const FADE_HALF_BAND = 0.04;
+
 export function fadeAlpha(fader: Fader, progress: number) {
   if (fader === 'blind') return 0;
   if (!['in', 'in2', 'out', 'out2'].includes(fader)) return 1;
@@ -70,7 +74,17 @@ export function fadeAlpha(fader: Fader, progress: number) {
     0,
     Math.min(
       1,
-      (fader.startsWith('in') ? progress - edge : edge - progress) / 0.08 + 0.5,
+      (fader.startsWith('in') ? progress - edge : edge - progress) /
+        (FADE_HALF_BAND * 2) +
+      0.5,
     ),
   );
+}
+
+// Progress (y/target) at which an out-fader's alpha reaches 0: the point where
+// a faded element is fully invisible. Returns null for non-out faders.
+export function fadeOutLimit(fader: Fader) {
+  if (fader === 'out') return 2 / 3 + FADE_HALF_BAND;
+  if (fader === 'out2') return 0.5 + FADE_HALF_BAND;
+  return null;
 }

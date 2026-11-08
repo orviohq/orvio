@@ -619,7 +619,7 @@ function songCards() {
   $('#songs').innerHTML = SONGS.map((s, i) =>
     hiddenSongs.has(s.id)
       ? ''
-      : `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${externalSource(s.id) ? `<img class="youtube-cover" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle + ' · ' + (externalSource(s.id)!.record.chartSetSha256 ? regenerationLabels(settings.language).current : regenerationLabels(settings.language).original)) : t(('subtitle' + i) as Word)}</span></span><span class="song-time"><em class="song-level">${chartLevel(s, settings.difficulty, settings.lanes)}</em>${Math.floor(duration(s) / 60)}:${Math.floor(
+      : `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${externalSource(s.id) ? `<img class="youtube-cover" data-song-art="${s.id}" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle + ' · ' + (externalSource(s.id)!.record.chartSetSha256 ? regenerationLabels(settings.language).current : regenerationLabels(settings.language).original)) : t(('subtitle' + i) as Word)}</span></span><span class="song-time"><em class="song-level">${chartLevel(s, settings.difficulty, settings.lanes)}</em>${Math.floor(duration(s) / 60)}:${Math.floor(
           duration(s) % 60,
         )
           .toString()
@@ -825,6 +825,7 @@ async function start() {
   // Hide it before the overlay can be visible, then reveal only the new image.
   wallpaper.hidden = true;
   wallpaper.referrerPolicy = 'no-referrer';
+  wallpaper.dataset.songArt = loadingSong.id;
   wallpaper.src = songArt(loadingSong.id);
   $('#loading-title').textContent = loadingSong.title;
   $('#loading-title').previousElementSibling!.textContent = externalSource(
@@ -1390,6 +1391,8 @@ function resultOptions(result: UiResult) {
     resultArt.onerror = null;
     resultArt.src = ART_FALLBACK;
   };
+  resultArt.dataset.songArt = song.id;
+  resultArt.toggleAttribute('data-external', !!externalSource(song.id));
   resultArt.src = songArt(song.id);
   const count = makeChart(song, result.difficulty, result.lanes).length;
   $('#result-metadata').textContent =
@@ -2389,3 +2392,23 @@ document.addEventListener(
 Object.defineProperty(window, 'orvioAudioTime', { get: () => clock?.now() });
 
 enhanceSelects();
+
+// One verified thumbnail choice is used by every view, including later image loads.
+document.addEventListener('orvio:art-ready', (event) => {
+  const id = (event as CustomEvent<string>).detail;
+  if (!externalSource(id)) return;
+  const url = songArt(id);
+  document
+    .querySelectorAll<HTMLImageElement>('[data-song-art]')
+    .forEach((img) => {
+      if (img.dataset.songArt === id) img.src = url;
+    });
+  if (SONGS[songIndex]?.id === id)
+    $('#selected-art').style.backgroundImage =
+      `url("${url}"), url("${ART_FALLBACK}")`;
+  if ($('#game').dataset.song === id)
+    document.body.style.setProperty(
+      '--play-wallpaper',
+      `url("${url}"), url("${ART_FALLBACK}")`,
+    );
+});
