@@ -15,7 +15,7 @@ test('A31 actions and settings remain readable and reachable across narrow and l
     await page.goto('/select/');
     await expect(page.locator('#remove-song')).toHaveCount(0);
     await expect(page.locator('.library .section-title>span')).toHaveCount(0);
-    await expect(page.locator('.under-start>span')).toHaveCount(1);
+    await expect(page.locator('.under-start>span')).toHaveCount(0);
     await page.keyboard.press('F2');
     for (const lang of languages) {
       await page.selectOption('#language', lang);

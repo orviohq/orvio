@@ -4026,3 +4026,13 @@ dialog .hint,
     min-width: 0;
   }
 }
+/* A38: the current chart's note count belongs with its song card. */
+.song-copy > .song-note-count {
+  color: #a6bfce;
+  font-size: 13px;
+  line-height: 1.4;
+  margin-top: 4px;
+}
+#chart-info {
+  display: none;
+}
