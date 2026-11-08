@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e',
   testMatch: [
+    'skin-pixel-parity.spec.ts',
     'combined-layout.spec.ts',
     'import-progress.spec.ts',
     'sonner.spec.ts',
