@@ -9,6 +9,7 @@ export const PATCH_V029 = {
       'A32: 리플레이 목록에 썸네일, 곡 길이와 플레이 시각을 추가하고 스크롤과 디자인을 개선했습니다. 이전 기록에 없는 시각은 미기록으로 표시합니다.',
       'A33·A34: 위쪽의 중복 삭제 버튼과 불필요한 라이브러리·키보드 문구를 없앴습니다. 우클릭 및 키보드 메뉴의 삭제 기능은 유지됩니다.',
       'A36: 곡 선택 화면으로 돌아오면 선택한 곡과 목록 위치를 유지합니다. A38: 선택한 키 수와 난이도의 노트 수를 각 곡 목록에 표시합니다.',
+      'A36(리플레이 표시): 리플레이를 보는 동안 상단에 재생 중 표시를 추가했습니다.',
       '음원 저장 한도 오류가 기기 용량이 아닌 서버 한도를 가리킨다는 점을 분명히 했습니다.',
     ],
     en: [
@@ -17,9 +18,11 @@ export const PATCH_V029 = {
       'A32: Replay cards now show artwork, song length and recorded play time, with improved scrolling and layout. Older missing dates are marked unrecorded.',
       'A33/A34: Removed the duplicate top removal button and redundant library/keyboard copy. Context and keyboard removal menus remain.',
       'A36: Returning to track selection keeps your track and list position. A38: Each song row shows the note count for the selected keys and difficulty.',
+      'A36 (replay indicator): A clear replay-playing label appears above the song title while watching.',
       'Audio capacity errors now clearly identify the server storage limit, not device space.',
     ],
     ja: [
+      'A36（リプレイ表示）：再生中は曲名の上にリプレイ再生中と表示します。',
       'A30: ロングノートを押している間のエフェクトが続き、離すと止まります。動きを減らす設定に従います。',
       'A31: 再プレイやメニューの小さい文字を大きくしました。小画面では結果や設定をスクロールできます。',
       'A32: リプレイに画像、曲の長さ、記録されたプレイ日時を追加しました。過去の未記録日時は未記録と表示します。',
@@ -28,6 +31,7 @@ export const PATCH_V029 = {
       '容量エラーが端末ではなくサーバーの音源保存上限を示すと明記しました。',
     ],
     zh: [
+      'A36（回放标识）：观看回放时，曲名上方显示回放播放中。',
       'A30：长按音符的特效持续到松开，并遵循减少动态效果设置。',
       'A31：放大再玩一次和菜单等小字，小屏幕上可滚动查看结果与设置。',
       'A32：回放卡片显示封面、曲长和已记录的游玩时间，改进布局和滚动。旧记录缺少的时间标为未记录。',
@@ -36,6 +40,7 @@ export const PATCH_V029 = {
       '音频容量错误明确指服务器存储上限，而非设备空间。',
     ],
     es: [
+      'A36 (indicador): La reproducción muestra una etiqueta visible sobre el título.',
       'A30: Los efectos de notas largas continúan mientras se pulsan y terminan al soltar. Se respeta el movimiento reducido.',
       'A31: Texto de acciones y menús más grande. Los resultados y ajustes se pueden recorrer en pantallas pequeñas.',
       'A32: Las repeticiones muestran imagen, duración y fecha registrada. Las fechas antiguas ausentes se indican como no registradas.',
@@ -44,6 +49,7 @@ export const PATCH_V029 = {
       'Los errores de capacidad indican el límite de audio del servidor, no espacio del dispositivo.',
     ],
     fr: [
+      'A36 (indicateur) : Le replay affiche un indicateur visible au-dessus du titre.',
       'A30 : Les effets des notes longues continuent pendant le maintien et cessent au relâchement. Le mouvement réduit est respecté.',
       'A31 : Texte des actions et menus agrandi. Résultats et réglages restent accessibles par défilement sur petit écran.',
       'A32 : Les replays affichent image, durée et date enregistrée. Les anciennes dates absentes sont indiquées non enregistrées.',
@@ -52,6 +58,7 @@ export const PATCH_V029 = {
       'Les erreurs de capacité précisent la limite audio du serveur, pas celle de votre appareil.',
     ],
     de: [
+      'A36 (Anzeige): Beim Ansehen steht ein sichtbarer Wiederholungshinweis über dem Titel.',
       'A30: Langnoteneffekte bleiben beim Halten aktiv und enden beim Loslassen. Reduzierte Bewegung wird beachtet.',
       'A31: Größere Aktions- und Menütexte. Ergebnisse und Einstellungen bleiben auf kleinen Bildschirmen per Scrollen erreichbar.',
       'A32: Replays zeigen Bild, Songlänge und aufgezeichnete Spielzeit. Fehlende alte Daten werden als nicht aufgezeichnet markiert.',
@@ -60,6 +67,7 @@ export const PATCH_V029 = {
       'Speicherfehler nennen das Audiolimit des Servers statt Gerätespeicher.',
     ],
     pt: [
+      'A36 (indicador): Um aviso visível aparece acima do título durante o replay.',
       'A30: Os efeitos das notas longas continuam ao segurar e param ao soltar. A redução de movimento é respeitada.',
       'A31: Textos de ações e menus maiores. Resultados e ajustes continuam acessíveis por rolagem em telas pequenas.',
       'A32: Replays mostram imagem, duração e data registrada. Datas antigas ausentes aparecem como não registradas.',
@@ -68,6 +76,7 @@ export const PATCH_V029 = {
       'Erros de capacidade identificam o limite de áudio do servidor, não do aparelho.',
     ],
     it: [
+      'A36 (indicatore): Durante il replay appare un avviso visibile sopra il titolo.',
       'A30: Gli effetti delle note lunghe continuano durante la pressione e terminano al rilascio. Si rispetta il movimento ridotto.',
       'A31: Testi di azioni e menu più grandi. Risultati e impostazioni restano accessibili scorrendo su schermi piccoli.',
       'A32: I replay mostrano immagine, durata e data registrata. Le vecchie date mancanti sono indicate come non registrate.',
@@ -76,6 +85,7 @@ export const PATCH_V029 = {
       'Gli errori di spazio indicano il limite audio del server, non del dispositivo.',
     ],
     ru: [
+      'A36 (индикатор): При просмотре над названием видна отметка воспроизведения повтора.',
       'A30: Эффекты длинных нот продолжаются при удержании и прекращаются при отпускании. Учитывается уменьшение движения.',
       'A31: Увеличен текст действий и меню. Результаты и настройки доступны прокруткой на маленьких экранах.',
       'A32: В повторах видны изображение, длина песни и записанное время игры. Отсутствующие старые даты помечены как незаписанные.',
@@ -84,6 +94,7 @@ export const PATCH_V029 = {
       'Ошибка ёмкости указывает лимит аудио сервера, а не память устройства.',
     ],
     id: [
+      'A36 (indikator): Label putar ulang terlihat di atas judul saat menonton.',
       'A30: Efek not panjang berlanjut saat ditahan dan berhenti saat dilepas. Pengurangan gerakan tetap dihormati.',
       'A31: Teks aksi dan menu diperbesar. Hasil dan pengaturan dapat digulir pada layar kecil.',
       'A32: Replay menampilkan gambar, durasi dan waktu bermain tercatat. Waktu lama yang hilang ditandai tidak tercatat.',
@@ -92,6 +103,7 @@ export const PATCH_V029 = {
       'Galat kapasitas menyebut batas audio server, bukan ruang perangkat.',
     ],
     tr: [
+      'A36 (gösterge): Tekrar izlenirken başlığın üstünde görünür bir etiket yer alır.',
       'A30: Uzun nota efektleri basılı tutulurken sürer, bırakınca biter. Azaltılmış hareket ayarı korunur.',
       'A31: İşlem ve menü yazıları büyütüldü. Küçük ekranlarda sonuçlar ve ayarlar kaydırılarak görülebilir.',
       'A32: Tekrarlar görsel, şarkı süresi ve kaydedilmiş oyun zamanını gösterir. Eski eksik tarihler kaydedilmemiş olarak belirtilir.',
@@ -100,6 +112,7 @@ export const PATCH_V029 = {
       'Kapasite hatası cihazı değil sunucu ses depolama sınırını belirtir.',
     ],
     vi: [
+      'A36 (chỉ báo): Khi xem phát lại, nhãn rõ ràng xuất hiện phía trên tên bài.',
       'A30: Hiệu ứng nốt dài tiếp tục khi giữ và dừng khi thả. Tôn trọng chế độ giảm chuyển động.',
       'A31: Tăng cỡ chữ thao tác và menu. Có thể cuộn kết quả và cài đặt trên màn hình nhỏ.',
       'A32: Bản phát lại có ảnh, độ dài bài và thời gian chơi đã ghi. Ngày cũ bị thiếu được đánh dấu chưa ghi.',

@@ -7,6 +7,7 @@
 - A32: Add replay artwork, exact song duration and new-session play timestamps; mark legacy missing times honestly. Improve archive cards and wheel/keyboard/touch scrolling.
 - A33/A34: Remove duplicate top removal action and redundant library/keyboard copy. Preserve contextual and keyboard removal.
 - A36: Keep stable selected-song identity and list scroll when returning.
+- A36 (replay indicator, separate request): Clearly label replay playback above the song title; hide on return or completion.
 - A38: Show current key-mode/difficulty note counts within each song row, remove bottom provenance/count line.
 - Clarify that audio-capacity errors refer to the server limit, not device storage.
 

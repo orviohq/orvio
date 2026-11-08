@@ -4091,3 +4091,45 @@ dialog .hint,
 .replay-art[hidden] {
   display: none;
 }
+
+/* Replay watching is visually distinct from keyboard play. */
+#replay-playing {
+  display: none;
+}
+.replay-view:not(.results-screen) #replay-playing {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 12px;
+  border: 1px solid #7ce6e9;
+  border-radius: 5px;
+  background: #07313e;
+  color: #b9fcff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-align: center;
+}
+.replay-view .game-top {
+  height: 88px;
+  gap: 12px;
+}
+.replay-view .song-now {
+  min-width: 0;
+  max-width: 75%;
+}
+.replay-view .song-now strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 540px) {
+  .replay-view .game-top {
+    height: 98px;
+  }
+  .replay-view .song-now {
+    max-width: 72%;
+  }
+}

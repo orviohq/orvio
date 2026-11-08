@@ -14,3 +14,19 @@ export const REPLAY_LABELS: Record<Language, [string, string, string]> = {
   tr: ['Tekrarı izle', 'Tekrar', 'Tekrar kullanılamıyor'],
   vi: ['Xem phát lại', 'Phát lại', 'Không thể tải phát lại'],
 };
+
+export const REPLAY_PLAYING: Record<Language, string> = {
+  ko: '리플레이 재생 중',
+  en: 'Replay playing',
+  ja: 'リプレイ再生中',
+  zh: '回放播放中',
+  es: 'Reproduciendo repetición',
+  fr: 'Lecture du replay',
+  de: 'Wiederholung läuft',
+  pt: 'Reproduzindo replay',
+  it: 'Replay in riproduzione',
+  ru: 'Воспроизведение повтора',
+  id: 'Memutar ulang',
+  tr: 'Tekrar oynatılıyor',
+  vi: 'Đang phát lại',
+};
