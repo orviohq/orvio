@@ -31,3 +31,10 @@ test('physical bindings retain readable symbols', () => {
   }))
     expect(keyLabel(code)).toBe(label);
 });
+
+test('runtime edition and diagnostics agree with the published package version', () => {
+  const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
+  const source = readFileSync('src/main.ts', 'utf8');
+  expect(source).toContain(`RHYTHM SYSTEM <i></i> ${version}`);
+  expect(source).toContain(`version: '${version}'`);
+});
