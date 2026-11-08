@@ -44,8 +44,22 @@ test('real renderer blink, gear blink, fog, blind and pixel retain original char
           timeout: 2000,
         })
         .toBe(1);
-    } else if (fader === 'blind') expect((await fx()).noteAlpha).toBe(0);
-    else if (fader === 'fog') expect((await fx()).fog).toBe(true);
+    } else if (fader === 'blind') {
+      // The option updates before the next draw. Assert the rendered state,
+      // not a stale FOG snapshot after an arbitrary wall-clock delay.
+      await expect
+        .poll(
+          async () => {
+            const current = await fx();
+            return { noteAlpha: current.noteAlpha, fog: current.fog };
+          },
+          { intervals: [25], timeout: 2000 },
+        )
+        .toEqual({ noteAlpha: 0, fog: false });
+    } else if (fader === 'fog')
+      await expect
+        .poll(async () => (await fx()).fog, { intervals: [25], timeout: 2000 })
+        .toBe(true);
     if (fader === 'pixel' || fader === 'pixel2') {
       const keys = ['d', 'f', 'Space', 'j', 'k'];
       const n = await page.evaluate(() =>
