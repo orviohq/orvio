@@ -1,9 +1,18 @@
 ---
+import { youtubeAddIcon } from '../library-actions';
+import { LANGUAGES, translate, type Language } from '../i18n';
+const mobileLabels = Object.fromEntries(
+  Object.keys(LANGUAGES).map((language) => [
+    language,
+    translate(language as Language, 'unsupported'),
+  ]),
+);
 import restore from '../library-first-paint-bootstrap.js?raw';
 ---
 
 <div
   id="library-first-paint"
+  data-mobile-labels={JSON.stringify(mobileLabels)}
   hidden
   inert
   aria-busy="true"
@@ -34,8 +43,19 @@ import restore from '../library-first-paint-bootstrap.js?raw';
       <div data-cached-mobile></div>
     </section>
     <section class="library">
+      <p class="mobile-playback-note" data-cached-playback-note></p>
       <div class="section-title">
         <strong data-cached-label></strong>
+        <div id="cached-library-actions">
+          <button
+            id="cached-add-youtube"
+            class="quiet youtube-add-icon"
+            type="button"
+            tabindex="-1"
+            aria-label="Add YouTube"
+            set:html={youtubeAddIcon}
+          />
+        </div>
       </div>
       <div id="cached-songs" class="cached-songs"></div>
       <div data-cached-selection></div>

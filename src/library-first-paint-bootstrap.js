@@ -107,6 +107,7 @@
       ['header nav', '[data-cached-nav]'],
       ['.preview-status', '[data-cached-preview]'],
       ['.mobile-note', '[data-cached-mobile]'],
+      ['.library .mobile-playback-note', '[data-cached-playback-note]'],
       ['.selection', '[data-cached-selection]'],
       ['.start-row', '[data-cached-start]'],
       ['.footer-strip', '[data-cached-footer]'],
@@ -121,7 +122,26 @@
       '[data-cached-bpm]',
       text(selected.meta).split('·').slice(1).join('·').trim(),
     );
+    const legacyNote = root.querySelector('[data-cached-playback-note]');
+    if (legacyNote) {
+      const labels = JSON.parse(root.dataset.mobileLabels || '{}');
+      const settings = JSON.parse(
+        localStorage.getItem('orvio.settings.v1') || '{}',
+      );
+      const browser =
+        (navigator.languages || [navigator.language])
+          .map((value) => value.toLowerCase().split(/[-_]/)[0])
+          .find((value) => value in labels) || 'en';
+      const language =
+        settings.languageMode === 'manual' && settings.language in labels
+          ? settings.language
+          : browser;
+      legacyNote.textContent = labels[language] || '';
+    }
     set('[data-cached-label]', cache.label);
+    const add = root.querySelector('#cached-add-youtube');
+    add.setAttribute('aria-label', text(cache.addLabel) || 'Add YouTube');
+    add.title = text(cache.addLabel) || 'Add YouTube';
     root.querySelector('.selected-art').style.backgroundImage =
       `url("${image(selected.art)}"), url("/wallpapers/first-light.png")`;
     const container = root.querySelector('.cached-songs');
@@ -178,6 +198,10 @@
       row.append(cover, copy, time);
       container.append(row);
     }
+    root.classList.toggle(
+      'mobile-playback-only',
+      matchMedia('(hover: none) and (pointer: coarse)').matches,
+    );
     root.hidden = false;
     // Match the saved selection viewport without making the projection actionable.
     const selection = JSON.parse(

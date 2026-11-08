@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.40] - 2026-11-09
+
+- Keep the live YouTube add action inside the live app, not the temporary saved-library projection, so it survives refresh.
+- Match the saved library toolbar and mobile notices to the live layout, with a trusted shared icon and display-only controls until startup completes.
+- Add desktop and touch refresh regression checks for toolbar geometry, safe keyboard focus and the working add dialog.
+
 ## [0.2.39] - 2026-11-09
 
 - Restore a small display-only saved library during HTML parsing, before module startup, IndexedDB hydration and background metadata refresh. Keep enlarged artwork, selection and scroll position.

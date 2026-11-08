@@ -3082,7 +3082,7 @@ canvas {
 #results {
   scroll-padding-bottom: 18px;
 }
-#add-youtube {
+:is(#add-youtube, #cached-add-youtube) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3095,16 +3095,16 @@ canvas {
   background: #111c26;
   color: #b6cad6;
 }
-#add-youtube:hover {
+:is(#add-youtube, #cached-add-youtube):hover {
   color: #54ddfa;
   border-color: #54ddfa;
   background: #142732;
 }
-#add-youtube svg {
+:is(#add-youtube, #cached-add-youtube) svg {
   width: 24px;
   height: 24px;
 }
-#library-actions {
+:is(#library-actions, #cached-library-actions) {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -3206,13 +3206,13 @@ canvas {
 }
 
 /* Library actions share one bounded row. The list scrolls before play controls move. */
-#library-actions {
+:is(#library-actions, #cached-library-actions) {
   display: flex;
   gap: 8px;
   margin-bottom: 8px;
   flex-shrink: 0;
 }
-#library-actions > button {
+:is(#library-actions, #cached-library-actions) > button {
   flex: 1 1 0;
   min-width: 0;
   width: auto;
@@ -3430,10 +3430,10 @@ textarea,
 .remove-song-actions button {
   flex: 1;
 }
-#library-actions {
+:is(#library-actions, #cached-library-actions) {
   flex-wrap: wrap;
 }
-#library-actions > button {
+:is(#library-actions, #cached-library-actions) > button {
   flex-basis: 120px;
 }
 
@@ -3572,7 +3572,8 @@ body.perf-enabled #fps {
   overflow-wrap: anywhere;
 }
 /* Icon action stays compact even in the shared library action flex row. */
-#library-actions > #add-youtube {
+:is(#library-actions, #cached-library-actions)
+  > :is(#add-youtube, #cached-add-youtube) {
   flex: 0 0 44px;
   width: 44px;
   height: 44px;
@@ -4367,7 +4368,7 @@ html {
   gap: 12px;
   min-height: 44px;
 }
-.library .section-title #library-actions {
+.library .section-title :is(#library-actions, #cached-library-actions) {
   margin: 0;
 }
 #results .result-heading {

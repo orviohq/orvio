@@ -39,6 +39,9 @@ export function rememberLibraryFirstPaint(ids: string[], selected: string) {
     }));
     const projection = {
       v: 1,
+      addLabel:
+        document.querySelector('#add-youtube')?.getAttribute('aria-label') ??
+        'Add YouTube',
       songs,
       selected,
       label:
@@ -51,6 +54,7 @@ export function rememberLibraryFirstPaint(ids: string[], selected: string) {
           'header nav',
           '.preview-status',
           '.mobile-note',
+          '.library .mobile-playback-note',
           '.selection',
           '.start-row',
           '.footer-strip',
