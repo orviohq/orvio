@@ -1,10 +1,5 @@
 import { VisualClock } from './visual-clock';
-import {
-  blinkAlpha,
-  fadeAlpha,
-  fadeOutLimit,
-  type Fader,
-} from './game-options';
+import { blinkAlpha, fadeAlpha, type Fader } from './game-options';
 import { noteLayout } from './note-layout';
 import { Application, Graphics, Container, Sprite, Texture } from 'pixi.js';
 import type { Engine } from './engine';
@@ -31,6 +26,8 @@ export class Playfield {
   private resizeObserver?: ResizeObserver;
   private visualClock = new VisualClock();
   private burstTexture!: Texture;
+  private fadeMask!: Sprite;
+  private fadeMaskMode: Fader = 'off';
   reducedMotion = false;
   fader: Fader = 'off';
   bpm = 120;
@@ -49,10 +46,17 @@ export class Playfield {
     this.disposed = true;
     this.resizeObserver?.disconnect();
     if (this.initialized) {
-      const ownedTextures = [this.burstTexture, this.fog?.texture];
+      this.notes.mask = null;
+      const ownedTextures = [
+        this.burstTexture,
+        this.fog?.texture,
+        this.fadeMask?.texture,
+      ];
       this.app.destroy(true, { children: true });
       // Release our generated textures, never the shared Texture.WHITE.
-      ownedTextures.forEach((texture) => texture?.destroy(true));
+      ownedTextures.forEach((texture) => {
+        if (texture !== Texture.WHITE) texture?.destroy(true);
+      });
       this.initialized = false;
     }
   }
@@ -121,7 +125,15 @@ export class Playfield {
     fogBrush.fillRect(0, 0, 4, 128);
     this.fog = new Sprite(Texture.from(fogCanvas));
     this.fog.visible = false;
-    this.app.stage.addChild(this.grid, this.notes, this.hit, this.fog);
+    this.fadeMask = new Sprite(Texture.WHITE);
+    this.app.stage.addChild(
+      this.grid,
+      this.notes,
+      this.hit,
+      this.fog,
+      this.fadeMask,
+    );
+    this.fadeMask.visible = false;
   }
   private rect(color: number) {
     const s = new Sprite(Texture.WHITE);
@@ -274,16 +286,38 @@ export class Playfield {
     const width = this.width / lanes;
     const target = this.height - 92;
     const px = target / travel;
-    const edge =
-      this.fader === 'in'
-        ? 0.5
-        : this.fader === 'in2'
-          ? 2 / 3
-          : this.fader === 'out'
-            ? 2 / 3
-            : 0.5;
-    const startY = this.fader.startsWith('in') ? target * edge : 0;
-    const endY = this.fader.startsWith('out') ? target * edge : this.height;
+    const spatialFade = ['out', 'out2'].includes(this.fader);
+    if (this.fadeMaskMode !== this.fader) {
+      this.notes.mask = null;
+      if (this.fadeMask.texture !== Texture.WHITE)
+        this.fadeMask.texture.destroy(true);
+      this.fadeMask.texture = Texture.WHITE;
+      this.fadeMask.visible = spatialFade;
+      if (spatialFade) {
+        // One screen-anchored alpha ramp fades every pixel of a long body.
+        // Its position never switches from head to tail when a hold begins.
+        const ramp = document.createElement('canvas');
+        ramp.width = 4;
+        ramp.height = 2048;
+        const brush = ramp.getContext('2d')!;
+        const image = brush.createImageData(ramp.width, ramp.height);
+        for (let y = 0; y < ramp.height; y++) {
+          const alpha = Math.round(
+            255 * fadeAlpha(this.fader, ((y + 0.5) * 2) / ramp.height),
+          );
+          for (let x = 0; x < ramp.width; x++) {
+            const i = (y * ramp.width + x) * 4;
+            image.data.set([255, 255, 255, alpha], i);
+          }
+        }
+        brush.putImageData(image, 0, 0);
+        this.fadeMask.texture = Texture.from(ramp);
+        this.notes.setMask({ mask: this.fadeMask, channel: 'alpha' });
+      }
+      this.fadeMaskMode = this.fader;
+    }
+    this.fadeMask.width = this.width;
+    this.fadeMask.height = target * 2;
     for (let lane = 0; lane < lanes; lane++) {
       const k = this.keys[lane];
       k.visible = this.pressed.has(lane);
@@ -333,7 +367,7 @@ export class Playfield {
       const layout = noteLayout(s, target, time, px, this.height);
       const { visible, headY: y, endY } = layout;
       v.head.visible = layout.showHead;
-      v.head.alpha = fadeAlpha(this.fader, y / target);
+      v.head.alpha = spatialFade ? 1 : fadeAlpha(this.fader, y / target);
       const x = n.lane * width + 5;
       const nw = width - 10;
       if (v.head.visible) {
@@ -347,27 +381,21 @@ export class Playfield {
         v.tail.visible = visible;
         if (visible) {
           v.body.tint = layout.failed ? 0x66747e : this.noteColor;
-          // Fade the body out with its leading edge (or with its tail while
-          // held) instead of slicing it at the fade line at constant alpha.
+          v.body.alpha = layout.failed ? 0.2 : 0.36;
           const bodyTrueBottom = endY + layout.bodyHeight;
-          const bodyFadePos = s.held ? endY : bodyTrueBottom;
-          v.body.alpha =
-            (layout.failed ? 0.2 : 0.36) *
-            (this.fader.startsWith('out')
-              ? fadeAlpha(this.fader, bodyFadePos / target)
-              : 1);
           v.tail.tint = layout.failed ? 0x88949b : 0xe5faff;
           v.tail.alpha =
-            (layout.failed ? 0.45 : 1) * fadeAlpha(this.fader, endY / target);
+            (layout.failed ? 0.45 : 1) *
+            (spatialFade ? 1 : fadeAlpha(this.fader, endY / target));
           v.body.x = x + nw * 0.23;
-          const bodyTop = Math.max(endY, startY);
-          // Clip at the point where the body alpha has already reached 0, so
-          // the clip is never visible as a hard cut.
-          const outLimit = fadeOutLimit(this.fader);
-          const bodyBottom = Math.min(
-            bodyTrueBottom,
-            outLimit === null ? this.height : target * outLimit,
-          );
+          const inStart =
+            this.fader === 'in'
+              ? target * 0.5
+              : this.fader === 'in2'
+                ? (target * 2) / 3
+                : 0;
+          const bodyTop = Math.max(endY, inStart);
+          const bodyBottom = Math.min(bodyTrueBottom, this.height);
           v.body.y = bodyTop;
           v.body.width = nw * 0.54;
           v.body.height = Math.max(0, bodyBottom - bodyTop);
