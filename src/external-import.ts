@@ -26,7 +26,14 @@ export function youtubeId(value: string) {
     return null;
   }
 }
-export async function importYoutube(input: string, signal: AbortSignal) {
+export async function importYoutube(
+  input: string,
+  signal: AbortSignal,
+  options: {
+    jobId?: string;
+    onJob?: (job: import('./external-audio-api').AudioJob) => void;
+  } = {},
+) {
   const id = youtubeId(input);
   if (!id) throw new AudioJobError('invalid_url');
   const first = (await listPinnedSources(id))[0];
@@ -40,10 +47,10 @@ export async function importYoutube(input: string, signal: AbortSignal) {
         author: cached.author,
       };
   }
-  let job = await createAudioJob(
-    'https://www.youtube.com/watch?v=' + id,
-    signal,
-  );
+  let job = options.jobId
+    ? await readAudioJob(options.jobId, signal)
+    : await createAudioJob('https://www.youtube.com/watch?v=' + id, signal);
+  options.onJob?.(job);
   const deadline = performance.now() + 90000;
   while (job.status === 'queued' || job.status === 'running') {
     if (performance.now() > deadline)
@@ -63,6 +70,7 @@ export async function importYoutube(input: string, signal: AbortSignal) {
       );
     });
     job = await readAudioJob(job.jobId, signal);
+    options.onJob?.(job);
   }
   if (job.status === 'error')
     throw new AudioJobError(job.error?.code ?? 'unavailable');

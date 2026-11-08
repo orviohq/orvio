@@ -3,6 +3,8 @@ import {
   saveHiddenLibraryIds,
   removalLabels,
 } from './library-removal';
+import { importRetryLabel } from './import-labels';
+import { BackgroundImports } from './background-imports';
 import './scrollbars.css';
 import { replayFrameChanged } from './replay-frame';
 import {
@@ -345,50 +347,9 @@ async function openLocalSession(id: string) {
   }
 }
 let selectionVersion = 0;
-let importController: AbortController | undefined;
-addYoutube.onclick = () => {
-  $('#youtube-status').textContent = '';
-  $('#youtube-progress').hidden = true;
-  $<HTMLButtonElement>('#youtube-submit').disabled = false;
-  $<HTMLDialogElement>('#youtube-import').showModal();
-  $('#youtube-url').focus();
-};
-$('#youtube-import').addEventListener('cancel', () =>
-  importController?.abort(),
-);
-$('#youtube-cancel').onclick = () => {
-  importController?.abort();
-  $<HTMLDialogElement>('#youtube-import').close();
-};
-$('#youtube-form').onsubmit = async (e) => {
-  e.preventDefault();
-  importController?.abort();
-  const controller = new AbortController();
-  importController = controller;
-  const labels = externalLabels(settings.language);
-  $<HTMLButtonElement>('#youtube-submit').disabled = true;
-  $('#youtube-status').textContent = '';
-  const progress = $('#youtube-progress');
-  progress.hidden = false;
-  $('#youtube-form').setAttribute('aria-busy', 'true');
-  $('#youtube-progress-label').textContent = labels.preparing;
-  const started = performance.now();
-  const elapsed = setInterval(() => {
-    if (controller.signal.aborted) return;
-    $('#youtube-elapsed').textContent =
-      Math.floor((performance.now() - started) / 1000) + ' s';
-  }, 1000);
-  // Paint the busy state before audio analysis can occupy the main thread.
-  await new Promise<void>((resolve) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-  );
-  try {
-    controller.signal.throwIfAborted();
-    const r = await importYoutube(
-      $<HTMLInputElement>('#youtube-url').value.trim(),
-      controller.signal,
-    );
-    if (controller.signal.aborted) return;
+const backgroundImports = new BackgroundImports(
+  () => songCards(),
+  async (r) => {
     const title = r.title?.trim() || 'YouTube · ' + r.prepared.record.videoId;
     await saveLocalAudio(
       r.prepared.record,
@@ -397,7 +358,6 @@ $('#youtube-form').onsubmit = async (e) => {
       r.prepared.bytes,
       r.author,
     );
-    if (controller.signal.aborted || importController !== controller) return;
     const item = installExternalSource(
       r.prepared.record,
       title,
@@ -405,33 +365,31 @@ $('#youtube-form').onsubmit = async (e) => {
       r.jobId,
       r.author,
     );
-    let index = SONGS.findIndex((s) => s.id === item.song.id);
-    if (index < 0) {
-      SONGS.push(item.song);
-      index = SONGS.length - 1;
-    }
+    if (!SONGS.some((s) => s.id === item.song.id)) SONGS.push(item.song);
     restoreLibraryVideo(r.prepared.record.videoId);
-    songCards();
-    selectSong(index, false);
-    $<HTMLDialogElement>('#youtube-import').close();
-    toast(labels.saved);
-  } catch (error) {
-    if (
-      importController === controller &&
-      !(error instanceof DOMException && error.name === 'AbortError')
-    )
-      $('#youtube-status').textContent = externalError(
-        error,
-        settings.language,
-      );
-  } finally {
-    clearInterval(elapsed);
-    if (importController === controller) {
-      progress.hidden = true;
-      $('#youtube-elapsed').textContent = '';
-      $('#youtube-form').removeAttribute('aria-busy');
-      $<HTMLButtonElement>('#youtube-submit').disabled = false;
+    if (!active && !preparing) {
+      songCards();
+      selectedSong();
     }
+    toast(externalLabels(settings.language).saved);
+  },
+);
+addYoutube.onclick = () => {
+  $('#youtube-status').textContent = '';
+  $('#youtube-progress').hidden = true;
+  $<HTMLButtonElement>('#youtube-submit').disabled = false;
+  $<HTMLDialogElement>('#youtube-import').showModal();
+  $('#youtube-url').focus();
+};
+$('#youtube-cancel').onclick = () =>
+  $<HTMLDialogElement>('#youtube-import').close();
+$('#youtube-form').onsubmit = (e) => {
+  e.preventDefault();
+  try {
+    backgroundImports.enqueue($<HTMLInputElement>('#youtube-url').value.trim());
+    $<HTMLDialogElement>('#youtube-import').close();
+  } catch (error) {
+    $('#youtube-status').textContent = externalError(error, settings.language);
   }
 };
 guardFullscreenEscape();
@@ -573,9 +531,10 @@ function chartLevel(
 function songCards() {
   document.querySelector<HTMLElement>(
     '.library .section-title>span',
-  )!.textContent = SONGS.some((s) => externalSource(s.id))
-    ? externalLabels(settings.language).library
-    : 'ORIGINALS / 001';
+  )!.textContent =
+    SONGS.some((s) => externalSource(s.id)) || backgroundImports.rows.size > 0
+      ? externalLabels(settings.language).library
+      : 'ORIGINALS / 001';
   const visible = new Set(visibleSongIndices());
   $('#songs').innerHTML = SONGS.map((s, i) =>
     !visible.has(i)
@@ -586,6 +545,58 @@ function songCards() {
           .toString()
           .padStart(2, '0')} <b>↗</b></span></button>`,
   ).join('');
+  for (const pending of backgroundImports.rows.values()) {
+    const row = document.createElement('div');
+    row.className = 'song-card import-pending';
+    row.dataset.pendingVideo = pending.videoId;
+    row.dataset.state = pending.state;
+    const copy = document.createElement('span');
+    copy.className = 'song-copy';
+    const title = document.createElement('strong');
+    title.textContent = pending.title || 'YouTube · ' + pending.videoId;
+    const state = document.createElement('span');
+    state.setAttribute('role', 'status');
+    state.textContent =
+      pending.state === 'loading'
+        ? externalLabels(settings.language).preparing
+        : externalError(
+            pending.failure ??
+              new AudioJobError(pending.error ?? 'unavailable'),
+            settings.language,
+          );
+    copy.append(title, state);
+    row.append(copy);
+    if (pending.state === 'loading') {
+      row.setAttribute('aria-disabled', 'true');
+      row.setAttribute('aria-busy', 'true');
+      const spinner = document.createElement('span');
+      spinner.className = 'youtube-spinner';
+      spinner.setAttribute('aria-hidden', 'true');
+      row.append(spinner);
+    } else {
+      const retry = document.createElement('button');
+      retry.className = 'quiet';
+      retry.textContent = importRetryLabel(settings.language);
+      retry.onclick = () => {
+        addYoutube.click();
+        $<HTMLInputElement>('#youtube-url').value =
+          'https://www.youtube.com/watch?v=' + pending.videoId;
+      };
+      const dismiss = document.createElement('button');
+      dismiss.className = 'quiet';
+      dismiss.textContent = '×';
+      dismiss.setAttribute('aria-label', t('close'));
+      dismiss.onclick = () => {
+        try {
+          backgroundImports.dismiss(pending.videoId);
+        } catch (error) {
+          toast(externalError(error, settings.language));
+        }
+      };
+      row.append(retry, dismiss);
+    }
+    $('#songs').append(row);
+  }
   document
     .querySelectorAll<HTMLImageElement>('.youtube-cover')
     .forEach((img) => {
@@ -1456,7 +1467,6 @@ window.addEventListener('keydown', (e) => {
   if ($<HTMLDialogElement>('#youtube-import').open) {
     if (e.code === 'Escape') {
       e.preventDefault();
-      importController?.abort();
       $<HTMLDialogElement>('#youtube-import').close();
     }
     return;
@@ -2295,6 +2305,7 @@ async function initializeLibrary() {
   } catch {
     toast(externalLabels(settings.language).failed);
   }
+  backgroundImports.resume();
   if (deferredLibraryRoute) await readInitialRoute();
   else if (screen === 'select' && !active) {
     songCards();

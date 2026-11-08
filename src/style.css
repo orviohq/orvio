@@ -3432,3 +3432,35 @@ body.perf-enabled #fps {
   overflow-wrap: anywhere;
   text-align: right;
 }
+.import-pending {
+  cursor: default;
+  opacity: 0.72;
+  gap: 1rem;
+  min-height: 90px;
+}
+.import-pending .song-copy {
+  min-width: 0;
+  flex: 1;
+}
+.import-pending .song-copy > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.import-pending button {
+  flex-shrink: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .import-pending .youtube-spinner {
+    animation: none;
+  }
+}
+
+.import-pending[data-state='error'] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+.import-pending[data-state='error'] .song-copy strong {
+  font-size: 16px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

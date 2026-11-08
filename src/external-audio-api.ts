@@ -17,6 +17,14 @@ const ERRORS = [
 ] as const;
 export type AudioErrorCode =
   (typeof ERRORS)[number] | 'network_error' | 'request_timeout';
+export function validAudioErrorCode(value: unknown): value is AudioErrorCode {
+  return (
+    typeof value === 'string' &&
+    [...ERRORS, 'network_error', 'request_timeout'].includes(
+      value as AudioErrorCode,
+    )
+  );
+}
 export class AudioJobError extends Error {
   constructor(
     readonly code: AudioErrorCode,

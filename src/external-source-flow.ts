@@ -1,5 +1,5 @@
 import { readAudioJob, loadAudio, AudioJobError } from './external-audio-api';
-import { generateSourceRecord } from './external-source-provider';
+import { generateSourceOffThread } from './external-source-worker';
 import {
   listPinnedSources,
   pinSource,
@@ -31,10 +31,11 @@ export async function prepareExternalJob(
     throw new AudioJobError('source_changed');
   const bytes = await loadAudio(job, videoId, first?.audioSha256, signal);
   if (first) return { record: first, bytes, restored: true };
-  const generated = await generateSourceRecord(
+  const generated = await generateSourceOffThread(
     bytes,
     videoId,
     job.audio!.sha256,
+    signal,
   );
   await pinSource(generated);
   const record = await readPinnedSource(
