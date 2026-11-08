@@ -11,6 +11,7 @@ const rows: Record<Language, string[]> = {
     'Only use audio you have permission to use.',
     'Your library',
     'Local replay',
+    'No local replays saved yet.',
   ],
   ko: [
     'YouTube 추가',
@@ -23,6 +24,7 @@ const rows: Record<Language, string[]> = {
     '사용 권한이 있는 음원만 이용하세요.',
     '내 라이브러리',
     '로컬 리플레이',
+    '저장된 로컬 리플레이가 없습니다.',
   ],
   zh: [
     '添加 YouTube',
@@ -35,6 +37,7 @@ const rows: Record<Language, string[]> = {
     '请仅使用您有权使用的音频。',
     '我的曲库',
     '本地回放',
+    '还没有保存的本地回放。',
   ],
   ja: [
     'YouTube を追加',
@@ -47,6 +50,7 @@ const rows: Record<Language, string[]> = {
     '利用権限のある音源のみ使用してください。',
     'ライブラリ',
     'ローカルリプレイ',
+    '保存されたローカルリプレイはまだありません。',
   ],
   es: [
     'Añadir YouTube',
@@ -59,6 +63,7 @@ const rows: Record<Language, string[]> = {
     'Usa solo audio que tengas permiso para usar.',
     'Tu biblioteca',
     'Repetición local',
+    'Aún no hay repeticiones locales guardadas.',
   ],
   fr: [
     'Ajouter YouTube',
@@ -71,6 +76,7 @@ const rows: Record<Language, string[]> = {
     'Utilisez uniquement des fichiers audio autorisés.',
     'Votre bibliothèque',
     'Replay local',
+    'Aucun replay local enregistré pour le moment.',
   ],
   de: [
     'YouTube hinzufügen',
@@ -83,6 +89,7 @@ const rows: Record<Language, string[]> = {
     'Nur Audio verwenden, für das du eine Erlaubnis hast.',
     'Deine Bibliothek',
     'Lokale Wiederholung',
+    'Noch keine lokalen Replays gespeichert.',
   ],
   pt: [
     'Adicionar YouTube',
@@ -95,6 +102,7 @@ const rows: Record<Language, string[]> = {
     'Use apenas áudio que você tem permissão para usar.',
     'Sua biblioteca',
     'Replay local',
+    'Ainda não há replays locais salvos.',
   ],
   it: [
     'Aggiungi YouTube',
@@ -107,6 +115,7 @@ const rows: Record<Language, string[]> = {
     'Usa solo audio che sei autorizzato a utilizzare.',
     'La tua raccolta',
     'Replay locale',
+    'Nessun replay locale salvato.',
   ],
   ru: [
     'Добавить YouTube',
@@ -119,6 +128,7 @@ const rows: Record<Language, string[]> = {
     'Используйте только разрешённые аудиозаписи.',
     'Ваша библиотека',
     'Локальный повтор',
+    'Пока нет сохранённых локальных реплеев.',
   ],
   id: [
     'Tambah YouTube',
@@ -131,6 +141,7 @@ const rows: Record<Language, string[]> = {
     'Gunakan hanya audio yang boleh Anda gunakan.',
     'Koleksi Anda',
     'Replay lokal',
+    'Belum ada replay lokal yang tersimpan.',
   ],
   tr: [
     'YouTube ekle',
@@ -143,6 +154,7 @@ const rows: Record<Language, string[]> = {
     'Yalnızca kullanım izniniz olan sesleri kullanın.',
     'Kitaplığınız',
     'Yerel tekrar',
+    'Henüz kaydedilmiş yerel tekrar yok.',
   ],
   vi: [
     'Thêm YouTube',
@@ -155,6 +167,7 @@ const rows: Record<Language, string[]> = {
     'Chỉ dùng âm thanh mà bạn có quyền sử dụng.',
     'Thư viện của bạn',
     'Phát lại cục bộ',
+    'Chưa có bản phát lại cục bộ nào được lưu.',
   ],
 };
 export function externalLabels(language: Language) {
@@ -170,5 +183,6 @@ export function externalLabels(language: Language) {
     rights: r[7],
     library: r[8],
     replay: r[9],
+    empty: r[10],
   };
 }

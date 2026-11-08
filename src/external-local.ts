@@ -185,3 +185,44 @@ export async function localMetadata(
     throw Error('Invalid metadata');
   return raw;
 }
+
+async function getAll(store: string): Promise<any[]> {
+  const db = await open();
+  try {
+    return await new Promise((resolve, reject) => {
+      const r = db.transaction(store, 'readonly').objectStore(store).getAll();
+      r.onsuccess = () => resolve(r.result ?? []);
+      r.onerror = () => reject(r.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+export interface ListedLocalSession extends LocalSession {
+  title?: string;
+}
+
+// A24: enumerate every saved local session for the dedicated replay page.
+// The old schema carries no timestamp, so no date ordering is invented here.
+// Each entry goes through the full readLocalSession validation contract;
+// corrupt archives are skipped and left untouched, never rewritten.
+export async function listLocalSessions(): Promise<ListedLocalSession[]> {
+  const raws = await getAll('sessions');
+  const out: ListedLocalSession[] = [];
+  for (const raw of raws) {
+    if (!raw || typeof raw.key !== 'string') continue;
+    try {
+      const session = await readLocalSession(raw.key);
+      if (!session) continue;
+      const meta = await localMetadata(session.source).catch(() => null);
+      out.push({
+        ...session,
+        title: typeof meta?.title === 'string' ? meta.title : undefined,
+      });
+    } catch {
+      /* Keep corrupt archives untouched, never rewrite them. */
+    }
+  }
+  return out;
+}

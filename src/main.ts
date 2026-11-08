@@ -1,3 +1,11 @@
+import { builtinShareFragment } from './builtin-share-fragment';
+import { REPLAY_SAVE_ERROR } from './replay-storage-labels';
+import {
+  saveBuiltinSession,
+  readBuiltinSession,
+} from './builtin-replay-library';
+import { REPLAY_READ_ERROR } from './replay-read-error';
+import { libraryContextMenu } from './library-context-menu';
 import { LibraryAddOrder } from './library-add-order';
 import { inspectDeviceAudio } from './device-audio-inspection';
 import {
@@ -43,6 +51,7 @@ import {
   readLocalSession,
   saveLocalSession,
 } from './external-local';
+import { initReplayPage, setReplayNavLabel, showReplays } from './replay-page';
 import { externalLabels } from './external-labels';
 import { importYoutube } from './external-import';
 import { pinSource, allPinnedSources } from './external-source-store';
@@ -101,6 +110,7 @@ import {
   duration,
   type Difficulty,
   type Lanes,
+  type Note,
 } from './chart';
 import { Engine, type JudgmentEvent } from './engine';
 import { AudioClock, renderSong, type Soundtrack } from './audio';
@@ -165,7 +175,7 @@ if (!(settings.language in LANGUAGES)) settings.language = 'ko';
 const t = (word: Word) => translate(settings.language, word);
 const label = (word: Word) => `<span data-i18n="${word}">${t(word)}</span>`;
 let songIndex = 0;
-let screen: 'home' | 'select' | 'ready' | 'play' = 'select';
+let screen: 'home' | 'select' | 'ready' | 'play' | 'replays' = 'select';
 let readingRoute = false;
 let engine: Engine | null = null;
 let clock: AudioClock;
@@ -254,7 +264,7 @@ function persist() {
 const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.26</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.27</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
 <section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div class="eyebrow">${label('selected')} <span id="selection-number">01 / 03</span></div><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
 <section class="library" aria-label="Track selection"><div class="section-title"><strong>${label('select')}</strong><span>ORIGINALS / 001</span></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">NM</button><button data-diff="mid">HD</button><button data-diff="high">MX</button><button data-diff="sc">SC</button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div><div class="under-start"><span id="chart-info"></span><span>${label('keyboard')}</span></div></section>
 <section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
@@ -282,10 +292,6 @@ const libraryActions = document.createElement('div');
 libraryActions.id = 'library-actions';
 $('#songs').before(libraryActions);
 libraryActions.append(addYoutube);
-const localReplayButton = document.createElement('button');
-localReplayButton.id = 'local-replay';
-localReplayButton.className = 'quiet hidden';
-addYoutube.after(localReplayButton);
 const hiddenSongs = hiddenLibraryIds();
 const libraryVideoKey = (id: string) => {
   const source = externalSource(id);
@@ -315,12 +321,53 @@ const visibleSongIndices = () => {
 const removeSongButton = document.createElement('button');
 removeSongButton.id = 'remove-song';
 removeSongButton.className = 'quiet hidden';
-localReplayButton.after(removeSongButton);
+addYoutube.after(removeSongButton);
 app.insertAdjacentHTML(
   'beforeend',
   '<dialog id="remove-song-dialog" aria-labelledby="remove-song-title"><h2 id="remove-song-title"></h2><p id="remove-song-prompt"></p><strong id="remove-song-name"></strong><div class="remove-song-actions"><button id="remove-song-cancel" class="quiet"></button><button id="remove-song-confirm" class="primary"></button></div></dialog>',
 );
+// A24: dedicated replay collection page; entry lives in the header nav.
+initReplayPage({
+  getLabels: () => ({
+    title: externalLabels(settings.language).replay,
+    empty: externalLabels(settings.language).empty,
+    readError: REPLAY_READ_ERROR[settings.language],
+    back: t('back'),
+  }),
+  onOpen: (key) => void openLocalSession(key),
+  onNavigate: () => {
+    if (active || preparing) return;
+    history.pushState(null, '', '/replays/');
+    readRoute();
+  },
+  onBack: () => {
+    history.pushState(null, '', '/select/');
+    readRoute();
+  },
+});
 let removingSongKey: string | undefined;
+libraryContextMenu($('#songs'), (row) => {
+  if (active || preparing) return null;
+  const index =
+    row.dataset.song === undefined ? undefined : Number(row.dataset.song);
+  const song = index === undefined ? undefined : SONGS[index];
+  const videoId =
+    row.dataset.canonicalVideo ??
+    row.dataset.importVideo ??
+    row.dataset.pendingVideo ??
+    (song ? externalSource(song.id)?.record.videoId : undefined);
+  if (!videoId) return null;
+  const title =
+    song?.title ??
+    canonicalPending.get(videoId)?.title ??
+    backgroundImports.rows.get(videoId)?.title ??
+    row.querySelector('strong')?.textContent ??
+    videoId;
+  return {
+    label: removalLabels(settings.language).button,
+    remove: () => openSongRemoval('yt:' + videoId, title),
+  };
+});
 function openSongRemoval(key: string, title: string) {
   if (active || preparing) return;
   removingSongKey = key;
@@ -425,13 +472,15 @@ async function openVideoHistory(videoId: string) {
   document.body.append(dialog);
   dialog.showModal();
 }
-localReplayButton.onclick = () => {
-  const videoId = externalSource(SONGS[songIndex].id)?.record.videoId;
-  if (videoId) void openVideoHistory(videoId);
-};
 async function openLocalSession(id: string) {
   try {
-    const session = await readLocalSession(id);
+    const session = id.startsWith('builtin:')
+      ? await readBuiltinSession(id)
+      : await readLocalSession(id);
+    localBuiltinNotes =
+      session && 'kind' in session && session.kind === 'builtin'
+        ? session.chart
+        : undefined;
     if (!session) throw Error();
     savedReplay = session.replay;
     replayExpected = false;
@@ -440,10 +489,17 @@ async function openLocalSession(id: string) {
     localSessionKey = session.key;
     showResult(session.result);
   } catch {
-    toast(externalLabels(settings.language).failed);
+    toast(REPLAY_READ_ERROR[settings.language]);
   }
 }
 let selectionVersion = 0;
+let localBuiltinNotes: Note[] | undefined;
+let youtubeInputRevision = 0;
+let submittedYoutubeInput:
+  { videoId: string; value: string; revision: number } | undefined;
+$('#youtube-url').addEventListener('input', () => {
+  youtubeInputRevision++;
+});
 const backgroundImports = new BackgroundImports(
   () => songCards(),
   async (r) => {
@@ -467,10 +523,19 @@ const backgroundImports = new BackgroundImports(
     if (!SONGS.some((s) => s.id === item.song.id)) SONGS.push(item.song);
     canonicalPreferred.set(r.prepared.record.videoId, item.song.id);
     canonicalPending.delete(r.prepared.record.videoId);
-    restoreLibraryVideo(r.prepared.record.videoId);
     if (!active && !preparing) {
       songCards();
       selectedSong();
+    }
+    const submitted = submittedYoutubeInput;
+    const input = $<HTMLInputElement>('#youtube-url');
+    if (
+      submitted?.videoId === r.prepared.record.videoId &&
+      submitted.revision === youtubeInputRevision &&
+      input.value === submitted.value
+    ) {
+      input.value = '';
+      submittedYoutubeInput = undefined;
     }
     toast(externalLabels(settings.language).saved);
   },
@@ -490,6 +555,12 @@ $('#youtube-form').onsubmit = (e) => {
     const videoId = backgroundImports.enqueue(
       $<HTMLInputElement>('#youtube-url').value.trim(),
     );
+    submittedYoutubeInput = {
+      videoId,
+      value: $<HTMLInputElement>('#youtube-url').value,
+      revision: ++youtubeInputRevision,
+    };
+    restoreLibraryVideo(videoId);
     libraryAddOrder.added(videoId);
     songCards();
     $<HTMLDialogElement>('#youtube-import').close();
@@ -507,7 +578,7 @@ function localize() {
   const external = externalLabels(settings.language);
   addYoutube.setAttribute('aria-label', external.add);
   addYoutube.title = external.add;
-  $('#local-replay').textContent = external.replay;
+  setReplayNavLabel(external.replay);
   $('#youtube-heading').textContent = external.add;
   $('#youtube-label').textContent = external.url;
   $('#youtube-submit').textContent = external.submit;
@@ -586,17 +657,8 @@ function selectedSong() {
     : t(('subtitle' + songIndex) as Word);
   $('#selected-genre').textContent = song.genre;
   $('#selected-bpm').textContent = song.bpm + ' BPM';
-  const selection = ++selectionVersion;
   removeSongButton.classList.toggle('hidden', !externalSource(song.id));
   removeSongButton.textContent = removalLabels(settings.language).button;
-  localReplayButton.classList.add('hidden');
-  if (externalSource(song.id))
-    void localVideoSessions(externalSource(song.id)!.record.videoId)
-      .then((r) => {
-        if (selection === selectionVersion)
-          localReplayButton.classList.toggle('hidden', !r.length);
-      })
-      .catch(() => {});
 }
 function selectSong(index: number, audition = true) {
   if (preparing || active) return;
@@ -660,6 +722,7 @@ function songCards() {
     element.dataset.canonicalVideo = row.videoId;
     element.dataset.state = row.state;
     element.setAttribute('role', 'group');
+    element.tabIndex = 0;
     const copy = document.createElement('span');
     copy.className = 'song-copy';
     const title = document.createElement('strong');
@@ -732,8 +795,11 @@ function songCards() {
       .catch(() => history.remove());
   }
   for (const pending of backgroundImports.rows.values()) {
+    if (hiddenSongs.has('yt:' + pending.videoId)) continue;
     const row = document.createElement('div');
     row.className = 'song-card import-pending';
+    row.tabIndex = 0;
+    row.setAttribute('role', 'group');
     row.dataset.importVideo = pending.videoId;
     row.dataset.pendingVideo = pending.videoId;
     row.dataset.state = pending.state;
@@ -981,6 +1047,10 @@ async function prepare(attempt: StartupAttempt) {
 }
 $('#cancel-startup').onclick = () => startup?.cancel();
 async function start() {
+  if (!playReplay) {
+    localBuiltinNotes = undefined;
+    localSessionKey = undefined;
+  }
   if (screen === 'home') {
     $('#home-start').click();
     return;
@@ -1063,6 +1133,7 @@ async function start() {
     const wallpaperAt = performance.now();
     const track = await prepare(attempt);
     $('#lobby').classList.add('hidden');
+    $('#replays').classList.add('hidden');
     $('#game').classList.remove('hidden');
     // Keep renderer resources local to one play session so a later start
     // cannot reuse stale lane geometry from a previous sprite batch.
@@ -1072,7 +1143,9 @@ async function start() {
     const song = SONGS[songIndex];
     engine = new Engine(
       transformChart(
-        makeChart(song, settings.difficulty, settings.lanes),
+        playReplay && localBuiltinNotes
+          ? structuredClone(localBuiltinNotes)
+          : makeChart(song, settings.difficulty, settings.lanes),
         settings.lanes,
         settings.shuffle,
         shuffleSeed,
@@ -1477,7 +1550,7 @@ function finish() {
         try {
           localSessionKey = await saveLocalSession(savedReplay, completed);
         } catch {
-          toast(externalLabels(settings.language).failed);
+          toast(REPLAY_SAVE_ERROR[settings.language]);
         }
       }
     } else if (
@@ -1488,6 +1561,11 @@ function finish() {
       try {
         replayText = await encodeReplay(savedReplay as ReplayData);
         replayExpectedLength = replayText.length;
+        try {
+          localSessionKey = await saveBuiltinSession(savedReplay, completed);
+        } catch {
+          toast(REPLAY_SAVE_ERROR[settings.language]);
+        }
       } catch {
         savedReplay = undefined;
         replayText = '';
@@ -1512,7 +1590,7 @@ function finish() {
 function resultLink(result: UiResult) {
   if (receivedShare?.data.result === result)
     return new URL('/result/#' + receivedShare.fragment, location.origin).href;
-  if (externalSource(result.song))
+  if (externalSource(result.song) || localSessionKey?.startsWith('builtin:'))
     return new URL(
       '/result/?local=' + encodeURIComponent(localSessionKey ?? result.song),
       location.origin,
@@ -1570,9 +1648,9 @@ function showResult(result: UiResult) {
   if (
     savedReplay?.fever?.auto &&
     savedReplay.fever.rulesId === 'orvio-auto-v1' &&
-    replayMatches(savedReplay, result)
+    replayMatches(savedReplay, result, localBuiltinNotes)
   ) {
-    const verified = replayEngine(savedReplay);
+    const verified = replayEngine(savedReplay, localBuiltinNotes);
     savedReplay.ops.forEach((op, i) => applyReplayOp(verified, op, i));
     verified.update(9999);
     resultFever.textContent = `FEVER MAX ${verified.fever.maxDisplayCombo}`;
@@ -1640,6 +1718,7 @@ function exit() {
   document.body.classList.remove('playing', 'results-screen');
   $('#game').classList.add('hidden');
   $('#lobby').classList.remove('hidden');
+  $('#replays').classList.add('hidden');
   screen = 'select';
   if (!readingRoute) history.pushState(null, '', selectionPath());
   selectedSong();
@@ -1696,6 +1775,13 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (preparing) {
+    if (e.code === 'Tab') $('#cancel-startup').focus();
+    if (
+      !e.repeat &&
+      e.target === $('#cancel-startup') &&
+      (e.code === 'Enter' || e.code === 'Space')
+    )
+      $('#cancel-startup').click();
     if (e.code === 'Escape' && !e.repeat) startup?.cancel();
     e.preventDefault();
     return;
@@ -1804,6 +1890,14 @@ window.addEventListener('keydown', (e) => {
       ) {
         e.preventDefault();
         $('#retry').click();
+      }
+      return;
+    }
+    if (screen === 'replays') {
+      if (e.code === 'Escape' && !e.repeat) {
+        e.preventDefault();
+        history.pushState(null, '', '/select/');
+        readRoute();
       }
       return;
     }
@@ -2050,7 +2144,11 @@ $('#share-result').onclick = async () => {
           title: item.song.title,
           ...(item.jobId ? { jobId: item.jobId } : {}),
         })
-      : new URL(resultLink(lastResult!)).hash.slice(1);
+      : await builtinShareFragment(
+          savedReplay!,
+          lastResult! as SharedResult,
+          localBuiltinNotes,
+        );
     let shared = shortCache.get(fragment);
     if (!shared || Date.parse(shared.expiresAt) <= Date.now())
       shared = await saveSharedReplay(fragment);
@@ -2061,12 +2159,14 @@ $('#share-result').onclick = async () => {
   })();
   try {
     if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+      const clipboardBody = link.then(
+        (url) => new Blob([url], { type: 'text/plain' }),
+      );
+      // Some browsers decline clipboard access without consuming this promise.
+      // Its rejection is handled by the surrounding share flow, not pageerror.
+      void clipboardBody.catch(() => undefined);
       await navigator.clipboard.write([
-        new ClipboardItem({
-          'text/plain': link.then(
-            (url) => new Blob([url], { type: 'text/plain' }),
-          ),
-        }),
+        new ClipboardItem({ 'text/plain': clipboardBody }),
       ]);
     } else {
       await navigator.clipboard.writeText(await link);
@@ -2089,7 +2189,11 @@ $('#share-result').onclick = async () => {
 };
 $('#watch-replay').onclick = () => void watchReplay();
 async function watchReplay() {
-  if (!savedReplay || !lastResult || !replayMatches(savedReplay, lastResult)) {
+  if (
+    !savedReplay ||
+    !lastResult ||
+    !replayMatches(savedReplay, lastResult, localBuiltinNotes)
+  ) {
     toast(REPLAY_LABELS[settings.language][2]);
     return;
   }
@@ -2447,6 +2551,7 @@ async function openExternalShare(fragment: string) {
 }
 
 function readRoute() {
+  localBuiltinNotes = undefined;
   if (location.pathname !== '/result/')
     document.documentElement.removeAttribute('data-result-pending');
   const fragment = location.hash.slice(1);
@@ -2570,12 +2675,20 @@ function readRoute() {
   )
     settings.difficulty = difficulty;
   screen =
-    parts[0] === 'play' ? 'ready' : parts[0] === 'select' ? 'select' : 'home';
+    parts[0] === 'play'
+      ? 'ready'
+      : parts[0] === 'select'
+        ? 'select'
+        : parts[0] === 'replays'
+          ? 'replays'
+          : 'home';
   document.body.classList.toggle('home-screen', screen === 'home');
   document.body.classList.toggle('ready-screen', screen === 'ready');
   $('#home-screen').classList.toggle('hidden', screen !== 'home');
   $('#ready-screen').classList.toggle('hidden', screen !== 'ready');
   $('#lobby').classList.toggle('hidden', screen !== 'select');
+  $('#replays').classList.toggle('hidden', screen !== 'replays');
+  if (screen === 'replays') void showReplays();
   $('#game').classList.add('hidden');
   $('#ready-title').textContent = SONGS[songIndex].title;
   $('#ready-detail').textContent =
@@ -2782,7 +2895,8 @@ async function initializeLibrary() {
       }
     }
   } catch {
-    toast(externalLabels(settings.language).failed);
+    if (location.pathname !== '/replays/' && location.pathname !== '/replays')
+      toast(REPLAY_READ_ERROR[settings.language]);
   }
   for (const row of canonicalPending.values()) void reconcileLibraryRow(row);
   backgroundImports.resume();
@@ -2790,11 +2904,17 @@ async function initializeLibrary() {
   else if (screen === 'select' && !active) {
     songCards();
     selectedSong();
-  }
+  } else if (screen === 'replays') void showReplays();
   const local = new URLSearchParams(location.search).get('local');
   if (local) {
     try {
-      const session = await readLocalSession(local);
+      const session = local.startsWith('builtin:')
+        ? await readBuiltinSession(local)
+        : await readLocalSession(local);
+      localBuiltinNotes =
+        session && 'kind' in session && session.kind === 'builtin'
+          ? session.chart
+          : undefined;
       if (!session) throw Error();
       savedReplay = session.replay;
       lastResult = session.result;
@@ -2806,7 +2926,7 @@ async function initializeLibrary() {
       settings.difficulty = session.replay.difficulty;
       showResult(session.result);
     } catch {
-      toast(externalLabels(settings.language).failed);
+      toast(REPLAY_READ_ERROR[settings.language]);
     }
   }
 }
@@ -2815,7 +2935,7 @@ void initializeLibrary();
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.2.26',
+    version: '0.2.27',
     active,
     paused,
     fever: engine

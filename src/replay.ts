@@ -1,6 +1,12 @@
 import { validFeverMetadata, type FeverReplayMetadata } from './fever';
 import { packReplay, unpackReplay } from './replay-binary';
-import { SONGS, makeChart, type Difficulty, type Lanes } from './chart';
+import {
+  SONGS,
+  makeChart,
+  type Difficulty,
+  type Lanes,
+  type Note,
+} from './chart';
 import { Engine } from './engine';
 import {
   FADERS,
@@ -137,14 +143,15 @@ export function validateRuntimeReplay(
       : {}),
   };
 }
-export function replayEngine(r: RuntimeReplay) {
+export function replayEngine(r: RuntimeReplay, frozenNotes?: Note[]) {
   return new Engine(
     transformChart(
-      makeChart(
-        SONGS.find((s) => s.id === r.song)!,
-        r.difficulty,
-        r.lanes,
-      ),
+      frozenNotes ??
+        makeChart(
+          SONGS.find((s) => s.id === r.song)!,
+          r.difficulty,
+          r.lanes,
+        ),
       r.lanes,
       r.options.shuffle,
       r.options.seed,
@@ -160,6 +167,7 @@ export function applyReplayOp(engine: Engine, op: ReplayOp, sequence: number) {
 export function replayMatches(
   r: RuntimeReplay,
   result: Omit<SharedResult, 'song'> & { song: string },
+  frozenNotes?: Note[],
 ) {
   if (
     r.song !== result.song ||
@@ -167,7 +175,7 @@ export function replayMatches(
     r.difficulty !== result.difficulty
   )
     return false;
-  const engine = replayEngine(r);
+  const engine = replayEngine(r, frozenNotes);
   r.ops.forEach((op, i) => applyReplayOp(engine, op, i));
   engine.update(9999);
   const counts = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 1, 0].map(

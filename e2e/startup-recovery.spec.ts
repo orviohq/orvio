@@ -93,8 +93,11 @@ for (const mode of [
           null,
           { polling: 10 },
         );
-      if (mode === 'cancel-button') await page.click('#cancel-startup');
-      else await page.keyboard.press('Escape');
+      if (mode === 'cancel-button') {
+        await page.keyboard.press('Tab');
+        await expect(page.locator('#cancel-startup')).toBeFocused();
+        await page.keyboard.press('Space');
+      } else await page.keyboard.press('Escape');
     }
     await expect(page.locator('#song-loading')).toBeHidden({ timeout: 6000 });
     await expect(page.locator('#lobby')).toBeVisible();

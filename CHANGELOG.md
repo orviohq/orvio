@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.27] - 2026-11-08
+
+- Add a replay collection for saved YouTube sessions and original-song sessions completed from this release onward. Keep exact saved charts for local playback and show storage failures honestly. Previously unsaved original sessions are not restored.
+- Add right-click and keyboard list removal to pending and error rows without deleting audio, results or replays. Keep original artwork uncropped and preparation UI quiet.
+- Clear YouTube input only after a successful addition, preserving failed, cancelled or newer input. Keep builtin replay sharing valid and handle clipboard share failures without uncaught errors.
+
 ## [0.2.26] - 2026-11-08
 
 - Keep saved server audio without age-based expiry or oldest-first eviction. A finite storage limit rejects new audio before extraction rather than deleting existing songs.

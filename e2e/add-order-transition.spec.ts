@@ -54,7 +54,10 @@ test('explicit additions stay newest first while loading, ready and after reload
           FAMILY_CHART_KEYS.map((k: any) => [k, { notes, sha256: noteSha }]),
         ),
         chartMetadata: Object.fromEntries(
-          FAMILY_CHART_KEYS.map((k: any) => [k, difficultyForChart(notes, 1, k)]),
+          FAMILY_CHART_KEYS.map((k: any) => [
+            k,
+            difficultyForChart(notes, 1, k),
+          ]),
         ),
       };
       record.chartSetSha256 = await chartSetHash(record);
@@ -140,6 +143,35 @@ test('explicit additions stay newest first while loading, ready and after reload
   await expect(page.locator('#songs>.song-card').first()).toContainText(
     'BBBBBBBBBBB',
   );
+  const readyRow = page.locator('#songs>.song-card').first();
+  const selectedBefore = await page.locator('#selected-title').innerText();
+  await readyRow.click({ button: 'right' });
+  const menu = page.locator('.library-context-menu');
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('#selected-title')).toHaveText(selectedBefore);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#remove-song-dialog')).toBeVisible();
+  await page.click('#remove-song-cancel');
+  await expect(readyRow).toContainText('BBBBBBBBBBB');
+  await readyRow.evaluate((row) =>
+    row.dispatchEvent(
+      new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 1279,
+        clientY: 719,
+      }),
+    ),
+  );
+  const bounds = await menu.boundingBox();
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(1272);
+  expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(712);
+  expect(bounds!.x + bounds!.width).toBeGreaterThanOrEqual(1271);
+  expect(bounds!.y + bounds!.height).toBeGreaterThanOrEqual(711);
+  await page.screenshot({ path: '/downloads/a25-ready-edge-menu.png' });
+  await page.mouse.click(5, 5);
+  await expect(menu).not.toBeVisible();
   expect(posts).toEqual([]);
   await page.screenshot({ path: '/downloads/coherent-a23-order.png' });
 });

@@ -3519,3 +3519,140 @@ body.perf-enabled #fps {
   padding: 10px;
   margin-left: auto;
 }
+.library-context-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  min-width: 168px;
+  max-width: calc(100vw - 16px);
+  padding: 5px;
+  border: 1px solid #34424e;
+  border-radius: 8px;
+  background: #12202b;
+  box-shadow: 0 12px 32px #0008;
+  color: #edf1f5;
+  z-index: 100;
+}
+.library-context-menu::backdrop {
+  background: transparent;
+}
+.library-context-menu button {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 5px;
+  color: #ff9eab;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+}
+.library-context-menu button:hover,
+.library-context-menu button:focus-visible {
+  background: #2d2635;
+  outline: 1px solid #ff9eab;
+  outline-offset: -1px;
+}
+/* A26: all thumbnail surfaces use the same 16:9 frame without cropping art. */
+.selected-art:not(.youtube-art) {
+  background-size: contain;
+  background-repeat: no-repeat;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  clip-path: none;
+}
+.song-card .cover:not(:has(.youtube-cover)) {
+  width: 88px;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  clip-path: none;
+}
+#result-art:not([data-external]) {
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: #0b1018;
+}
+/* A27: retain assistive loading/cancel text and Escape, without visible copy. */
+#loading-status,
+#cancel-startup {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* A24: dedicated local replay collection page */
+#replays {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 28px clamp(16px, 5vw, 56px) 56px;
+}
+#replays .replays-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+}
+#replay-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.replay-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 44px;
+  padding: 14px 18px;
+  border: 1px solid #ffffff09;
+  background: #ffffff05;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.replay-row:hover,
+.replay-row:focus-visible {
+  border-color: #ffffff2e;
+  background: #ffffff0d;
+}
+.replay-row > strong {
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.replay-row > span {
+  flex-shrink: 0;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+#replays-empty {
+  margin: 0;
+  padding: 40px 0;
+  opacity: 0.6;
+  text-align: center;
+}
+.replays-foot {
+  margin-top: 28px;
+}
+@media (max-width: 640px) {
+  #replays {
+    padding: 20px 16px 40px;
+  }
+  .replay-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .replay-row > span {
+    white-space: normal;
+  }
+}
