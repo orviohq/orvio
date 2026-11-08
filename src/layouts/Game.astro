@@ -27,22 +27,23 @@ const resultEntry = Astro.url.pathname.startsWith('/result');
           600 18px system-ui,
           sans-serif;
       }
-      #result-entry section {
-        width: min(480px, calc(100vw - 48px));
-        border-top: 2px solid #27cceb;
-        padding: 32px 0;
+      #result-entry .result-spinner {
+        width: 42px;
+        height: 42px;
+        border: 3px solid #30404d;
+        border-top-color: #51e4f5;
+        border-radius: 50%;
+        animation: result-spin 0.8s linear infinite;
       }
-      #result-entry img {
-        filter: brightness(0) invert(1);
+      @keyframes result-spin {
+        to {
+          transform: rotate(360deg);
+        }
       }
-      #result-entry h1 {
-        font-size: 48px;
-        margin: 24px 0;
-      }
-      #result-entry p {
-        color: #8f95ab;
-        font-size: 12px;
-        letter-spacing: 0.14em;
+      @media (prefers-reduced-motion: reduce) {
+        #result-entry .result-spinner {
+          animation: none;
+        }
       }
     </style>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -86,11 +87,7 @@ const resultEntry = Astro.url.pathname.startsWith('/result');
   <body>
     {resultEntry && (
       <div id="result-entry" aria-hidden="true">
-        <section>
-          <img src="/wordmark.svg" alt="" width="105" height="30" />
-          <h1>RESULT</h1>
-          <p>SCORE / ACCURACY / MAX COMBO</p>
-        </section>
+        <div class="result-spinner"></div>
       </div>
     )}
     <div id="app"></div>

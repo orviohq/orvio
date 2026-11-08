@@ -46,7 +46,20 @@ test('cold short entry paints only a result shell and then the result, never hom
   await page.goto(baseURL + '/result/?s=synthetic000000000000000000');
   await expect(page.locator('#result-entry')).toBeVisible();
   await expect(page.locator('#home-start')).toBeHidden();
-  await page.screenshot({ path: 'test-results/orvio-share-entry-shell.png' });
+  await expect(page.locator('#result-entry')).toHaveText('');
+  expect(
+    await page
+      .locator('.result-spinner')
+      .evaluate((e) => getComputedStyle(e).animationName),
+  ).toBe('result-spin');
+  await page.screenshot({ path: '/downloads/a37-result-spinner.png' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  expect(
+    await page
+      .locator('.result-spinner')
+      .evaluate((e) => getComputedStyle(e).animationName),
+  ).toBe('none');
+  await page.screenshot({ path: '/downloads/a37-result-reduced-motion.png' });
   release();
   await expect(page.locator('#results')).toBeVisible();
   await expect(page.locator('#result-entry')).toBeHidden();

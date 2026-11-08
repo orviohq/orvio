@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.30] - 2026-11-08
+
+- A37 (result transition, separate request): Replace the brief static result page with a reduced-motion-aware loading animation without added delay.
+- A38 (shared-result title, separate request): Preserve source/song object identity and useful titles through reload; refresh only identity-bound result display metadata. Saved audio, charts, replays and shared fragments remain unchanged.
+- A39: Full-screen responsive mobile results, touch-friendly navigation and actual game-view replay playback. Direct gameplay stays desktop-only, including retry and deep-link starts.
+
 ## [0.2.29] - 2026-11-08
 
 - A30: Continue long-note hit effects while held, stop after release, honor reduced motion. Judgments and timing unchanged.

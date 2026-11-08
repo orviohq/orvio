@@ -21,6 +21,25 @@ export function installExternalSource(
   jobId?: string,
   author?: string,
 ): ExternalSong {
+  const existing = sources.get(sourceId(record));
+  if (
+    existing &&
+    existing.record.audioSha256 === record.audioSha256 &&
+    existing.record.chartSetSha256 === record.chartSetSha256 &&
+    existing.record.frames === record.frames &&
+    existing.record.sampleRate === record.sampleRate
+  ) {
+    // Every view of this source keeps one song object. A pinned ID-only load
+    // must not replace the useful title carried by a verified share.
+    const fallback = (value: string) =>
+      value === record.videoId || value === sourceId(record);
+    if (!fallback(title) || fallback(existing.song.title))
+      existing.song.title = title;
+    if (author) existing.song.subtitle = author;
+    if (bytes !== undefined) existing.bytes = bytes;
+    if (jobId !== undefined) existing.jobId = jobId;
+    return existing;
+  }
   const song: Song = {
     id: sourceId(record),
     title,
