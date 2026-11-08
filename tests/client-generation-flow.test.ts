@@ -120,7 +120,11 @@ it('new verified current worker output gets only explicit local provenance', asy
     audioSha256: record.audioSha256,
     signal: expect.any(AbortSignal),
   });
-  expect(rememberLocalGenerated).toHaveBeenCalledWith(result?.record, 'digest');
+  expect(rememberLocalGenerated).toHaveBeenCalledWith(
+    result?.record,
+    'digest',
+    expect.any(AbortSignal),
+  );
 });
 it('invalid whole-record or chart digest rejects before any local publication', async () => {
   vi.mocked(verifyChartHashes).mockResolvedValue(false);
@@ -146,5 +150,17 @@ it('a corrupt download never starts a worker or saves a pin', async () => {
     prepareClientJob(record.videoId, job.jobId, signal()),
   ).rejects.toBeDefined();
   expect(prepareLocalChartOwned).not.toHaveBeenCalled();
+  expect(rememberLocalGenerated).not.toHaveBeenCalled();
+});
+
+it('abort during asynchronous post-worker chart validation cannot publish a pin', async () => {
+  const c = new AbortController();
+  vi.mocked(verifyChartHashes).mockImplementation(async () => {
+    c.abort();
+    return true;
+  });
+  await expect(
+    prepareClientJob(record.videoId, job.jobId, c.signal),
+  ).rejects.toBeDefined();
   expect(rememberLocalGenerated).not.toHaveBeenCalled();
 });

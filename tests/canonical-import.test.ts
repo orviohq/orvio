@@ -1,7 +1,17 @@
+vi.mock('../src/local-generated-library', () => ({
+  savedLocalGenerated: vi.fn(),
+}));
 import { it, expect, vi, afterEach } from 'vitest';
 vi.mock('../src/canonical-library', () => ({ refreshCanonical: vi.fn() }));
-vi.mock('../src/external-local', () => ({ localAudio: vi.fn() }));
-vi.mock('../src/canonical-audio-api', () => ({ loadCanonicalAudio: vi.fn() }));
+vi.mock('../src/external-local', () => ({
+  localAudio: vi.fn(),
+  localMetadata: vi.fn(),
+  saveLocalAudio: vi.fn(),
+}));
+vi.mock('../src/canonical-audio-api', () => ({
+  loadCanonicalAudio: vi.fn(),
+  loadRetainedAudio: vi.fn(),
+}));
 vi.mock('../src/external-audio-api', async (original) => ({
   ...(await original<typeof import('../src/external-audio-api')>()),
   createAudioJob: vi.fn(),
@@ -11,7 +21,12 @@ vi.mock('../src/external-source-flow', () => ({ prepareExternalJob: vi.fn() }));
 import { importYoutube } from '../src/external-import';
 import { refreshCanonical } from '../src/canonical-library';
 import { localAudio } from '../src/external-local';
-import { loadCanonicalAudio } from '../src/canonical-audio-api';
+import {
+  loadCanonicalAudio,
+  loadRetainedAudio,
+} from '../src/canonical-audio-api';
+import { savedLocalGenerated } from '../src/local-generated-library';
+import { saveLocalAudio, localMetadata } from '../src/external-local';
 import {
   createAudioJob,
   readAudioJob,
@@ -205,3 +220,46 @@ for (const code of [
     ).rejects.toMatchObject({ code });
     expect(createAudioJob).not.toHaveBeenCalled();
   });
+
+it('known local identity with evicted audio uses exact retained SHA GET before any POST, not a replacement extraction', async () => {
+  vi.mocked(refreshCanonical).mockResolvedValue({ state: 'missing' });
+  vi.mocked(savedLocalGenerated).mockResolvedValue(record);
+  vi.mocked(localAudio).mockResolvedValue(null);
+  vi.mocked(localMetadata).mockResolvedValue({
+    title: 'Preserved chart',
+    jobId: 'expired-job',
+  } as any);
+  vi.mocked(loadRetainedAudio).mockResolvedValue(bytes);
+  const result = await importYoutube(
+    record.videoId,
+    new AbortController().signal,
+  );
+  expect(result.prepared.record).toBe(record);
+  expect(result.prepared.bytes).toBe(bytes);
+  expect(loadRetainedAudio).toHaveBeenCalledWith(
+    record,
+    expect.any(AbortSignal),
+  );
+  expect(saveLocalAudio).toHaveBeenCalled();
+  expect(createAudioJob).not.toHaveBeenCalled();
+  expect(readAudioJob).not.toHaveBeenCalled();
+  expect(prepareExternalJob).not.toHaveBeenCalled();
+});
+it('known local SHA mismatch or retained outage does not re-extract or regenerate', async () => {
+  for (const code of [
+    'source_changed',
+    'integrity_failed',
+    'network_error',
+  ] as const) {
+    vi.mocked(refreshCanonical).mockResolvedValue({ state: 'missing' });
+    vi.mocked(savedLocalGenerated).mockResolvedValue(record);
+    vi.mocked(localAudio).mockResolvedValue(null);
+    vi.mocked(localMetadata).mockResolvedValue(null);
+    vi.mocked(loadRetainedAudio).mockRejectedValue(new AudioJobError(code));
+    await expect(
+      importYoutube(record.videoId, new AbortController().signal),
+    ).rejects.toMatchObject({ code });
+    expect(createAudioJob).not.toHaveBeenCalled();
+    expect(saveLocalAudio).not.toHaveBeenCalled();
+  }
+});

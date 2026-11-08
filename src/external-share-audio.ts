@@ -80,6 +80,9 @@ export async function recoverSharedAudio(
   let job = await createAudioJob(
     'https://www.youtube.com/watch?v=' + item.record.videoId,
     signal,
+    item.record.sourceProvenance === 'local-current35-v1'
+      ? 'client'
+      : undefined,
   );
   while (job.status === 'queued' || job.status === 'running') {
     await wait(

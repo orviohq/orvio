@@ -6,7 +6,7 @@ import {
   recordDigest,
 } from './local-generated-library';
 import { prepareLocalChartOwned } from './local-chart-worker-client';
-import { loadCanonicalAudio } from './canonical-audio-api';
+import { loadCanonicalAudio, loadRetainedAudio } from './canonical-audio-api';
 import { localAudio } from './external-local';
 import { validSourceRecord, verifyChartHashes } from './external-source';
 import { inspectWav } from './canonical-pcm.mjs';
@@ -45,9 +45,7 @@ export async function prepareClientJob(
     const cached = await localAudio(saved);
     return {
       record: saved,
-      bytes:
-        cached?.bytes ??
-        (await loadAudio(job, videoId, saved.audioSha256, signal)),
+      bytes: cached?.bytes ?? (await loadRetainedAudio(saved, signal)),
       restored: true,
     };
   }
@@ -81,8 +79,9 @@ export async function prepareClientJob(
     throw new AudioJobError('integrity_failed');
   const localRecord = { ...r, sourceProvenance: 'local-current35-v1' as const };
   const digest = await recordDigest(localRecord);
+  signal.throwIfAborted();
   await audioAtStage('storage', () =>
-    rememberLocalGenerated(localRecord, digest),
+    rememberLocalGenerated(localRecord, digest, signal),
   );
   signal.throwIfAborted();
   return { record: localRecord, bytes: generated.bytes, restored: false };

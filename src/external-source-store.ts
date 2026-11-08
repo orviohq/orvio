@@ -20,16 +20,28 @@ function open(): Promise<IDBDatabase> {
 /** Add-only pin. A source or update cannot silently overwrite an existing record. */
 export async function pinSource(
   record: SourceRecord,
+  signal?: AbortSignal,
 ): Promise<'saved' | 'already-pinned'> {
+  signal?.throwIfAborted();
   const snapshot = structuredClone(record);
   if (!(await verifyChartHashes(snapshot)))
     throw new Error('Invalid source chart integrity');
+  signal?.throwIfAborted();
   const key = recordKey(snapshot),
     db = await open();
   try {
+    signal?.throwIfAborted();
     return await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE, 'readwrite'),
         store = tx.objectStore(STORE);
+      const abort = () => {
+        try {
+          tx.abort();
+        } catch {}
+      };
+      signal?.addEventListener('abort', abort, { once: true });
+      const cleanup = () => signal?.removeEventListener('abort', abort);
+      if (signal?.aborted) abort();
       let status: 'saved' | 'already-pinned' = 'saved';
       const existing = store.get(key);
       existing.onsuccess = () => {
@@ -39,10 +51,22 @@ export async function pinSource(
         }
         store.add({ key, record: snapshot, pinnedAt: Date.now() });
       };
-      tx.oncomplete = () => resolve(status);
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () =>
-        reject(tx.error ?? new Error('Local chart save interrupted'));
+      tx.oncomplete = () => {
+        cleanup();
+        resolve(status);
+      };
+      tx.onerror = () => {
+        cleanup();
+        reject(tx.error);
+      };
+      tx.onabort = () => {
+        cleanup();
+        reject(
+          signal?.aborted
+            ? signal.reason
+            : (tx.error ?? new Error('Local chart save interrupted')),
+        );
+      };
     });
   } finally {
     db.close();

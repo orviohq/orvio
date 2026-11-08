@@ -44,7 +44,9 @@ function references(): LocalReference[] {
 export async function rememberLocalGenerated(
   record: SourceRecord,
   expectedDigest: string,
+  signal?: AbortSignal,
 ) {
+  signal?.throwIfAborted();
   if (
     !validSourceRecord(record) ||
     !record.chartSetSha256 ||
@@ -52,6 +54,7 @@ export async function rememberLocalGenerated(
     (await recordDigest(record)) !== expectedDigest
   )
     throw Error('Invalid generated source');
+  signal?.throwIfAborted();
   const ref: LocalReference = {
     videoId: record.videoId,
     audioSha256: record.audioSha256,
@@ -62,7 +65,9 @@ export async function rememberLocalGenerated(
   const before = references().find((r) => r.videoId === record.videoId);
   if (before && JSON.stringify(before) !== JSON.stringify(ref))
     throw Error('Local source identity changed');
-  await pinSource(record);
+  signal?.throwIfAborted();
+  await pinSource(record, signal);
+  signal?.throwIfAborted();
   const all = references(),
     current = all.find((r) => r.videoId === record.videoId);
   if (current && JSON.stringify(current) !== JSON.stringify(ref))

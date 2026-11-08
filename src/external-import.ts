@@ -1,7 +1,7 @@
 import { prepareClientJob } from './prepare-local-job';
 import { savedLocalGenerated } from './local-generated-library';
 import { jobImportStage, type ImportStage } from './import-progress';
-import { loadCanonicalAudio } from './canonical-audio-api';
+import { loadCanonicalAudio, loadRetainedAudio } from './canonical-audio-api';
 import { audioAtStage } from './audio-error-stage';
 import {
   createAudioJob,
@@ -9,7 +9,7 @@ import {
   AudioJobError,
 } from './external-audio-api';
 import { refreshCanonical } from './canonical-library';
-import { localAudio } from './external-local';
+import { localAudio, saveLocalAudio, localMetadata } from './external-local';
 import {
   prepareExternalJob,
   type PreparedSource,
@@ -90,6 +90,23 @@ export async function importYoutube(
         title: audio.title,
         author: audio.author,
       };
+    options.onStage?.('downloading');
+    const metadata = await localMetadata(localGenerated);
+    const bytes = await loadRetainedAudio(localGenerated, signal);
+    const title = metadata?.title ?? 'YouTube · ' + id;
+    await saveLocalAudio(
+      localGenerated,
+      title,
+      metadata?.jobId,
+      bytes,
+      metadata?.author,
+    );
+    return {
+      prepared: { record: localGenerated, bytes, restored: true },
+      jobId: metadata?.jobId,
+      title,
+      author: metadata?.author,
+    };
   }
   if (lookup.state !== 'missing')
     throw new AudioJobError('request_timeout', lookup.retryAfterSec);
