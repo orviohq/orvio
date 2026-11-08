@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.33] - 2026-11-09
+
+- Add song-only sharing with explicit review and Add before local storage.
+- Show optional early YouTube titles and truthful import stages, with completion feedback only after local installation.
+- Keep selection artwork stable with long titles, extend Korean glyph coverage and improve notification placement.
+- Replace opaque BREAK fill with a thin edge without changing timing, judgments or scores.
+
 ## [0.2.32] - 2026-11-09
 
 - Use a fixed CSS-pixel note-scroll reference across devices. Reserve the actual visible travel window for countdowns and retain saved replay timing.
