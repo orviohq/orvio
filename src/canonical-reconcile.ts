@@ -1,8 +1,9 @@
+import { loadCanonicalAudio } from './canonical-audio-api';
 import { audioAtStage } from './audio-error-stage';
 import { savedCanonical, refreshCanonical } from './canonical-library';
 import { localAudio, localMetadata } from './external-local';
 import { canonicalForJob } from './canonical-job';
-import { readAudioJob, loadAudio, AudioJobError } from './external-audio-api';
+import { readAudioJob, AudioJobError } from './external-audio-api';
 import type { SourceRecord } from './external-source';
 export interface CanonicalLibraryRow {
   videoId: string;
@@ -62,7 +63,7 @@ export async function reconcileCanonical(
   else {
     if (!row.jobId)
       throw new AudioJobError(
-        lookup.state === 'missing' ? 'audio_expired' : 'request_timeout',
+        lookup.state === 'missing' ? 'not_found' : 'request_timeout',
       );
     const job = await readAudioJob(row.jobId, signal);
     if (job.status !== 'done')
@@ -82,17 +83,12 @@ export async function reconcileCanonical(
       title: local.title,
       author: local.author,
     };
-  if (!row.jobId) throw new AudioJobError('audio_expired');
-  const job = await readAudioJob(row.jobId, signal);
-  if (job.status !== 'done') throw new AudioJobError('audio_expired');
-  if (job.audio?.sha256 !== record.audioSha256)
-    throw new AudioJobError('source_changed');
-  const bytes = await loadAudio(job, row.videoId, record.audioSha256, signal);
+  const bytes = await loadCanonicalAudio(record, signal);
   const meta = await audioAtStage('storage', () => localMetadata(record));
   return {
     record,
     bytes,
-    jobId: job.jobId,
+    jobId: row.jobId,
     title: meta?.title ?? row.title,
     author: meta?.author,
   };

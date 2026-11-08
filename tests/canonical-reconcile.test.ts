@@ -1,3 +1,5 @@
+vi.mock('../src/canonical-audio-api', () => ({ loadCanonicalAudio: vi.fn() }));
+import { loadCanonicalAudio } from '../src/canonical-audio-api';
 import { it, expect, vi, afterEach } from 'vitest';
 import type { SourceRecord } from '../src/external-source';
 vi.mock('../src/canonical-library', () => ({
@@ -64,7 +66,7 @@ it('missing no-job cache fails explicitly and never silently extracts', async ()
   vi.stubGlobal('fetch', fetch);
   await expect(
     reconcileCanonical(row, new AbortController().signal),
-  ).rejects.toMatchObject({ code: 'audio_expired' });
+  ).rejects.toMatchObject({ code: 'not_found' });
   expect(fetch).not.toHaveBeenCalled();
   expect(canonicalForJob).not.toHaveBeenCalled();
 });
@@ -81,21 +83,31 @@ it('deferred repair returns the declared retry delay without looping or old-job 
   ).rejects.toMatchObject({ code: 'request_timeout', retryAfterSec: 60 });
   expect(refreshCanonical).toHaveBeenCalledTimes(1);
 });
-it('ready canonical without local audio or job needs source, never silently uploads or extracts', async () => {
-  vi.mocked(refreshCanonical).mockResolvedValue({
-    state: 'ready',
-    record,
-    recordSha256: 'b'.repeat(64),
-    audioCached: true,
+for (const jobId of [undefined, 'expired-job'])
+  it(`ready canonical restores retained exact audio independently of ${jobId ?? 'no job'}`, async () => {
+    vi.mocked(refreshCanonical).mockResolvedValue({
+      state: 'ready',
+      record,
+      recordSha256: 'b'.repeat(64),
+      audioCached: true,
+    });
+    vi.mocked(localAudio).mockResolvedValue(null);
+    const bytes = new ArrayBuffer(12);
+    vi.mocked(loadCanonicalAudio).mockResolvedValue(bytes);
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const result = await reconcileCanonical(
+      { ...row, jobId },
+      new AbortController().signal,
+    );
+    expect(result).toMatchObject({ record, bytes, jobId });
+    expect(loadCanonicalAudio).toHaveBeenCalledWith(
+      record,
+      expect.any(AbortSignal),
+    );
+    expect(fetch).not.toHaveBeenCalled();
+    expect(canonicalForJob).not.toHaveBeenCalled();
   });
-  vi.mocked(localAudio).mockResolvedValue(null);
-  const fetch = vi.fn();
-  vi.stubGlobal('fetch', fetch);
-  await expect(
-    reconcileCanonical(row, new AbortController().signal),
-  ).rejects.toMatchObject({ code: 'audio_expired' });
-  expect(fetch).not.toHaveBeenCalled();
-});
 it('pending repair stops on abort without further GET or old-job lookup', async () => {
   vi.useFakeTimers();
   vi.mocked(refreshCanonical).mockResolvedValue({

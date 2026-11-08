@@ -116,25 +116,6 @@ const unrated: Record<Language, string> = {
   tr: 'Derecelendirilmedi',
   vi: 'Chưa xếp hạng',
 };
-/** Honest basis label: Orvio's own estimate, shown near any numeric level. */
-const ratingBasis: Record<Language, string> = {
-  en: 'Orvio estimate',
-  ko: 'Orvio 자체 추정',
-  zh: 'Orvio 自有估计',
-  ja: 'Orvio 独自推定',
-  es: 'Estimación de Orvio',
-  fr: 'Estimation Orvio',
-  de: 'Orvio-Schätzung',
-  pt: 'Estimativa Orvio',
-  it: 'Stima Orvio',
-  ru: 'Оценка Orvio',
-  id: 'Perkiraan Orvio',
-  tr: 'Orvio tahmini',
-  vi: 'Ước tính Orvio',
-};
-export function ratingBasisText(language: Language): string {
-  return ratingBasis[language];
-}
 /** The same pinned fields feed selection and result. Tier names never imply a family. */
 export function difficultyText(
   metadata: ChartDifficultyMetadata | undefined,

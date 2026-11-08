@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.26] - 2026-11-08
+
+- Keep saved server audio without age-based expiry or oldest-first eviction. A finite storage limit rejects new audio before extraction rather than deleting existing songs.
+- Read verified, pin-bound audio by stable song identity without a live processing job. Prefer verified local audio and never silently re-extract published songs during pending preparation or missing-artifact failures.
+- Accept explicit non-expiring audio metadata and explain full storage in all 13 languages. Preserve archived charts, results and replays.
+- Browser storage can still be removed by the browser or the user. This release does not promise unlimited cloud storage or recover audio deleted before this change.
+
 ## [0.2.25] - 2026-11-08
 
 - Add removal controls to unavailable YouTube song rows. Confirming removes only the list entry; saved audio, results and replays stay unchanged.

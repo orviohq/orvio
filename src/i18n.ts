@@ -49,7 +49,7 @@ const en = {
   resume: 'RESUME',
   select: 'TRACK SELECT',
   options: 'OPTIONS',
-  start: 'START SESSION',
+  start: 'START GAME',
   back: 'TRACK SELECT',
   retry: 'PLAY AGAIN',
   close: 'Close',

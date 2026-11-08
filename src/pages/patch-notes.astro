@@ -159,6 +159,17 @@ import { LANGUAGES, type Language } from '../i18n';
     gap: 24px;
     margin-bottom: 52px;
   }
+  /* The enhanced select's shared default is full-width for form fields.
+     Keep only this header language control compact. */
+  header :global(.orvio-select) {
+    flex: 0 1 180px;
+    width: 180px;
+    max-width: calc(100% - 129px);
+    margin-left: auto;
+  }
+  header :global(.select-menu) {
+    font-family: Outfit, Noto, NotoSC, NotoJP, system-ui, sans-serif;
+  }
   header img {
     filter: invert(1);
   }

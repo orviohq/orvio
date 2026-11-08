@@ -11,6 +11,7 @@ const ERRORS = [
   'unavailable',
   'not_found',
   'audio_expired',
+  'storage_full',
   'source_changed',
   'integrity_failed',
   'unsupported_format',
@@ -58,7 +59,7 @@ export interface AudioArtifact {
   contentType: string;
   durationSec: number;
   contractVersion: 'audio/1';
-  expiresAt: number;
+  expiresAt: number | null;
 }
 export interface CanonicalJobStatus {
   status:
@@ -103,7 +104,8 @@ async function fetchAudio(input: string, init?: RequestInit) {
 async function readJob(response: Response): Promise<AudioJob> {
   const body = await response.json().catch(() => null);
   if (!response.ok) {
-    const code = body?.error?.code;
+    const code =
+      typeof body?.error === 'string' ? body.error : body?.error?.code;
     throw new AudioJobError(
       ERRORS.includes(code) ? code : 'unavailable',
       seconds(body?.error?.retryAfterSec ?? body?.retryAfterSec),
@@ -151,9 +153,10 @@ async function readJob(response: Response): Promise<AudioJob> {
       a.durationSec <= 0 ||
       a.durationSec > AUDIO_MAX_SECONDS ||
       !(
-        typeof a.expiresAt === 'number' &&
-        Number.isFinite(a.expiresAt) &&
-        a.expiresAt > 0
+        a.expiresAt === null ||
+        (typeof a.expiresAt === 'number' &&
+          Number.isFinite(a.expiresAt) &&
+          a.expiresAt > 0)
       )
     )
       throw new AudioJobError(

@@ -1,3 +1,4 @@
+import { LibraryAddOrder } from './library-add-order';
 import { inspectDeviceAudio } from './device-audio-inspection';
 import {
   deviceInspectionButton,
@@ -28,12 +29,7 @@ import { readSharedAudio, recoverSharedAudio } from './external-share-audio';
 import { sharedAudioLabels } from './shared-audio-labels';
 import './scrollbars.css';
 import { replayFrameChanged } from './replay-frame';
-import {
-  difficultyForChart,
-  difficultyText,
-  ratingBasisText,
-} from './chart-difficulty';
-import { FEVER_LABELS } from './fever-labels';
+import { difficultyForChart, difficultyText } from './chart-difficulty';
 import { CURRENT_FEVER } from './fever';
 import { renderFeverHud } from './fever-hud';
 import { StartupAttempt } from './startup';
@@ -154,7 +150,7 @@ function getSettings(): Settings {
     ...automatic,
     language: resolvedLanguage(automatic, navigator.languages),
     languageMode: automatic.languageMode === 'manual' ? 'manual' : 'auto',
-    feverAuto: automatic.feverAuto !== false,
+    feverAuto: true,
   };
 }
 let settings = getSettings();
@@ -258,7 +254,7 @@ function persist() {
 const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.25</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.26</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
 <section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div class="eyebrow">${label('selected')} <span id="selection-number">01 / 03</span></div><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
 <section class="library" aria-label="Track selection"><div class="section-title"><strong>${label('select')}</strong><span>ORIGINALS / 001</span></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">NM</button><button data-diff="mid">HD</button><button data-diff="high">MX</button><button data-diff="sc">SC</button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div><div class="under-start"><span id="chart-info"></span><span>${label('keyboard')}</span></div></section>
 <section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
@@ -269,7 +265,7 @@ app.innerHTML = `
   .map(([k, v]) => `<option value="${k}">${v}</option>`)
   .join(
     '',
-  )}</select><label>${label('position')}</label><div class="segmented" id="position"><button data-pos="left"><span class="position-preview" aria-hidden="true"><i></i><b></b><i></i></span>${label('left')}</button><button data-pos="center"><span class="position-preview" aria-hidden="true"><i></i><b></b><i></i></span>${label('center')}</button><button data-pos="right"><span class="position-preview" aria-hidden="true"><i></i><b></b><i></i></span>${label('right')}</button></div><label for="volume">${label('volume')}</label><input id="volume" type="range" min="0" max="1" step="0.05"></section><section class="settings-keys" id="settings-keys" role="tabpanel" aria-labelledby="settings-keys-tab"><label>${label('bindings')} <span id="binding-mode"></span></label><div id="bindings"></div><p class="hint" id="bind-hint">${label('bindHint')}</p></section></div><label class="toggle"><span id="fever-option-label">${FEVER_LABELS[settings.language].option} · ${FEVER_LABELS[settings.language].rules}</span><input id="fever-auto" type="checkbox"></label><label class="toggle"><span>${label('reduced')}</span><input id="reduced-motion" type="checkbox"></label><button id="reset" class="quiet">${label('reset')}</button><p class="local-note">TAB / SHIFT TAB / ESC</p></dialog>
+  )}</select><label>${label('position')}</label><div class="segmented" id="position"><button data-pos="left"><span class="position-preview" aria-hidden="true"><i></i><b></b><i></i></span>${label('left')}</button><button data-pos="center"><span class="position-preview" aria-hidden="true"><i></i><b></b><i></i></span>${label('center')}</button><button data-pos="right"><span class="position-preview" aria-hidden="true"><i></i><b></b><i></i></span>${label('right')}</button></div><label for="volume">${label('volume')}</label><input id="volume" type="range" min="0" max="1" step="0.05"></section><section class="settings-keys" id="settings-keys" role="tabpanel" aria-labelledby="settings-keys-tab"><label>${label('bindings')} <span id="binding-mode"></span></label><div id="bindings"></div><p class="hint" id="bind-hint">${label('bindHint')}</p></section></div><label class="toggle"><span>${label('reduced')}</span><input id="reduced-motion" type="checkbox"></label><button id="reset" class="quiet">${label('reset')}</button><p class="local-note">TAB / SHIFT TAB / ESC</p></dialog>
 <div id="song-loading" class="hidden" role="status" aria-live="polite"><img id="loading-wallpaper" alt=""><div class="loading-info"><span>ORVIO ORIGINALS</span><h1 id="loading-title"></h1><p id="loading-detail"></p><strong id="loading-status"></strong><button id="cancel-startup" class="quiet" type="button"></button></div></div><dialog id="game-options"><form method="dialog"><div class="dialog-title"><h2>${label('gameOptions')}</h2><button class="close" aria-label="Close">×</button></div></form><label for="speed">${label('speed')} <output id="speed-value"></output></label><select id="speed"></select><label for="fader">${label('fader')}</label><select id="fader"><option value="off">OFF</option><option value="in">FADE IN</option><option value="in2">FADE IN 2</option><option value="out">FADE OUT</option><option value="out2">FADE OUT 2</option><option value="blink">BLINK</option><option value="blink2">BLINK 2</option><option value="fog">FOG</option><option value="pixel">PIXEL</option><option value="pixel2">PIXEL 2</option><option value="blind">BLIND</option></select><label for="shuffle">${label('shuffle')}</label><select id="shuffle"><option value="off">OFF</option><option value="mirror">MIRROR</option><option value="random">RANDOM</option></select><p class="hint" id="option-hint">${label('optionHint')}</p><button id="options-done" class="primary">${label('close')} ↵</button></dialog><dialog id="restart-options"><h2>${label('shuffleRestart')}</h2><p>${label('shuffleRestartHint')}</p><button id="confirm-shuffle-restart" class="primary">${label('restartApply')}</button><button id="cancel-shuffle-restart" class="quiet">${label('cancelChange')}</button></dialog><dialog id="results" tabindex="-1" aria-labelledby="result-song"><div class="result-system">ORVIO / SESSION REPORT</div><div class="result-heading"><img id="result-art" alt=""><div class="result-track"><h2 id="result-song"></h2><p id="result-metadata"></p><button id="result-preview" class="quiet" aria-pressed="false"></button></div><span id="result-rank"></span></div><p id="result-options"></p><div id="result-badge"></div><div class="result-score" id="result-score"></div><div class="result-stats"><div><span>${label('accuracy')}</span><strong id="result-rate"></strong></div><div><span>${label('maxCombo')}</span><strong id="result-combo"></strong></div><div><span>BREAK</span><strong id="result-break"></strong></div></div><p id="result-fever" class="hint hidden"></p><div id="judgment-list"></div><p id="share-status" class="hint" role="status"></p><p id="replay-status" class="hint hidden" role="status"></p><button id="watch-replay" class="quiet hidden"></button><div class="result-actions"><button id="share-result" class="quiet"></button><button id="back" class="quiet">ESC ${label('back')}</button><button id="retry" class="primary">${label('retry')} ↵</button></div></dialog>
 
 <dialog id="about"><form method="dialog"><div class="dialog-title"><h2>${label('aboutTitle')}</h2><button class="close" aria-label="Close">×</button></div></form><p>${label('aboutBody')}</p><a href="https://github.com/orviohq/orvio" target="_blank" rel="noreferrer">${label('code')} ↗</a></dialog><div id="toast" role="status"></div>`;
@@ -279,7 +275,9 @@ app.insertAdjacentHTML(
 );
 const addYoutube = document.createElement('button');
 addYoutube.id = 'add-youtube';
-addYoutube.className = 'quiet';
+addYoutube.className = 'quiet youtube-add-icon';
+addYoutube.innerHTML =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="2.5" y="5.5" width="17" height="13" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m9 9 5 3-5 3Z" fill="currentColor"/><path d="M19 2v6M16 5h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
 const libraryActions = document.createElement('div');
 libraryActions.id = 'library-actions';
 $('#songs').before(libraryActions);
@@ -297,6 +295,7 @@ const isHiddenSong = (id: string) =>
   hiddenSongs.has(id) || hiddenSongs.has(libraryVideoKey(id));
 const canonicalPreferred = new Map<string, string>();
 const canonicalPending = new Map<string, CanonicalLibraryRow>();
+const libraryAddOrder = new LibraryAddOrder(localStorage);
 const visibleSongIndices = () => {
   const seen = new Set<string>();
   return SONGS.flatMap((song, i) => {
@@ -307,7 +306,11 @@ const visibleSongIndices = () => {
     if (isHiddenSong(song.id) || seen.has(key)) return [];
     seen.add(key);
     return [i];
-  });
+  }).sort(
+    (a, b) =>
+      libraryAddOrder.rank(externalSource(SONGS[a].id)?.record.videoId) -
+      libraryAddOrder.rank(externalSource(SONGS[b].id)?.record.videoId),
+  );
 };
 const removeSongButton = document.createElement('button');
 removeSongButton.id = 'remove-song';
@@ -484,7 +487,11 @@ $('#youtube-cancel').onclick = () =>
 $('#youtube-form').onsubmit = (e) => {
   e.preventDefault();
   try {
-    backgroundImports.enqueue($<HTMLInputElement>('#youtube-url').value.trim());
+    const videoId = backgroundImports.enqueue(
+      $<HTMLInputElement>('#youtube-url').value.trim(),
+    );
+    libraryAddOrder.added(videoId);
+    songCards();
     $<HTMLDialogElement>('#youtube-import').close();
   } catch (error) {
     $('#youtube-status').textContent = externalError(error, settings.language);
@@ -498,7 +505,8 @@ document.addEventListener('orvio:fullscreen-capture', () => {
 const scoreDisplay = new ScoreDisplay($('#score'));
 function localize() {
   const external = externalLabels(settings.language);
-  $('#add-youtube').textContent = external.add;
+  addYoutube.setAttribute('aria-label', external.add);
+  addYoutube.title = external.add;
   $('#local-replay').textContent = external.replay;
   $('#youtube-heading').textContent = external.add;
   $('#youtube-label').textContent = external.url;
@@ -552,12 +560,6 @@ function localize() {
       : t('session');
   }
   $<HTMLInputElement>('#reduced-motion').checked = settings.reducedMotion;
-  $('#fever-option-label').textContent =
-    FEVER_LABELS[settings.language].option +
-    ' · ' +
-    FEVER_LABELS[settings.language].rules;
-  $<HTMLInputElement>('#fever-auto').checked = settings.feverAuto;
-  $<HTMLInputElement>('#fever-auto').disabled = active || preparing;
 }
 function selectedSong() {
   const song = SONGS[songIndex];
@@ -636,16 +638,17 @@ function songCards() {
     SONGS.some((s) => externalSource(s.id)) || backgroundImports.rows.size > 0
       ? externalLabels(settings.language).library
       : 'ORIGINALS / 001';
-  const visible = new Set(visibleSongIndices());
-  $('#songs').innerHTML = SONGS.map((s, i) =>
-    !visible.has(i)
-      ? ''
-      : `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${externalSource(s.id) ? `<img class="youtube-cover" data-song-art="${s.id}" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle) : t(('subtitle' + i) as Word)}</span></span><span class="song-time"><em class="song-level">${chartLevel(s, settings.difficulty, settings.lanes)}</em>${Math.floor(duration(s) / 60)}:${Math.floor(
-          duration(s) % 60,
-        )
-          .toString()
-          .padStart(2, '0')} <b>↗</b></span></button>`,
-  ).join('');
+  const visible = visibleSongIndices();
+  $('#songs').innerHTML = visible
+    .map((i) => {
+      const s = SONGS[i];
+      return `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${externalSource(s.id) ? `<img class="youtube-cover" data-song-art="${s.id}" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle) : t(('subtitle' + i) as Word)}</span></span><span class="song-time"><em class="song-level">${chartLevel(s, settings.difficulty, settings.lanes)}</em>${Math.floor(duration(s) / 60)}:${Math.floor(
+        duration(s) % 60,
+      )
+        .toString()
+        .padStart(2, '0')} <b>↗</b></span></button>`;
+    })
+    .join('');
   for (const row of canonicalPending.values()) {
     if (
       backgroundImports.rows.has(row.videoId) ||
@@ -731,6 +734,7 @@ function songCards() {
   for (const pending of backgroundImports.rows.values()) {
     const row = document.createElement('div');
     row.className = 'song-card import-pending';
+    row.dataset.importVideo = pending.videoId;
     row.dataset.pendingVideo = pending.videoId;
     row.dataset.state = pending.state;
     const copy = document.createElement('span');
@@ -780,6 +784,23 @@ function songCards() {
     }
     $('#songs').append(row);
   }
+  // Order DOM rows together, including loading/error transitions, without changing song IDs or selection indices.
+  const rows = [...$('#songs').children];
+  rows.sort((a, b) => {
+    const video = (el: Element) => {
+      const element = el as HTMLElement;
+      return (
+        element.dataset.canonicalVideo ??
+        element.dataset.importVideo ??
+        (element.dataset.song !== undefined
+          ? externalSource(SONGS[Number(element.dataset.song)].id)?.record
+              .videoId
+          : undefined)
+      );
+    };
+    return libraryAddOrder.rank(video(a)) - libraryAddOrder.rank(video(b));
+  });
+  $('#songs').append(...rows);
   document
     .querySelectorAll<HTMLImageElement>('.youtube-cover')
     .forEach((img) => {
@@ -817,7 +838,7 @@ function syncSettings() {
     const diff = b.dataset.diff as Difficulty;
     b.disabled = !makeChart(selected, diff, settings.lanes).length;
     b.textContent = chartLevel(selected, diff, settings.lanes);
-    b.title = ratingBasisText(settings.language);
+    b.removeAttribute('title');
   });
   document
     .querySelectorAll<HTMLElement>('.song-level')
@@ -856,7 +877,7 @@ function syncSettings() {
     b.setAttribute('aria-pressed', String(selected));
   });
   $('#chart-info').textContent =
-    `${makeChart(SONGS[songIndex], settings.difficulty, settings.lanes).length} ${t('notes')} · ${externalSource(SONGS[songIndex].id) ? 'YouTube' : t('original')} · ${ratingBasisText(settings.language)}`;
+    `${makeChart(SONGS[songIndex], settings.difficulty, settings.lanes).length} ${t('notes')} · ${externalSource(SONGS[songIndex].id) ? 'YouTube' : t('original')}`;
   const speed = $<HTMLSelectElement>('#speed');
   speed.innerHTML = Array.from({ length: 17 }, (_, i) => 1 + i / 2)
     .map((value) => `<option value="${value}">${value.toFixed(1)}×</option>`)
@@ -1056,9 +1077,7 @@ async function start() {
         settings.shuffle,
         shuffleSeed,
       ),
-      playReplay
-        ? playReplay.fever
-        : { ...CURRENT_FEVER, auto: settings.feverAuto },
+      playReplay ? playReplay.fever : { ...CURRENT_FEVER, auto: true },
     );
     seenEvents = 0;
     sequence = 0;
@@ -1086,7 +1105,7 @@ async function start() {
           },
           ops: [],
           end: 0,
-          fever: { ...CURRENT_FEVER, auto: settings.feverAuto },
+          fever: { ...CURRENT_FEVER, auto: true },
         };
     replayCursor = 0;
     lastRecordedSpeed = settings.speed;
@@ -1105,6 +1124,7 @@ async function start() {
     field.fader = settings.fader;
     field.pressed.clear();
     field.flashes.clear();
+    $('#highway-wrap').classList.remove('danger');
     field.setup(
       engine,
       settings.lanes,
@@ -1903,7 +1923,6 @@ async function resumeGame() {
 }
 $('#resume').onclick = () => void resumeGame();
 $('#pause-settings').onclick = () => {
-  $<HTMLInputElement>('#fever-auto').disabled = true;
   $<HTMLDialogElement>('#pause').close();
   $<HTMLDialogElement>('#settings').showModal();
 };
@@ -2166,7 +2185,6 @@ $('#back').onclick = () => {
 };
 $('#open-settings').onclick = () => {
   if (active) return;
-  $<HTMLInputElement>('#fever-auto').disabled = false;
   $<HTMLDialogElement>('#settings').showModal();
   syncSettings();
 };
@@ -2255,11 +2273,6 @@ $('#language').onchange = (e) => {
   selectedSong();
   syncSettings();
   $('#preview-status').textContent = t(preview ? 'nowPlaying' : 'previewReady');
-};
-$('#fever-auto').onchange = (e) => {
-  if (active || preparing) return;
-  settings.feverAuto = (e.target as HTMLInputElement).checked;
-  persist();
 };
 $('#reduced-motion').onchange = (e) => {
   settings.reducedMotion = (e.target as HTMLInputElement).checked;
@@ -2802,7 +2815,7 @@ void initializeLibrary();
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.2.25',
+    version: '0.2.26',
     active,
     paused,
     fever: engine

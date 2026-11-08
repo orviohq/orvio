@@ -1,3 +1,4 @@
+import { loadCanonicalAudio } from './canonical-audio-api';
 import {
   createAudioJob,
   readAudioJob,
@@ -60,8 +61,14 @@ export async function readSharedAudio(
     item.jobId = local.jobId;
     return local.bytes;
   }
-  if (!item.jobId) throw new AudioJobError('audio_expired');
-  return attach(item, await readAudioJob(item.jobId, signal), signal);
+  // The stable audio route verifies the server's canonical pin. Its response
+  // must match the frozen share's video/hash, and loadCanonicalAudio verifies
+  // the complete body hash and WAV frame/rate before returning any bytes.
+  // A second full chart-record GET adds latency but no extra audio authority.
+  const bytes = await loadCanonicalAudio(item.record, signal);
+  await saveLocalAudio(item.record, item.song.title, item.jobId, bytes);
+  item.bytes = bytes;
+  return bytes;
 }
 /** Only an explicit recovery button may call this. Frozen chart is never regenerated. */
 export async function recoverSharedAudio(

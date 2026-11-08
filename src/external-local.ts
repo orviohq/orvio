@@ -17,7 +17,7 @@ export interface LocalAsset {
   key: string;
   title: string;
   author?: string;
-  jobId: string;
+  jobId?: string;
   bytes: ArrayBuffer;
 }
 export interface LocalSession {
@@ -68,7 +68,7 @@ async function get(store: string, key: string): Promise<any> {
 export async function saveLocalAudio(
   record: SourceRecord,
   title: string,
-  jobId: string,
+  jobId: string | undefined,
   bytes: ArrayBuffer,
   author?: string,
 ) {
@@ -108,7 +108,7 @@ export async function localAudio(
     a.bytes.byteLength > AUDIO_MAX_BYTES ||
     typeof a.title !== 'string' ||
     a.title.length > 300 ||
-    typeof a.jobId !== 'string'
+    (a.jobId !== undefined && typeof a.jobId !== 'string')
   )
     throw Error('Invalid local audio');
   const hash = Array.from(
@@ -180,7 +180,7 @@ export async function localMetadata(
   if (
     typeof raw.title !== 'string' ||
     raw.title.length > 300 ||
-    typeof raw.jobId !== 'string'
+    (raw.jobId !== undefined && typeof raw.jobId !== 'string')
   )
     throw Error('Invalid metadata');
   return raw;

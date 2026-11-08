@@ -1,3 +1,10 @@
+vi.mock('../src/canonical-source-api', () => ({
+  readCanonicalSource: vi.fn(),
+}));
+vi.mock('../src/canonical-audio-api', () => ({ loadCanonicalAudio: vi.fn() }));
+import { readCanonicalSource } from '../src/canonical-source-api';
+import { loadCanonicalAudio } from '../src/canonical-audio-api';
+import { AudioJobError } from '../src/external-audio-api';
 import { it, expect, vi, afterEach } from 'vitest';
 import {
   readSharedAudio,
@@ -14,7 +21,8 @@ vi.mock('../src/external-local', () => ({
 }));
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.clearAllMocks();
+  vi.resetAllMocks();
+  store.local.mockResolvedValue(null);
 });
 function item(jobId?: string) {
   return {
@@ -29,31 +37,55 @@ function item(jobId?: string) {
     jobId,
   } as unknown as ExternalSong;
 }
-it('no existing job means no fetch and no implicit audio request', async () => {
-  const fetch = vi.fn();
-  vi.stubGlobal('fetch', fetch);
-  await expect(readSharedAudio(item())).rejects.toMatchObject({
-    code: 'audio_expired',
+for (const jobId of [undefined, 'expired-job'])
+  it(`fresh viewer reads retained canonical audio with ${jobId ?? 'no job'}, preserving frozen charts`, async () => {
+    const source = item(jobId),
+      original = structuredClone(source.record),
+      bytes = new ArrayBuffer(44);
+    vi.mocked(readCanonicalSource).mockResolvedValue({
+      state: 'ready',
+      record: source.record,
+      recordSha256: 'b'.repeat(64),
+      audioCached: true,
+    });
+    vi.mocked(loadCanonicalAudio).mockResolvedValue(bytes);
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    expect(await readSharedAudio(source)).toBe(bytes);
+    expect(source.record).toEqual(original);
+    expect(readCanonicalSource).not.toHaveBeenCalled();
+    expect(loadCanonicalAudio).toHaveBeenCalledWith(
+      source.record,
+      expect.any(AbortSignal),
+    );
+    expect(store.save).toHaveBeenCalledWith(
+      source.record,
+      source.song.title,
+      jobId,
+      bytes,
+    );
+    expect(fetch).not.toHaveBeenCalled();
   });
-  expect(fetch).not.toHaveBeenCalled();
-});
-it('expired existing job only GETs; never POSTs and retains the original chart/result', async () => {
-  const fetch = vi.fn(
-    async (_url: string, _init?: RequestInit) =>
-      new Response(JSON.stringify({ error: { code: 'audio_expired' } }), {
-        status: 410,
-      }),
+it('mismatched authoritative pin never substitutes audio or chart, never POSTs or saves', async () => {
+  const source = item('expired-job'),
+    original = structuredClone(source.record),
+    fetch = vi.fn();
+  vi.stubGlobal('fetch', fetch);
+  vi.mocked(loadCanonicalAudio).mockRejectedValue(
+    new AudioJobError('source_changed'),
   );
-  vi.stubGlobal('fetch', fetch);
-  const source = item('old-job'),
-    original = structuredClone(source.record);
+  store.save.mockClear();
   await expect(readSharedAudio(source)).rejects.toMatchObject({
-    code: 'audio_expired',
+    code: 'source_changed',
   });
-  expect(fetch).toHaveBeenCalledTimes(1);
-  expect(fetch.mock.calls[0][0]).toContain('/old-job');
   expect(source.record).toEqual(original);
+  expect(loadCanonicalAudio).toHaveBeenCalledWith(
+    source.record,
+    expect.any(AbortSignal),
+  );
+  expect(readCanonicalSource).not.toHaveBeenCalled();
   expect(store.save).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
 });
 it('explicit recovery POSTs once, detects changed audio before accepting or saving and never regenerates', async () => {
   const fetch = vi.fn(

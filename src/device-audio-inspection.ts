@@ -142,7 +142,7 @@ export async function inspectDeviceAudio(
         !(asset.bytes instanceof ArrayBuffer) ||
         typeof asset.title !== 'string' ||
         asset.title.length > 300 ||
-        typeof asset.jobId !== 'string' ||
+        (asset.jobId !== undefined && typeof asset.jobId !== 'string') ||
         asset.bytes.byteLength > AUDIO_MAX_BYTES ||
         (await digest(asset.bytes)) !== record.audioSha256
       )

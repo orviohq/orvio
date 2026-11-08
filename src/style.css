@@ -3023,9 +3023,31 @@ canvas {
   scroll-padding-bottom: 18px;
 }
 #add-youtube {
-  margin-bottom: 12px;
-  width: 100%;
-  padding: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  margin: 0 0 12px auto;
+  border: 1px solid #34424e;
+  border-radius: 10px;
+  background: #111c26;
+  color: #b6cad6;
+}
+#add-youtube:hover {
+  color: #54ddfa;
+  border-color: #54ddfa;
+  background: #142732;
+}
+#add-youtube svg {
+  width: 24px;
+  height: 24px;
+}
+#library-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 #youtube-import {
   width: min(540px, calc(100vw - 32px));
@@ -3488,4 +3510,12 @@ body.perf-enabled #fps {
   line-height: 1.8;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+/* Icon action stays compact even in the shared library action flex row. */
+#library-actions > #add-youtube {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  margin-left: auto;
 }

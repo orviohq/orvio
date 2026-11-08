@@ -1,3 +1,4 @@
+import { loadCanonicalAudio } from './canonical-audio-api';
 import { audioAtStage } from './audio-error-stage';
 import {
   createAudioJob,
@@ -38,8 +39,8 @@ export async function importYoutube(
   const id = youtubeId(input);
   if (!id) throw new AudioJobError('invalid_url');
   const lookup = await refreshCanonical(id, signal);
-  const first = lookup.state === 'ready' ? lookup.record : undefined;
-  if (first) {
+  if (lookup.state === 'ready') {
+    const first = lookup.record;
     const cached = await audioAtStage('storage', () => localAudio(first));
     if (cached)
       return {
@@ -48,7 +49,17 @@ export async function importYoutube(
         title: cached.title,
         author: cached.author,
       };
+    // A published identity is never silently re-extracted because a job handle expired.
+    const bytes = await loadCanonicalAudio(first, signal);
+    return {
+      prepared: { record: first, bytes, restored: true },
+      jobId: undefined,
+      title: undefined,
+      author: undefined,
+    };
   }
+  if (lookup.state !== 'missing')
+    throw new AudioJobError('request_timeout', lookup.retryAfterSec);
   let job = options.jobId
     ? await readAudioJob(options.jobId, signal)
     : await createAudioJob('https://www.youtube.com/watch?v=' + id, signal);
