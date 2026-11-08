@@ -40,6 +40,7 @@ export class Playfield {
   private lastFrame = 0;
   pressed = new Set<number>();
   flashes = new Map<number, { at: number; ok: boolean }>();
+  private heldLanes = new Set<number>();
   private disposed = false;
   private initialized = false;
   dispose() {
@@ -318,6 +319,13 @@ export class Playfield {
     }
     this.fadeMask.width = this.width;
     this.fadeMask.height = target * 2;
+    // Lanes with an actively held long note; drives the sustained effect.
+    this.heldLanes.clear();
+    if (!this.reducedMotion)
+      engine.states.forEach((s) => {
+        if (s.held && !s.done && s.note.end !== undefined)
+          this.heldLanes.add(s.note.lane);
+      });
     for (let lane = 0; lane < lanes; lane++) {
       const k = this.keys[lane];
       k.visible = this.pressed.has(lane);
@@ -338,27 +346,36 @@ export class Playfield {
         f.tint = flash!.ok ? 0xe5faff : 0xff334d;
       }
       const life = Math.min(1, age / 170);
-      const hit = !!flash?.ok && age < 170 && !this.reducedMotion;
+      const burst = !!flash?.ok && age < 170 && !this.reducedMotion;
+      const holding = this.heldLanes.has(lane);
       const beam = this.hitBeams[lane];
-      beam.visible = hit;
-      if (hit) {
+      beam.visible = burst || holding;
+      if (beam.visible) {
         beam.x = lane * width + width * 0.05;
-        beam.y = target - 76 + life * 10;
+        beam.y = target - 76 + (burst ? life * 10 : 0);
         beam.width = width * 0.9;
         beam.height = 96;
-        beam.alpha = (1 - life) * 0.8;
+        // A held long note keeps a soft, gently pulsing beam until release;
+        // the head/tail burst simply outshines it while it plays.
+        const burstAlpha = burst ? (1 - life) * 0.8 : 0;
+        const holdAlpha = holding ? 0.38 + 0.12 * Math.sin(now / 140) : 0;
+        beam.alpha = Math.max(burstAlpha, holdAlpha);
       }
       this.hitSparks[lane].forEach((spark, index) => {
         spark.visible = false;
-        if (!hit) return;
+        if (!burst && !holding) return;
+        // While held (after the burst), each spark loops on its own staggered
+        // cycle: a quiet continuous fountain instead of head/tail-only bursts.
+        const l = burst ? life : (now / 260 + index / 6) % 1;
+        spark.visible = true;
+        const size = burst ? 1 : 1.35;
         const angle = (index / 5) * Math.PI;
-        spark.x =
-          lane * width + width / 2 + Math.cos(angle) * width * 0.42 * life;
-        spark.y = target - 8 - Math.sin(angle) * 65 * life - life * 16;
-        spark.width = 3 * (1 - life) + 1;
-        spark.height = 8 * (1 - life) + 2;
+        spark.x = lane * width + width / 2 + Math.cos(angle) * width * 0.42 * l;
+        spark.y = target - 8 - Math.sin(angle) * 65 * l - l * 16;
+        spark.width = (3 * (1 - l) + 1) * size;
+        spark.height = (8 * (1 - l) + 2) * size;
         spark.rotation = (index - 2.5) * 0.32;
-        spark.alpha = 1 - life;
+        spark.alpha = (1 - l) * (burst ? 1 : 0.85);
       });
     }
     engine.states.forEach((s, i) => {
