@@ -154,3 +154,46 @@ test('exit during a hung stream cancels work and never auto-resumes or persists'
     await page.evaluate(() => (window as any).orvioDiagnostics.active),
   ).toBe(false);
 });
+
+test('focus loss during a cold replay aborts without stale resume; a later verified run and cache repeat remain independent', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await install(page);
+  await open(page);
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await expect(page.locator('#results')).toBeVisible();
+  expect(await audioRows(page)).toBe(0);
+  await page.waitForTimeout(6500);
+  expect(await audioRows(page)).toBe(0);
+  expect(
+    await page.evaluate(() => (window as any).orvioDiagnostics.active),
+  ).toBe(false);
+  await page.locator('#watch-replay').click();
+  await page.waitForFunction(() => (window as any).orvioDiagnostics?.active);
+  await expect.poll(() => audioRows(page), { timeout: 10000 }).toBe(1);
+  await expect(page.locator('#results')).toBeVisible({ timeout: 20000 });
+  const calls = await page.evaluate(
+    () =>
+      (window as any).__streamCalls.filter((s: string) => s.endsWith('/audio'))
+        .length,
+  );
+  expect(calls).toBe(2);
+  await page.locator('#watch-replay').click();
+  await page.waitForFunction(() => (window as any).orvioDiagnostics?.active);
+  await page.waitForFunction(
+    () => (window as any).orvioDiagnostics.clock > 0.5,
+  );
+  expect(
+    await page.evaluate(
+      () =>
+        (window as any).__streamCalls.filter((s: string) =>
+          s.endsWith('/audio'),
+        ).length,
+    ),
+  ).toBe(calls);
+  await page.click('#exit');
+  await expect(page.locator('#results')).toBeVisible();
+  expect(errors).toEqual([]);
+});
