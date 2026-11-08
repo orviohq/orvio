@@ -155,10 +155,12 @@ test('ORV-62 static: v=3 fragment without replay is fetchless; warm revisit pain
   await page.goto('/result/#' + FRAGMENT_PLAIN);
   await expect(page.locator('#results')).toBeVisible();
   await expect(page.locator('#result-score')).toHaveText('500,000');
+  // The result keeps its own address while the dialog is open (guard fix):
+  // no silent hand-over to /select/.
+  await page.waitForTimeout(1500);
+  expect(page.url()).toContain('/result/#');
   await slowModules(context);
-  // The app hands a v3 result over to /select/ itself (pre-existing 039
-  // behavior, verified on the live site), so the revisit is an explicit goto.
-  await page.goto('/result/#' + FRAGMENT_PLAIN, { waitUntil: 'commit' });
+  await page.reload({ waitUntil: 'commit' });
   await expectWarmProjection(page, '500,000');
   expect(requests).toHaveLength(0);
 });
@@ -171,8 +173,10 @@ test('ORV-62 static: v=3 fragment with encoded replay decodes locally; warm revi
   await page.goto('/result/#' + FRAGMENT_REPLAY);
   await expect(page.locator('#results')).toBeVisible();
   await expect(page.locator('#result-score')).toHaveText('17,857');
+  await page.waitForTimeout(1500);
+  expect(page.url()).toContain('/result/#');
   await slowModules(context);
-  await page.goto('/result/#' + FRAGMENT_REPLAY, { waitUntil: 'commit' });
+  await page.reload({ waitUntil: 'commit' });
   await expectWarmProjection(page, '17,857');
   expect(requests).toHaveLength(0);
   await page.screenshot({ path: 'test-results/orv62-static-replay.png' });
@@ -478,4 +482,23 @@ test('ORV-62 static: hard localStorage quota pressure never breaks the verified 
       () => localStorage.getItem('orvio.result-display.v2') !== null,
     ),
   );
+});
+
+test('ORV-62 static: revisiting the ORIGINAL arrival fragment URL (as shared) paints from the arrival identity with zero network', async ({
+  page,
+  context,
+}) => {
+  const requests = await instrumentWorker(context);
+  await page.goto('/result/#' + FRAGMENT_REPLAY);
+  await expect(page.locator('#results')).toBeVisible();
+  // The app canonicalized the address (re-encoded, rp=1 added); a user
+  // re-clicking the ORIGINAL link presents the arrival serialization.
+  expect(page.url()).toContain('rp=1'); // canonicalized, not the arrival form
+  await slowModules(context);
+  // A hash-only goto is a same-document navigation (no re-parse, no
+  // bootstrap); leave the document first so the revisit is a real load.
+  await page.goto('/select/');
+  await page.goto('/result/#' + FRAGMENT_REPLAY, { waitUntil: 'commit' });
+  await expectWarmProjection(page, '17,857');
+  expect(requests).toHaveLength(0);
 });

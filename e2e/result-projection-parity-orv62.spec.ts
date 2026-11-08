@@ -25,6 +25,7 @@ for (const viewport of [
       await new Promise((x) => setTimeout(x, 2500));
       await r.continue();
     });
+    await p.goto('/select/');
     await p.goto('/result/#' + fragment, { waitUntil: 'commit' });
     await expect(p.locator('#result-first-paint')).toBeVisible();
     const cached = await p.locator('#rpaint').boundingBox();

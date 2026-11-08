@@ -1223,7 +1223,11 @@ function syncSettings() {
       }),
   );
   persist();
-  if (!readingRoute && screen === 'select')
+  if (
+    !readingRoute &&
+    screen === 'select' &&
+    !$<HTMLDialogElement>('#results').open
+  )
     history.replaceState(null, '', selectionPath());
   if (libraryHydrated && screen === 'select')
     rememberLibraryFirstPaint(
@@ -2765,7 +2769,11 @@ $('#reduced-motion').onchange = (e) => {
   settings.reducedMotion = (e.target as HTMLInputElement).checked;
   localize();
   persist();
-  if (!readingRoute && screen === 'select')
+  if (
+    !readingRoute &&
+    screen === 'select' &&
+    !$<HTMLDialogElement>('#results').open
+  )
     history.replaceState(null, '', selectionPath());
 };
 $('#fullscreen').onclick = () => {
