@@ -1,5 +1,8 @@
 import { it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { loadCanonicalAudio } from '../src/canonical-audio-api';
+import {
+  loadCanonicalAudio,
+  loadRetainedAudio,
+} from '../src/canonical-audio-api';
 import type { SourceRecord } from '../src/external-source';
 import { queryClient } from '../src/query-client';
 beforeEach(() => queryClient.clear());
@@ -169,4 +172,24 @@ it('aborted request and network failure stay truthful and never retry', async ()
     code: 'network_error',
     stage: 'service',
   });
+});
+
+it('retained local source uses exact stable SHA route and never shares a canonical-route response', async () => {
+  const fetch = vi.fn(
+    async (_url: string, _init?: RequestInit) => new Response(wav, { headers }),
+  );
+  vi.stubGlobal('fetch', fetch);
+  const [canonical, retained] = await Promise.all([
+    loadCanonicalAudio(record),
+    loadRetainedAudio(record),
+  ]);
+  expect(canonical).toEqual(wav);
+  expect(retained).toEqual(wav);
+  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(fetch.mock.calls.map((c) => c[0])).toEqual(
+    expect.arrayContaining([
+      expect.stringContaining('/v1/chart-sources/1-xGerv5FOk/audio'),
+      expect.stringContaining(`/v1/audio-sources/1-xGerv5FOk/${sha}/audio`),
+    ]),
+  );
 });
