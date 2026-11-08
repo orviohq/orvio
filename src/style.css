@@ -4518,3 +4518,11 @@ html {
   justify-content: flex-end;
   flex-wrap: wrap;
 }
+/* Long unbroken metadata must not grow the library's intrinsic grid track. */
+#lobby .library,
+#lobby .song-copy {
+  min-width: 0;
+}
+#lobby .song-copy strong {
+  overflow-wrap: anywhere;
+}

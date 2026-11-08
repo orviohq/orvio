@@ -9,6 +9,8 @@ test('combined artwork stays fixed for short long and unbroken titles across des
   ]) {
     await page.setViewportSize({ width: w, height: h });
     await page.goto('/select/');
+    await page.evaluate(() => document.fonts.ready);
+    await expect(page.locator('#selected-title')).toHaveText('First Light');
     const b = await page.locator('#selected-art').boundingBox();
     for (const title of ['Short', 'Long title '.repeat(30), 'W'.repeat(250)]) {
       await page.evaluate(async (title) => {
