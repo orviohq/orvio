@@ -2353,10 +2353,21 @@ function showAudioRecovery(
 async function openExternalShare(fragment: string) {
   const request = ++shareRouteRequest;
   const href = location.href;
+  const navigation = navigationVersion;
   const data = await decodeExternalShare(fragment);
-  if (request !== shareRouteRequest || location.href !== href) return;
+  if (
+    request !== shareRouteRequest ||
+    location.href !== href ||
+    navigationVersion !== navigation
+  )
+    return;
   await pinSource(data.record);
-  if (request !== shareRouteRequest || location.href !== href) return;
+  if (
+    request !== shareRouteRequest ||
+    location.href !== href ||
+    navigationVersion !== navigation
+  )
+    return;
   const item = installExternalSource(
     data.record,
     data.title,
@@ -2382,7 +2393,11 @@ function readRoute() {
     fragment.startsWith('v=5&d=') &&
     receivedShare?.fragment !== fragment
   ) {
+    const routeHref = location.href,
+      routeNavigation = navigationVersion;
     void openExternalShare(fragment).catch(() => {
+      if (location.href !== routeHref || navigationVersion !== routeNavigation)
+        return;
       toast(shareLabels(settings.language).invalid);
       document.documentElement.removeAttribute('data-result-pending');
     });
