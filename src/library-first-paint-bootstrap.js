@@ -105,7 +105,6 @@
     };
     for (const [selector, target] of [
       ['header nav', '[data-cached-nav]'],
-      ['.preview-status', '[data-cached-preview]'],
       ['.mobile-note', '[data-cached-mobile]'],
       ['.library .mobile-playback-note', '[data-cached-playback-note]'],
       ['.selection', '[data-cached-selection]'],

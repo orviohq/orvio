@@ -294,6 +294,12 @@ async function preloadTrack(id: string): Promise<Soundtrack | undefined> {
   try {
     preloadContext ??= new OfflineAudioContext(1, 1, 44100);
     if (externalSource(id)) {
+      const item = externalSource(id)!;
+      if (item.record.manifestSha256 && !item.bytes) {
+        const local = await localAudio(item.record);
+        if (local) item.bytes = local.bytes;
+        else return undefined;
+      }
       await ensureExternalBytes(id);
       return { buffer: externalAudio(id, preloadContext), peak: 1 };
     }
@@ -317,8 +323,8 @@ function persist() {
 const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.41</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
-<section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><p class="mobile-playback-note"></p><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.44</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><p class="mobile-playback-note"></p><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status"></span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
 <section class="library" aria-label="Track selection"><p class="mobile-playback-note"></p><div class="section-title"><strong>${label('select')}</strong></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">NM</button><button data-diff="mid">HD</button><button data-diff="high">MX</button><button data-diff="sc">SC</button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div></section>
 <section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
 <section id="game" class="hidden" aria-label="Rhythm game"><div class="game-top"><button id="exit" class="quiet">ESC ${label('exit')}</button><div class="song-now"><span id="replay-playing" role="status"></span><strong id="now-title"></strong><span id="now-detail"></span></div><span id="fps" hidden></span></div><div id="progress"><div></div></div><div id="arena" data-position="center"><aside class="score-block"><span class="eyebrow">${label('score')}</span><strong id="score">0000000</strong><div><b id="rate">100.00</b><span>% ${label('accuracy')}</span></div><section id="fever-hud" class="hidden" aria-live="off"></section></aside><div id="highway-wrap"><div id="highway"></div><div id="impact" aria-hidden="true"></div><div id="fever-burst" aria-hidden="true"></div><div id="judge" aria-live="off"></div><div id="combo"></div><div id="keycaps"></div><button id="play-options" class="quiet option-readout"></button><div id="countdown"></div></div><aside class="track-block"><div class="orb-mini"></div><span class="eyebrow">ORVIO ORIGINALS</span><h2 id="side-title"></h2><div id="lane-detail"></div></aside></div><div class="game-footer"></div></section>
@@ -390,15 +396,48 @@ function restoreLibrarySelection() {
   if (at < 0) return;
   songIndex = visible[at];
 }
+let restoringLibraryScroll = false;
 function restoreLibraryScroll() {
   if (!librarySelection || screen !== 'select') return;
-  $('#songs').scrollTop = librarySelection.scroll;
+  restoringLibraryScroll = true;
+  const list = $('#songs');
+  list.scrollTop = librarySelection.scroll;
   window.scrollTo(0, librarySelection.pageScroll);
+  const selected = list.querySelector<HTMLElement>('.song-card.selected');
+  if (selected) {
+    const row = selected.getBoundingClientRect(),
+      box = list.getBoundingClientRect();
+    if (list.scrollHeight > list.clientHeight + 1) {
+      const visibleTop = Math.max(72, box.top),
+        visibleBottom = Math.min(innerHeight - 12, box.bottom);
+      if (row.top < visibleTop) list.scrollTop += row.top - visibleTop;
+      else if (row.bottom > visibleBottom)
+        list.scrollTop += row.bottom - visibleBottom;
+    }
+    {
+      const row = selected.getBoundingClientRect();
+      const top = 72,
+        bottom = innerHeight - 12;
+      if (row.top < top) window.scrollBy(0, row.top - top);
+      else if (row.bottom > bottom) window.scrollBy(0, row.bottom - bottom);
+    }
+  }
+  requestAnimationFrame(() => {
+    const selected = list.querySelector<HTMLElement>('.song-card.selected');
+    selected?.scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest',
+      behavior: 'instant',
+    });
+    requestAnimationFrame(() => {
+      restoringLibraryScroll = false;
+    });
+  });
 }
 $('#songs').addEventListener(
   'scroll',
   () => {
-    if (screen === 'select' && !active && !preparing)
+    if (screen === 'select' && !active && !preparing && !restoringLibraryScroll)
       rememberLibrarySelection();
   },
   { passive: true },
@@ -406,7 +445,7 @@ $('#songs').addEventListener(
 window.addEventListener(
   'scroll',
   () => {
-    if (screen === 'select' && !active && !preparing)
+    if (screen === 'select' && !active && !preparing && !restoringLibraryScroll)
       rememberLibrarySelection();
   },
   { passive: true },
@@ -850,6 +889,7 @@ function chartLevel(
     : 'SC --';
 }
 function songCards() {
+  const listScroll = $('#songs').scrollTop;
   const visible = visibleSongIndices();
   $('#songs').innerHTML = visible
     .map((i) => {
@@ -975,6 +1015,9 @@ function songCards() {
               new AudioJobError(pending.error ?? 'unavailable'),
             settings.language,
           );
+    const category = document.createElement('small');
+    category.textContent = 'YouTube';
+    if (pending.state === 'loading') copy.append(category);
     copy.append(title, state);
     const cover = document.createElement('span');
     cover.className = 'cover import-cover';
@@ -1045,6 +1088,7 @@ function songCards() {
     return libraryAddOrder.rank(video(a)) - libraryAddOrder.rank(video(b));
   });
   $('#songs').append(...rows);
+  $('#songs').scrollTop = listScroll;
   if (libraryHydrated && screen === 'select')
     rememberLibraryFirstPaint(
       visible.map((i) => SONGS[i].id),
@@ -1190,6 +1234,8 @@ function syncSettings() {
 
 function stopPreview() {
   previewRequest++;
+  previewAbort?.abort();
+  previewAbort = undefined;
   try {
     preview?.stop();
   } catch {
@@ -1197,13 +1243,13 @@ function stopPreview() {
   }
   preview = undefined;
   syncResultPreview();
-  $('#preview-status').textContent = t('previewReady');
+  $('#preview-status').textContent = '';
   document.body.classList.remove('previewing');
 }
-async function ensureExternalBytes(id: string) {
+async function ensureExternalBytes(id: string, signal?: AbortSignal) {
   const external = externalSource(id);
   if (external && !external.bytes) {
-    await readSharedAudio(external);
+    await readSharedAudio(external, signal);
   }
 }
 async function prepare(attempt: StartupAttempt, joinGatePreload = false) {
@@ -1211,6 +1257,15 @@ async function prepare(attempt: StartupAttempt, joinGatePreload = false) {
   const audio = clock;
   await attempt.wait(audio.activate());
   const song = SONGS[songIndex];
+  const external = externalSource(song.id);
+  if (external?.record.manifestSha256 && !external.bytes) {
+    const local = await attempt.wait(localAudio(external.record));
+    if (local) external.bytes = local.bytes;
+    else {
+      rendered = undefined;
+      return { progressive: external, warm: false } as const;
+    }
+  }
   await attempt.wait(ensureExternalBytes(song.id));
   let track = cache.get(song.id);
   if (!track && joinGatePreload && preloading.has(song.id)) {
@@ -1478,13 +1533,48 @@ async function start() {
     // New recordings stamp their exact lead-in; watching a pre-A5 replay
     // restores the fixed 0.15s anchor its wall-scheduled ops were made on.
     if (sessionReplay) sessionReplay.audioLeadIn = cd.leadIn;
-    await attempt.wait(
-      clock.play(
-        track.buffer,
-        playReplay ? (playReplay.audioLeadIn ?? 0.15) : cd.leadIn,
-        attempt.signal,
-      ),
-    );
+    const leadIn = playReplay ? (playReplay.audioLeadIn ?? 0.15) : cd.leadIn;
+    let bufferingAt: number | undefined;
+    if ('progressive' in track && track.progressive) {
+      const item = track.progressive;
+      const playingClock = clock;
+      await attempt.wait(
+        clock.playProgressive(
+          item.record,
+          leadIn,
+          attempt.signal,
+          async (bytes) => {
+            // Terminal whole-SHA/WAV gate passed; only now may these bytes persist.
+            item.bytes = bytes;
+            await saveLocalAudio(
+              item.record,
+              item.song.title,
+              item.jobId,
+              bytes,
+              item.song.subtitle,
+            );
+          },
+          (error) => {
+            if (clock !== playingClock) return;
+            if (active) {
+              exit();
+              toast(externalError(error, settings.language));
+            }
+          },
+          (buffering) => {
+            if (!active) return;
+            if (buffering) {
+              bufferingAt ??= performance.now();
+              if (!playReplay) recordOp([2, 0, clock.now(), 1]);
+            } else if (bufferingAt !== undefined) {
+              if (playReplay) sessionWallAt += performance.now() - bufferingAt;
+              else recordOp([2, 0, clock.now(), 0]);
+              bufferingAt = undefined;
+            }
+          },
+        ),
+      );
+    } else await attempt.wait(clock.play(track.buffer, leadIn, attempt.signal));
     sessionWallAt = performance.now();
     active = true;
     if (document.hidden || !document.hasFocus()) {
@@ -1607,6 +1697,10 @@ let countdownLegacy = false;
 function loop(now: number) {
   if (!active || !engine || paused) return;
   const time = clock.now();
+  if (clock.buffering) {
+    frame = requestAnimationFrame(loop);
+    return;
+  }
   if (playReplay) {
     const elapsed = performance.now() - sessionWallAt;
     while (
@@ -1718,9 +1812,10 @@ function loop(now: number) {
         : '-- FPS';
   }
   if (
-    playReplay
+    !clock.verificationPending &&
+    (playReplay
       ? performance.now() - sessionWallAt >= playReplay.end
-      : time >= duration(SONGS[songIndex])
+      : time >= duration(SONGS[songIndex]))
   ) {
     finish();
     return;
@@ -2233,7 +2328,7 @@ window.addEventListener('keydown', (e) => {
     }
     return;
   }
-  if (!active || !engine || e.repeat) return;
+  if (!active || !engine || e.repeat || clock.buffering) return;
   const lane = settings.keys[settings.lanes].indexOf(e.code);
   if (lane < 0) return;
   e.preventDefault();
@@ -2243,7 +2338,7 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
   if (editableTarget(e.target)) return;
   if (playReplay) return;
-  if (!active || !engine) return;
+  if (!active || !engine || clock.buffering) return;
   const lane = settings.keys[settings.lanes].indexOf(e.code);
   if (lane < 0) return;
   e.preventDefault();
@@ -2251,12 +2346,23 @@ window.addEventListener('keyup', (e) => {
   recordInput(lane, paused ? clock.now() : keyTime(e), false);
 });
 window.addEventListener('blur', () => {
+  if (screen === 'select' && !active && !preparing) rememberLibrarySelection();
   stopPreview();
   if (active && !paused) {
     void pauseGame();
   }
 });
+window.addEventListener('pageshow', () => {
+  if (screen === 'select' && libraryHydrated) restoreLibraryScroll();
+});
+window.addEventListener('focus', () => {
+  if (screen === 'select' && libraryHydrated) restoreLibraryScroll();
+});
 document.addEventListener('visibilitychange', () => {
+  if (document.hidden && screen === 'select' && !active && !preparing)
+    rememberLibrarySelection();
+  if (!document.hidden && screen === 'select' && libraryHydrated)
+    restoreLibraryScroll();
   if (document.hidden) stopPreview();
   if (document.hidden && active && !paused) {
     void pauseGame();
@@ -2471,7 +2577,7 @@ async function watchReplay() {
   const replayToWatch = savedReplay,
     resultToWatch = lastResult;
   const item = externalSource(savedReplay.song);
-  if (item && !item.bytes) {
+  if (item && !item.bytes && !item.record.manifestSha256) {
     const button = $<HTMLButtonElement>('#watch-replay');
     button.disabled = true;
     try {
@@ -2567,14 +2673,18 @@ $('#open-settings').onclick = () => {
 };
 $('#about-button').onclick = () => $<HTMLDialogElement>('#about').showModal();
 let previewRequest = 0;
+let previewAbort: AbortController | undefined;
 async function previewSong() {
   const request = ++previewRequest;
+  previewAbort?.abort();
+  const controller = new AbortController();
+  previewAbort = controller;
   const song = SONGS[songIndex];
   if (!clock) clock = new AudioClock();
   try {
     // resume is called during the selection key/click gesture, before rendering.
     await clock.activate();
-    await ensureExternalBytes(song.id);
+    await ensureExternalBytes(song.id, controller.signal);
     let track = cache.get(song.id);
     if (!track) {
       track = externalSource(song.id)
@@ -2649,7 +2759,7 @@ $('#language').onchange = (e) => {
   songCards();
   selectedSong();
   syncSettings();
-  $('#preview-status').textContent = t(preview ? 'nowPlaying' : 'previewReady');
+  $('#preview-status').textContent = preview ? t('nowPlaying') : '';
 };
 $('#reduced-motion').onchange = (e) => {
   settings.reducedMotion = (e.target as HTMLInputElement).checked;
@@ -3367,7 +3477,7 @@ void initializeLibrary();
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.2.41',
+    version: '0.2.44',
     active,
     paused,
     fever: engine

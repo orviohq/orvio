@@ -51,7 +51,6 @@ export const de = {
     '↑ ↓ TITEL / ← → SCHWIERIGKEIT / 5 7 TASTEN / ENTER START / F2 OPTIONEN',
   selected: 'AUSGEWÄHLTER TITEL',
   nowPlaying: 'VORSCHAU LÄUFT',
-  previewReady: 'TITEL FÜR VORSCHAU WÄHLEN',
   preparing: 'AUDIO WIRD VORBEREITET',
   previewBlocked: 'Wähle einen Titel erneut, um den Ton einzuschalten.',
   original: 'ORIGINALMUSIK',

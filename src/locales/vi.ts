@@ -49,7 +49,6 @@ export const vi = {
     '↑ ↓ BÀI HÁT / ← → ĐỘ KHÓ / 5 7 PHÍM / ENTER BẮT ĐẦU / F2 CÀI ĐẶT',
   selected: 'BÀI HÁT ĐÃ CHỌN',
   nowPlaying: 'ĐANG NGHE THỬ',
-  previewReady: 'CHỌN BÀI HÁT ĐỂ NGHE THỬ',
   preparing: 'ĐANG CHUẨN BỊ ÂM THANH',
   previewBlocked: 'Chọn lại bài hát để bật âm thanh.',
   original: 'NHẠC GỐC',

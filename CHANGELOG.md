@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.44] - 2026-11-09
+
+- Keep the selected song visible after returning from other screens, refreshing, changing tabs or rebuilding the library list. Preserve selection and the relevant nested/page scroll position.
+- Request persistent browser storage once after a successful audio save when supported. Refusal or unsupported storage never blocks playback, deletes songs or changes audio verification. Browser storage is still not a permanent backup.
+
+## [0.2.43] - 2026-11-09
+
+- Remove the idle selection-preview hint in every language and from legacy saved-library projections, without changing preview playback.
+- Match loading YouTube cards to the standard library artwork size, spacing, rounded edges and title hierarchy at desktop and mobile widths. Keep progress distinct and loading tracks unplayable.
+- Preserve explicit failed-import retry/removal and retained failure diagnostics.
+
+## [0.2.42] - 2026-11-09
+
+- Start supported shared tracks from verified audio segments before the whole download finishes, retaining the normal countdown and wallpaper presentation.
+- Pause safely at the buffered boundary, resume with verified data, and cancel pending playback on exit or focus loss. Save audio only after the whole file and WAV checks pass.
+- Cancel an unfinished preview download when starting the selected track, avoiding a duplicate full download.
+- Preserve cached playback and fall back to full verification for tracks without a supported progressive manifest.
+
 ## [0.2.41] - 2026-11-09
 
 - Keep failed YouTube additions readable, with grouped retry/remove actions and a separate small-screen action row. Preserve explicit retry and removal behavior without automatic new requests.

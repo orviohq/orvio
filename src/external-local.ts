@@ -1,3 +1,4 @@
+import { retainAudioStorage } from './audio-storage-persistence';
 import { AUDIO_MAX_BYTES } from './audio-limits.mjs';
 import { externalSource, sourceId, sourceAudioId } from './external-catalog';
 import {
@@ -95,6 +96,7 @@ export async function saveLocalAudio(
       tx.onerror = () => reject(tx.error);
       tx.onabort = () => reject(tx.error);
     });
+    void retainAudioStorage();
   } finally {
     db.close();
   }

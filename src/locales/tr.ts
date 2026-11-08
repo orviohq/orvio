@@ -49,7 +49,6 @@ export const tr = {
   selectionHint: '↑ ↓ ŞARKI / ← → ZORLUK / 5 7 TUŞ / ENTER BAŞLAT / F2 AYARLAR',
   selected: 'SEÇİLEN ŞARKI',
   nowPlaying: 'ÖNİZLEME ÇALIYOR',
-  previewReady: 'ÖNİZLEME İÇİN ŞARKI SEÇ',
   preparing: 'SES HAZIRLANIYOR',
   previewBlocked: 'Sesi açmak için şarkıyı yeniden seçin.',
   original: 'ÖZGÜN MÜZİK',
