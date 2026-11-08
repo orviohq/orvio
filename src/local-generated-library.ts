@@ -47,6 +47,24 @@ export async function rememberLocalGenerated(
   signal?: AbortSignal,
 ) {
   signal?.throwIfAborted();
+  // One origin-wide publication lock also prevents different-video updates
+  // from losing each other in the shared localStorage projection.
+  // Without cross-tab exclusion, never claim an immutable pin was published.
+  if (typeof navigator === 'undefined' || !navigator.locks?.request)
+    throw Error('Local chart storage unavailable');
+  const snapshot = structuredClone(record);
+  return navigator.locks.request(
+    'orvio.local-generated-library.publication.v1',
+    { mode: 'exclusive', signal },
+    () => publishLocalGenerated(snapshot, expectedDigest, signal),
+  );
+}
+async function publishLocalGenerated(
+  record: SourceRecord,
+  expectedDigest: string,
+  signal?: AbortSignal,
+) {
+  signal?.throwIfAborted();
   if (
     !validSourceRecord(record) ||
     !record.chartSetSha256 ||
