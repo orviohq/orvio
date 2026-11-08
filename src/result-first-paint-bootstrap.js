@@ -162,8 +162,7 @@
     const shareLabelNode =
       root.querySelector('[data-rp-share-label]') ??
       root.querySelector('#rp-share-result');
-    if (shareLabelNode)
-      shareLabelNode.textContent = text(p.shareLabel, 100);
+    if (shareLabelNode) shareLabelNode.textContent = text(p.shareLabel, 100);
     let noteNode = root.querySelector('[data-rp-mobile-note]');
     if (!noteNode) {
       noteNode = document.createElement('p');

@@ -353,32 +353,35 @@ test('ORV-62 static: a hash-collision store entry can never paint (exact fragmen
   // Simulate a lookup-key collision: an entry filed under THIS fragment's
   // hash but carrying a DIFFERENT original fragment must not paint.
   const { fnv128 } = await import('../src/result-first-paint-core');
-  await page.addInitScript((key) => {
-    localStorage.setItem(
-      'orvio.settings.v1',
-      JSON.stringify({ language: 'ko' }),
-    );
-    localStorage.setItem(
-      'orvio.result-display.v2',
-      JSON.stringify({
-        v: 2,
-        entries: {
-          [key]: {
-            fp: 'x',
-            locale: 'ko',
-            title: 'Wrong Result',
-            scoreText: '999,999',
-            combo: 99,
-            rateText: '99.99%',
-            badges: [],
-            fragments: [
-              'v=3&song=other-song&keys=7&diff=high&score=1&acc=0.01&combo=0&j=0,0,0,0,0,0,0,0,0,0,0,1',
-            ],
+  await page.addInitScript(
+    (key) => {
+      localStorage.setItem(
+        'orvio.settings.v1',
+        JSON.stringify({ language: 'ko' }),
+      );
+      localStorage.setItem(
+        'orvio.result-display.v2',
+        JSON.stringify({
+          v: 2,
+          entries: {
+            [key]: {
+              fp: 'x',
+              locale: 'ko',
+              title: 'Wrong Result',
+              scoreText: '999,999',
+              combo: 99,
+              rateText: '99.99%',
+              badges: [],
+              fragments: [
+                'v=3&song=other-song&keys=7&diff=high&score=1&acc=0.01&combo=0&j=0,0,0,0,0,0,0,0,0,0,0,1',
+              ],
+            },
           },
-        },
-      }),
-    );
-  }, 'h:' + fnv128(FRAGMENT_PLAIN));
+        }),
+      );
+    },
+    'h:' + fnv128(FRAGMENT_PLAIN),
+  );
   await page.goto('/result/#' + FRAGMENT_PLAIN);
   await expect(page.locator('#results')).toBeVisible({ timeout: 20000 });
   await expect(page.locator('#result-score')).toHaveText('500,000');
