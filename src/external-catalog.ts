@@ -68,3 +68,20 @@ export function externalAudio(id: string, context: AudioContext): AudioBuffer {
   }
   return buffer;
 }
+
+export function updateExternalDisplayMetadata(
+  record: SourceRecord,
+  title: string,
+  author: string,
+) {
+  const item = sources.get(sourceId(record));
+  if (
+    !item ||
+    item.record.audioSha256 !== record.audioSha256 ||
+    item.record.chartSetSha256 !== record.chartSetSha256
+  )
+    return false;
+  item.song.title = title;
+  item.song.subtitle = author || 'YouTube';
+  return true;
+}

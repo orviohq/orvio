@@ -226,3 +226,32 @@ export async function listLocalSessions(): Promise<ListedLocalSession[]> {
   }
   return out;
 }
+
+/** Display metadata only: preserve keys, audio bytes, sessions, source and hashes. */
+export async function updateLocalDisplayMetadata(
+  record: SourceRecord,
+  title: string,
+  author: string,
+) {
+  const db = await open();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(['audio', 'metadata'], 'readwrite');
+      for (const [store, key] of [
+        ['audio', sourceAudioId(record)],
+        ['metadata', sourceId(record)],
+      ]) {
+        const target = tx.objectStore(store),
+          r = target.get(key);
+        r.onsuccess = () => {
+          if (r.result) target.put({ ...r.result, title, author });
+        };
+      }
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
+  }
+}

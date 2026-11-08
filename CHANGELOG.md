@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.28] - 2026-11-08
+
+- Recover YouTube song titles and artists from identity-bound saved metadata for fresh and already-added songs, without re-adding or re-extracting audio. Keep saved audio, charts and replays unchanged.
+- Treat unavailable or mismatched display metadata as optional; playable songs remain playable. Update display-only local metadata without replacing saved audio bytes.
+
 ## [0.2.27] - 2026-11-08
 
 - Add a replay collection for saved YouTube sessions and original-song sessions completed from this release onward. Keep exact saved charts for local playback and show storage failures honestly. Previously unsaved original sessions are not restored.
