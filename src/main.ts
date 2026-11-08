@@ -1,5 +1,7 @@
 import { importStageLabel } from './import-progress';
 import { showToast as toast } from './ui/sonner';
+import { showSongLink } from './song-share-copy';
+import { createSongLink } from './song-share';
 import {
   readLibrarySelection,
   writeLibrarySelection,
@@ -302,6 +304,30 @@ const libraryActions = document.createElement('div');
 libraryActions.id = 'library-actions';
 $('.library .section-title').append(libraryActions);
 libraryActions.append(addYoutube);
+const shareSongButton = document.createElement('button');
+shareSongButton.id = 'share-song';
+shareSongButton.className = 'quiet';
+shareSongButton.hidden = true;
+$('.intro').append(shareSongButton);
+shareSongButton.onclick = async () => {
+  const item = externalSource(SONGS[songIndex].id);
+  if (!item || shareSongButton.disabled) return;
+  shareSongButton.disabled = true;
+  try {
+    const url = await createSongLink(item.record, location.origin);
+    if (screen !== 'select' || externalSource(SONGS[songIndex].id) !== item)
+      return;
+    showSongLink(url, settings.language === 'ko');
+  } catch {
+    toast(
+      settings.language === 'ko'
+        ? '곡 링크를 복사할 수 없습니다. 곡 정보와 연결 또는 클립보드 권한을 확인해 주세요.'
+        : 'Could not copy the song link. Check the source, connection or clipboard permission.',
+    );
+  } finally {
+    shareSongButton.disabled = false;
+  }
+};
 const hiddenSongs = hiddenLibraryIds();
 const libraryVideoKey = (id: string) => {
   const source = externalSource(id);
@@ -708,6 +734,9 @@ function selectedSong() {
   $('#selected-art').style.backgroundImage =
     `url("${songArt(song.id)}"), url("${ART_FALLBACK}")`;
   $('#selected-art .art-index').textContent = '0' + (songIndex + 1);
+  shareSongButton.hidden = !externalSource(song.id);
+  shareSongButton.textContent =
+    settings.language === 'ko' ? '곡 공유' : 'Share song';
   $('#selected-title').textContent = song.title;
   $('#selected-title').title = song.title;
   const originLabel = document.querySelector<HTMLElement>(

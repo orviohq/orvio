@@ -262,3 +262,17 @@ export async function updateLocalDisplayMetadata(
     db.close();
   }
 }
+
+/** Explicit song-link Add: display metadata only, never audio or replay mutation. */
+export async function saveSongMetadata(
+  record: SourceRecord,
+  title: string,
+  author: string | null,
+) {
+  await put('metadata', {
+    ...(await localMetadata(record)),
+    key: sourceId(record),
+    title: title.slice(0, 300),
+    ...(author !== null ? { author: author.slice(0, 100) } : {}),
+  });
+}

@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#14131a" />
+    <title>Song invitation · orvio</title>
+    <link rel="icon" href="/favicon.png" />
+  </head>
+  <body>
+    <a class="brand" href="/select/">
+      orvio<span>FIND YOUR FLOW</span>
+    </a>
+    <dialog
+      id="song-invite"
+      aria-labelledby="song-heading"
+      aria-describedby="song-note"
+    >
+      <span class="eyebrow">ORVIO / SONG INVITATION</span>
+      <h1 id="song-heading">Add this song to your library?</h1>
+      <div class="track">
+        <span class="music" aria-hidden="true">
+          ♫
+        </span>
+        <div>
+          <h2 id="song-title"></h2>
+          <p id="song-author"></p>
+          <small id="song-video"></small>
+        </div>
+      </div>
+      <p id="song-note"></p>
+      <p id="song-status" role="status" aria-live="polite"></p>
+      <div class="actions">
+        <button id="song-cancel" type="button">
+          Cancel
+        </button>
+        <button id="song-add" type="button" disabled>
+          Add to my library
+        </button>
+      </div>
+    </dialog>
+    <noscript>
+      This song invitation needs JavaScript. Nothing has been added.
+    </noscript>
+    <script src="../song-share-page.ts"></script>
+  </body>
+</html>
+<style is:global>
+  @font-face {
+    font-family: OrvioKR;
+    src: url('/korean.ttf');
+    font-display: swap;
+  }
+  @font-face {
+    font-family: Outfit;
+    src: url('/outfit.ttf');
+    font-display: swap;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  html {
+    color-scheme: dark;
+    background: #14131a;
+    color: #f0eff5;
+    font-family: Outfit, OrvioKR, system-ui, sans-serif;
+  }
+  body {
+    margin: 0;
+    min-height: 100svh;
+    background: radial-gradient(ellipse at top, #272438, #14131a 65%);
+  }
+  .brand {
+    position: absolute;
+    top: 32px;
+    left: 32px;
+    color: #f0eff5;
+    text-decoration: none;
+    font-size: 28px;
+    letter-spacing: -1px;
+    font-weight: 800;
+  }
+  .brand span {
+    display: block;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: #aaa7ba;
+    margin-top: 6px;
+  }
+  dialog {
+    width: min(540px, calc(100% - 32px));
+    max-height: calc(100svh - 48px);
+    overflow: auto;
+    border: 1px solid #4a465c;
+    border-radius: 20px;
+    background: #201e2b;
+    color: inherit;
+    padding: 32px;
+    box-shadow: 0 30px 100px #0008;
+  }
+  dialog::backdrop {
+    background: #10101899;
+  }
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #83e8ef;
+  }
+  h1 {
+    font-size: clamp(22px, 5vw, 28px);
+    line-height: 1.35;
+    margin: 16px 0 24px;
+  }
+  h2 {
+    font-size: 19px;
+    line-height: 1.4;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+  .track {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    background: #17151f;
+    padding: 18px;
+    border-radius: 12px;
+    min-height: 100px;
+  }
+  .track > div {
+    min-width: 0;
+  }
+  .music {
+    font-size: 30px;
+    color: #83e8ef;
+    padding: 8px;
+  }
+  .track p {
+    margin: 6px 0;
+    color: #c4bfd1;
+    overflow-wrap: anywhere;
+  }
+  .track small {
+    color: #9692a6;
+    font-size: 11px;
+  }
+  #song-note {
+    color: #b7b3c4;
+    font-size: 13px;
+    line-height: 1.65;
+    margin: 22px 0 12px;
+  }
+  #song-status {
+    min-height: 38px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #83e8ef;
+    overflow-wrap: anywhere;
+  }
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  button {
+    border: 1px solid #555065;
+    border-radius: 9px;
+    color: #e2deeb;
+    background: transparent;
+    padding: 12px 17px;
+    min-height: 46px;
+    font:
+      600 14px Outfit,
+      OrvioKR,
+      system-ui,
+      sans-serif;
+    cursor: pointer;
+  }
+  button:focus-visible,
+  a:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 3px;
+  }
+  #song-add {
+    background: #83e8ef;
+    color: #131923;
+    border-color: #83e8ef;
+  }
+  button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  @media (max-width: 430px) {
+    dialog {
+      padding: 24px;
+    }
+    .actions {
+      flex-direction: column-reverse;
+    }
+    .actions button {
+      width: 100%;
+    }
+    .brand {
+      top: 22px;
+      left: 24px;
+    }
+  }
+</style>

@@ -4408,3 +4408,33 @@ html {
     padding-bottom: 12px;
   }
 }
+
+#share-song {
+  margin-top: 12px;
+}
+.song-link-dialog {
+  width: min(520px, calc(100% - 32px));
+}
+.song-link-dialog p {
+  line-height: 1.6;
+  font-size: 13px;
+}
+.song-link-dialog textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  padding: 12px;
+  color: inherit;
+  background: #14131a;
+  border: 1px solid #5a536c;
+  border-radius: 8px;
+  font: 12px monospace;
+  overflow-wrap: anywhere;
+}
+.song-link-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
