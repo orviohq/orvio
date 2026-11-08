@@ -72,7 +72,12 @@ it('interrupted pre-job state needs explicit retry and storage failure starts no
       },
     },
   );
-  expect(() => blocked.enqueue('BBBBBBBBBBB')).toThrow('blocked');
+  expect(() => blocked.enqueue('BBBBBBBBBBB')).toThrow('unavailable');
+  try {
+    blocked.enqueue('BBBBBBBBBBB');
+  } catch (error) {
+    expect(error).toMatchObject({ stage: 'storage' });
+  }
   expect(blocked.rows.size).toBe(0);
   expect(api.import).not.toHaveBeenCalled();
 });
@@ -101,5 +106,31 @@ it('restores bounded typed failures and reset metadata without retrying, rejecti
     'ip_day',
   );
   expect(pending.rows.get('BBBBBBBBBBB')?.error).toBe('unavailable');
+  expect(api.import).not.toHaveBeenCalled();
+});
+
+it('restores only known failure stages, retaining cause classification across reload', () => {
+  const pending = new BackgroundImports(
+    () => {},
+    async () => {},
+    store(
+      JSON.stringify([
+        {
+          videoId: 'AAAAAAAAAAA',
+          state: 'error',
+          error: 'unavailable',
+          failure: { stage: 'storage' },
+        },
+        {
+          videoId: 'BBBBBBBBBBB',
+          state: 'error',
+          error: 'unavailable',
+          failure: { stage: 'invented' },
+        },
+      ]),
+    ),
+  );
+  expect(pending.rows.get('AAAAAAAAAAA')?.failure?.stage).toBe('storage');
+  expect(pending.rows.get('BBBBBBBBBBB')?.failure?.stage).toBeUndefined();
   expect(api.import).not.toHaveBeenCalled();
 });

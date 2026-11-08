@@ -1,3 +1,4 @@
+import { audioAtStage } from './audio-error-stage';
 import { readAudioJob, loadAudio, AudioJobError } from './external-audio-api';
 import { generateSourceOffThread } from './external-source-worker';
 import {
@@ -17,7 +18,9 @@ export async function prepareExternalJob(
   jobId: string,
   signal?: AbortSignal,
 ): Promise<PreparedSource> {
-  const pinned = await listPinnedSources(videoId);
+  const pinned = await audioAtStage('storage', () =>
+    listPinnedSources(videoId),
+  );
   const first = pinned[0];
   const job = await readAudioJob(jobId, signal);
   if (job.status !== 'done')
@@ -26,23 +29,28 @@ export async function prepareExternalJob(
         ? (job.error?.code ?? 'unavailable')
         : 'unavailable',
       job.retryAfterSec,
+      undefined,
+      undefined,
+      job.status === 'error' ? 'service' : 'response',
     );
   if (first && job.audio!.sha256 !== first.audioSha256)
     throw new AudioJobError('source_changed');
   const bytes = await loadAudio(job, videoId, first?.audioSha256, signal);
   if (first) return { record: first, bytes, restored: true };
-  const generated = await generateSourceOffThread(
-    bytes,
-    videoId,
-    job.audio!.sha256,
-    signal,
+  const generated = await audioAtStage('analysis', () =>
+    generateSourceOffThread(bytes, videoId, job.audio!.sha256, signal),
   );
-  await pinSource(generated);
-  const record = await readPinnedSource(
-    videoId,
-    generated.audioSha256,
-    generated.chartSetSha256,
+  await audioAtStage('storage', () => pinSource(generated));
+  const record = await audioAtStage('storage', () =>
+    readPinnedSource(videoId, generated.audioSha256, generated.chartSetSha256),
   );
-  if (!record) throw Error('Local chart save could not be confirmed');
+  if (!record)
+    throw new AudioJobError(
+      'unavailable',
+      undefined,
+      undefined,
+      undefined,
+      'storage',
+    );
   return { record, bytes, restored: false };
 }

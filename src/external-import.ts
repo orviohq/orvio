@@ -1,3 +1,4 @@
+import { audioAtStage } from './audio-error-stage';
 import {
   createAudioJob,
   readAudioJob,
@@ -36,9 +37,9 @@ export async function importYoutube(
 ) {
   const id = youtubeId(input);
   if (!id) throw new AudioJobError('invalid_url');
-  const first = (await listPinnedSources(id))[0];
+  const first = (await audioAtStage('storage', () => listPinnedSources(id)))[0];
   if (first) {
-    const cached = await localAudio(first);
+    const cached = await audioAtStage('storage', () => localAudio(first));
     if (cached)
       return {
         prepared: { record: first, bytes: cached.bytes, restored: true },
@@ -73,7 +74,13 @@ export async function importYoutube(
     options.onJob?.(job);
   }
   if (job.status === 'error')
-    throw new AudioJobError(job.error?.code ?? 'unavailable');
+    throw new AudioJobError(
+      job.error?.code ?? 'unavailable',
+      undefined,
+      undefined,
+      undefined,
+      'service',
+    );
   return {
     prepared: await prepareExternalJob(id, job.jobId, signal),
     jobId: job.jobId,

@@ -1,3 +1,4 @@
+import { audioStageMessage } from './audio-stage-message';
 import { audioFailureMessage } from './audio-failure-message';
 import { audioLimitMessage } from './audio-limit-message';
 import { AudioJobError } from './external-audio-api';
@@ -135,6 +136,10 @@ const errors: Record<Language, string[]> = {
   ],
 };
 export function externalError(error: unknown, language: Language) {
+  if (!(error instanceof AudioJobError))
+    return audioStageMessage(undefined, language);
+  if (error.code === 'unavailable' && error.status !== 429)
+    return audioStageMessage(error.stage, language);
   if (
     error instanceof AudioJobError &&
     error.code === 'rate_limited' &&

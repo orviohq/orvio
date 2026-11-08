@@ -1,3 +1,4 @@
+import { audioAtStage } from './audio-error-stage';
 import {
   hiddenLibraryIds,
   saveHiddenLibraryIds,
@@ -351,12 +352,14 @@ const backgroundImports = new BackgroundImports(
   () => songCards(),
   async (r) => {
     const title = r.title?.trim() || 'YouTube · ' + r.prepared.record.videoId;
-    await saveLocalAudio(
-      r.prepared.record,
-      title,
-      r.jobId,
-      r.prepared.bytes,
-      r.author,
+    await audioAtStage('storage', () =>
+      saveLocalAudio(
+        r.prepared.record,
+        title,
+        r.jobId,
+        r.prepared.bytes,
+        r.author,
+      ),
     );
     const item = installExternalSource(
       r.prepared.record,

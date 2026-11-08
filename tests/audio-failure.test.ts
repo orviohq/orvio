@@ -22,7 +22,7 @@ it('distinguishes typed causes and gives a remedy in all thirteen languages', ()
     );
   }
   expect(externalError(new AudioJobError('unavailable'), 'ko')).toContain(
-    '구체적인 원인을 알려주지',
+    '원인은 확인되지',
   );
   expect(externalError(new Error('unknown'), 'ko')).not.toContain('지역 제한');
 });

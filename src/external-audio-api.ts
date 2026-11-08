@@ -25,12 +25,29 @@ export function validAudioErrorCode(value: unknown): value is AudioErrorCode {
     )
   );
 }
+export const AUDIO_FAILURE_STAGES = [
+  'service',
+  'response',
+  'analysis',
+  'storage',
+  'browser',
+] as const;
+export type AudioFailureStage = (typeof AUDIO_FAILURE_STAGES)[number];
+export function validAudioFailureStage(
+  stage: unknown,
+): stage is AudioFailureStage {
+  return (
+    typeof stage === 'string' &&
+    (AUDIO_FAILURE_STAGES as readonly string[]).includes(stage)
+  );
+}
 export class AudioJobError extends Error {
   constructor(
     readonly code: AudioErrorCode,
     readonly retryAfterSec?: number,
     readonly status?: number,
     readonly limit?: AudioLimit,
+    readonly stage?: AudioFailureStage,
   ) {
     super(code);
   }
@@ -78,6 +95,7 @@ async function readJob(response: Response): Promise<AudioJob> {
       seconds(body?.error?.retryAfterSec ?? body?.retryAfterSec),
       response.status,
       code === 'rate_limited' ? readAudioLimit(body?.error) : undefined,
+      'service',
     );
   }
   if (
@@ -85,14 +103,26 @@ async function readJob(response: Response): Promise<AudioJob> {
     !JOB.test(body.jobId) ||
     !['queued', 'running', 'done', 'error'].includes(body.status)
   )
-    throw new AudioJobError('unavailable');
+    throw new AudioJobError(
+      'unavailable',
+      undefined,
+      undefined,
+      undefined,
+      'response',
+    );
   if (
     (body.title !== undefined &&
       (typeof body.title !== 'string' || body.title.length > 200)) ||
     (body.author !== undefined &&
       (typeof body.author !== 'string' || body.author.length > 100))
   )
-    throw new AudioJobError('unavailable');
+    throw new AudioJobError(
+      'unavailable',
+      undefined,
+      undefined,
+      undefined,
+      'response',
+    );
   if (body.status === 'done') {
     const a = body.audio;
     if (
@@ -112,10 +142,22 @@ async function readJob(response: Response): Promise<AudioJob> {
         a.expiresAt > 0
       )
     )
-      throw new AudioJobError('unavailable');
+      throw new AudioJobError(
+        'unavailable',
+        undefined,
+        undefined,
+        undefined,
+        'response',
+      );
   }
   if (body.status === 'error' && !ERRORS.includes(body.error?.code))
-    throw new AudioJobError('unavailable');
+    throw new AudioJobError(
+      'unavailable',
+      undefined,
+      undefined,
+      undefined,
+      'response',
+    );
   return body;
 }
 /** Explicit user submission only; callers never auto-rePOST a failed or expired job. */
@@ -213,6 +255,7 @@ export async function loadAudio(
       raw?.error?.code === 'rate_limited'
         ? readAudioLimit(raw?.error)
         : undefined,
+      'service',
     );
   }
   const hash = response.headers.get('X-Content-SHA256');
@@ -225,7 +268,14 @@ export async function loadAudio(
     throw new AudioJobError('integrity_failed');
   if (expectedHash && hash !== expectedHash)
     throw new AudioJobError('source_changed');
-  if (!response.body) throw new AudioJobError('unavailable');
+  if (!response.body)
+    throw new AudioJobError(
+      'unavailable',
+      undefined,
+      undefined,
+      undefined,
+      'response',
+    );
   const reader = response.body.getReader(),
     joined = new Uint8Array(job.audio.sizeBytes);
   let length = 0;
