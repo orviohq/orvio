@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.45] - 2026-11-09
+
+- Match loading, failed and retained-but-unready song cards to library artwork, spacing and text styles on desktop and mobile. Keep retry, dismiss, device inspection, replay history and removal actions grouped and usable. Storage and extraction failures remain truthful; no automatic retry or retained-source deletion is added.
+
 ## [0.2.44] - 2026-11-09
 
 - Keep the selected song visible after returning from other screens, refreshing, changing tabs or rebuilding the library list. Preserve selection and the relevant nested/page scroll position.
