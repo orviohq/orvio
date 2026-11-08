@@ -31,6 +31,13 @@ const DIFFICULTY_LABEL: Record<string, string> = {
   sc: 'SC',
 };
 
+// A72: display-only projection of the last verified list, painted pre-module
+// on the next plain /replays/ reload. Sessions themselves stay in IndexedDB;
+// this cache is skipped or discarded whenever it cannot be trusted.
+const REPLAY_DISPLAY_KEY = 'orvio.replay-list-display.v1';
+const dropFirstPaint = () =>
+  document.getElementById('replay-first-paint')?.remove();
+
 let getLabels: () => ReplayPageLabels = () => ({
   title: '',
   empty: '',
@@ -189,6 +196,12 @@ export async function showReplays() {
     sessions = [...external, ...builtin];
   } catch {
     if (version !== showVersion) return;
+    dropFirstPaint();
+    try {
+      localStorage.removeItem(REPLAY_DISPLAY_KEY);
+    } catch {
+      /* Optional paint cache. */
+    }
     empty.textContent = getLabels().readError;
     empty.dataset.state = 'read-error';
     empty.classList.remove('hidden');
@@ -200,6 +213,12 @@ export async function showReplays() {
   q('#replays-title').textContent = fresh.title;
   q<HTMLButtonElement>('#replays-back').textContent = `ESC ${fresh.back}`;
   if (!sessions.length) {
+    dropFirstPaint();
+    try {
+      localStorage.removeItem(REPLAY_DISPLAY_KEY);
+    } catch {
+      /* Optional paint cache. */
+    }
     empty.textContent = fresh.empty;
     empty.classList.remove('hidden');
     return;
@@ -213,4 +232,37 @@ export async function showReplays() {
       b.result.score - a.result.score,
   );
   for (const session of sessions) list.append(renderRow(session));
+  dropFirstPaint();
+  // A72: remember the verified list as a display-only projection for the next
+  // plain reload's pre-module paint. Serialized-identical entries are never
+  // rewritten; quota failure silently skips this optional cache.
+  try {
+    const rows = [...list.querySelectorAll('.replay-row')].map((row) => ({
+      title: row.querySelector('.replay-copy strong')?.textContent ?? '',
+      mode: row.querySelector('.replay-mode')?.textContent ?? '',
+      time: row.querySelector('.replay-time')?.textContent ?? '',
+      dateTime: row.querySelector('time')?.getAttribute('datetime') ?? '',
+      score: row.querySelector('.replay-score strong')?.textContent ?? '',
+      stats: row.querySelector('.replay-score span')?.textContent ?? '',
+      art: row.querySelector('img.replay-art')?.getAttribute('src') ?? '',
+      artHidden:
+        row.querySelector<HTMLImageElement>('img.replay-art')?.hidden === true,
+    }));
+    const json = JSON.stringify({
+      v: 2,
+      nav: [...document.querySelectorAll('#app > header nav button')].map(
+        (node) => node.textContent ?? '',
+      ),
+      lang: getLanguage(),
+      header: { title: fresh.title, back: fresh.back },
+      rows,
+    });
+    if (json.length > 200000) {
+      localStorage.removeItem(REPLAY_DISPLAY_KEY);
+    } else if (localStorage.getItem(REPLAY_DISPLAY_KEY) !== json) {
+      localStorage.setItem(REPLAY_DISPLAY_KEY, json);
+    }
+  } catch {
+    /* Optional paint cache never blocks the verified list. */
+  }
 }

@@ -160,6 +160,13 @@ test('integrated replay collection preserves all sessions and follow-on controls
   await page.click('#open-replays');
   await expect(page).toHaveURL(/\/replays\/$/);
   await expect(page.locator('.replay-row')).toHaveCount(3);
+  const projection = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('orvio.replay-list-display.v1') || '{}'),
+  );
+  expect(projection.v).toBe(2);
+  expect(projection.rows).toHaveLength(3);
+  expect(projection.rows[0].mode).toContain('0:01');
+  expect(projection.rows[0].title).toContain('AAAAAAAAAAA');
   await page.screenshot({ path: '/downloads/coherent-a24-desktop.png' });
   await page.reload();
   await expect(page.locator('.replay-row')).toHaveCount(3);
