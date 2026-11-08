@@ -28,8 +28,8 @@ export async function rememberCanonical(
 ) {
   if (!record.chartSetSha256 || !/^[a-f0-9]{64}$/.test(recordSha256))
     throw Error('Invalid canonical reference');
-  const all = references();
-  const previous = all.find((x) => x.videoId === record.videoId);
+  const before = references();
+  const previous = before.find((x) => x.videoId === record.videoId);
   if (
     previous &&
     (previous.audioSha256 !== record.audioSha256 ||
@@ -39,6 +39,16 @@ export async function rememberCanonical(
     throw Error('Canonical identity changed');
   const localRecordSha256 = await localRecordHash(record);
   await pinSource(record);
+  // No await between this fresh read, conflict check and storage write.
+  const all = references();
+  const current = all.find((x) => x.videoId === record.videoId);
+  if (
+    current &&
+    (current.audioSha256 !== record.audioSha256 ||
+      current.chartSetSha256 !== record.chartSetSha256 ||
+      current.recordSha256 !== recordSha256)
+  )
+    throw Error('Canonical identity changed');
   const next = all.filter((x) => x.videoId !== record.videoId);
   next.push({
     videoId: record.videoId,

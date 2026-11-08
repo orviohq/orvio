@@ -74,3 +74,30 @@ it('storage failure never gives a usable local canonical reference', async () =>
   );
   expect(await savedCanonical('ImuWa3SJulY')).toBeNull();
 });
+it('concurrent different-video verification retains both offline references', async () => {
+  setup();
+  const a = record(),
+    b = { ...record(), videoId: 'BBBBBBBBBBB', audioSha256: 'd'.repeat(64) };
+  await Promise.all([
+    rememberCanonical(a, 'c'.repeat(64)),
+    rememberCanonical(b, 'e'.repeat(64)),
+  ]);
+  expect(await savedCanonical(a.videoId)).toEqual(a);
+  expect(await savedCanonical(b.videoId)).toEqual(b);
+});
+it('concurrent conflicting identities for one video cannot replace its verified reference', async () => {
+  const storage = setup(),
+    a = record(),
+    b = { ...record(), audioSha256: 'd'.repeat(64) };
+  const outcomes = await Promise.allSettled([
+    rememberCanonical(a, 'c'.repeat(64)),
+    rememberCanonical(b, 'e'.repeat(64)),
+  ]);
+  expect(outcomes.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
+  expect(outcomes.filter((x) => x.status === 'rejected')).toHaveLength(1);
+  const refs = JSON.parse(storage.get('orvio.canonical-library.v1')!);
+  expect(refs).toHaveLength(1);
+  expect(refs[0].audioSha256).toBe(
+    outcomes[0].status === 'fulfilled' ? a.audioSha256 : b.audioSha256,
+  );
+});
