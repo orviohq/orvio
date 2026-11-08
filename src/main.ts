@@ -1585,6 +1585,7 @@ window.addEventListener('keydown', (e) => {
   recordInput(lane, keyTime(e), true);
 });
 window.addEventListener('keyup', (e) => {
+  if (editableTarget(e.target)) return;
   if (playReplay) return;
   if (!active || !engine) return;
   const lane = settings.keys[settings.lanes].indexOf(e.code);
