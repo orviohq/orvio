@@ -1884,6 +1884,7 @@ async function watchReplay() {
     toast(REPLAY_LABELS[settings.language][2]);
     return;
   }
+  const watchHref = location.href;
   const replayToWatch = savedReplay,
     resultToWatch = lastResult;
   const item = externalSource(savedReplay.song);
@@ -1893,13 +1894,20 @@ async function watchReplay() {
     try {
       await readSharedAudio(item);
     } catch (error) {
-      showAudioRecovery(item, error);
+      if (
+        location.href === watchHref &&
+        savedReplay === replayToWatch &&
+        lastResult === resultToWatch &&
+        $<HTMLDialogElement>('#results').open
+      )
+        showAudioRecovery(item, error);
       return;
     } finally {
       button.disabled = false;
     }
   }
   if (
+    location.href !== watchHref ||
     savedReplay !== replayToWatch ||
     lastResult !== resultToWatch ||
     !$<HTMLDialogElement>('#results').open
@@ -2138,6 +2146,9 @@ function showAudioRecovery(
   item: NonNullable<ReturnType<typeof externalSource>>,
   error: unknown,
 ) {
+  const recoveryHref = location.href;
+  const recoveryReplay = savedReplay,
+    recoveryResult = lastResult;
   const dialog = document.createElement('dialog');
   dialog.className = 'share-error';
   const text = document.createElement('p');
@@ -2169,9 +2180,15 @@ function showAudioRecovery(
         item,
         AbortSignal.any([controller.signal, AbortSignal.timeout(90000)]),
       );
+      const stillCurrent =
+        location.href === recoveryHref &&
+        savedReplay === recoveryReplay &&
+        lastResult === recoveryResult &&
+        $<HTMLDialogElement>('#results').open &&
+        dialog.open;
       dialog.close();
       dialog.remove();
-      await watchReplay();
+      if (stillCurrent) await watchReplay();
     } catch (e) {
       if (!controller.signal.aborted)
         text.textContent =
@@ -2228,6 +2245,7 @@ function readRoute() {
     .querySelectorAll<HTMLDialogElement>('dialog[open]')
     .forEach((d) => d.close());
   if (active || paused) exit();
+  document.body.classList.remove('results-screen');
   const parts = location.pathname.split('/').filter(Boolean);
   const q = new URLSearchParams(location.search);
   const speed = Number(q.get('speed'));
