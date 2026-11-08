@@ -28,3 +28,13 @@ jobs:
       - name: Source and original-UI integration (mock backend only)
         run: npx playwright test --config playwright.source.config.ts --grep-invert "real origin backend|actual production origin|original UI reads live"
       - run: npx playwright test --config playwright.pwa.config.ts
+      - name: Keep quality failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-failure-evidence
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+          if-no-files-found: warn

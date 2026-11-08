@@ -9,21 +9,33 @@ export async function atKey(
   code: string,
   down: boolean,
 ) {
-  await page.evaluate(
+  return await page.evaluate(
     ({ at, code, down }) =>
-      new Promise<void>((resolve) => {
+      new Promise<{
+        target: number;
+        observed: number;
+        latenessMs: number;
+        dispatchPerformanceMs: number;
+      }>((resolve) => {
         const tick = () => {
           if ((window as any).orvioDiagnostics.clock < at) {
             setTimeout(tick, 1);
             return;
           }
+          const observed = (window as any).orvioDiagnostics.clock;
+          const dispatchPerformanceMs = performance.now();
           window.dispatchEvent(
             new KeyboardEvent(down ? 'keydown' : 'keyup', {
               code,
               bubbles: true,
             }),
           );
-          resolve();
+          resolve({
+            target: at,
+            observed,
+            latenessMs: (observed - at) * 1000,
+            dispatchPerformanceMs,
+          });
         };
         tick();
       }),

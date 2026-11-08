@@ -101,13 +101,24 @@ test('held note survives speed and effect changes without a new chart or remappi
     ),
   ).toEqual(state);
   await page.click('#resume');
-  await atKey(page, note.end, key, false);
+  const release = await atKey(page, note.end, key, false);
   const tail = await page.evaluate(
     (id) =>
       (window as any).orvioDiagnostics.events.find(
         (e: any) => e.noteId === id && e.tail,
       ),
     note.id,
+  );
+  console.log(
+    'held-note-release-timing',
+    JSON.stringify({
+      noteId: note.id,
+      noteEnd: note.end,
+      head: state.head,
+      release,
+      tail,
+      mappingResidualMs: tail.delta - release.latenessMs,
+    }),
   );
   expect(tail.value).toBe(state.head);
   expect(Math.abs(tail.delta)).toBeLessThan(45);

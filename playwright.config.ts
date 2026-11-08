@@ -4,6 +4,8 @@ export default defineConfig({
   workers: 1,
   timeout: 60000,
   use: {
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
     locale: 'ko-KR',
     baseURL: 'http://127.0.0.1:4173',
     launchOptions: {
