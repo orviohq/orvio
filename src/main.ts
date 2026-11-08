@@ -1,3 +1,8 @@
+import {
+  readLibrarySelection,
+  writeLibrarySelection,
+  resolveLibrarySelection,
+} from './library-selection';
 import { readCanonicalMetadata } from './canonical-metadata-api';
 import { updateLocalDisplayMetadata } from './external-local';
 import { updateExternalDisplayMetadata } from './external-catalog';
@@ -302,6 +307,46 @@ const libraryVideoKey = (id: string) => {
 };
 const isHiddenSong = (id: string) =>
   hiddenSongs.has(id) || hiddenSongs.has(libraryVideoKey(id));
+let librarySelection = readLibrarySelection(localStorage);
+function rememberLibrarySelection() {
+  if (!SONGS[songIndex] || isHiddenSong(SONGS[songIndex].id)) return;
+  librarySelection = {
+    key: libraryVideoKey(SONGS[songIndex].id),
+    scroll: $('#songs').scrollTop,
+    pageScroll: window.scrollY,
+  };
+  writeLibrarySelection(localStorage, librarySelection);
+}
+function restoreLibrarySelection() {
+  const visible = visibleSongIndices();
+  const at = resolveLibrarySelection(
+    visible.map((i) => libraryVideoKey(SONGS[i].id)),
+    librarySelection?.key,
+  );
+  if (at < 0) return;
+  songIndex = visible[at];
+}
+function restoreLibraryScroll() {
+  if (!librarySelection || screen !== 'select') return;
+  $('#songs').scrollTop = librarySelection.scroll;
+  window.scrollTo(0, librarySelection.pageScroll);
+}
+$('#songs').addEventListener(
+  'scroll',
+  () => {
+    if (screen === 'select' && !active && !preparing)
+      rememberLibrarySelection();
+  },
+  { passive: true },
+);
+window.addEventListener(
+  'scroll',
+  () => {
+    if (screen === 'select' && !active && !preparing)
+      rememberLibrarySelection();
+  },
+  { passive: true },
+);
 const canonicalPreferred = new Map<string, string>();
 const canonicalPending = new Map<string, CanonicalLibraryRow>();
 const libraryAddOrder = new LibraryAddOrder(localStorage);
@@ -337,6 +382,7 @@ initReplayPage({
   onOpen: (key) => void openLocalSession(key),
   onNavigate: () => {
     if (active || preparing) return;
+    rememberLibrarySelection();
     history.pushState(null, '', '/replays/');
     readRoute();
   },
@@ -665,6 +711,7 @@ function selectSong(index: number, audition = true) {
   syncSettings();
   selectedSong();
   $('#songs .song-card.selected')?.scrollIntoView({ block: 'nearest' });
+  rememberLibrarySelection();
   if (audition) void previewSong();
 }
 
@@ -1064,6 +1111,7 @@ async function start() {
     toast(t('unsupported'));
     return;
   }
+  if (!playReplay) rememberLibrarySelection();
   preparing = true;
   const attempt = new StartupAttempt();
   startup = attempt;
@@ -1708,8 +1756,12 @@ function exit() {
   $('#lobby').classList.remove('hidden');
   $('#replays').classList.add('hidden');
   screen = 'select';
+  restoreLibrarySelection();
   if (!readingRoute) history.pushState(null, '', selectionPath());
+  songCards();
+  syncSettings();
   selectedSong();
+  restoreLibraryScroll();
 }
 function keyTime(e: KeyboardEvent) {
   let stamp = e.timeStamp;
@@ -2670,6 +2722,7 @@ function readRoute() {
         : parts[0] === 'replays'
           ? 'replays'
           : 'home';
+  if (screen === 'select' && !id) restoreLibrarySelection();
   document.body.classList.toggle('home-screen', screen === 'home');
   document.body.classList.toggle('ready-screen', screen === 'ready');
   $('#home-screen').classList.toggle('hidden', screen !== 'home');
@@ -2685,6 +2738,7 @@ function readRoute() {
   songCards();
   selectedSong();
   syncSettings();
+  restoreLibraryScroll();
   readingRoute = false;
   if (shared) {
     // A verified replay owns its FEVER summary. Do not paint an incomplete
@@ -2933,8 +2987,12 @@ async function initializeLibrary() {
   backgroundImports.resume();
   if (deferredLibraryRoute) await readInitialRoute();
   else if (screen === 'select' && !active) {
+    if (!new URLSearchParams(location.search).has('song'))
+      restoreLibrarySelection();
     songCards();
     selectedSong();
+    syncSettings();
+    restoreLibraryScroll();
   } else if (screen === 'replays') void showReplays();
   const local = new URLSearchParams(location.search).get('local');
   if (local) {
