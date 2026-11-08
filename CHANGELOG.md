@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.38] - 2026-11-09
+
+- Enlarge song-list artwork and clarify titles, metadata and selection, while keeping controls reachable on portrait and landscape screens.
+- Restore the requested 1.2-second decoded wallpaper presentation before player-triggered starts, including local replay retries. Credit a play-route gate already shown; do not add a catalog or result data-loading delay.
+- Add real local replay retry and warm-start regression coverage while preserving audio readiness, cancellation, countdown and cached route startup checks.
+
 ## [0.2.37] - 2026-11-09
 
 - Animate the result score from zero, stamp the rank and reveal details in sequence without blocking actions.

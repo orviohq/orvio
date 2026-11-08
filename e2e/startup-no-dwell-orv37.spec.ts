@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-test('cold render, same-document memory and fresh-page local starts have no presentation dwell', async ({
+test('audio readiness is cached while fresh pre-play preserves wallpaper and an elapsed route gate adds no extra dwell', async ({
   page,
 }) => {
   const samples: any[] = [];
@@ -25,6 +25,7 @@ test('cold render, same-document memory and fresh-page local starts have no pres
       at: performance.now(),
       renders: (window as any).__renders,
     }));
+    if (kind === 'indexeddb') await page.waitForTimeout(1250);
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
     const state = await page.evaluate(() => ({
@@ -40,14 +41,15 @@ test('cold render, same-document memory and fresh-page local starts have no pres
       renders: state.renders,
       rendersDuringStart: state.renders - before.renders,
     });
-    expect(state.timers.some((n: number) => n > 350 && n <= 1200)).toBe(false);
+
     await expect(page.locator('#song-loading')).toBeHidden();
     await expect(page.locator('#game')).toHaveAttribute(
       'data-song',
       'afterimage',
     );
     await page.screenshot({ path: `/downloads/orv37-${kind}.png` });
-    if (kind !== 'cold') expect(duration).toBeLessThan(1100);
+    if (kind === 'indexeddb') expect(duration - 1250).toBeLessThan(1100);
+    if (kind === 'memory') expect(duration).toBeGreaterThanOrEqual(1180);
   };
   await measure('cold');
   await page.keyboard.press('Escape');

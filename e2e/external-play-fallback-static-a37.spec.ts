@@ -121,6 +121,8 @@ test('external play fallback boots the game with no 404 flash', async ({
   await expect(page.locator('.not-found')).toBeHidden();
   await expect(page.locator('#loading-title')).toHaveText('YT Fixture');
   await page.screenshot({ path: 'test-results/a37-play-fallback.png' });
+  // A route gate already shown for the presentation interval adds no second wait.
+  await page.waitForTimeout(1250);
   const startedAt = await page.evaluate(() => performance.now());
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active, {
