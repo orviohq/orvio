@@ -74,3 +74,15 @@ it('flag-off nested poll failure rejects immediately with one GET and no POST or
   expect(f.mock.calls[0][0]).toContain('/v1/audio-jobs/cachedJob');
   expect(f.mock.calls[0][1].method).toBeUndefined();
 });
+for (const [status, raw] of [
+  [502, 'storage_error'],
+  [429, 'share_quota_exhausted'],
+] as const)
+  it(`legacy flat marker error ${status} ${raw} is a terminal service failure without fallback`, async () => {
+    const f = vi.fn(async () => Response.json({ error: raw }, { status }));
+    vi.stubGlobal('fetch', f);
+    await expect(
+      createAudioJob('https://youtu.be/AAAAAAAAAAA', undefined, 'client'),
+    ).rejects.toMatchObject({ code: 'unavailable', status, stage: 'service' });
+    expect(f).toHaveBeenCalledTimes(1);
+  });

@@ -81,3 +81,38 @@ test('flag-off pending job stops polling without fallback admission', async ({
   expect(polls).toBe(1);
   expect(posts).toBe(0);
 });
+
+for (const [status, raw] of [
+  [502, 'storage_error'],
+  [429, 'share_quota_exhausted'],
+] as const)
+  test(`flat marker ${raw} stops after one client POST and stays honest`, async ({
+    page,
+  }) => {
+    let posts = 0;
+    await page.route('https://orvio-share.pn-26f.workers.dev/**', (r) => {
+      if (r.request().method() === 'POST') {
+        posts++;
+        expect(r.request().postDataJSON().generationMode).toBe('client');
+        return r.fulfill({ status, json: { error: raw } });
+      }
+      return r.fulfill({
+        status: 404,
+        json: { error: 'chart_source_not_found' },
+      });
+    });
+    await page.goto('/select/');
+    await page.click('#add-youtube');
+    await page.fill('#youtube-url', 'https://youtu.be/AAAAAAAAAAA');
+    await page.click('#youtube-submit');
+    const row = page.locator('.import-pending[data-import-error=unavailable]');
+    await expect(row).toBeVisible();
+    expect(await row.getAttribute('data-import-error-status')).toBe(
+      String(status),
+    );
+    await page.waitForTimeout(400);
+    expect(posts).toBe(1);
+    await expect(row.locator('[role=status]')).not.toContainText(
+      /storage_error|share_quota_exhausted/,
+    );
+  });
