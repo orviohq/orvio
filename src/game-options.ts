@@ -76,7 +76,7 @@ export function fadeAlpha(fader: Fader, progress: number) {
       1,
       (fader.startsWith('in') ? progress - edge : edge - progress) /
         (FADE_HALF_BAND * 2) +
-      0.5,
+        0.5,
     ),
   );
 }

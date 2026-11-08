@@ -10,7 +10,9 @@ export function hiddenLibraryIds(
         ? value.filter(
             (id): id is string =>
               typeof id === 'string' &&
-              /^yt-[A-Za-z0-9_-]{11}-[a-f0-9]{16}(?:-c[a-f0-9]{16})?$/.test(id),
+              /^(?:yt:[A-Za-z0-9_-]{11}|yt-[A-Za-z0-9_-]{11}-[a-f0-9]{16}(?:-c[a-f0-9]{16})?)$/.test(
+                id,
+              ),
           )
         : [],
     );
@@ -30,7 +32,7 @@ export function saveHiddenLibraryIds(
 const labels: Record<Language, string[]> = {
   en: [
     'Remove from list',
-    'Remove this chart version from the list? Audio, results and replays stay saved. Adding the same link restores removed versions of this song.',
+    'Remove this song from the list? Audio, results and replays stay saved. Adding the same link restores the song.',
     'Remove',
     'Cancel',
     'Removed from list',
@@ -38,7 +40,7 @@ const labels: Record<Language, string[]> = {
   ],
   ko: [
     '목록에서 삭제',
-    '이 채보 버전을 목록에서 삭제할까요? 음원·기록·리플레이는 유지됩니다. 같은 링크를 추가하면 이 곡의 삭제한 버전이 다시 표시됩니다.',
+    '이 곡을 목록에서 삭제할까요? 음원·기록·리플레이는 유지됩니다. 같은 링크를 추가하면 이 곡이 다시 표시됩니다.',
     '삭제',
     '취소',
     '목록에서 삭제했습니다.',
@@ -46,7 +48,7 @@ const labels: Record<Language, string[]> = {
   ],
   zh: [
     '从列表移除',
-    '从列表移除此谱面版本？音频、成绩和回放会保留。重新添加相同链接可恢复此曲移除的版本。',
+    '从列表移除此歌曲？音频、成绩和回放会保留。重新添加相同链接可恢复歌曲。',
     '移除',
     '取消',
     '已从列表移除',
@@ -54,7 +56,7 @@ const labels: Record<Language, string[]> = {
   ],
   ja: [
     '一覧から削除',
-    'この譜面バージョンを一覧から削除しますか？音源・記録・リプレイは保持されます。同じリンクの追加で削除したバージョンを再表示できます。',
+    'この曲を一覧から削除しますか？音源・記録・リプレイは保持されます。同じリンクの追加で曲を再表示できます。',
     '削除',
     'キャンセル',
     '一覧から削除しました',
@@ -62,7 +64,7 @@ const labels: Record<Language, string[]> = {
   ],
   es: [
     'Quitar de la lista',
-    '¿Quitar esta versión del mapa? El audio, resultados y repeticiones se conservan. Añadir el mismo enlace restaura las versiones quitadas de esta canción.',
+    '¿Quitar esta canción de la lista? El audio, resultados y repeticiones se conservan. Añadir el mismo enlace restaura la canción.',
     'Quitar',
     'Cancelar',
     'Quitado de la lista',
@@ -70,7 +72,7 @@ const labels: Record<Language, string[]> = {
   ],
   fr: [
     'Retirer de la liste',
-    'Retirer cette version de la partition ? Audio, résultats et replays sont conservés. Ajouter le même lien restaure les versions retirées de ce morceau.',
+    'Retirer ce morceau de la liste ? Audio, résultats et replays sont conservés. Ajouter le même lien restaure le morceau.',
     'Retirer',
     'Annuler',
     'Retiré de la liste',
@@ -78,7 +80,7 @@ const labels: Record<Language, string[]> = {
   ],
   de: [
     'Aus Liste entfernen',
-    'Diese Chart-Version entfernen? Audio, Ergebnisse und Replays bleiben gespeichert. Derselbe Link stellt entfernte Versionen dieses Songs wieder her.',
+    'Diesen Song aus der Liste entfernen? Audio, Ergebnisse und Replays bleiben gespeichert. Derselbe Link stellt den Song wieder her.',
     'Entfernen',
     'Abbrechen',
     'Aus Liste entfernt',
@@ -86,7 +88,7 @@ const labels: Record<Language, string[]> = {
   ],
   pt: [
     'Remover da lista',
-    'Remover esta versão do mapa? Áudio, resultados e replays ficam salvos. Adicionar o mesmo link restaura as versões removidas desta música.',
+    'Remover esta música da lista? Áudio, resultados e replays ficam salvos. Adicionar o mesmo link restaura a música.',
     'Remover',
     'Cancelar',
     'Removido da lista',
@@ -94,7 +96,7 @@ const labels: Record<Language, string[]> = {
   ],
   it: [
     'Rimuovi dalla lista',
-    'Rimuovere questa versione della mappa? Audio, risultati e replay restano salvati. Aggiungendo lo stesso link si ripristinano le versioni rimosse del brano.',
+    'Rimuovere questo brano dalla lista? Audio, risultati e replay restano salvati. Lo stesso link ripristina il brano.',
     'Rimuovi',
     'Annulla',
     'Rimosso dalla lista',
@@ -102,7 +104,7 @@ const labels: Record<Language, string[]> = {
   ],
   ru: [
     'Убрать из списка',
-    'Убрать эту версию карты? Аудио, результаты и повторы сохранятся. Добавление той же ссылки вернёт убранные версии этой песни.',
+    'Убрать эту песню из списка? Аудио, результаты и повторы сохранятся. Та же ссылка вернет песню в список.',
     'Убрать',
     'Отмена',
     'Убрано из списка',
@@ -110,7 +112,7 @@ const labels: Record<Language, string[]> = {
   ],
   id: [
     'Hapus dari daftar',
-    'Hapus versi chart ini dari daftar? Audio, hasil, dan replay tetap tersimpan. Menambahkan tautan yang sama memulihkan versi lagu yang dihapus.',
+    'Hapus lagu ini dari daftar? Audio, hasil, dan replay tetap tersimpan. Menambahkan tautan yang sama memulihkan lagu.',
     'Hapus',
     'Batal',
     'Dihapus dari daftar',
@@ -118,7 +120,7 @@ const labels: Record<Language, string[]> = {
   ],
   tr: [
     'Listeden kaldır',
-    'Bu nota haritası sürümü listeden kaldırılsın mı? Ses, sonuçlar ve tekrarlar saklanır. Aynı bağlantıyı eklemek kaldırılan sürümleri geri getirir.',
+    'Bu şarkı listeden kaldırılsın mı? Ses, sonuçlar ve tekrarlar kayıtlı kalır. Aynı bağlantıyı eklemek şarkıyı geri getirir.',
     'Kaldır',
     'İptal',
     'Listeden kaldırıldı',
@@ -126,7 +128,7 @@ const labels: Record<Language, string[]> = {
   ],
   vi: [
     'Xóa khỏi danh sách',
-    'Xóa phiên bản bản nhạc này khỏi danh sách? Âm thanh, kết quả và phát lại vẫn được lưu. Thêm lại cùng liên kết sẽ khôi phục các phiên bản đã xóa của bài này.',
+    'Xóa bài hát này khỏi danh sách? Âm thanh, kết quả và bản phát lại vẫn được lưu. Thêm cùng liên kết sẽ khôi phục bài hát.',
     'Xóa',
     'Hủy',
     'Đã xóa khỏi danh sách',

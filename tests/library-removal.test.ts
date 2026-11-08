@@ -6,7 +6,7 @@ import {
 } from '../src/library-removal';
 import { LANGUAGES } from '../src/i18n';
 const id = 'yt-I_DocC3srzY-1f7116af22c84f4a-c0b7f43d7af4b9c07';
-it('persists exact external version IDs, rejecting builtins and malformed storage', () => {
+it('persists video visibility keys and preserves legacy source IDs, rejecting builtins and malformed storage', () => {
   let value = '[]';
   const storage = {
     getItem: () => value,
@@ -14,8 +14,8 @@ it('persists exact external version IDs, rejecting builtins and malformed storag
       value = next;
     },
   };
-  saveHiddenLibraryIds(new Set([id]), storage);
-  expect([...hiddenLibraryIds(storage)]).toEqual([id]);
+  saveHiddenLibraryIds(new Set([id, 'yt:I_DocC3srzY']), storage);
+  expect([...hiddenLibraryIds(storage)]).toEqual([id, 'yt:I_DocC3srzY'].sort());
   value = JSON.stringify([id, 'first-light', 'not-a-source', 42]);
   expect([...hiddenLibraryIds(storage)]).toEqual([id]);
   value = '{';
@@ -37,7 +37,7 @@ it('does not pretend persistence succeeded after a failed write/readback', () =>
     }),
   ).toThrow();
 });
-it('all locales explain the version-only scope and recovery', () => {
+it('all locales explain the song-list-only scope and recovery', () => {
   for (const l of Object.keys(LANGUAGES) as (keyof typeof LANGUAGES)[]) {
     const copy = removalLabels(l);
     expect(copy.prompt.length).toBeGreaterThan(30);

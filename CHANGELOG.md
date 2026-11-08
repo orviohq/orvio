@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.22] - 2026-11-08
+
+- Remove a song from the library without deleting its audio, results or replay archive. Show one entry per video and remove old/new chart and migration controls.
+- Fade hold bodies smoothly with FADE OUT and FADE OUT 2.
+- Add original FEVER activation audio, burst and combo feedback, honoring volume and reduced motion.
+- Preserve complete YouTube artwork across library, gameplay and results.
+- Add opt-in local frame diagnostics with query-safe navigation. This is a measurement tool, not a claimed display-ghosting fix.
+- Cross-device authoritative chart generation and external replay sharing remain separate work, not a guarantee in this release.
+
 ## [0.2.21] - 2026-11-08
 
 - Support YouTube imports up to five minutes with bounded audio copies.

@@ -13,8 +13,6 @@ import {
 import { FEVER_LABELS } from './fever-labels';
 import { CURRENT_FEVER } from './fever';
 import { renderFeverHud } from './fever-hud';
-import { regenerateSource } from './external-regenerate';
-import { regenerationLabels } from './regeneration-labels';
 import { StartupAttempt } from './startup';
 import { songArt, ART_FALLBACK } from './song-art';
 import { AudioJobError } from './external-audio-api';
@@ -234,7 +232,7 @@ function persist() {
 const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.21</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.22</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
 <section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div class="eyebrow">${label('selected')} <span id="selection-number">01 / 03</span></div><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t('previewReady')}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
 <section class="library" aria-label="Track selection"><div class="section-title"><strong>${label('select')}</strong><span>ORIGINALS / 001</span></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">NM</button><button data-diff="mid">HD</button><button data-diff="high">MX</button><button data-diff="sc">SC</button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div><div class="under-start"><span id="chart-info"></span><span>${label('keyboard')}</span></div></section>
 <section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
@@ -264,30 +262,33 @@ const localReplayButton = document.createElement('button');
 localReplayButton.id = 'local-replay';
 localReplayButton.className = 'quiet hidden';
 addYoutube.after(localReplayButton);
-const regenerateButton = document.createElement('button');
-regenerateButton.id = 'regenerate-chart';
-regenerateButton.className = 'quiet hidden';
-localReplayButton.after(regenerateButton);
 const hiddenSongs = hiddenLibraryIds();
-const visibleSongIndices = () =>
-  SONGS.map((_, i) => i).filter((i) => !hiddenSongs.has(SONGS[i].id));
+const libraryVideoKey = (id: string) => {
+  const source = externalSource(id);
+  return source ? 'yt:' + source.record.videoId : id;
+};
+const isHiddenSong = (id: string) =>
+  hiddenSongs.has(id) || hiddenSongs.has(libraryVideoKey(id));
+const visibleSongIndices = () => {
+  const seen = new Set<string>();
+  return SONGS.flatMap((song, i) => {
+    const key = libraryVideoKey(song.id);
+    if (isHiddenSong(song.id) || seen.has(key)) return [];
+    seen.add(key);
+    return [i];
+  });
+};
 const removeSongButton = document.createElement('button');
 removeSongButton.id = 'remove-song';
 removeSongButton.className = 'quiet hidden';
-regenerateButton.after(removeSongButton);
+localReplayButton.after(removeSongButton);
 app.insertAdjacentHTML(
   'beforeend',
   '<dialog id="remove-song-dialog" aria-labelledby="remove-song-title"><h2 id="remove-song-title"></h2><p id="remove-song-prompt"></p><strong id="remove-song-name"></strong><div class="remove-song-actions"><button id="remove-song-cancel" class="quiet"></button><button id="remove-song-confirm" class="primary"></button></div></dialog>',
 );
 let removingSongId: string | undefined;
 removeSongButton.onclick = () => {
-  if (
-    active ||
-    preparing ||
-    regenerating ||
-    !externalSource(SONGS[songIndex].id)
-  )
-    return;
+  if (active || preparing || !externalSource(SONGS[songIndex].id)) return;
   removingSongId = SONGS[songIndex].id;
   const labels = removalLabels(settings.language);
   $('#remove-song-title').textContent = labels.button;
@@ -301,24 +302,25 @@ removeSongButton.onclick = () => {
 $('#remove-song-cancel').onclick = () =>
   $<HTMLDialogElement>('#remove-song-dialog').close();
 $('#remove-song-confirm').onclick = () => {
-  if (!removingSongId || active || preparing || regenerating) return;
+  if (!removingSongId || active || preparing) return;
   const next = new Set(hiddenSongs);
-  next.add(removingSongId);
+  next.add(libraryVideoKey(removingSongId));
   try {
     saveHiddenLibraryIds(next);
   } catch {
     toast(removalLabels(settings.language).failed);
     return;
   }
-  hiddenSongs.add(removingSongId);
+  hiddenSongs.add(libraryVideoKey(removingSongId));
   $<HTMLDialogElement>('#remove-song-dialog').close();
   stopPreview();
   selectSong(visibleSongIndices()[0], false);
   history.replaceState(null, '', selectionPath());
   toast(removalLabels(settings.language).removed);
 };
-function restoreSongVersions(videoId: string) {
+function restoreLibraryVideo(videoId: string) {
   const next = new Set(hiddenSongs);
+  next.delete('yt:' + videoId);
   for (const song of SONGS)
     if (externalSource(song.id)?.record.videoId === videoId)
       next.delete(song.id);
@@ -327,43 +329,6 @@ function restoreSongVersions(videoId: string) {
   hiddenSongs.clear();
   for (const id of next) hiddenSongs.add(id);
 }
-let regenerating = false;
-regenerateButton.onclick = async () => {
-  const original = externalSource(SONGS[songIndex].id);
-  if (!original || regenerating || active || preparing) return;
-  regenerating = true;
-  regenerateButton.disabled = true;
-  regenerateButton.textContent = regenerationLabels(settings.language).busy;
-  // Paint the loading label before local analysis starts.
-  await new Promise<void>((resolve) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-  );
-  try {
-    const next = await regenerateSource(original.record);
-    const item = installExternalSource(
-      next.record,
-      next.audio.title,
-      next.audio.bytes,
-      next.audio.jobId,
-      next.audio.author,
-    );
-    let index = SONGS.findIndex((s) => s.id === item.song.id);
-    if (index < 0) {
-      SONGS.push(item.song);
-      index = SONGS.length - 1;
-    }
-    regenerating = false;
-    songCards();
-    selectSong(index, false);
-    toast(externalLabels(settings.language).saved);
-  } catch {
-    toast(externalLabels(settings.language).failed);
-  } finally {
-    regenerating = false;
-    regenerateButton.disabled = false;
-    regenerateButton.textContent = regenerationLabels(settings.language).create;
-  }
-};
 localReplayButton.onclick = () => void openLocalSession(SONGS[songIndex].id);
 async function openLocalSession(id: string) {
   try {
@@ -445,7 +410,7 @@ $('#youtube-form').onsubmit = async (e) => {
       SONGS.push(item.song);
       index = SONGS.length - 1;
     }
-    restoreSongVersions(r.prepared.record.videoId);
+    restoreLibraryVideo(r.prepared.record.videoId);
     songCards();
     selectSong(index, false);
     $<HTMLDialogElement>('#youtube-import').close();
@@ -479,7 +444,6 @@ function localize() {
   const external = externalLabels(settings.language);
   $('#add-youtube').textContent = external.add;
   $('#local-replay').textContent = external.replay;
-  regenerateButton.textContent = regenerationLabels(settings.language).create;
   $('#youtube-heading').textContent = external.add;
   $('#youtube-label').textContent = external.url;
   $('#youtube-submit').textContent = external.submit;
@@ -558,16 +522,11 @@ function selectedSong() {
       ? 'YOUTUBE'
       : 'ORVIO / ORIGINALS';
   $('#selected-subtitle').textContent = externalSource(song.id)
-    ? song.subtitle +
-      ' · ' +
-      (externalSource(song.id)!.record.chartSetSha256
-        ? regenerationLabels(settings.language).current
-        : regenerationLabels(settings.language).original)
+    ? song.subtitle
     : t(('subtitle' + songIndex) as Word);
   $('#selected-genre').textContent = song.genre;
   $('#selected-bpm').textContent = song.bpm + ' BPM';
   const selection = ++selectionVersion;
-  regenerateButton.classList.toggle('hidden', !externalSource(song.id));
   removeSongButton.classList.toggle('hidden', !externalSource(song.id));
   removeSongButton.textContent = removalLabels(settings.language).button;
   localReplayButton.classList.add('hidden');
@@ -580,9 +539,9 @@ function selectedSong() {
       .catch(() => {});
 }
 function selectSong(index: number, audition = true) {
-  if (preparing || active || regenerating) return;
+  if (preparing || active) return;
   songIndex = (index + SONGS.length) % SONGS.length;
-  if (hiddenSongs.has(SONGS[songIndex].id)) songIndex = visibleSongIndices()[0];
+  if (isHiddenSong(SONGS[songIndex].id)) songIndex = visibleSongIndices()[0];
   stopPreview();
   rendered = cache.get(SONGS[songIndex].id);
   songCards();
@@ -617,10 +576,11 @@ function songCards() {
   )!.textContent = SONGS.some((s) => externalSource(s.id))
     ? externalLabels(settings.language).library
     : 'ORIGINALS / 001';
+  const visible = new Set(visibleSongIndices());
   $('#songs').innerHTML = SONGS.map((s, i) =>
-    hiddenSongs.has(s.id)
+    !visible.has(i)
       ? ''
-      : `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${externalSource(s.id) ? `<img class="youtube-cover" data-song-art="${s.id}" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle + ' · ' + (externalSource(s.id)!.record.chartSetSha256 ? regenerationLabels(settings.language).current : regenerationLabels(settings.language).original)) : t(('subtitle' + i) as Word)}</span></span><span class="song-time"><em class="song-level">${chartLevel(s, settings.difficulty, settings.lanes)}</em>${Math.floor(duration(s) / 60)}:${Math.floor(
+      : `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${externalSource(s.id) ? `<img class="youtube-cover" data-song-art="${s.id}" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle) : t(('subtitle' + i) as Word)}</span></span><span class="song-time"><em class="song-level">${chartLevel(s, settings.difficulty, settings.lanes)}</em>${Math.floor(duration(s) / 60)}:${Math.floor(
           duration(s) % 60,
         )
           .toString()
@@ -812,7 +772,7 @@ async function start() {
     $('#home-start').click();
     return;
   }
-  if (preparing || active || regenerating) return;
+  if (preparing || active) return;
   if (matchMedia('(pointer: coarse)').matches && innerWidth < 900) {
     toast(t('unsupported'));
     return;
@@ -2194,8 +2154,14 @@ function readRoute() {
       ? parts[1]
       : q.get('song');
   const idx = SONGS.findIndex((s) => s.id === id);
-  if (idx >= 0 && (shared || !hiddenSongs.has(SONGS[idx].id))) songIndex = idx;
-  else if (!shared && hiddenSongs.has(SONGS[songIndex].id))
+  if (idx >= 0 && (shared || !isHiddenSong(SONGS[idx].id))) {
+    songIndex = shared
+      ? idx
+      : (visibleSongIndices().find(
+          (i) =>
+            libraryVideoKey(SONGS[i].id) === libraryVideoKey(SONGS[idx].id),
+        ) ?? idx);
+  } else if (!shared && isHiddenSong(SONGS[songIndex].id))
     songIndex = visibleSongIndices()[0];
   const lanes = parts[0] === 'play' ? parts[2] : q.get('lanes');
   const difficulty = parts[0] === 'play' ? parts[3] : q.get('difficulty');
@@ -2358,7 +2324,7 @@ void initializeLibrary();
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.2.21',
+    version: '0.2.22',
     active,
     paused,
     fever: engine

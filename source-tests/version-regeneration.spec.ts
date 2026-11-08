@@ -20,7 +20,7 @@ const bytes = Buffer.from(raw.subarray(0, data + 8 + 48000 * 4 * 8));
 bytes.writeUInt32LE(bytes.length - 8, 4);
 bytes.writeUInt32LE(48000 * 4 * 8, data + 4);
 const sha = createHash('sha256').update(bytes).digest('hex');
-test('explicit regeneration keeps legacy pin and replay while adding a separate version', async ({
+test('archived sources remain frozen and replayable behind one visible video entry', async ({
   page,
 }) => {
   test.setTimeout(120000);
@@ -148,8 +148,15 @@ test('explicit regeneration keeps legacy pin and replay while adding a separate 
   await page.click('#local-replay');
   await expect(page.locator('#results')).toBeVisible();
   await page.click('#back');
-  await page.click('#regenerate-chart');
-  await expect(page.locator('#regenerate-chart')).toBeEnabled();
+  await expect(page.locator('#regenerate-chart')).toHaveCount(0);
+  // Seed an archived analysis record internally, never through removed user UI.
+  await page.evaluate(async () => {
+    const { listPinnedSources } = await import('/src/external-source-store.ts');
+    const { regenerateSource } = await import('/src/external-regenerate.ts');
+    await regenerateSource((await listPinnedSources('uXn-zOt68V8'))[0]);
+  });
+  await page.reload();
+  await page.locator('[data-song="3"]').click();
   const versions = await page.evaluate(async () => {
     const { listPinnedSources, readPinnedSource } =
       await import('/src/external-source-store.ts');
@@ -184,8 +191,8 @@ test('explicit regeneration keeps legacy pin and replay while adding a separate 
     oldPin.charts['7:high'].notes,
   );
   expect(network).toBe(count);
-  await expect(page.locator('#local-replay')).toBeHidden();
-  await expect(page.locator('.song-card')).toHaveCount(5);
+  await expect(page.locator('#local-replay')).toBeVisible();
+  await expect(page.locator('.song-card')).toHaveCount(4);
   await page.screenshot({
     path: 'test-results/version-regeneration-select.png',
   });
@@ -222,7 +229,7 @@ test('explicit regeneration keeps legacy pin and replay while adding a separate 
         '#start',
         '#open-game-options',
         '#add-youtube',
-        '#regenerate-chart',
+        '#remove-song',
       ]) {
         const bounds = await page.locator(id).evaluate((e) => {
           const r = e.getBoundingClientRect();
@@ -265,11 +272,18 @@ test('explicit regeneration keeps legacy pin and replay while adding a separate 
     window.dispatchEvent(new Event('languagechange'));
   });
   // Same analysis is idempotent, not an ever-growing library.
-  await page.click('#regenerate-chart');
-  await expect(page.locator('#regenerate-chart')).toBeEnabled();
-  await expect(page.locator('.song-card')).toHaveCount(5);
+  await expect(page.locator('#regenerate-chart')).toHaveCount(0);
+  // Seed an archived analysis record internally, never through removed user UI.
+  await page.evaluate(async () => {
+    const { listPinnedSources } = await import('/src/external-source-store.ts');
+    const { regenerateSource } = await import('/src/external-regenerate.ts');
+    await regenerateSource((await listPinnedSources('uXn-zOt68V8'))[0]);
+  });
   await page.reload();
-  await expect(page.locator('.song-card')).toHaveCount(5);
+  await page.locator('[data-song="3"]').click();
+  await expect(page.locator('.song-card')).toHaveCount(4);
+  await page.reload();
+  await expect(page.locator('.song-card')).toHaveCount(4);
   await page.locator('[data-song="3"]').click();
   await expect(page.locator('#local-replay')).toBeVisible();
   await page.click('#local-replay');

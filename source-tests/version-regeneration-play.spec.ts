@@ -21,18 +21,9 @@ bytes.writeUInt32LE(bytes.length - 8, 4);
 bytes.writeUInt32LE(48000 * 4 * 8, data + 4);
 const sha = createHash('sha256').update(bytes).digest('hex');
 for (const [lanes, early] of [[5, false]] as const)
-  test(`legacy source explicitly regenerated then new-version hold ${lanes}K is playable and replay-exact`, async ({
+  test(`direct import frozen chart hold ${lanes}K is playable and replay-exact`, async ({
     page,
   }) => {
-    await page.route('**/src/external-source-provider.ts', (route) =>
-      route.fulfill({
-        contentType: 'text/javascript',
-        body: fs.readFileSync(
-          'source-tests/fixtures/legacy-provider-browser.js',
-          'utf8',
-        ),
-      }),
-    );
     await page.route('https://i.ytimg.com/**', (route) =>
       route.fulfill({
         contentType: 'image/png',
@@ -89,23 +80,12 @@ for (const [lanes, early] of [[5, false]] as const)
     );
     await page.click('#youtube-submit');
     await expect(page.locator('#youtube-import')).not.toBeVisible();
-    const old = await page.evaluate(async () => {
-      const { listPinnedSources } =
-        await import('/src/external-source-store.ts');
-      return (await listPinnedSources('uXn-zOt68V8'))[0];
-    });
-    expect(old.chartSetSha256).toBeUndefined();
-    await page.unroute('**/src/external-source-provider.ts');
-    await page.reload();
-    await page.locator('[data-song="3"]').click();
-    await page.click('#regenerate-chart');
-    await expect(page.locator('#regenerate-chart')).toBeEnabled();
-    await expect(page.locator('.song-card')).toHaveCount(5);
-    await expect(page.locator('#local-replay')).toBeHidden();
+    await expect(page.locator('#regenerate-chart')).toHaveCount(0);
+    await expect(page.locator('.song-card')).toHaveCount(4);
     const current = await page.evaluate(async () => {
       const { listPinnedSources } =
         await import('/src/external-source-store.ts');
-      return (await listPinnedSources('uXn-zOt68V8'))[1];
+      return (await listPinnedSources('uXn-zOt68V8'))[0];
     });
     expect(current.chartSetSha256).toMatch(/^[a-f0-9]{64}$/);
 
@@ -243,13 +223,11 @@ for (const [lanes, early] of [[5, false]] as const)
       const records = await listPinnedSources('uXn-zOt68V8');
       return {
         records,
-        oldmeta: await localMetadata(records[0]),
-        newmeta: await localMetadata(records[1]),
+        newmeta: await localMetadata(records[0]),
       };
     });
-    expect(stored.records[0]).toEqual(old);
-    expect(stored.records[1]).toEqual(current);
-    expect(stored.oldmeta.latestSession).toBeUndefined();
+    expect(stored.records).toHaveLength(1);
+    expect(stored.records[0]).toEqual(current);
     expect(stored.newmeta.latestSession).toBeTruthy();
     await page.click('#back');
     await expect(page.locator('#local-replay')).toBeVisible();
