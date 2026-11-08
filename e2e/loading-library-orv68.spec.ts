@@ -41,7 +41,11 @@ for (const width of [1440, 979, 390, 320])
     const row = p.locator('.import-pending[data-state=loading]'),
       normal = p.locator('#songs>[data-song="0"]');
     await expect(row).toBeVisible();
-    await row.scrollIntoViewIfNeeded();
+    // Boot may rebuild the list while the same pending job remains active.
+    await expect(async () => {
+      await row.scrollIntoViewIfNeeded();
+      await expect(row).toBeVisible();
+    }).toPass({ timeout: 5000 });
     const metrics = async (e: any) =>
       e.evaluate((n: HTMLElement) => {
         const s = getComputedStyle(n),

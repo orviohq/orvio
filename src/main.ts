@@ -923,7 +923,24 @@ function songCards() {
             .filter(Boolean)
             .join(' ');
     copy.append(title, status);
-    element.append(copy);
+    const cover = document.createElement('span');
+    cover.className = 'cover import-cover';
+    const thumbnail = document.createElement('img');
+    thumbnail.className = 'youtube-cover';
+    thumbnail.alt = '';
+    thumbnail.referrerPolicy = 'no-referrer';
+    thumbnail.src = `https://i.ytimg.com/vi/${row.videoId}/mqdefault.jpg`;
+    thumbnail.onerror = () => {
+      thumbnail.onerror = null;
+      thumbnail.src = ART_FALLBACK;
+    };
+    cover.append(thumbnail);
+    const category = document.createElement('small');
+    category.textContent = 'YouTube';
+    copy.prepend(category);
+    const actions = document.createElement('span');
+    actions.className = 'import-actions';
+    element.append(cover, copy, actions);
     if (row.state === 'loading') {
       element.setAttribute('aria-busy', 'true');
       const spinner = document.createElement('span');
@@ -934,7 +951,7 @@ function songCards() {
       retry.className = 'quiet';
       retry.textContent = importRetryLabel(settings.language);
       retry.onclick = () => void reconcileLibraryRow(row);
-      element.append(retry);
+      actions.append(retry);
     }
     const inspect = document.createElement('button');
     inspect.className = 'quiet';
@@ -960,17 +977,17 @@ function songCards() {
       status.textContent = deviceInspectionMessage(state, settings.language);
       status.dataset.deviceAudio = state;
     };
-    element.append(inspect);
+    actions.append(inspect);
     const history = document.createElement('button');
     history.className = 'quiet';
     history.textContent = externalLabels(settings.language).replay;
     history.onclick = () => void openVideoHistory(row.videoId);
-    element.append(history);
+    actions.append(history);
     const remove = document.createElement('button');
     remove.className = 'quiet';
     remove.textContent = removalLabels(settings.language).button;
     remove.onclick = () => openSongRemoval('yt:' + row.videoId, row.title);
-    element.append(remove);
+    actions.append(remove);
     $('#songs').append(element);
     void localVideoSessions(row.videoId)
       .then((sessions) => {
@@ -1011,7 +1028,7 @@ function songCards() {
           );
     const category = document.createElement('small');
     category.textContent = 'YouTube';
-    if (pending.state === 'loading') copy.append(category);
+    copy.append(category);
     copy.append(title, state);
     const cover = document.createElement('span');
     cover.className = 'cover import-cover';
