@@ -49,12 +49,28 @@
     }
     if (!key) return discard();
     const raw = localStorage.getItem('orvio.result-display.v2');
-    if (!raw || raw.length > 400000) return discard();
+    if (!raw) return discard();
     const store = JSON.parse(raw);
     if (store.v !== 2 || !store.entries || typeof store.entries !== 'object')
       return discard();
     const p = store.entries[key];
     if (!p) return discard();
+    // Fragment-keyed entries bind identity by exact string equality: the
+    // hash is only a lookup, a collision can never paint a wrong result.
+    if (key.startsWith('h:')) {
+      // Exact identity: the entry stores the full original fragment
+      // serializations (arrival and canonical, which differ because the app
+      // re-encodes and re-orders params). No hash comparison decides what
+      // paints, so no collision can paint a different result.
+      const fragment = location.hash.slice(1);
+      if (
+        !Array.isArray(p.fragments) ||
+        !p.fragments.some(
+          (f) => typeof f === 'string' && f.length <= 130000 && f === fragment,
+        )
+      )
+        return discard();
+    }
     // Locale is part of identity: a projection captured in another language
     // would flash stale labels. Settings are display preferences, safe to
     // read here; if they cannot be read, the stored locale must match the
@@ -140,8 +156,23 @@
     set('#rp-retry', p.retryLabel, 100);
     const retryNode = root.querySelector('#rp-retry');
     if (retryNode) retryNode.disabled = p.retryDisabled === true;
-    set('[data-rp-share-label]', p.shareLabel, 100);
-    set('[data-rp-mobile-note]', p.note, 300);
+    // The share label goes into the dedicated span slot when the component
+    // provides one, otherwise onto the button itself (its icon is static
+    // markup in the component or absent - never stored data).
+    const shareLabelNode =
+      root.querySelector('[data-rp-share-label]') ??
+      root.querySelector('#rp-share-result');
+    if (shareLabelNode)
+      shareLabelNode.textContent = text(p.shareLabel, 100);
+    let noteNode = root.querySelector('[data-rp-mobile-note]');
+    if (!noteNode) {
+      noteNode = document.createElement('p');
+      noteNode.className = 'mobile-playback-note';
+      noteNode.setAttribute('data-rp-mobile-note', '');
+      const actions = root.querySelector('.result-actions');
+      if (actions) actions.before(noteNode);
+    }
+    if (noteNode) noteNode.textContent = text(p.note, 300);
     // Option badges: typed data only, rebuilt with createElementNS. Anything
     // outside the whitelist discards the whole projection.
     const KINDS = ['keys', 'difficulty', 'speed', 'shuffle', 'fader'];
@@ -240,7 +271,14 @@
     }
     // FEVER summary: text + class-hidden state, same mechanism as the live
     // dialog (syncResultFever toggles the 'hidden' class).
-    const fever = root.querySelector('#rp-fever');
+    let fever = root.querySelector('#rp-fever');
+    if (!fever) {
+      fever = document.createElement('p');
+      fever.id = 'rp-fever';
+      fever.className = 'hint hidden';
+      const list0 = root.querySelector('#rp-judgment-list');
+      if (list0) list0.before(fever);
+    }
     if (fever && p.fever && typeof p.fever === 'object') {
       if (p.fever.hidden !== true && text(p.fever.text, 120)) {
         fever.textContent = text(p.fever.text, 120);

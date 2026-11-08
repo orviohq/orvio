@@ -6,10 +6,10 @@ import type { SharedResult } from './share';
 
 type UiResult = Omit<SharedResult, 'song'> & { song: string };
 
-/** 128-bit FNV-1a (two independently seeded 64-bit lanes) over the FULL
- * fragment string. Cache identity, not security: 2^-128 accidental collision
- * on same-origin, self-written entries, and hydration re-verifies the result
- * fingerprint before consuming a projection anyway. */
+/** FNV-1a-style lookup hash over the full fragment string. This is ONLY a
+ * storage key: fragment-keyed entries carry the full original fragment and
+ * the bootstrap requires exact string equality before painting, so a hash
+ * collision can never paint a different result. */
 export function fnv128(value: string): string {
   let a1 = 0x811c9dc5,
     a2 = 0x811c9dc5,
@@ -80,10 +80,11 @@ export function isProjectionExpired(
 
 /** Storage pressure handling: evict the oldest DISPLAY projections until the
  * serialized store fits the budget. The just-written keys are never evicted;
- * if they alone exceed the budget they are still written (a cache update must
- * never fail outright). Insertion order is the LRU order because writers
- * delete-then-set. This touches only the display-projection store, never
- * functional replay/session history. */
+ * if they alone exceed the budget the write is still attempted, and if the
+ * browser then refuses it (hard quota) this optional paint cache simply
+ * skips the update - it never breaks the verified result. Insertion order
+ * is the LRU order because writers delete-then-set. This touches only the
+ * display-projection store, never functional replay/session history. */
 export function evictResultDisplayEntries<T>(
   entries: Record<string, T>,
   keep: ReadonlySet<string>,

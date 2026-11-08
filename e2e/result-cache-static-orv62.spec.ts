@@ -346,3 +346,133 @@ test('ORV-62 static: cold first visit still plays the count-up (ORV-59 no regres
     timeout: 20000,
   });
 });
+
+test('ORV-62 static: a hash-collision store entry can never paint (exact fragment binding)', async ({
+  page,
+}) => {
+  // Simulate a lookup-key collision: an entry filed under THIS fragment's
+  // hash but carrying a DIFFERENT original fragment must not paint.
+  const { fnv128 } = await import('../src/result-first-paint-core');
+  await page.addInitScript((key) => {
+    localStorage.setItem(
+      'orvio.settings.v1',
+      JSON.stringify({ language: 'ko' }),
+    );
+    localStorage.setItem(
+      'orvio.result-display.v2',
+      JSON.stringify({
+        v: 2,
+        entries: {
+          [key]: {
+            fp: 'x',
+            locale: 'ko',
+            title: 'Wrong Result',
+            scoreText: '999,999',
+            combo: 99,
+            rateText: '99.99%',
+            badges: [],
+            fragments: [
+              'v=3&song=other-song&keys=7&diff=high&score=1&acc=0.01&combo=0&j=0,0,0,0,0,0,0,0,0,0,0,1',
+            ],
+          },
+        },
+      }),
+    );
+  }, 'h:' + fnv128(FRAGMENT_PLAIN));
+  await page.goto('/result/#' + FRAGMENT_PLAIN);
+  await expect(page.locator('#results')).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('#result-score')).toHaveText('500,000');
+  const outcome = await page.evaluate(
+    () => (window as any).__resultFirstPaintOutcome,
+  );
+  expect(outcome.painted).toBe(false);
+});
+
+test('ORV-62 static: a store larger than the old 400KB global read cap still paints', async ({
+  page,
+}) => {
+  const { fnv128 } = await import('../src/result-first-paint-core');
+  await page.addInitScript(
+    ({ key, fragment }) => {
+      const filler = (n: number) => ({
+        fp: 'x',
+        locale: 'ko',
+        title: 'Filler',
+        scoreText: '1',
+        combo: 0,
+        rateText: '0.10%',
+        badges: [],
+        fragments: ['v=3&song=filler&pad=' + 'y'.repeat(n)],
+      });
+      localStorage.setItem(
+        'orvio.settings.v1',
+        JSON.stringify({ language: 'ko' }),
+      );
+      localStorage.setItem(
+        'orvio.result-display.v2',
+        JSON.stringify({
+          v: 2,
+          entries: {
+            'h:filler1': filler(120000),
+            'h:filler2': filler(120000),
+            'h:filler3': filler(120000),
+            [key]: {
+              fp: 'x',
+              locale: 'ko',
+              title: 'First Light',
+              scoreText: '500,000',
+              combo: 1,
+              rateText: '50.00%',
+              badges: [],
+              fragments: [fragment],
+            },
+          },
+        }),
+      );
+    },
+    { key: 'h:' + fnv128(FRAGMENT_PLAIN), fragment: FRAGMENT_PLAIN },
+  );
+  await page.goto('/result/#' + FRAGMENT_PLAIN);
+  await expect(page.locator('#results')).toBeVisible({ timeout: 20000 });
+  const outcome = await page.evaluate(
+    () => (window as any).__resultFirstPaintOutcome,
+  );
+  expect(outcome.painted).toBe(true);
+  expect(outcome.matched).toBe(false); // fp 'x' never matches: no count-up skip
+});
+
+test('ORV-62 static: hard localStorage quota pressure never breaks the verified render', async ({
+  page,
+  context,
+}) => {
+  await instrumentWorker(context);
+  const id = 'replay000000000000000062';
+  await page.goto('/result/?s=' + id);
+  await expect(page.locator('#results')).toBeVisible();
+  // Fill the origin's storage to real quota.
+  await page.evaluate(() => {
+    const junk = 'x'.repeat(1024 * 1024);
+    for (let i = 0; i < 20; i++) {
+      try {
+        localStorage.setItem('orvio-junk-' + i, junk);
+      } catch {
+        break;
+      }
+    }
+  });
+  await slowModules(context);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.goto('/result/?s=' + id, { waitUntil: 'commit' });
+  await expect(page.locator('#results')).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('#result-score')).toHaveText('500,000');
+  expect(errors).toHaveLength(0);
+  // The paint cache write may have been skipped under quota; the result
+  // itself is unaffected either way (honest optional-cache behavior).
+  console.log(
+    'ORV62 quota test store readable:',
+    await page.evaluate(
+      () => localStorage.getItem('orvio.result-display.v2') !== null,
+    ),
+  );
+});

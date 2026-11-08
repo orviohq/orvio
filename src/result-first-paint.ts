@@ -47,6 +47,11 @@ interface ResultProjection {
   preview: { label: string; hidden: boolean };
   systemLabel: string;
   art: string;
+  /** The full original fragment serializations (arrival and canonical) for
+   * fragment-keyed entries: the hash key is only a lookup, identity binds
+   * by exact string equality, so no hash collision can ever paint a
+   * different result. */
+  fragments?: string[];
   expiresAt?: number;
 }
 
@@ -61,6 +66,10 @@ export interface ResultFirstPaintDetails {
   /** settings.language at write time; the bootstrap refuses to paint a
    * projection whose labels are in the wrong language. */
   locale?: string;
+  /** The fragment exactly as it arrived, before the app canonicalizes the
+   * address (it re-encodes and re-orders params); a warm revisit presents
+   * the arrival form, so exact identity needs both serializations. */
+  arrivalFragment?: string;
 }
 
 /** Snapshot the live, verified result DOM exactly as rendered (locale
@@ -127,6 +136,17 @@ export function rememberResultFirstPaint(
         document.querySelector('#results .result-system > span')?.textContent ??
         '',
       art: document.querySelector<HTMLImageElement>('#result-art')?.src ?? '',
+      ...(wanted.some((k) => k.startsWith('h:'))
+        ? {
+            fragments: [
+              ...new Set(
+                [details.arrivalFragment, location.hash.slice(1)].filter(
+                  (f): f is string => !!f && f.length <= 130000,
+                ),
+              ),
+            ],
+          }
+        : {}),
       ...(details.expiresAt !== undefined
         ? { expiresAt: details.expiresAt }
         : {}),
@@ -147,7 +167,23 @@ export function rememberResultFirstPaint(
     );
     const json = JSON.stringify(store);
     if (localStorage.getItem(STORAGE_KEY) !== json)
-      localStorage.setItem(STORAGE_KEY, json);
+      try {
+        localStorage.setItem(STORAGE_KEY, json);
+      } catch {
+        // Hard quota (QuotaExceededError): degrade to just the new entries;
+        // if even that does not fit, the paint cache simply skips this
+        // write - it never blocks or breaks the verified result.
+        try {
+          const solo: Record<string, ResultProjection> = {};
+          for (const key of wanted) solo[key] = projection;
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({ v: 2, entries: solo }),
+          );
+        } catch {
+          /* no projection this time */
+        }
+      }
     localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch {
     /* Optional paint cache must never block the verified result. */

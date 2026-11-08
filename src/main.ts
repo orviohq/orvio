@@ -1839,7 +1839,9 @@ function resultLink(result: UiResult) {
 }
 function showResult(result: UiResult) {
   const arrivalKey = initialArrivalKey ?? resultIdentityKey(location.href);
+  const arrivalFragment = initialArrivalFragment;
   initialArrivalKey = null;
+  initialArrivalFragment = null;
   $('#retry').innerHTML =
     `${label(ownResults.has(result) ? 'retry' : 'start')} ↵`;
   screen = 'select';
@@ -1919,6 +1921,7 @@ function showResult(result: UiResult) {
     ...(shared ? { expiresAt: Date.parse(shared.expiresAt) } : {}),
     badges: resultBadgeList,
     locale: settings.language,
+    arrivalFragment: arrivalFragment ?? undefined,
   });
   resultMotion.play(result.score, settings.reducedMotion || projected);
 }
@@ -3072,10 +3075,13 @@ async function resolveSharedReplay(
   return loadSharedReplay(id);
 }
 let initialArrivalKey: string | null = null;
+let initialArrivalFragment: string | null = null;
 async function readInitialRoute() {
   // The ?s= flow replaceStates to the fragment form before rendering; keep
   // the arrival identity so the projection is written under both.
   initialArrivalKey = resultIdentityKey(location.href);
+  initialArrivalFragment =
+    location.hash.length > 1 ? location.hash.slice(1) : null;
   let expectedHref = location.href;
   const initialNavigation = navigationVersion;
   const stillInitial = () =>
