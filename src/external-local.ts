@@ -233,7 +233,7 @@ export async function listLocalSessions(): Promise<ListedLocalSession[]> {
 export async function updateLocalDisplayMetadata(
   record: SourceRecord,
   title: string,
-  author: string,
+  author: string | null,
 ) {
   const db = await open();
   try {
@@ -246,7 +246,12 @@ export async function updateLocalDisplayMetadata(
         const target = tx.objectStore(store),
           r = target.get(key);
         r.onsuccess = () => {
-          if (r.result) target.put({ ...r.result, title, author });
+          if (r.result)
+            target.put({
+              ...r.result,
+              title,
+              ...(author !== null ? { author } : {}),
+            });
         };
       }
       tx.oncomplete = () => resolve();

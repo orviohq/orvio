@@ -72,7 +72,7 @@ export function externalAudio(id: string, context: AudioContext): AudioBuffer {
 export function updateExternalDisplayMetadata(
   record: SourceRecord,
   title: string,
-  author: string,
+  author: string | null,
 ) {
   const item = sources.get(sourceId(record));
   if (
@@ -82,6 +82,6 @@ export function updateExternalDisplayMetadata(
   )
     return false;
   item.song.title = title;
-  item.song.subtitle = author || 'YouTube';
+  if (author !== null) item.song.subtitle = author || item.song.subtitle;
   return true;
 }

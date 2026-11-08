@@ -3,7 +3,7 @@ import type { SourceRecord } from './external-source';
 export interface CanonicalMetadata {
   videoId: string;
   title: string;
-  author: string;
+  author: string | null;
   durationSec: number | null;
   audioSha256: string;
   chartSetSha256: string;
@@ -24,9 +24,10 @@ export function validCanonicalMetadata(
     m.title.trim().length > 0 &&
     m.title.length <= 300 &&
     !/[\u0000-\u001f\u007f]/.test(m.title) &&
-    typeof m.author === 'string' &&
-    m.author.length <= 200 &&
-    !/[\u0000-\u001f\u007f]/.test(m.author) &&
+    (m.author === null ||
+      (typeof m.author === 'string' &&
+        m.author.length <= 200 &&
+        !/[\u0000-\u001f\u007f]/.test(m.author))) &&
     (m.durationSec === null ||
       (Number.isInteger(m.durationSec) &&
         m.durationSec! >= 0 &&
@@ -74,5 +75,10 @@ export async function readCanonicalMetadata(
   } catch {
     return null;
   }
-  return validCanonicalMetadata(raw, record) ? raw : null;
+  if (!validCanonicalMetadata(raw, record)) return null;
+  return {
+    ...raw,
+    author:
+      typeof raw.author === 'string' && raw.author.trim() ? raw.author : null,
+  };
 }
