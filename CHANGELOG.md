@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.48] - 2026-11-09
+
+- Prepare charts for already-saved audio on the device in an owned Web Worker.
+- Preserve server-frozen charts and local immutable chart identities, including interrupted saves and concurrent tabs.
+- Recover shared local charts only from exact verified audio. Missing or changed audio fails honestly without automatic extraction.
+- New uncached audio admission and compression remain off. Existing audio and replay data are retained.
+
 ## [0.2.47] - 2026-11-09
 
 - Isolate each whole-audio download's frozen identity, cancellation and returned buffer ownership. One caller cannot reuse another caller's WAV-dimension check, cancel its request or detach its bytes by transfer. These mutable owned buffers deliberately do not deduplicate concurrent requests; no full-WAV copy or persistent audio duplicate is added. Small JSON query caching and progressive playback are unchanged.
