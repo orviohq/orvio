@@ -1,3 +1,7 @@
+## [0.3.3] - 2026-11-10
+
+- Remove hidden songs from the visible list immediately, while keeping their saved audio, results and replays.
+
 ## [0.3.2] - 2026-11-10
 
 - Fix a click-handling error after returning from a replay to the song list.
