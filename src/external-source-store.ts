@@ -116,7 +116,7 @@ export async function listPinnedSources(
       const request = db
         .transaction(STORE, 'readonly')
         .objectStore(STORE)
-        .getAll();
+        .getAll(IDBKeyRange.bound(videoId + ':', videoId + ':\uffff'));
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });

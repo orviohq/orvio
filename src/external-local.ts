@@ -1,3 +1,4 @@
+import { updateLegacyDisplayMetadata } from './library-metadata';
 import { isOpusRecord } from './playable-source';
 import {
   saveOpus35Metadata,
@@ -299,32 +300,12 @@ export async function updateLocalDisplayMetadata(
       await saveOpus35Metadata(record, title, old.jobId, author ?? old.author);
     return;
   }
-  const db = await open();
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(['audio', 'metadata'], 'readwrite');
-      for (const [store, key] of [
-        ['audio', sourceAudioId(record)],
-        ['metadata', sourceId(record)],
-      ]) {
-        const target = tx.objectStore(store),
-          r = target.get(key);
-        r.onsuccess = () => {
-          if (r.result)
-            target.put({
-              ...r.result,
-              title,
-              ...(author !== null ? { author } : {}),
-            });
-        };
-      }
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
-    });
-  } finally {
-    db.close();
-  }
+  await updateLegacyDisplayMetadata(
+    sourceAudioId(record),
+    sourceId(record),
+    title,
+    author,
+  );
 }
 
 /** Explicit song-link Add: display metadata only, never audio or replay mutation. */

@@ -3548,10 +3548,36 @@ function recoverDisplayMetadata(record: PlayableSourceRecord) {
       ) {
         $('#result-song').textContent = metadata.title;
       }
-      if (!active && !preparing && screen === 'select') {
-        songCards();
+      // Display-only responses must not replace live click/focus targets.
+      // Rows keep their chart/source identity and handlers during refresh.
+      for (const element of document.querySelectorAll<HTMLElement>(
+        '#songs [data-song]',
+      )) {
+        const song = SONGS[Number(element.dataset.song)];
+        const item = song && externalSource(song.id);
+        if (
+          item?.record.videoId !== record.videoId ||
+          item.record.audioSha256 !== record.audioSha256 ||
+          item.record.chartSetSha256 !== record.chartSetSha256
+        )
+          continue;
+        const title = element.querySelector<HTMLElement>('.song-copy > strong');
+        const subtitle = element.querySelector<HTMLElement>(
+          '.song-copy > span:not(.song-note-count)',
+        );
+        if (title && title.textContent !== song.title)
+          title.textContent = song.title;
+        if (subtitle && subtitle.textContent !== song.subtitle)
+          subtitle.textContent = song.subtitle;
+      }
+      if (
+        !active &&
+        !preparing &&
+        screen === 'select' &&
+        externalSource(SONGS[songIndex].id)?.record.videoId === record.videoId
+      )
         selectedSong();
-      } else if (screen === 'replays') void showReplays();
+      else if (screen === 'replays') void showReplays();
     } catch {
       /* Optional display recovery never blocks or replaces a playable source. */
     }
