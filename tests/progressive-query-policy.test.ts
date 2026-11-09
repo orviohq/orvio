@@ -83,6 +83,19 @@ it('simultaneous progressive runs have independent audio GET ownership and never
       ? Response.json(fixture.manifestBody)
       : new Response(fixture.recordBody, { headers: fixture.recordHeaders });
   });
+  // Capture each run's query as the cache adds it: runs use gcTime 0, so a
+  // settled query can be collected on a macrotask turn before a slower
+  // sibling finishes (crypto/body reads). Counting only after both settle
+  // would race that collection; ownership is what was created, not what
+  // still remains cached.
+  const owned = new Map<string, import('@tanstack/react-query').Query>();
+  const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+    if (
+      event.type === 'added' &&
+      event.query.queryKey[0] === 'progressive-play'
+    )
+      owned.set(JSON.stringify(event.query.queryKey), event.query);
+  });
   const a = beginProgressivePlayback(
       fixture.record,
       context(),
@@ -99,10 +112,9 @@ it('simultaneous progressive runs have independent audio GET ownership and never
     expect(a.done).rejects.toThrow('fixture audio failure'),
     expect(b.done).rejects.toThrow('fixture audio failure'),
   ]);
+  unsubscribe();
   expect(audio).toBe(2);
-  const queries = queryClient
-    .getQueryCache()
-    .findAll({ queryKey: ['progressive-play'] });
+  const queries = [...owned.values()];
   expect(queries).toHaveLength(2);
   expect(
     queries.every((q) => q.state.data === undefined && !shouldPersistQuery(q)),
