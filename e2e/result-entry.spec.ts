@@ -4,7 +4,7 @@ const fragment =
 test('cold short entry paints only a result shell and then the result, never home', async ({
   browser,
   baseURL,
-}) => {
+}, testInfo) => {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
   });
@@ -52,14 +52,18 @@ test('cold short entry paints only a result shell and then the result, never hom
       .locator('.result-spinner')
       .evaluate((e) => getComputedStyle(e).animationName),
   ).toBe('result-spin');
-  await page.screenshot({ path: '/downloads/a37-result-spinner.png' });
+  await page.screenshot({
+    path: testInfo.outputPath('a37-result-spinner.png'),
+  });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   expect(
     await page
       .locator('.result-spinner')
       .evaluate((e) => getComputedStyle(e).animationName),
   ).toBe('none');
-  await page.screenshot({ path: '/downloads/a37-result-reduced-motion.png' });
+  await page.screenshot({
+    path: testInfo.outputPath('a37-result-reduced-motion.png'),
+  });
   release();
   await expect(page.locator('#results')).toBeVisible();
   await expect(page.locator('#result-entry')).toBeHidden();

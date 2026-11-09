@@ -10,7 +10,7 @@ for (const viewport of [
 ])
   test(`result card ends just below actions at ${viewport.width}x${viewport.height}`, async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.setViewportSize(viewport);
     await page.goto(result);
     await expect(page.locator('#results')).toBeVisible();
@@ -33,6 +33,6 @@ for (const viewport of [
     expect(measure.overflow).toBe(false);
     await expect(page.locator('#retry')).toBeInViewport();
     await page.screenshot({
-      path: `/downloads/orv60-final-${viewport.width}.png`,
+      path: testInfo.outputPath(`orv60-final-${viewport.width}.png`),
     });
   });

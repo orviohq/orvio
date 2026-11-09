@@ -3,7 +3,7 @@ const result =
   '/result/#v=4&song=afterimage&keys=7&diff=high&score=500000&acc=50&combo=1&j=1,0,0,0,0,0,0,0,0,0,0,1&speed=3&shuffle=off&fade=off&seed=123';
 test('count-up, punchy rank and sequential details animate without locking actions', async ({
   page,
-}) => {
+}, testInfo) => {
   await page.addInitScript(() => {
     const w = window as any;
     w.__scoreFrames = [];
@@ -56,7 +56,9 @@ test('count-up, punchy rank and sequential details animate without locking actio
   );
   await expect(page.locator('#result-rank')).toHaveText('C');
   await expect(page.locator('#result-rate')).toHaveText('50.00%');
-  await page.screenshot({ path: '/downloads/orv59-final-desktop.png' });
+  await page.screenshot({
+    path: testInfo.outputPath('orv59-final-desktop.png'),
+  });
 });
 test('reduced motion shows exact final values immediately, no animation', async ({
   page,
@@ -103,7 +105,7 @@ test('changing OS motion preference settles an in-flight count', async ({
 test('motion evidence real frames desktop and mobile', async ({
   browser,
   baseURL,
-}) => {
+}, testInfo) => {
   for (const [width, height] of [
     [1280, 720],
     [390, 844],
@@ -112,17 +114,26 @@ test('motion evidence real frames desktop and mobile', async ({
       viewport: { width, height },
       locale: 'ko-KR',
       baseURL,
-      recordVideo: { dir: '/downloads/orv59-motion', size: { width, height } },
+      recordVideo: {
+        dir: testInfo.outputPath('orv59-motion'),
+        size: { width, height },
+      },
     });
     const page = await context.newPage();
     await page.goto(result);
     await expect(page.locator('#results')).toBeVisible();
     await page.waitForTimeout(180);
-    await page.screenshot({ path: `/downloads/orv59-early-${width}.png` });
+    await page.screenshot({
+      path: testInfo.outputPath(`orv59-early-${width}.png`),
+    });
     await page.waitForTimeout(300);
-    await page.screenshot({ path: `/downloads/orv59-mid-${width}.png` });
+    await page.screenshot({
+      path: testInfo.outputPath(`orv59-mid-${width}.png`),
+    });
     await page.waitForTimeout(1000);
-    await page.screenshot({ path: `/downloads/orv59-final-${width}.png` });
+    await page.screenshot({
+      path: testInfo.outputPath(`orv59-final-${width}.png`),
+    });
     await context.close();
     console.log('MOTION_VIDEO', width, await page.video()!.path());
   }
