@@ -105,7 +105,7 @@ import { importYoutube } from './external-import';
 import { pinSource, allPinnedSources } from './external-source-store';
 import {
   externalSource,
-  externalAudio,
+  externalAudioCooperative,
   installExternalSource,
   sourceId,
 } from './external-catalog';
@@ -353,7 +353,10 @@ async function preloadTrack(id: string): Promise<Soundtrack | undefined> {
         else return undefined;
       }
       await ensureExternalBytes(id);
-      return { buffer: externalAudio(id, preloadContext), peak: 1 };
+      return {
+        buffer: await externalAudioCooperative(id, preloadContext),
+        peak: 1,
+      };
     }
     const cached = await cachedAudio(id, preloadContext);
     if (cached) return cached;
@@ -1388,14 +1391,16 @@ async function prepare(attempt: StartupAttempt, joinGatePreload = false) {
     external.record.manifestSha256 &&
     !external.bytes
   ) {
-    const local = await attempt.wait(localAudio(external.record));
+    const local = await attempt.wait(
+      localAudio(external.record, attempt.signal),
+    );
     if (local) external.bytes = local.bytes;
     else {
       rendered = undefined;
       return { progressive: external, warm: false } as const;
     }
   }
-  await attempt.wait(ensureExternalBytes(song.id));
+  await attempt.wait(ensureExternalBytes(song.id, attempt.signal));
   let track = cache.get(song.id);
   if (!track && joinGatePreload && preloading.has(song.id)) {
     // A gate preload already renders this song; join it instead of
@@ -1404,7 +1409,12 @@ async function prepare(attempt: StartupAttempt, joinGatePreload = false) {
     track = cache.get(song.id);
   }
   track ??= externalSource(song.id)
-    ? { buffer: externalAudio(song.id, audio.context), peak: 1 }
+    ? {
+        buffer: await attempt.wait(
+          externalAudioCooperative(song.id, audio.context, attempt.signal),
+        ),
+        peak: 1,
+      }
     : await attempt.wait(cachedAudio(song.id, audio.context));
   const warm = !!track;
   if (!track) {
@@ -2841,7 +2851,14 @@ async function previewSong() {
     let track = cache.get(song.id);
     if (!track) {
       track = externalSource(song.id)
-        ? { buffer: externalAudio(song.id, clock.context), peak: 1 }
+        ? {
+            buffer: await externalAudioCooperative(
+              song.id,
+              clock.context,
+              controller.signal,
+            ),
+            peak: 1,
+          }
         : ((await cachedAudio(song.id, clock.context)) ??
           (await renderSong(song)));
       cache.set(song.id, track);

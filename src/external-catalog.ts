@@ -1,3 +1,4 @@
+import { fillPcmAudioBuffer } from './cooperative-audio';
 import type { Song, Note, Difficulty, Lanes } from './chart';
 import {
   isOpusRecord,
@@ -119,4 +120,44 @@ export function updateExternalDisplayMetadata(
   item.song.title = title;
   if (author !== null) item.song.subtitle = author || item.song.subtitle;
   return true;
+}
+
+/** Playback assembly after the unchanged whole-audio verification gate. */
+export async function externalAudioCooperative(
+  id: string,
+  context: BaseAudioContext,
+  signal?: AbortSignal,
+): Promise<AudioBuffer> {
+  signal?.throwIfAborted();
+  const item = sources.get(id);
+  if (!item?.bytes) throw Error('Matching source audio unavailable');
+  if (isOpusRecord(item.record)) {
+    const frames = item.record.frames;
+    if (
+      !Number.isSafeInteger(frames) ||
+      frames < 1 ||
+      frames > 14400000 ||
+      item.bytes.byteLength !== frames * 4
+    )
+      throw Error('opus_playback_pcm');
+    return fillPcmAudioBuffer(
+      context,
+      new DataView(item.bytes),
+      frames,
+      2,
+      48000,
+      0,
+      signal,
+    );
+  }
+  const p = inspectWav(item.bytes);
+  return fillPcmAudioBuffer(
+    context,
+    p.view,
+    p.frames,
+    p.channels,
+    p.sampleRate,
+    p.dataOffset,
+    signal,
+  );
 }

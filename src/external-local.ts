@@ -1,3 +1,4 @@
+import { readLocalAudioOwned } from './local-audio-reader';
 import { updateLegacyDisplayMetadata } from './library-metadata';
 import { isOpusRecord } from './playable-source';
 import {
@@ -8,7 +9,6 @@ import {
 } from './opus/opus35-store';
 import { sha256 } from './opus/opus-descriptor.mjs';
 import { retainAudioStorage } from './audio-storage-persistence';
-import { AUDIO_MAX_BYTES } from './audio-limits.mjs';
 import { externalSource, sourceId, sourceAudioId } from './external-catalog';
 import {
   validPlayableSource as validSourceRecord,
@@ -21,7 +21,6 @@ import {
   type RuntimeReplay,
 } from './replay';
 import type { SharedResult } from './share';
-import { inspectWav } from './canonical-pcm.mjs';
 type Result = Omit<SharedResult, 'song'> & { song: string };
 export interface LocalAsset {
   key: string;
@@ -136,25 +135,15 @@ export async function localAudio(
         }
       : null;
   }
-  const a = await get('audio', sourceAudioId(record));
-  if (!a) return null;
-  if (
-    !(a.bytes instanceof ArrayBuffer) ||
-    a.bytes.byteLength > AUDIO_MAX_BYTES ||
-    typeof a.title !== 'string' ||
-    a.title.length > 300 ||
-    (a.jobId !== undefined && typeof a.jobId !== 'string')
-  )
-    throw Error('Invalid local audio');
-  const hash = Array.from(
-    new Uint8Array(await crypto.subtle.digest('SHA-256', a.bytes)),
-    (x) => x.toString(16).padStart(2, '0'),
-  ).join('');
-  if (hash !== record.audioSha256) throw Error('Saved audio integrity failed');
-  const p = inspectWav(a.bytes);
-  if (p.sampleRate !== record.sampleRate || p.frames !== record.frames)
-    throw Error('Saved audio format changed');
-  return a;
+  return readLocalAudioOwned(
+    {
+      key: sourceAudioId(record),
+      audioSha256: record.audioSha256,
+      sampleRate: record.sampleRate,
+      frames: record.frames,
+    },
+    signal,
+  );
 }
 export async function saveLocalSession(replay: RuntimeReplay, result: Result) {
   const item = externalSource(replay.song);
