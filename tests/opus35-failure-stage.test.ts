@@ -95,3 +95,66 @@ it('ready same-job reads trace the existing handle and pass accurate later stage
   ]);
   expect(api.prepare.mock.calls[0][2].trace).toBe(trace);
 });
+it('create-only durable queued receipt reaches onJob before the first advancing GET', async () => {
+  vi.useFakeTimers();
+  try {
+    const order: string[] = [];
+    api.create.mockImplementation(async () => {
+      order.push('create');
+      return { ...base, status: 'pending', phase: 'QUEUED', retryAfterSec: 5 };
+    });
+    api.read.mockImplementation(async () => {
+      order.push('get');
+      return { ...base, status: 'verified' };
+    });
+    api.prepare.mockResolvedValue({ record: {} });
+    const result = importOpus35(base.videoId, new AbortController().signal, {
+      onJob: () => {
+        order.push('persist');
+      },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(order).toEqual(['create', 'persist']);
+    await vi.advanceTimersByTimeAsync(5000);
+    await result;
+    expect(order).toEqual(['create', 'persist', 'get', 'persist']);
+    expect(api.create).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+it('failed durable receipt callback prevents the first advancing GET without a replacement POST', async () => {
+  api.create.mockResolvedValue({
+    ...base,
+    status: 'pending',
+    phase: 'QUEUED',
+    retryAfterSec: 5,
+  });
+  const failure = Error('durable receipt blocked');
+  await expect(
+    importOpus35(base.videoId, new AbortController().signal, {
+      onJob: () => {
+        throw failure;
+      },
+    }),
+  ).rejects.toBe(failure);
+  expect(api.create).toHaveBeenCalledTimes(1);
+  expect(api.read).not.toHaveBeenCalled();
+});
+it('aborted advancing GET retains a known handle and a later resume does not create', async () => {
+  const control = new AbortController();
+  api.read.mockImplementationOnce(async () => {
+    control.abort();
+    throw control.signal.reason;
+  });
+  await expect(
+    importOpus35(base.videoId, control.signal, { jobId: base.jobId }),
+  ).rejects.toMatchObject({ name: 'AbortError' });
+  api.read.mockResolvedValue({ ...base, status: 'verified' });
+  api.prepare.mockResolvedValue({ record: {} });
+  await importOpus35(base.videoId, new AbortController().signal, {
+    jobId: base.jobId,
+  });
+  expect(api.create).not.toHaveBeenCalled();
+  expect(api.read).toHaveBeenCalledTimes(2);
+});

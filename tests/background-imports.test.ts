@@ -376,3 +376,42 @@ it('queued explicit retry intent survives reload behind an active job and is con
     retryFailed: false,
   });
 });
+it('a v2 job handle must persist before the importer can advance any known job', async () => {
+  raf();
+  let text = '[]';
+  const advance = vi.fn();
+  api.import.mockImplementationOnce(async (_id, _signal, options: any) => {
+    options.onJob({
+      videoId: 'AAAAAAAAAAA',
+      jobId: '11111111-2222-4333-8444-555555555555',
+      transportVersion: 2,
+      audioFormat: 'orvio-opus-v1',
+      status: 'queued',
+    });
+    advance();
+    return { prepared: { record: { videoId: 'AAAAAAAAAAA' } } };
+  });
+  const pending = new BackgroundImports(
+    () => {},
+    async () => {},
+    {
+      getItem: () => text,
+      setItem: (_key, value) => {
+        if (value.includes('11111111-2222-4333-8444-555555555555'))
+          throw Error('Storage full');
+        text = value;
+      },
+    },
+  );
+  pending.enqueue('AAAAAAAAAAA');
+  await vi.waitFor(() =>
+    expect(pending.rows.get('AAAAAAAAAAA')?.state).toBe('error'),
+  );
+  expect(advance).not.toHaveBeenCalled();
+  expect(pending.rows.get('AAAAAAAAAAA')).toMatchObject({
+    jobId: '11111111-2222-4333-8444-555555555555',
+    transportVersion: 2,
+    error: 'unavailable',
+    failure: { stage: 'storage' },
+  });
+});

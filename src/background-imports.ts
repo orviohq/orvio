@@ -246,8 +246,11 @@ export class BackgroundImports {
             if (job.title) row.title = job.title;
             try {
               this.persist();
-            } catch {
-              /* Preserve the known job in memory; never restart with another POST. */
+            } catch (error) {
+              // Keep the known handle in memory, but never advance v2 work
+              // without a durable handle for reload/unknown-effect recovery.
+              if ('transportVersion' in job && job.transportVersion === 2)
+                throw error;
             }
             this.changed();
           },
