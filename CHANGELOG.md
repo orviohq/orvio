@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.51] - 2026-11-09
+
+- Reduce repeated frequency-band lookup work while preparing charts on the device. Preserve exact chart outputs, timing, judgments and existing replay identities.
+
 ## [0.2.50] - 2026-11-09
 
 - Add 4-, 6- and 8-key modes for built-in songs alongside 5 and 7 keys.

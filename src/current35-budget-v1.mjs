@@ -491,6 +491,18 @@ function computeBandMags(
       Math.max(1, Math.floor(lo / binHz)),
       Math.min(window / 2 - 1, Math.ceil(hi / binHz)),
     ];
+  // Resolve first-match band priority once, preserving bin and sum order.
+  const bandForBin = [];
+  const bandEntries = Object.entries(bandBins);
+  const bandNames = Object.keys(BANDS);
+  for (let k = 1; k < window / 2; k++) {
+    for (const [b, [lo, hi]] of bandEntries) {
+      if (k >= lo && k <= hi) {
+        bandForBin[k] = b;
+        break;
+      }
+    }
+  }
   const re = new Float64Array(window),
     im = new Float64Array(window);
   const times = [],
@@ -504,13 +516,10 @@ function computeBandMags(
     const sums = { low: 0, mid: 0, high: 0 };
     for (let k = 1; k < window / 2; k++) {
       const m = Math.sqrt(re[k] * re[k] + im[k] * im[k]);
-      for (const [b, [lo, hi]] of Object.entries(bandBins))
-        if (k >= lo && k <= hi) {
-          sums[b] += m;
-          break;
-        }
+      const b = bandForBin[k];
+      if (b !== undefined) sums[b] += m;
     }
-    for (const b of Object.keys(BANDS))
+    for (const b of bandNames)
       mags[b].push(sums[b] / (bandBins[b][1] - bandBins[b][0] + 1));
     times.push((i + window / 2) / sampleRate);
   }
