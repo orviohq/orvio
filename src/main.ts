@@ -1,3 +1,4 @@
+import { installDoubleTapGuard } from './touch-gestures';
 import { isOpusRecord, type PlayableSourceRecord } from './playable-source';
 import { listOpus35Metadata } from './opus/opus35-store';
 import { readVerifiedOpusByRoots } from './opus/opus-cache.mjs';
@@ -268,6 +269,7 @@ let localSessionKey: string | undefined;
 /** True only when the current local session was opened from the archive
  * (library handoff or ?local= route), not archived after a fresh play.
  * A fresh play's address stays the canonical shareable fragment link. */
+installDoubleTapGuard();
 let localSessionOpened = false;
 const ownResults = new WeakSet<UiResult>();
 let receivedShare:

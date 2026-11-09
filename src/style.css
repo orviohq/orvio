@@ -3748,7 +3748,7 @@ body.perf-enabled #fps {
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
   scroll-padding: 24px;
   background: radial-gradient(ellipse at 90% 0%, #132b3b99, transparent 65%);
 }
@@ -4365,7 +4365,13 @@ body.playing {
   inset: 0;
   width: 100%;
   height: 100dvh;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-top: var(--play-safe-top, env(safe-area-inset-top, 0px));
+  padding-right: max(
+    3vw,
+    var(--play-safe-right, env(safe-area-inset-right, 0px))
+  );
+  padding-bottom: var(--play-safe-bottom, env(safe-area-inset-bottom, 0px));
+  padding-left: max(3vw, var(--play-safe-left, env(safe-area-inset-left, 0px)));
 }
 html {
   touch-action: manipulation;
@@ -5074,4 +5080,18 @@ html {
   #settings #bind-hint {
     line-height: 1.45;
   }
+}
+
+/* Empty legacy footer must not reserve replay space on touch devices. */
+.mobile-playback-only.playing #game .game-footer:empty {
+  display: none;
+}
+/* Apply the no-double-tap gesture policy to each hit target, including dialogs. */
+body,
+body * {
+  touch-action: manipulation;
+}
+#songs,
+#cached-songs {
+  touch-action: pan-y pinch-zoom;
 }
