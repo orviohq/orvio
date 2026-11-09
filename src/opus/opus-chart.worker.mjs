@@ -27,6 +27,9 @@ self.onmessage = async ({ data }) => {
       bytes: new Uint8Array(bytes),
       wasmBytes: new Uint8Array(wasmBytes),
       expected: d,
+      // prepareOpusOwned terminates this worker on cancellation. No input or
+      // sibling work shares its event loop, so timer-clamped chunk yields are idle.
+      yieldAfterChunk: false,
     });
     measure('decodeVerifyMs');
     let record = frozenRecord;

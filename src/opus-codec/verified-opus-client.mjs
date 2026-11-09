@@ -43,6 +43,8 @@ export async function decodeVerifiedOpus({
   expected,
   signal,
   chunkBytes = 65536,
+  // Only an owned worker with out-of-band termination may opt out.
+  yieldAfterChunk = true,
 }) {
   const check = () => signal?.throwIfAborted();
   check();
@@ -178,7 +180,8 @@ export async function decodeVerifiedOpus({
           bytes.subarray(off, Math.min(off + chunkBytes, bytes.length)),
         ),
       ]);
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (yieldAfterChunk)
+        await new Promise((resolve) => setTimeout(resolve, 0));
     }
     await pages([...parser.flush()]);
     check();
