@@ -12,3 +12,15 @@ fixtures
 test-support/opus35-frost/
 # Local qualification evidence harnesses are not portable CI inputs.
 qualification-local/
+
+# Generated qualification artifacts contain hash-bound source/embedded worker
+# bytes. Reformatting changes producer/recipe identity. Keep their exact bytes;
+# source modules and all other tests remain checked by Prettier.
+src/opus/private-adaptive-build/
+src/opus/private-generate-build/
+src/opus/private-nmguard-build/
+src/opus/public468-candidate1901.mjs
+src/opus/public468-v7.mjs
+
+# Astro-generated declarations, not authored source.
+.astro/

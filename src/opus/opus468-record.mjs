@@ -51,7 +51,10 @@ export const OPUS468_GENERATOR_VERSION =
 // defaults to [] and only trusted integration code may flip qualified to true
 // AFTER actual producer qualification. Consumers must gate on this, not on
 // worker success alone.
-export function opus468Admission(record, trustedQualifiedGeneratorVersions = []) {
+export function opus468Admission(
+  record,
+  trustedQualifiedGeneratorVersions = [],
+) {
   const list = Array.isArray(trustedQualifiedGeneratorVersions)
     ? trustedQualifiedGeneratorVersions
     : [];
@@ -86,12 +89,16 @@ const ROOTS = [
 const TIER_FAMILY = { low: 'NM', mid: 'HD', high: 'MX', sc: 'SC' };
 const MAX_STORED_BYTES = 1572864;
 const TE = new TextEncoder();
-const hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+const hex = (bytes) =>
+  Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 export const sha256Hex = (bytes) => hex(nobleSha256(bytes));
 const sha = (s) => sha256Hex(TE.encode(s));
 const HASH = (v) => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v);
 
-export function checkOpus468GeneratorVersion(generatorVersion, baseAnalyzerVersion) {
+export function checkOpus468GeneratorVersion(
+  generatorVersion,
+  baseAnalyzerVersion,
+) {
   if (
     typeof generatorVersion !== 'string' ||
     !generatorVersion ||
@@ -100,7 +107,10 @@ export function checkOpus468GeneratorVersion(generatorVersion, baseAnalyzerVersi
     generatorVersion === 'orvio-current35-v1'
   )
     throw Error('opus468_generator_version');
-  if (baseAnalyzerVersion !== undefined && generatorVersion === baseAnalyzerVersion)
+  if (
+    baseAnalyzerVersion !== undefined &&
+    generatorVersion === baseAnalyzerVersion
+  )
     throw Error('opus468_base_analyzer_is_not_extension_generator');
 }
 
@@ -108,7 +118,11 @@ export function checkOpus468GeneratorVersion(generatorVersion, baseAnalyzerVersi
 // plus optional end; sequential ids, non-decreasing time, lane bounds, no
 // same-lane overlap, end within duration.
 function normalizeNotes468(raw, lanes, duration, tier) {
-  if (!Array.isArray(raw) || !raw.length || raw.length > OPUS468_TIER_NOTE_CAP[tier])
+  if (
+    !Array.isArray(raw) ||
+    !raw.length ||
+    raw.length > OPUS468_TIER_NOTE_CAP[tier]
+  )
     throw Error('opus468_note_count_' + tier);
   const out = raw.map((n, i) => {
     if (
@@ -127,12 +141,18 @@ function normalizeNotes468(raw, lanes, duration, tier) {
         (!Number.isFinite(n.end) || n.end <= n.time || n.end > duration))
     )
       throw Error('opus468_note');
-    return { id: n.id, time: n.time, lane: n.lane, ...(Object.hasOwn(n, 'end') ? { end: n.end } : {}) };
+    return {
+      id: n.id,
+      time: n.time,
+      lane: n.lane,
+      ...(Object.hasOwn(n, 'end') ? { end: n.end } : {}),
+    };
   });
   const until = new Map();
   let previous = -Infinity;
   for (const n of out) {
-    if (n.time < previous || (until.get(n.lane) ?? -Infinity) >= n.time) throw Error('opus468_note_order');
+    if (n.time < previous || (until.get(n.lane) ?? -Infinity) >= n.time)
+      throw Error('opus468_note_order');
     previous = n.time;
     until.set(n.lane, n.end ?? n.time);
   }
@@ -143,23 +163,44 @@ function deepEqualJson(a, b) {
   if (a === b) return true;
   if (typeof a !== typeof b || !a || !b || typeof a !== 'object') return false;
   if (Array.isArray(a) !== Array.isArray(b)) return false;
-  if (Array.isArray(a)) return a.length === b.length && a.every((x, i) => deepEqualJson(x, b[i]));
+  if (Array.isArray(a))
+    return a.length === b.length && a.every((x, i) => deepEqualJson(x, b[i]));
   const ka = Object.keys(a);
-  return ka.length === Object.keys(b).length && ka.every((k) => Object.hasOwn(b, k) && deepEqualJson(a[k], b[k]));
+  return (
+    ka.length === Object.keys(b).length &&
+    ka.every((k) => Object.hasOwn(b, k) && deepEqualJson(a[k], b[k]))
+  );
 }
 
 // Verify the frozen base v2 record + descriptor binding the same way the
 // producer worker does before generating (fail-closed, typed errors).
-export function bindOpus468Base({ baseRecordRaw, baseRecord, descriptor: d, descriptorSha256 }) {
-  if (typeof baseRecordRaw !== 'string' || TE.encode(baseRecordRaw).length > MAX_STORED_BYTES)
+export function bindOpus468Base({
+  baseRecordRaw,
+  baseRecord,
+  descriptor: d,
+  descriptorSha256,
+}) {
+  if (
+    typeof baseRecordRaw !== 'string' ||
+    TE.encode(baseRecordRaw).length > MAX_STORED_BYTES
+  )
     throw Error('opus468_base_record_bytes');
-  if (!baseRecord || typeof baseRecord !== 'object' || Array.isArray(baseRecord))
+  if (
+    !baseRecord ||
+    typeof baseRecord !== 'object' ||
+    Array.isArray(baseRecord)
+  )
     throw Error('opus468_base_record');
   // The raw bytes being hashed must BE the parsed base record: a different
   // valid record object alongside foreign raw bytes is not a binding.
   let parsedRaw;
-  try { parsedRaw = JSON.parse(baseRecordRaw); } catch { throw Error('opus468_base_record_json'); }
-  if (!deepEqualJson(parsedRaw, baseRecord)) throw Error('opus468_base_record_raw_binding');
+  try {
+    parsedRaw = JSON.parse(baseRecordRaw);
+  } catch {
+    throw Error('opus468_base_record_json');
+  }
+  if (!deepEqualJson(parsedRaw, baseRecord))
+    throw Error('opus468_base_record_raw_binding');
   if (!d || typeof d !== 'object') throw Error('opus468_descriptor');
   if (!HASH(descriptorSha256)) throw Error('opus468_descriptor_sha');
   const r = baseRecord;
@@ -204,14 +245,27 @@ export function assembleOpus468Extension({
   generatedCharts,
   generatorVersion = OPUS468_GENERATOR_VERSION,
 }) {
-  checkOpus468GeneratorVersion(generatorVersion, baseRecord && baseRecord.analyzerVersion);
-  const bound = bindOpus468Base({ baseRecordRaw, baseRecord, descriptor: d, descriptorSha256 });
-  if (!generatedCharts || typeof generatedCharts !== 'object' || Array.isArray(generatedCharts))
+  checkOpus468GeneratorVersion(
+    generatorVersion,
+    baseRecord && baseRecord.analyzerVersion,
+  );
+  const bound = bindOpus468Base({
+    baseRecordRaw,
+    baseRecord,
+    descriptor: d,
+    descriptorSha256,
+  });
+  if (
+    !generatedCharts ||
+    typeof generatedCharts !== 'object' ||
+    Array.isArray(generatedCharts)
+  )
     throw Error('opus468_charts');
   // Strict 12-slot contract: unknown generated slots are rejected, never
   // silently dropped; partial completion is not allowed.
   for (const k of Object.keys(generatedCharts))
-    if (!OPUS468_CHART_KEYS.includes(k)) throw Error('opus468_unknown_slot_' + k);
+    if (!OPUS468_CHART_KEYS.includes(k))
+      throw Error('opus468_unknown_slot_' + k);
   const duration = d.frames / 48000;
   const charts = {};
   const chartMeta = {};
@@ -226,7 +280,14 @@ export function assembleOpus468Extension({
     charts[key] = { notes, sha256: sha(JSON.stringify(notes)) };
     chartMeta[key] = {
       family: TIER_FAMILY[tier],
-      rating: { scale: tier === 'sc' ? 'sc' : 'standard', level: rateDifficulty(notes, duration, tier === 'sc' ? 'sc' : 'standard') },
+      rating: {
+        scale: tier === 'sc' ? 'sc' : 'standard',
+        level: rateDifficulty(
+          notes,
+          duration,
+          tier === 'sc' ? 'sc' : 'standard',
+        ),
+      },
       scAvailable: true,
     };
   }
@@ -236,7 +297,10 @@ export function assembleOpus468Extension({
   for (const lanes of [4, 6, 8]) {
     const scKey = `${lanes}:sc`;
     const highKey = `${lanes}:high`;
-    if (JSON.stringify(charts[scKey].notes) === JSON.stringify(charts[highKey].notes)) {
+    if (
+      JSON.stringify(charts[scKey].notes) ===
+      JSON.stringify(charts[highKey].notes)
+    ) {
       total -= charts[scKey].notes.length;
       charts[scKey] = { unavailable: OPUS468_SC_MARKER };
       chartMeta[scKey] = { family: 'SC', rating: null, scAvailable: false };
@@ -254,8 +318,14 @@ export function assembleOpus468Extension({
   };
   const extensionSha256 = sha(JSON.stringify(canonical));
   const stored = { ...canonical, extensionSha256 };
-  if (TE.encode(JSON.stringify(stored)).length > MAX_STORED_BYTES) throw Error('opus468_stored_bytes');
-  selfVerifyOpus468Extension(stored, { baseRecordRaw, baseRecord, descriptor: d, descriptorSha256 });
+  if (TE.encode(JSON.stringify(stored)).length > MAX_STORED_BYTES)
+    throw Error('opus468_stored_bytes');
+  selfVerifyOpus468Extension(stored, {
+    baseRecordRaw,
+    baseRecord,
+    descriptor: d,
+    descriptorSha256,
+  });
   return stored;
 }
 
@@ -263,22 +333,49 @@ export function assembleOpus468Extension({
 // the roots from the raw inputs and re-validates every slot, hash and cap.
 // Mirrors the non-journal checks of the binding validator; journal authority is
 // out of scope here by design.
-export function selfVerifyOpus468Extension(stored, { baseRecordRaw, baseRecord, descriptor: d, descriptorSha256 }) {
-  const bound = bindOpus468Base({ baseRecordRaw, baseRecord, descriptor: d, descriptorSha256 });
-  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) throw Error('opus468_verify_shape');
-  const expectedKeys = [
-    'kind', 'version', 'family', ...ROOTS, 'generatorVersion', 'config', 'charts', 'chartMeta', 'extensionSha256',
-  ];
-  if (!Object.keys(stored).every((k, i) => k === expectedKeys[i])) throw Error('opus468_verify_field_order');
-  if (stored.kind !== OPUS468_EXTENSION_KIND || stored.version !== 1 || stored.family !== OPUS468_EXTENSION_FAMILY)
+export function selfVerifyOpus468Extension(
+  stored,
+  { baseRecordRaw, baseRecord, descriptor: d, descriptorSha256 },
+) {
+  const bound = bindOpus468Base({
+    baseRecordRaw,
+    baseRecord,
+    descriptor: d,
+    descriptorSha256,
+  });
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored))
     throw Error('opus468_verify_shape');
-  for (const k of ROOTS) if (stored[k] !== bound[k]) throw Error('opus468_verify_root_' + k);
-  checkOpus468GeneratorVersion(stored.generatorVersion, baseRecord && baseRecord.analyzerVersion);
+  const expectedKeys = [
+    'kind',
+    'version',
+    'family',
+    ...ROOTS,
+    'generatorVersion',
+    'config',
+    'charts',
+    'chartMeta',
+    'extensionSha256',
+  ];
+  if (!Object.keys(stored).every((k, i) => k === expectedKeys[i]))
+    throw Error('opus468_verify_field_order');
+  if (
+    stored.kind !== OPUS468_EXTENSION_KIND ||
+    stored.version !== 1 ||
+    stored.family !== OPUS468_EXTENSION_FAMILY
+  )
+    throw Error('opus468_verify_shape');
+  for (const k of ROOTS)
+    if (stored[k] !== bound[k]) throw Error('opus468_verify_root_' + k);
+  checkOpus468GeneratorVersion(
+    stored.generatorVersion,
+    baseRecord && baseRecord.analyzerVersion,
+  );
   if (stored.config !== baseRecord.config) throw Error('opus468_verify_config');
   const duration = d.frames / 48000;
   let total = 0;
   if (
-    !stored.charts || !stored.chartMeta ||
+    !stored.charts ||
+    !stored.chartMeta ||
     Object.keys(stored.charts).length !== OPUS468_CHART_KEYS.length ||
     Object.keys(stored.chartMeta).length !== OPUS468_CHART_KEYS.length ||
     !OPUS468_CHART_KEYS.every((k) => Object.hasOwn(stored.charts, k)) ||
@@ -293,14 +390,24 @@ export function selfVerifyOpus468Extension(stored, { baseRecordRaw, baseRecord, 
     if (cKeys.length === 1 && cKeys[0] === 'unavailable') {
       if (tier !== 'sc' || c.unavailable !== OPUS468_SC_MARKER)
         throw Error('opus468_verify_unavailable');
-      if (m.family !== 'SC' || m.rating !== null || m.scAvailable !== false || Object.keys(m).length !== 3)
+      if (
+        m.family !== 'SC' ||
+        m.rating !== null ||
+        m.scAvailable !== false ||
+        Object.keys(m).length !== 3
+      )
         throw Error('opus468_verify_metadata');
       continue;
     }
-    if (cKeys.length !== 2 || !cKeys.includes('notes') || !cKeys.includes('sha256'))
+    if (
+      cKeys.length !== 2 ||
+      !cKeys.includes('notes') ||
+      !cKeys.includes('sha256')
+    )
       throw Error('opus468_verify_chart_shape');
     const notes = normalizeNotes468(c.notes, Number(key[0]), duration, tier);
-    if (sha(JSON.stringify(notes)) !== c.sha256) throw Error('opus468_verify_chart_hash');
+    if (sha(JSON.stringify(notes)) !== c.sha256)
+      throw Error('opus468_verify_chart_hash');
     total += notes.length;
     if (
       m.family !== TIER_FAMILY[tier] ||
@@ -315,17 +422,26 @@ export function selfVerifyOpus468Extension(stored, { baseRecordRaw, baseRecord, 
     )
       throw Error('opus468_verify_metadata');
     // Rating is derived, not merely bounded: recompute from the notes.
-    if (m.rating.level !== rateDifficulty(notes, duration, tier === 'sc' ? 'sc' : 'standard'))
+    if (
+      m.rating.level !==
+      rateDifficulty(notes, duration, tier === 'sc' ? 'sc' : 'standard')
+    )
       throw Error('opus468_verify_rating');
   }
   if (total > OPUS468_MAX_TOTAL_NOTES) throw Error('opus468_verify_total');
   for (const lanes of [4, 6, 8]) {
     const sc = stored.charts[`${lanes}:sc`];
-    if (sc.notes && JSON.stringify(sc.notes) === JSON.stringify(stored.charts[`${lanes}:high`].notes))
+    if (
+      sc.notes &&
+      JSON.stringify(sc.notes) ===
+        JSON.stringify(stored.charts[`${lanes}:high`].notes)
+    )
       throw Error('opus468_verify_sc_duplicate');
   }
   const { extensionSha256, ...rest } = stored;
-  if (sha(JSON.stringify(rest)) !== extensionSha256) throw Error('opus468_verify_extension_hash');
-  if (TE.encode(JSON.stringify(stored)).length > MAX_STORED_BYTES) throw Error('opus468_verify_bytes');
+  if (sha(JSON.stringify(rest)) !== extensionSha256)
+    throw Error('opus468_verify_extension_hash');
+  if (TE.encode(JSON.stringify(stored)).length > MAX_STORED_BYTES)
+    throw Error('opus468_verify_bytes');
   return true;
 }

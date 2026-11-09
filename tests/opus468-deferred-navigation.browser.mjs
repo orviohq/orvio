@@ -1,20 +1,223 @@
-import {chromium}from'@playwright/test';import fs from'node:fs';import path from'node:path';
+import { chromium } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
 // Local candidate UI resources only. Genuine backend GET/read-only projection POST.
-const root=path.resolve('dist'),out='/downloads/deferred1913',requests=[],errors=[];
-const browser=await chromium.launch({headless:true,env:{...process.env,TMPDIR:'/dev/shm'},args:['--autoplay-policy=no-user-gesture-required','--enable-unsafe-swiftshader']});
-const context=await browser.newContext({locale:'ko-KR',viewport:{width:1280,height:900},serviceWorkers:'block',storageState:'/downloads/integrated1906-base-storage.json'});
-await context.route('https://orvio-play.pages.dev/**',async route=>{const u=new URL(route.request().url());let file=path.join(root,decodeURIComponent(u.pathname));if(u.pathname.endsWith('/'))file=path.join(file,'index.html');if(!file.startsWith(root+path.sep)||!fs.existsSync(file)){await route.abort();return;}const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.wasm':'application/wasm','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'};await route.fulfill({status:200,contentType:types[path.extname(file)]??'application/octet-stream',body:fs.readFileSync(file)});});
-await context.route('https://orvio-share.pn-26f.workers.dev/**',async route=>{const r=route.request();requests.push({method:r.method(),url:r.url(),body:r.postData(),at:Date.now()});if(r.method()!=='GET'&&!(r.method()==='POST'&&r.url()==='https://orvio-share.pn-26f.workers.dev/v2/opus-owner-audio-projection'))throw Error('unexpected_mutation');await route.continue();});
-const p=await context.newPage();p.on('pageerror',e=>errors.push(String(e)));
-try{
- await p.goto('https://orvio-play.pages.dev/select/');await p.waitForFunction(()=>window.general468Qualification);
- const proof=await p.evaluate(async()=>{const api=window.general468Qualification,t=api.makeTransport(),runtime=api.createPublic468Candidate({readArtifact:api.readArtifact,exchangeProjection:t.exchange});window.general468Runtime=runtime;const start=performance.now();await api.enableGeneral468Candidate({...runtime,extendCachedBase:async(...args)=>{const pin=await runtime.extendCachedBase(...args);window.deferredPinReady=true;while(!window.releaseDeferredPin)await new Promise(r=>setTimeout(r,10));return pin}});return{enableMs:performance.now()-start,title:"이무진 (LEE MU JIN) - '청춘만화' MV",initialExtensionCount:runtime.frontend.list().length};});
- const row=p.locator('#songs [data-song]').filter({hasText:proof.title});await row.click();const before=requests.length,start=Date.now();await p.locator('[data-lanes="4"]').click();await p.locator('#songs .song-unready').waitFor({timeout:10000});proof.loading=await p.evaluate(()=>({disabled:document.querySelector('#start').disabled,unready:document.querySelector('#songs .song-unready')?.getAttribute('aria-disabled')}));await p.evaluate(()=>{history.pushState(null,'','/replays/');dispatchEvent(new PopStateEvent('popstate'));});
- await p.evaluate(()=>window.releaseDeferredPin=true);await p.waitForTimeout(1000);await p.waitForFunction(()=>window.deferredPinReady===true,null,{timeout:95000});await p.waitForTimeout(1000);
- proof.whileAway=await p.evaluate(()=>({url:location.href,active:window.orvioDiagnostics.active,ids:window.general468Qualification.catalogIds(),song:window.orvioDiagnostics.song}));if(proof.whileAway.ids.some(x=>x.startsWith('yt-opus-')))throw Error('extension_installed_while_away:'+JSON.stringify(proof.whileAway));
- await p.evaluate(()=>{history.pushState(null,'','/select/');dispatchEvent(new PopStateEvent('popstate'));});await p.locator('[data-lanes="5"]').click();await p.locator('[data-lanes="4"]').click();await p.waitForFunction(()=>window.general468Qualification.catalogIds().some(x=>x.startsWith('yt-opus-')),null,{timeout:45000});await p.locator('#songs [data-song]').filter({hasText:proof.title}).click();await p.waitForFunction(()=>!document.querySelector('#start').disabled);proof.deferredMs=Date.now()-start;
- await p.locator('#start').click();await p.waitForFunction(()=>window.orvioDiagnostics.active&&window.orvioDiagnostics.clock>3,null,{timeout:45000});proof.after=await p.evaluate(()=>({active:window.orvioDiagnostics.active,clock:window.orvioDiagnostics.clock,song:window.orvioDiagnostics.song,lanes:window.orvioDiagnostics.settings.lanes,audioActive:window.orvioDiagnostics.audioActive}));await p.screenshot({path:out+'-playing.png'});await p.keyboard.press('Escape');await p.locator('#pause-exit').click();
- await p.screenshot({path:out+'-selected.png'});
- if(requests.some(r=>r.method==='POST'&&!r.url.endsWith('/v2/opus-owner-audio-projection')))throw Error('unexpected_provider_mutation');if(!proof.after.song.startsWith('yt-opus-1bZNp9d7pLM-')||proof.after.lanes!==4||!proof.after.audioActive)throw Error('wrong_deferred_source');
- fs.writeFileSync(out+'-install.json',JSON.stringify({proof,requests,errors,scope:'private general build; genuine GET and nonce projection POST; no provider acquisition; not public rollout'},null,2));console.log(JSON.stringify({proof,requests:requests.length,errors}));
-}catch(error){fs.writeFileSync(out+'-failure.json',JSON.stringify({error:String(error),stack:error.stack,diagnostics:await p.evaluate(()=>({url:location.href,ids:window.general468Qualification?.catalogIds(),songs:window.general468Runtime?.frontend.list(),ready:window.deferredPinReady,release:window.releaseDeferredPin,body:document.body.innerText.slice(-3500)})).catch(()=>null),requests,errors},null,2));throw error;}finally{await browser.close();}
+const root = path.resolve('dist'),
+  out = '/downloads/deferred1913',
+  requests = [],
+  errors = [];
+const browser = await chromium.launch({
+  headless: true,
+  env: { ...process.env, TMPDIR: '/dev/shm' },
+  args: [
+    '--autoplay-policy=no-user-gesture-required',
+    '--enable-unsafe-swiftshader',
+  ],
+});
+const context = await browser.newContext({
+  locale: 'ko-KR',
+  viewport: { width: 1280, height: 900 },
+  serviceWorkers: 'block',
+  storageState: '/downloads/integrated1906-base-storage.json',
+});
+await context.route('https://orvio-play.pages.dev/**', async (route) => {
+  const u = new URL(route.request().url());
+  let file = path.join(root, decodeURIComponent(u.pathname));
+  if (u.pathname.endsWith('/')) file = path.join(file, 'index.html');
+  if (!file.startsWith(root + path.sep) || !fs.existsSync(file)) {
+    await route.abort();
+    return;
+  }
+  const types = {
+    '.html': 'text/html',
+    '.js': 'text/javascript',
+    '.css': 'text/css',
+    '.wasm': 'application/wasm',
+    '.png': 'image/png',
+    '.svg': 'image/svg+xml',
+    '.woff2': 'font/woff2',
+  };
+  await route.fulfill({
+    status: 200,
+    contentType: types[path.extname(file)] ?? 'application/octet-stream',
+    body: fs.readFileSync(file),
+  });
+});
+await context.route(
+  'https://orvio-share.pn-26f.workers.dev/**',
+  async (route) => {
+    const r = route.request();
+    requests.push({
+      method: r.method(),
+      url: r.url(),
+      body: r.postData(),
+      at: Date.now(),
+    });
+    if (
+      r.method() !== 'GET' &&
+      !(
+        r.method() === 'POST' &&
+        r.url() ===
+          'https://orvio-share.pn-26f.workers.dev/v2/opus-owner-audio-projection'
+      )
+    )
+      throw Error('unexpected_mutation');
+    await route.continue();
+  },
+);
+const p = await context.newPage();
+p.on('pageerror', (e) => errors.push(String(e)));
+try {
+  await p.goto('https://orvio-play.pages.dev/select/');
+  await p.waitForFunction(() => window.general468Qualification);
+  const proof = await p.evaluate(async () => {
+    const api = window.general468Qualification,
+      t = api.makeTransport(),
+      runtime = api.createPublic468Candidate({
+        readArtifact: api.readArtifact,
+        exchangeProjection: t.exchange,
+      });
+    window.general468Runtime = runtime;
+    const start = performance.now();
+    await api.enableGeneral468Candidate({
+      ...runtime,
+      extendCachedBase: async (...args) => {
+        const pin = await runtime.extendCachedBase(...args);
+        window.deferredPinReady = true;
+        while (!window.releaseDeferredPin)
+          await new Promise((r) => setTimeout(r, 10));
+        return pin;
+      },
+    });
+    return {
+      enableMs: performance.now() - start,
+      title: "이무진 (LEE MU JIN) - '청춘만화' MV",
+      initialExtensionCount: runtime.frontend.list().length,
+    };
+  });
+  const row = p.locator('#songs [data-song]').filter({ hasText: proof.title });
+  await row.click();
+  const before = requests.length,
+    start = Date.now();
+  await p.locator('[data-lanes="4"]').click();
+  await p.locator('#songs .song-unready').waitFor({ timeout: 10000 });
+  proof.loading = await p.evaluate(() => ({
+    disabled: document.querySelector('#start').disabled,
+    unready: document
+      .querySelector('#songs .song-unready')
+      ?.getAttribute('aria-disabled'),
+  }));
+  await p.evaluate(() => {
+    history.pushState(null, '', '/replays/');
+    dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await p.evaluate(() => (window.releaseDeferredPin = true));
+  await p.waitForTimeout(1000);
+  await p.waitForFunction(() => window.deferredPinReady === true, null, {
+    timeout: 95000,
+  });
+  await p.waitForTimeout(1000);
+  proof.whileAway = await p.evaluate(() => ({
+    url: location.href,
+    active: window.orvioDiagnostics.active,
+    ids: window.general468Qualification.catalogIds(),
+    song: window.orvioDiagnostics.song,
+  }));
+  if (proof.whileAway.ids.some((x) => x.startsWith('yt-opus-')))
+    throw Error(
+      'extension_installed_while_away:' + JSON.stringify(proof.whileAway),
+    );
+  await p.evaluate(() => {
+    history.pushState(null, '', '/select/');
+    dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await p.locator('[data-lanes="5"]').click();
+  await p.locator('[data-lanes="4"]').click();
+  await p.waitForFunction(
+    () =>
+      window.general468Qualification
+        .catalogIds()
+        .some((x) => x.startsWith('yt-opus-')),
+    null,
+    { timeout: 45000 },
+  );
+  await p
+    .locator('#songs [data-song]')
+    .filter({ hasText: proof.title })
+    .click();
+  await p.waitForFunction(() => !document.querySelector('#start').disabled);
+  proof.deferredMs = Date.now() - start;
+  await p.locator('#start').click();
+  await p.waitForFunction(
+    () => window.orvioDiagnostics.active && window.orvioDiagnostics.clock > 3,
+    null,
+    { timeout: 45000 },
+  );
+  proof.after = await p.evaluate(() => ({
+    active: window.orvioDiagnostics.active,
+    clock: window.orvioDiagnostics.clock,
+    song: window.orvioDiagnostics.song,
+    lanes: window.orvioDiagnostics.settings.lanes,
+    audioActive: window.orvioDiagnostics.audioActive,
+  }));
+  await p.screenshot({ path: out + '-playing.png' });
+  await p.keyboard.press('Escape');
+  await p.locator('#pause-exit').click();
+  await p.screenshot({ path: out + '-selected.png' });
+  if (
+    requests.some(
+      (r) =>
+        r.method === 'POST' &&
+        !r.url.endsWith('/v2/opus-owner-audio-projection'),
+    )
+  )
+    throw Error('unexpected_provider_mutation');
+  if (
+    !proof.after.song.startsWith('yt-opus-1bZNp9d7pLM-') ||
+    proof.after.lanes !== 4 ||
+    !proof.after.audioActive
+  )
+    throw Error('wrong_deferred_source');
+  fs.writeFileSync(
+    out + '-install.json',
+    JSON.stringify(
+      {
+        proof,
+        requests,
+        errors,
+        scope:
+          'private general build; genuine GET and nonce projection POST; no provider acquisition; not public rollout',
+      },
+      null,
+      2,
+    ),
+  );
+  console.log(JSON.stringify({ proof, requests: requests.length, errors }));
+} catch (error) {
+  fs.writeFileSync(
+    out + '-failure.json',
+    JSON.stringify(
+      {
+        error: String(error),
+        stack: error.stack,
+        diagnostics: await p
+          .evaluate(() => ({
+            url: location.href,
+            ids: window.general468Qualification?.catalogIds(),
+            songs: window.general468Runtime?.frontend.list(),
+            ready: window.deferredPinReady,
+            release: window.releaseDeferredPin,
+            body: document.body.innerText.slice(-3500),
+          }))
+          .catch(() => null),
+        requests,
+        errors,
+      },
+      null,
+      2,
+    ),
+  );
+  throw error;
+} finally {
+  await browser.close();
+}

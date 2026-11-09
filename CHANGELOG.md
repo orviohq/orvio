@@ -1,3 +1,8 @@
+# 0.3.1 - 2026-11-09
+
+- Preserve initial shared result and replay routes during chart startup.
+- Keep generated hash-bound artifacts byte-exact while checking authored source formatting.
+
 # Changelog
 
 ## [0.3.0] - 2026-11-09

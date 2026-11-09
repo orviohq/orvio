@@ -13,7 +13,9 @@ import { readVerifiedOpus } from './opus-cache.mjs';
 
 const copy = (x) => structuredClone(x);
 const hex = (b) =>
-  Array.from(new Uint8Array(b), (x) => x.toString(16).padStart(2, '0')).join('');
+  Array.from(new Uint8Array(b), (x) => x.toString(16).padStart(2, '0')).join(
+    '',
+  );
 const sha256Hex = async (b) => hex(await crypto.subtle.digest('SHA-256', b));
 const hashText = async (t) => sha256Hex(new TextEncoder().encode(t));
 const fail = (s) => {
@@ -28,12 +30,20 @@ export function createOpus468ReplayInstaller({
   importSharedReplay, // actual 1111 adapter product
   hashTextImpl = hashText,
 } = {}) {
-  if (typeof makeCodec !== 'function') throw Error('replay_install_codec_factory_missing');
-  if (typeof frontend?.pin !== 'function' || typeof frontend?.restore !== 'function')
+  if (typeof makeCodec !== 'function')
+    throw Error('replay_install_codec_factory_missing');
+  if (
+    typeof frontend?.pin !== 'function' ||
+    typeof frontend?.restore !== 'function'
+  )
     throw Error('replay_install_frontend_seam_missing');
-  if (typeof importSharedReplay !== 'function') throw Error('replay_install_importer_missing');
+  if (typeof importSharedReplay !== 'function')
+    throw Error('replay_install_importer_missing');
   return async function installSharedReplay(input, { signal } = {}) {
-    if (!(input instanceof Uint8Array) || !(input.buffer instanceof ArrayBuffer))
+    if (
+      !(input instanceof Uint8Array) ||
+      !(input.buffer instanceof ArrayBuffer)
+    )
       fail('bytes');
     const wire = input.slice(); // snapshot before first await
     // 1. decode (fresh codec: strict wire + fresh policy/owner inside)
@@ -42,7 +52,8 @@ export function createOpus468ReplayInstaller({
     const decoded = await codec.decode(wire, { signal });
     signal?.throwIfAborted?.();
     if (!decoded || typeof decoded !== 'object') fail('decode');
-    const song = typeof decoded.song === 'string' ? decoded.song.slice() : fail('song');
+    const song =
+      typeof decoded.song === 'string' ? decoded.song.slice() : fail('song');
     const extension = copy(decoded.extension);
     const baseSourceRecordJson =
       typeof decoded.baseSourceRecordJson === 'string'
@@ -68,7 +79,10 @@ export function createOpus468ReplayInstaller({
       base?.decoderWasmSha256 !== extension?.decoderWasmSha256
     )
       fail('base_binding');
-    if ((await hashTextImpl(baseSourceRecordJson)) !== extension.baseSourceRecordSha256)
+    if (
+      (await hashTextImpl(baseSourceRecordJson)) !==
+      extension.baseSourceRecordSha256
+    )
       fail('base_sha');
     signal?.throwIfAborted?.();
     // 3. EXISTING verified encoded cache ONLY (opus-cache readVerifiedOpus,
@@ -78,7 +92,10 @@ export function createOpus468ReplayInstaller({
     // network, no fabrication.
     let descriptor, cached;
     try {
-      descriptor = await parseVerifiedDescriptor(descriptorBytes, extension.audioDescriptorSha256);
+      descriptor = await parseVerifiedDescriptor(
+        descriptorBytes,
+        extension.audioDescriptorSha256,
+      );
     } catch (e) {
       const err = Error('replay_install_descriptor');
       err.code = 'replay_install_descriptor';
@@ -86,7 +103,11 @@ export function createOpus468ReplayInstaller({
       throw err;
     }
     try {
-      cached = await readVerifiedOpus(descriptor, extension.audioDescriptorSha256, signal);
+      cached = await readVerifiedOpus(
+        descriptor,
+        extension.audioDescriptorSha256,
+        signal,
+      );
     } catch (e) {
       const err = Error('replay_install_audio_unavailable');
       err.code = 'replay_install_audio_unavailable';
@@ -94,22 +115,32 @@ export function createOpus468ReplayInstaller({
       throw err;
     }
     if (!cached) fail('audio_missing');
-    if (JSON.stringify(cached.record) !== JSON.stringify(base)) fail('audio_record_binding');
+    if (JSON.stringify(cached.record) !== JSON.stringify(base))
+      fail('audio_record_binding');
     const cachedBytes =
       cached.bytes instanceof Uint8Array
         ? cached.bytes
         : new Uint8Array(cached.bytes);
-    if ((await sha256Hex(cachedBytes)) !== extension.encodedAudioSha256) fail('audio_sha');
+    if ((await sha256Hex(cachedBytes)) !== extension.encodedAudioSha256)
+      fail('audio_sha');
     signal?.throwIfAborted?.();
     // 4. base pin / fresh policy / catalog register through the actual
     // frontend seam. A mid-pin failure AFTER the fresh-store commit is a
     // partial state, not an installation: report it structurally so an exact
     // retry can finish catalog registration (the two databases are not one
     // atomic transaction).
-    const selection = copy({ lanes: replay?.lanes, difficulty: replay?.difficulty });
+    const selection = copy({
+      lanes: replay?.lanes,
+      difficulty: replay?.difficulty,
+    });
     const metadata = {
-      title: typeof base.title === 'string' && base.title ? base.title : `yt-${base.videoId}`,
-      ...(typeof base.author === 'string' && base.author ? { author: base.author } : {}),
+      title:
+        typeof base.title === 'string' && base.title
+          ? base.title
+          : `yt-${base.videoId}`,
+      ...(typeof base.author === 'string' && base.author
+        ? { author: base.author }
+        : {}),
     };
     const request = copy({
       version: 1,
@@ -127,8 +158,11 @@ export function createOpus468ReplayInstaller({
     //   throws  -> observation itself failed: both 'unknown'.
     const observePinState = async () => {
       let truth;
-      try { truth = await frontend.restore(song, { signal: undefined }); }
-      catch { return { pinCommitted: 'unknown', catalogInstalled: 'unknown' }; }
+      try {
+        truth = await frontend.restore(song, { signal: undefined });
+      } catch {
+        return { pinCommitted: 'unknown', catalogInstalled: 'unknown' };
+      }
       if (truth) return { pinCommitted: true, catalogInstalled: true };
       return { pinCommitted: 'unknown', catalogInstalled: false };
     };
@@ -139,10 +173,17 @@ export function createOpus468ReplayInstaller({
     const prior = await frontend.restore(song, { signal }).catch(() => null);
     if (!prior) {
       try {
-        const pinned = await frontend.pin(request, descriptorBytes, selection, metadata, { signal });
+        const pinned = await frontend.pin(
+          request,
+          descriptorBytes,
+          selection,
+          metadata,
+          { signal },
+        );
         // Actual FE contract: pin returns { song: Song, localPinCommitted } with
         // Song.id === the song key (display(row)), not a bare string.
-        if (pinned?.localPinCommitted !== true || pinned?.song?.id !== song) fail('pin_contract');
+        if (pinned?.localPinCommitted !== true || pinned?.song?.id !== song)
+          fail('pin_contract');
       } catch (e) {
         // Any pin-stage failure (including an abort the real pin surfaces
         // itself) reports the observed tri-state; never a fake rollback.
@@ -175,7 +216,8 @@ export function createOpus468ReplayInstaller({
     signal?.throwIfAborted?.();
     // 5. derive + save through the actual 1111 importer (fresh owner per use)
     const saved = await importSharedReplay(wire, { signal });
-    if (saved?.song !== song || typeof saved?.sessionKey !== 'string') fail('session_binding');
+    if (saved?.song !== song || typeof saved?.sessionKey !== 'string')
+      fail('session_binding');
     return copy({
       song,
       installed: true,

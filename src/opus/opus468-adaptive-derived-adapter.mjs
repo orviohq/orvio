@@ -18,57 +18,107 @@ import { validOpusDescriptor } from './opus-descriptor.mjs';
 
 const TE = new TextEncoder();
 
-export function createOpus468AdaptiveDerivedVerifier({ resolveArtifacts, verifyInWorker } = {}) {
-  if (typeof resolveArtifacts !== 'function') throw Error('adapter_resolver_missing');
-  if (typeof verifyInWorker !== 'function') throw Error('adapter_worker_missing');
+export function createOpus468AdaptiveDerivedVerifier({
+  resolveArtifacts,
+  verifyInWorker,
+} = {}) {
+  if (typeof resolveArtifacts !== 'function')
+    throw Error('adapter_resolver_missing');
+  if (typeof verifyInWorker !== 'function')
+    throw Error('adapter_worker_missing');
   return async function verifyDerivedRecord(extension, context = {}) {
     const { signal } = context;
     if (signal !== undefined && !(signal instanceof AbortSignal)) return false;
     signal?.throwIfAborted();
     // Snapshot inputs before the first await; never clone the signal itself.
-    if (!extension || typeof extension !== 'object' || Array.isArray(extension)) return false;
+    if (!extension || typeof extension !== 'object' || Array.isArray(extension))
+      return false;
     const ext = structuredClone(extension);
     const { baseRecordRaw, baseRecord, descriptor, descriptorSha256 } = context;
-    if (typeof baseRecordRaw !== 'string' || !baseRecordRaw.length) return false;
+    if (typeof baseRecordRaw !== 'string' || !baseRecordRaw.length)
+      return false;
     const raw = baseRecordRaw.slice();
     let base;
-    try { base = JSON.parse(raw); } catch { return false; }
-    if (!baseRecord || JSON.stringify(baseRecord) !== JSON.stringify(base)) return false;
-    if (!descriptor || typeof descriptor !== 'object' || Array.isArray(descriptor)) return false;
+    try {
+      base = JSON.parse(raw);
+    } catch {
+      return false;
+    }
+    if (!baseRecord || JSON.stringify(baseRecord) !== JSON.stringify(base))
+      return false;
+    if (
+      !descriptor ||
+      typeof descriptor !== 'object' ||
+      Array.isArray(descriptor)
+    )
+      return false;
     const desc = structuredClone(descriptor);
     const dSha = typeof descriptorSha256 === 'string' ? descriptorSha256 : '';
     // 1. base raw root + descriptor root + cross-record root checks.
-    if (!/^[a-f0-9]{64}$/.test(dSha) || dSha !== base.audioDescriptorSha256 || dSha !== ext.audioDescriptorSha256) return false;
+    if (
+      !/^[a-f0-9]{64}$/.test(dSha) ||
+      dSha !== base.audioDescriptorSha256 ||
+      dSha !== ext.audioDescriptorSha256
+    )
+      return false;
     if (sha256Hex(TE.encode(raw)) !== ext.baseSourceRecordSha256) return false;
     if (validOpusDescriptor(desc) !== true) return false;
-    if (ext.videoId !== desc.videoId || base.videoId !== desc.videoId ||
-        ext.encodedAudioSha256 !== desc.oggSha256 || base.encodedAudioSha256 !== desc.oggSha256 ||
-        ext.audioSha256 !== desc.pcm16Sha256 || base.audioSha256 !== desc.pcm16Sha256 ||
-        ext.decoderWasmSha256 !== desc.decoderWasmSha256 ||
-        ext.frames !== desc.frames || ext.sampleRate !== desc.sampleRate || ext.channels !== desc.channels) return false;
+    if (
+      ext.videoId !== desc.videoId ||
+      base.videoId !== desc.videoId ||
+      ext.encodedAudioSha256 !== desc.oggSha256 ||
+      base.encodedAudioSha256 !== desc.oggSha256 ||
+      ext.audioSha256 !== desc.pcm16Sha256 ||
+      base.audioSha256 !== desc.pcm16Sha256 ||
+      ext.decoderWasmSha256 !== desc.decoderWasmSha256 ||
+      ext.frames !== desc.frames ||
+      ext.sampleRate !== desc.sampleRate ||
+      ext.channels !== desc.channels
+    )
+      return false;
     // 2. canonical level-2 self-verify through the actual pinned record module.
-    try { selfVerifyOpus468Extension(ext, { baseRecordRaw: raw, baseRecord: base, descriptor: desc, descriptorSha256: dSha }); }
-    catch { return false; }
+    try {
+      selfVerifyOpus468Extension(ext, {
+        baseRecordRaw: raw,
+        baseRecord: base,
+        descriptor: desc,
+        descriptorSha256: dSha,
+      });
+    } catch {
+      return false;
+    }
     signal?.throwIfAborted();
     // 3. build-owned resolver: bound roots out, detached owned artifacts in.
     //    The resolver is never trusted: every artifact is re-hashed against the
     //    bound roots and buffers must be three distinct ArrayBuffers.
-    const resolved = await resolveArtifacts({
-      videoId: ext.videoId,
-      audioSha256: ext.audioSha256,
-      encodedAudioSha256: ext.encodedAudioSha256,
-      audioDescriptorSha256: dSha,
-      decoderWasmSha256: desc.decoderWasmSha256,
-      frames: desc.frames,
-    }, { signal });
+    const resolved = await resolveArtifacts(
+      {
+        videoId: ext.videoId,
+        audioSha256: ext.audioSha256,
+        encodedAudioSha256: ext.encodedAudioSha256,
+        audioDescriptorSha256: dSha,
+        decoderWasmSha256: desc.decoderWasmSha256,
+        frames: desc.frames,
+      },
+      { signal },
+    );
     signal?.throwIfAborted();
     // FE resolver (src/opus/opus468-local-artifacts.mjs
     // resolveOpus468LocalArtifacts, verified against the actual 1213 module)
     // returns Uint8Array COPIES { audioBytes, descriptorBytes,
     // decoderWasmBytes }. Never trusted: re-hash all three.
     if (!resolved || typeof resolved !== 'object') return false;
-    const { audioBytes: audio, descriptorBytes: resolvedDescriptor, decoderWasmBytes: decoderWasm } = resolved;
-    if (!(audio instanceof Uint8Array) || !(resolvedDescriptor instanceof Uint8Array) || !(decoderWasm instanceof Uint8Array)) return false;
+    const {
+      audioBytes: audio,
+      descriptorBytes: resolvedDescriptor,
+      decoderWasmBytes: decoderWasm,
+    } = resolved;
+    if (
+      !(audio instanceof Uint8Array) ||
+      !(resolvedDescriptor instanceof Uint8Array) ||
+      !(decoderWasm instanceof Uint8Array)
+    )
+      return false;
     if (sha256Hex(audio) !== ext.encodedAudioSha256) return false;
     if (sha256Hex(resolvedDescriptor) !== dSha) return false;
     if (sha256Hex(decoderWasm) !== desc.decoderWasmSha256) return false;
@@ -90,9 +140,11 @@ export function createOpus468AdaptiveDerivedVerifier({ resolveArtifacts, verifyI
       signal,
     });
     signal?.throwIfAborted();
-    return verdict?.ok === true &&
+    return (
+      verdict?.ok === true &&
       verdict?.steps?.regeneration?.level === 2 &&
       verdict.steps.regeneration.extensionSha256Match === true &&
-      verdict.steps.regeneration.canonicalRecordMatch === true;
+      verdict.steps.regeneration.canonicalRecordMatch === true
+    );
   };
 }

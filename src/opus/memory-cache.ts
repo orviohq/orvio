@@ -38,7 +38,11 @@ export function createBoundedTrackCache<T extends BufferedTrack>({
   maxEntries = 2,
   maxBytes = 256 * 1024 * 1024,
   retain = (_id: string) => true,
-}: { maxEntries?: number; maxBytes?: number; retain?: (id: string) => boolean } = {}): BoundedTrackCache<T> {
+}: {
+  maxEntries?: number;
+  maxBytes?: number;
+  retain?: (id: string) => boolean;
+} = {}): BoundedTrackCache<T> {
   const entries = new Map<string, T>();
   const sizes = new Map<string, number>();
   let total = 0;
@@ -66,7 +70,9 @@ export function createBoundedTrackCache<T extends BufferedTrack>({
       if (!retain(id)) {
         const size = sizes.get(id);
         if (size !== undefined) total -= size;
-        entries.delete(id); sizes.delete(id); return;
+        entries.delete(id);
+        sizes.delete(id);
+        return;
       }
       const previous = sizes.get(id);
       if (previous !== undefined) total -= previous;
@@ -88,7 +94,10 @@ export function createBoundedTrackCache<T extends BufferedTrack>({
 
 export interface DecodedBufferCache {
   /** Returns the shared buffer for key, creating (and caching) it on miss. */
-  acquire(key: string, create: () => AudioBuffer): {
+  acquire(
+    key: string,
+    create: () => AudioBuffer,
+  ): {
     buffer: AudioBuffer;
     reused: boolean;
   };

@@ -27,12 +27,26 @@ import { HANN, WRE, WIM } from '../flux-tables.mjs';
 export const OPUS468_LANES = [4, 6, 8];
 export const OPUS468_TIERS = ['low', 'mid', 'high', 'sc'];
 export const OPUS468_CHART_KEYS = [
-  '4:low', '4:mid', '4:high', '4:sc',
-  '6:low', '6:mid', '6:high', '6:sc',
-  '8:low', '8:mid', '8:high', '8:sc',
+  '4:low',
+  '4:mid',
+  '4:high',
+  '4:sc',
+  '6:low',
+  '6:mid',
+  '6:high',
+  '6:sc',
+  '8:low',
+  '8:mid',
+  '8:high',
+  '8:sc',
 ];
 // csx/1 contract caps (fixed 12-slot family): per-tier caps + total + body cap.
-export const OPUS468_TIER_NOTE_CAP = { low: 910, mid: 1270, high: 2770, sc: 3130 };
+export const OPUS468_TIER_NOTE_CAP = {
+  low: 910,
+  mid: 1270,
+  high: 2770,
+  sc: 3130,
+};
 export const OPUS468_MAX_TOTAL_NOTES = 24300;
 export const OPUS468_SC_MARKER = 'sc_collapsed_into_mx';
 
@@ -57,7 +71,8 @@ export function assignLanes468(analysis, highTimes, lanes, scale) {
     rel.sort(
       (x, y) =>
         y.score - x.score ||
-        ['low', 'mid', 'high'].indexOf(x.band) - ['low', 'mid', 'high'].indexOf(y.band),
+        ['low', 'mid', 'high'].indexOf(x.band) -
+          ['low', 'mid', 'high'].indexOf(y.band),
     );
     const band = rel[0]?.band || 'mid';
     const g = groups[band];
@@ -82,7 +97,9 @@ export function fixedLaneMap468(
     for (const arr of Object.values(groups)) if (arr.includes(l)) return arr;
     return [l];
   };
-  const medStr = [...onsetInfo.info.values()].map((i) => i.strength).sort((x, y) => x - y);
+  const medStr = [...onsetInfo.info.values()]
+    .map((i) => i.strength)
+    .sort((x, y) => x - y);
   const med = medStr[Math.floor(medStr.length / 2)] || 0;
   const candHeads = new Set();
   for (const t of highTimes) {
@@ -171,9 +188,17 @@ export function fixedLaneMap468(
 }
 
 // Mirror of c3-core decorateTier with 4/6/8 groups. Identical hold/chord policy.
-export function decorateTier468(base, tier, onsetInfo, lanes, P = C3_DEFAULT_PARAMS) {
+export function decorateTier468(
+  base,
+  tier,
+  onsetInfo,
+  lanes,
+  P = C3_DEFAULT_PARAMS,
+) {
   const groups = laneGroups468(lanes);
-  const medStr = [...onsetInfo.info.values()].map((i) => i.strength).sort((x, y) => x - y);
+  const medStr = [...onsetInfo.info.values()]
+    .map((i) => i.strength)
+    .sort((x, y) => x - y);
   const med = medStr[Math.floor(medStr.length / 2)] || 0;
   const getStr = (n) => (onsetInfo.info.get(n.time) || {}).strength || 0;
   const cand = base
@@ -198,7 +223,8 @@ export function decorateTier468(base, tier, onsetInfo, lanes, P = C3_DEFAULT_PAR
       .sort((x, y) => x.time - y.time)[0];
     let dur = Math.min(P.capHold, c.info.sustain);
     if (next) dur = Math.min(dur, next.time - c.time - P.tailClipMargin);
-    if (dur >= P.minHold) holds.push({ time: c.time, duration: +dur.toFixed(4) });
+    if (dur >= P.minHold)
+      holds.push({ time: c.time, duration: +dur.toFixed(4) });
   }
   const holdMap = new Map(holds.map((h) => [h.time, h.duration]));
   const chordCapN = Math.floor(base.length * P.chordCap[tier]);
@@ -208,12 +234,18 @@ export function decorateTier468(base, tier, onsetInfo, lanes, P = C3_DEFAULT_PAR
   const chordPicks = [];
   for (const c of chordCands) {
     if (chordPicks.length >= chordCapN) break;
-    if (chordPicks.some((h) => Math.abs(h.time - c.time) < P.chordSpacing)) continue;
+    if (chordPicks.some((h) => Math.abs(h.time - c.time) < P.chordSpacing))
+      continue;
     const info = onsetInfo.info.get(c.time);
     const g2 = groups[info.bands[1].band];
-    const used = new Set(base.filter((q) => Math.abs(q.time - c.time) < 0.001).map((q) => q.lane));
+    const used = new Set(
+      base.filter((q) => Math.abs(q.time - c.time) < 0.001).map((q) => q.lane),
+    );
     for (const h of holds) {
-      if (c.time >= h.time - P.chordHoldMargin && c.time < h.time + h.duration + P.chordHoldMargin)
+      if (
+        c.time >= h.time - P.chordHoldMargin &&
+        c.time < h.time + h.duration + P.chordHoldMargin
+      )
         used.add((base.find((q) => q.time === h.time) || {}).lane);
     }
     const laneTimes = new Map();
@@ -225,7 +257,12 @@ export function decorateTier468(base, tier, onsetInfo, lanes, P = C3_DEFAULT_PAR
     for (const l of g2) {
       if (used.has(l)) continue;
       const ts = laneTimes.get(l) || [];
-      if (ts.some((t) => Math.abs(t - c.time) < 0.15 && Math.abs(t - c.time) > 0.001)) continue;
+      if (
+        ts.some(
+          (t) => Math.abs(t - c.time) < 0.15 && Math.abs(t - c.time) > 0.001,
+        )
+      )
+        continue;
       pickLane = l;
       break;
     }
@@ -241,7 +278,8 @@ export function decorateTier468(base, tier, onsetInfo, lanes, P = C3_DEFAULT_PAR
       ...(d ? { duration: d } : {}),
     });
   }
-  for (const cp of chordPicks) notes.push({ time: cp.time, lane: cp.lane, type: 'tap' });
+  for (const cp of chordPicks)
+    notes.push({ time: cp.time, lane: cp.lane, type: 'tap' });
   notes.sort((x, y) => x.time - y.time || x.lane - y.lane);
   notes.forEach((n, i) => (n.id = i));
   return notes;
@@ -263,7 +301,8 @@ export function adaptDecoratedChart468(raw, lanes, duration) {
   const laneUntil = new Map();
   let previous = -Infinity;
   return raw.map((candidate) => {
-    if (!candidate || typeof candidate !== 'object') throw new Error('opus468_invalid_candidate_note');
+    if (!candidate || typeof candidate !== 'object')
+      throw new Error('opus468_invalid_candidate_note');
     const n = candidate;
     if (
       !Number.isInteger(n.id) ||
@@ -283,7 +322,11 @@ export function adaptDecoratedChart468(raw, lanes, duration) {
     previous = n.time;
     const note = { id: n.id, time: n.time, lane: n.lane };
     if (n.type === 'hold') {
-      if (!Number.isFinite(n.duration) || n.duration <= 0 || n.time + n.duration > duration)
+      if (
+        !Number.isFinite(n.duration) ||
+        n.duration <= 0 ||
+        n.time + n.duration > duration
+      )
         throw new Error('opus468_invalid_candidate_hold');
       note.end = n.time + n.duration;
     } else if (n.duration !== undefined)
@@ -320,16 +363,31 @@ export function generateOpus468Charts(parsed) {
     const low = chartFromAnalysis(analysis, 'low', lanes).map((n) => n.time);
     const mid = chartFromAnalysis(analysis, 'mid', lanes).map((n) => n.time);
     const high = chartFromAnalysis(analysis, 'high', lanes).map((n) => n.time);
-    const laneMap = fixedLaneMap468(analysis, high, lanes, info.scale, info).map;
-    for (const [tier, times] of [['low', low], ['mid', mid], ['high', high]]) {
+    const laneMap = fixedLaneMap468(
+      analysis,
+      high,
+      lanes,
+      info.scale,
+      info,
+    ).map;
+    for (const [tier, times] of [
+      ['low', low],
+      ['mid', mid],
+      ['high', high],
+    ]) {
       const base = times.map((time) => {
         const lane = laneMap.get(time);
         if (lane === undefined) throw Error('opus468_missing_inherited_lane');
         return { time, lane };
       });
       const key = `${lanes}:${tier}`;
-      const adapted = adaptDecoratedChart468(decorateTier468(base, tier, info, lanes), lanes, samples.length / rate);
-      if (adapted.length > OPUS468_TIER_NOTE_CAP[tier]) throw Error('opus468_cap_' + tier);
+      const adapted = adaptDecoratedChart468(
+        decorateTier468(base, tier, info, lanes),
+        lanes,
+        samples.length / rate,
+      );
+      if (adapted.length > OPUS468_TIER_NOTE_CAP[tier])
+        throw Error('opus468_cap_' + tier);
       totalNotes += adapted.length;
       charts[key] = adapted;
     }
@@ -344,7 +402,8 @@ export function generateOpus468Charts(parsed) {
       lanes,
       samples.length / rate,
     );
-    if (scAdapted.length > OPUS468_TIER_NOTE_CAP.sc) throw Error('opus468_cap_sc');
+    if (scAdapted.length > OPUS468_TIER_NOTE_CAP.sc)
+      throw Error('opus468_cap_sc');
     totalNotes += scAdapted.length;
     charts[scKey] = scAdapted;
   }

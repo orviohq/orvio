@@ -14,8 +14,11 @@ const fail = (s) => {
   throw Error('replay_share_import_' + s);
 };
 const hex = (b) =>
-  Array.from(new Uint8Array(b), (x) => x.toString(16).padStart(2, '0')).join('');
-const sha256Hex = async (bytes) => hex(await crypto.subtle.digest('SHA-256', bytes));
+  Array.from(new Uint8Array(b), (x) => x.toString(16).padStart(2, '0')).join(
+    '',
+  );
+const sha256Hex = async (bytes) =>
+  hex(await crypto.subtle.digest('SHA-256', bytes));
 const hashText = async (t) => sha256Hex(new TextEncoder().encode(t));
 
 export function createOpus468ReplayShareImporter({
@@ -26,8 +29,10 @@ export function createOpus468ReplayShareImporter({
   applyReplayOp, // actual ../replay.ts
   judgments, // actual ../engine.ts JUDGMENTS
 } = {}) {
-  if (typeof makeCodec !== 'function') throw Error('replay_share_codec_factory_missing');
-  if (typeof saveSession !== 'function') throw Error('replay_share_session_seam_missing');
+  if (typeof makeCodec !== 'function')
+    throw Error('replay_share_codec_factory_missing');
+  if (typeof saveSession !== 'function')
+    throw Error('replay_share_session_seam_missing');
   if (
     typeof validateRuntimeReplay !== 'function' ||
     typeof replayEngine !== 'function' ||
@@ -37,7 +42,10 @@ export function createOpus468ReplayShareImporter({
   )
     throw Error('replay_share_engine_seam_missing');
   return async function importSharedReplay(input, { signal } = {}) {
-    if (!(input instanceof Uint8Array) || !(input.buffer instanceof ArrayBuffer))
+    if (
+      !(input instanceof Uint8Array) ||
+      !(input.buffer instanceof ArrayBuffer)
+    )
       fail('bytes');
     // Snapshot wire bytes BEFORE the first await; decode through a FRESH codec
     // (fresh reader/policy/owner per use; current candidate denied inside).
@@ -49,7 +57,9 @@ export function createOpus468ReplayShareImporter({
     // Snapshot every decoded field before further awaits.
     if (!decoded || typeof decoded !== 'object') fail('decode');
     const song =
-      typeof decoded.song === 'string' && decoded.song ? decoded.song.slice() : fail('song');
+      typeof decoded.song === 'string' && decoded.song
+        ? decoded.song.slice()
+        : fail('song');
     const selectedChartSha256 =
       typeof decoded.selectedChartSha256 === 'string' &&
       /^[0-9a-f]{64}$/.test(decoded.selectedChartSha256)
@@ -77,7 +87,11 @@ export function createOpus468ReplayShareImporter({
       fail('frozen_chart');
     // Strict replay revalidation against the bound song identity.
     const validated = validateRuntimeReplay(replay, (id) => id === song);
-    if (!validated || ![4, 6, 8].includes(validated.lanes) || validated.song !== song)
+    if (
+      !validated ||
+      ![4, 6, 8].includes(validated.lanes) ||
+      validated.song !== song
+    )
       fail('replay_shape');
     // Derive events + result through the ACTUAL Engine on the committed
     // frozen chart. The wire carries NO claimed result; the result is
@@ -85,7 +99,9 @@ export function createOpus468ReplayShareImporter({
     const engine = replayEngine(validated, copy(frozenNotes));
     validated.ops.forEach((op, i) => applyReplayOp(engine, op, i));
     engine.update(9999);
-    const counts = judgments.map((v) => engine.events.filter((ev) => ev.value === v).length);
+    const counts = judgments.map(
+      (v) => engine.events.filter((ev) => ev.value === v).length,
+    );
     const result = {
       song,
       lanes: validated.lanes,
