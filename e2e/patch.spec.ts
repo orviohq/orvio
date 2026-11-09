@@ -62,7 +62,9 @@ test('equal integer lane widths survive resize and MAX100 has no field overlay',
     const dispatch = await atKey(
       page,
       note.time,
-      (await page.locator('#keycaps span').allTextContents())[note.lane].replace('␣', 'Space').toLowerCase(),
+      (await page.locator('#keycaps span').allTextContents())[note.lane]
+        .replace('␣', 'Space')
+        .toLowerCase(),
       true,
     );
     const onTime = dispatch.latenessMs <= ON_TIME_MS;
@@ -112,7 +114,9 @@ test('broken hold has muted remaining tail without score re-entry', async ({
     () =>
       (window as any).orvioDiagnostics.notes.find((s: any) => s.note.end).note,
   );
-  const key = (await page.locator('#keycaps span').allTextContents())[note.lane].replace('␣', 'Space').toLowerCase();
+  const key = (await page.locator('#keycaps span').allTextContents())[note.lane]
+    .replace('␣', 'Space')
+    .toLowerCase();
   await atKey(page, note.time, key, true);
   await atKey(page, note.time + 0.15, key, false);
   const before = await page.evaluate(() => (window as any).orvioDiagnostics);

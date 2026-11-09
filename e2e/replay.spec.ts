@@ -12,7 +12,9 @@ test('real keyboard performance shares a local input replay with exact judgments
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
   const d = await page.evaluate(() => (window as any).orvioDiagnostics);
-  const keys = (await page.locator('#keycaps span').allTextContents()).map(k=>k === '␣' ? 'Space' : k.toLowerCase());
+  const keys = (await page.locator('#keycaps span').allTextContents()).map(
+    (k) => (k === '␣' ? 'Space' : k.toLowerCase()),
+  );
   for (const { note: n } of d.notes.slice(0, 7)) {
     await page.waitForFunction(
       (t) => (window as any).orvioAudioTime >= t,

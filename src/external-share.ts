@@ -81,7 +81,8 @@ export function externalReplayEngine(
   replay: RuntimeReplay,
   record: SourceRecord,
 ) {
-  if (replay.lanes !== 5 && replay.lanes !== 7) throw Error('Missing original chart');
+  if (replay.lanes !== 5 && replay.lanes !== 7)
+    throw Error('Missing original chart');
   const chart = record.charts[`${replay.lanes}:${replay.difficulty}`];
   if (!chart) throw Error('Missing original chart');
   return new Engine(

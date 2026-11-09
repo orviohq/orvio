@@ -28,7 +28,7 @@ it('all new builtin lanes produce valid charts, replay operations and results wi
     engine.update(9999);
     expect(engine.total).toBeGreaterThanOrEqual(notes.length);
     expect(engine.score).toBe(0);
-    expect(engine.events.every(e=>e.value===0)).toBe(true);
+    expect(engine.events.every((e) => e.value === 0)).toBe(true);
     const result = {
       song: SONGS[0].id as 'first-light',
       lanes,

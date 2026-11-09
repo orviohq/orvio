@@ -46,7 +46,8 @@ export const tr = {
   normal: 'NORMAL',
   hard: 'ZOR',
   choose: 'ŞARKINI SEÇ',
-  selectionHint: '↑ ↓ ŞARKI / ← → ZORLUK / 4 5 6 7 8 TUŞ / ENTER BAŞLAT / F2 AYARLAR',
+  selectionHint:
+    '↑ ↓ ŞARKI / ← → ZORLUK / 4 5 6 7 8 TUŞ / ENTER BAŞLAT / F2 AYARLAR',
   selected: 'SEÇİLEN ŞARKI',
   nowPlaying: 'ÖNİZLEME ÇALIYOR',
   preparing: 'SES HAZIRLANIYOR',

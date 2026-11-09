@@ -170,7 +170,8 @@ const ko: Words = {
   normal: '중',
   hard: '상',
   choose: '곡을 선택하세요',
-  selectionHint: '↑ ↓ 곡  /  ← → 난이도  /  4 5 6 7 8 키  /  ENTER 시작  /  F2 설정',
+  selectionHint:
+    '↑ ↓ 곡  /  ← → 난이도  /  4 5 6 7 8 키  /  ENTER 시작  /  F2 설정',
   selected: '선택한 곡',
   nowPlaying: '미리듣기 재생 중',
   preparing: '음악 준비 중',
@@ -364,7 +365,8 @@ const ja: Words = {
   normal: '普通',
   hard: '難しい',
   choose: '楽曲を選択',
-  selectionHint: '↑ ↓ 楽曲 / ← → 難易度 / 4 5 6 7 8 キー / ENTER 開始 / F2 設定',
+  selectionHint:
+    '↑ ↓ 楽曲 / ← → 難易度 / 4 5 6 7 8 キー / ENTER 開始 / F2 設定',
   selected: '選択中の楽曲',
   nowPlaying: 'プレビュー再生中',
   preparing: '音楽を準備中',
