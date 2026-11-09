@@ -437,3 +437,148 @@ it('raw R2 rejects ninth header/nested extras and invalid UTF8 before unpack', a
     await expect(decodeOpus35Share(fragment), kind).rejects.toThrow();
   }
 });
+
+import { readOpus35Job } from '../src/opus/opus35-api';
+it('public HTTP rejection keeps known code, status, retry delay and service stage', async () => {
+  const handle = {
+    jobId: base.jobId,
+    videoId: base.videoId,
+    transportVersion: 2 as const,
+    audioFormat: 'orvio-opus-v1' as const,
+  };
+  const fetcher = vi
+    .fn()
+    .mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: { code: 'unavailable', retryAfterSec: 30 } }),
+        { status: 429 },
+      ),
+    );
+  vi.stubGlobal('fetch', fetcher);
+  try {
+    await expect(
+      readOpus35Job(handle, AbortSignal.timeout(1000)),
+    ).rejects.toMatchObject({
+      code: 'unavailable',
+      status: 429,
+      retryAfterSec: 30,
+      stage: 'service',
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0][1].method).toBeUndefined();
+    fetcher.mockResolvedValue(
+      new Response(JSON.stringify({ error: { code: 'too_long' } }), {
+        status: 422,
+      }),
+    );
+    await expect(
+      readOpus35Job(handle, AbortSignal.timeout(1000)),
+    ).rejects.toMatchObject({
+      code: 'too_long',
+      status: 422,
+      stage: 'service',
+    });
+    fetcher.mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: { code: 'untrusted_custom_cause' } }),
+        { status: 503 },
+      ),
+    );
+    await expect(
+      readOpus35Job(handle, AbortSignal.timeout(1000)),
+    ).rejects.toMatchObject({
+      code: 'unavailable',
+      status: 503,
+      stage: 'service',
+    });
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+it('malformed successful public state is response failure, not fabricated service cause', async () => {
+  const handle = {
+    jobId: base.jobId,
+    videoId: base.videoId,
+    transportVersion: 2 as const,
+    audioFormat: 'orvio-opus-v1' as const,
+  };
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...base,
+          status: 'unknown',
+          phase: 'untrusted',
+          canRetry: false,
+        }),
+      ),
+    ),
+  );
+  try {
+    await expect(
+      readOpus35Job(handle, AbortSignal.timeout(1000)),
+    ).rejects.toMatchObject({ code: 'unavailable', stage: 'response' });
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+it('only exact durable source duration rejection supplies the too-long fact', () => {
+  const terminal = {
+    ...base,
+    status: 'failed',
+    phase: 'SOURCE_REJECTED',
+    canRetry: false,
+    error: {
+      code: 'duration_exceeded',
+      stage: 'source',
+      durationSec: 450.06079166666666,
+      maxDurationSec: 300,
+    },
+  };
+  expect(parsePublicOpus35State(terminal, base.videoId, base.jobId)).toEqual(
+    terminal,
+  );
+  for (const mutation of [
+    { ...terminal, canRetry: true },
+    { ...terminal, phase: 'COLLECTING' },
+    { ...terminal, url: 'https://untrusted.invalid' },
+    { ...terminal, error: { ...terminal.error, stage: 'codec' } },
+    { ...terminal, error: { ...terminal.error, maxDurationSec: 600 } },
+    { ...terminal, error: { ...terminal.error, durationSec: 299 } },
+    { ...terminal, error: { ...terminal.error, durationSec: Infinity } },
+    { ...terminal, error: { ...terminal.error, extra: true } },
+  ])
+    expect(() =>
+      parsePublicOpus35State(mutation, base.videoId, base.jobId),
+    ).toThrow();
+});
+it('empty or malformed HTTP rejection bodies never erase known status and service attribution', async () => {
+  const handle = {
+    jobId: base.jobId,
+    videoId: base.videoId,
+    transportVersion: 2 as const,
+    audioFormat: 'orvio-opus-v1' as const,
+  };
+  const fetcher = vi.fn();
+  vi.stubGlobal('fetch', fetcher);
+  try {
+    for (const status of [429, 503])
+      for (const body of ['', '{not json']) {
+        fetcher.mockResolvedValue(new Response(body, { status }));
+        await expect(
+          readOpus35Job(handle, AbortSignal.timeout(1000)),
+        ).rejects.toMatchObject({
+          code: 'unavailable',
+          status,
+          stage: 'service',
+        });
+      }
+    fetcher.mockResolvedValue(new Response('{not json', { status: 200 }));
+    await expect(
+      readOpus35Job(handle, AbortSignal.timeout(1000)),
+    ).rejects.toMatchObject({ code: 'unavailable', stage: 'response' });
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

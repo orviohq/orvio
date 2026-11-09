@@ -1,3 +1,4 @@
+import { audioAtStage } from '../audio-error-stage';
 // Private actual Response-artifact preparation. No legacy source route used.
 import ChartWorkerUrl from './opus-chart.worker.mjs?worker&url';
 import DecoderUrl from '../opus-codec/opus-decoder.wasm?url';
@@ -24,7 +25,9 @@ export function createAcquiredOpusV2Preparer({
   return async function prepare(input: unknown, signal: AbortSignal) {
     signal.throwIfAborted();
     const job = captureAcquiredOpusV2(input),
-      artifact = await artifacts.load(job, { signal });
+      artifact = await audioAtStage<any>('response', () =>
+        artifacts.load(job, { signal }),
+      );
     const r = await waitAcquired(
       fetch(DecoderUrl, { signal }),
       signal,
@@ -42,14 +45,16 @@ export function createAcquiredOpusV2Preparer({
     signal.throwIfAborted();
     if ((await sha256(new Uint8Array(wasmBytes))) !== DECODER)
       throw Error('opus_decoder_identity');
-    const result = await prepareOpusOwned({
-      workerUrl: ChartWorkerUrl,
-      bytes: artifact.bytes.slice().buffer,
-      wasmBytes,
-      descriptorBytes: artifact.descriptorBytes.slice().buffer,
-      descriptorSha256: artifact.descriptorSha256,
-      signal,
-    });
+    const result = await audioAtStage<any>('analysis', () =>
+      prepareOpusOwned({
+        workerUrl: ChartWorkerUrl,
+        bytes: artifact.bytes.slice().buffer,
+        wasmBytes,
+        descriptorBytes: artifact.descriptorBytes.slice().buffer,
+        descriptorSha256: artifact.descriptorSha256,
+        signal,
+      }),
+    );
     signal.throwIfAborted();
     if (
       !(await verifyOpusRecord(
@@ -60,7 +65,9 @@ export function createAcquiredOpusV2Preparer({
     )
       throw Error('acquired_v2_prepared_record');
     signal.throwIfAborted();
-    await saveVerifiedOpus({ ...artifact, record: result.record }, signal);
+    await audioAtStage('storage', () =>
+      saveVerifiedOpus({ ...artifact, record: result.record }, signal),
+    );
     signal.throwIfAborted();
     return {
       kind: 'orvio-opus-v1',

@@ -75,8 +75,25 @@ export async function importOpus35(
             : 'error',
     });
     if (j.status === 'verified') break;
-    if (j.status === 'unknown' || j.status === 'error')
-      throw new AudioJobError('unavailable');
+    if (j.status === 'failed')
+      throw new AudioJobError(
+        'too_long',
+        undefined,
+        undefined,
+        undefined,
+        'service',
+      );
+    if (j.status === 'error')
+      // A validated terminal backend failure is a service failure, never a
+      // browser analysis or local-storage failure. Unknown work stays unknown.
+      throw new AudioJobError(
+        'unavailable',
+        undefined,
+        undefined,
+        undefined,
+        'service',
+      );
+    if (j.status === 'unknown') throw new AudioJobError('unavailable');
     if (performance.now() >= end) throw new AudioJobError('request_timeout');
     options.onStage?.('queued');
     await pause(5000, signal);

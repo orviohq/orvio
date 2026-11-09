@@ -1,4 +1,9 @@
-import { AUDIO_BASE, AudioJobError } from '../external-audio-api';
+import {
+  AUDIO_BASE,
+  AudioJobError,
+  validAudioErrorCode,
+} from '../external-audio-api';
+import { audioAtStage } from '../audio-error-stage';
 import { captureAcquiredOpusV2 } from './opus-acquired-v2-artifacts.mjs';
 import { createAcquiredOpusV2Preparer } from './opus-acquired-v2-prepare';
 import { prepareOpusOwned } from './opus-chart-worker-client.mjs';
@@ -99,6 +104,20 @@ export function parsePublicOpus35State(
   )
     return j;
   if (
+    j.status === 'failed' &&
+    exact(j, [...base, 'canRetry', 'error']) &&
+    j.phase === 'SOURCE_REJECTED' &&
+    j.canRetry === false &&
+    exact(j.error, ['code', 'stage', 'durationSec', 'maxDurationSec']) &&
+    j.error.code === 'duration_exceeded' &&
+    j.error.stage === 'source' &&
+    typeof j.error.durationSec === 'number' &&
+    Number.isFinite(j.error.durationSec) &&
+    j.error.maxDurationSec === 300 &&
+    j.error.durationSec > j.error.maxDurationSec
+  )
+    return j;
+  if (
     j.status === 'error' &&
     exact(j, [...base, 'code', 'stage', 'canRetry']) &&
     j.code === 'unavailable' &&
@@ -116,13 +135,34 @@ async function requestState(
   init: RequestInit,
   jobId?: string,
 ) {
-  const response = await fetch(url, { ...init, redirect: 'error' });
-  const j = await response.json();
-  if (!response.ok)
+  let response: Response;
+  try {
+    response = await fetch(url, { ...init, redirect: 'error' });
+  } catch (error) {
+    if (init.signal?.aborted) throw error;
+    throw new AudioJobError('network_error');
+  }
+  // HTTP status remains a known service fact even when its optional error
+  // body is empty or malformed. Successful responses require valid JSON.
+  const j = response.ok
+    ? await audioAtStage('response', () => response.json())
+    : await response.json().catch(() => null);
+  if (!response.ok) {
+    const code = j?.error?.code;
+    const retry = j?.error?.retryAfterSec ?? j?.retryAfterSec;
     throw new AudioJobError(
-      j?.error?.code === 'storage_full' ? 'storage_full' : 'unavailable',
+      validAudioErrorCode(code) ? code : 'unavailable',
+      typeof retry === 'number' && Number.isFinite(retry) && retry >= 0
+        ? Math.min(86400, Math.ceil(retry))
+        : undefined,
+      response.status,
+      undefined,
+      'service',
     );
-  return parsePublicOpus35State(j, videoId, jobId);
+  }
+  return audioAtStage('response', async () =>
+    parsePublicOpus35State(j, videoId, jobId),
+  );
 }
 export async function createOpus35Job(
   videoId: string,
