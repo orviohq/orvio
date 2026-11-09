@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.0] - 2026-11-09
+
+- Add verified 4-, 6- and 8-key charts for compressed YouTube songs while preserving existing 5- and 7-key charts.
+- Save results and replay sessions, share short result links on demand, and replay shared results on another device. Shared songs stay temporary until explicitly added.
+- Preserve existing audio and replay identities, bounded import recovery, and the 0.2.53 stage-timeout fixes. This release does not increase audio storage capacity.
+
 ## [0.2.53] - 2026-11-09
 
 - Fix an import timeout that could stop an already prepared YouTube song during download.

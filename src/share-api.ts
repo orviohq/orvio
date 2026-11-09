@@ -1,7 +1,9 @@
 import { V5_MAX_FRAGMENT_CHARS } from './external-share';
 import { queryClient, queryKeys, runMutation } from './query-client';
 function fragmentLimit(fragment: string) {
-  return fragment.startsWith('v=5&d=') || fragment.startsWith('v=6&d=')
+  return fragment.startsWith('v=5&d=') ||
+    fragment.startsWith('v=6&d=') ||
+    fragment.startsWith('v=7&d=')
     ? V5_MAX_FRAGMENT_CHARS
     : 160000;
 }
@@ -11,15 +13,24 @@ export class ShareError extends Error {
     super('Share request failed: ' + status);
   }
 }
-export async function saveSharedReplay(fragment: string) {
+export async function saveSharedReplay(
+  fragment: string,
+  { signal }: { signal?: AbortSignal } = {},
+) {
   if (new TextEncoder().encode(fragment).length > fragmentLimit(fragment))
     throw new ShareError(413);
   return runMutation(['save-shared-replay'], async () => {
     const response = await fetch(SHARE_API + '/v1/replays', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': fragment.startsWith('v=7&d=')
+          ? 'application/json; orvio-share-version=7'
+          : 'application/json',
+      },
       body: JSON.stringify({ fragment }),
-      signal: AbortSignal.timeout(12000),
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(12000)])
+        : AbortSignal.timeout(12000),
     });
     if (!response.ok) throw new ShareError(response.status);
     const data = await response.json();

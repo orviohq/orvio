@@ -1,4 +1,17 @@
 import { externalSource } from './external-catalog';
+import { createVerifiedOpusPresentationRegistry } from './opus/opus468-presentation-registry';
+import type { OpusRecord } from './opus/opus-record';
+const extensionPresentation = createVerifiedOpusPresentationRegistry();
+export const attachOpus468Artwork = (
+  song: string,
+  record: OpusRecord,
+  options?: { signal?: AbortSignal },
+) => extensionPresentation.attach(song, record, options);
+export function songVideoId(id: string) {
+  return (
+    externalSource(id)?.record.videoId ?? extensionPresentation.videoId(id)
+  );
+}
 export const ART_FALLBACK = '/wallpapers/first-light.png';
 const resolved = new Map<string, string>();
 const pending = new Set<string>();
@@ -44,8 +57,8 @@ function chooseThumbnail(id: string, videoId: string) {
 }
 /** Only a validated video id reaches the public thumbnail host; never an API/job URL. */
 export function songArt(id: string): string {
-  const source = externalSource(id);
-  if (!source) return `/wallpapers/${id}.png`;
-  chooseThumbnail(id, source.record.videoId);
-  return resolved.get(id) ?? thumbnailCandidates(source.record.videoId)[1];
+  const videoId = songVideoId(id);
+  if (!videoId) return `/wallpapers/${id}.png`;
+  chooseThumbnail(id, videoId);
+  return resolved.get(id) ?? thumbnailCandidates(videoId)[1];
 }

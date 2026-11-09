@@ -54,6 +54,11 @@ function q<T extends HTMLElement>(selector: string): T {
   return el;
 }
 
+let privateSessions: (() => Promise<any[]>) | undefined;
+export function installPrivateReplayList(read: () => Promise<any[]>) {
+  privateSessions = read;
+}
+
 export function initReplayPage(options: {
   getLanguage: () => Language;
   getLabels: () => ReplayPageLabels;
@@ -145,7 +150,9 @@ function renderRow(
   mode.className = 'replay-mode';
   const difficulty =
     DIFFICULTY_LABEL[session.replay.difficulty] ?? session.replay.difficulty;
-  const builtin = 'kind' in session && session.kind === 'builtin';
+  const builtin =
+    'kind' in session &&
+    (session.kind === 'builtin' || String(session.kind) === 'extension');
   const song = SONGS.find((s) => s.id === session.replay.song);
   const length = builtin
     ? (session.durationSec ?? (song ? duration(song) : null))
@@ -189,11 +196,12 @@ export async function showReplays() {
   empty.classList.add('hidden');
   let sessions: (ListedLocalSession | BuiltinSession)[];
   try {
-    const [external, builtin] = await Promise.all([
+    const [external, builtin, extensions] = await Promise.all([
       listLocalSessions(),
       listBuiltinSessions(),
+      privateSessions ? privateSessions() : Promise.resolve([]),
     ]);
-    sessions = [...external, ...builtin];
+    sessions = [...external, ...builtin, ...extensions];
   } catch {
     if (version !== showVersion) return;
     dropFirstPaint();

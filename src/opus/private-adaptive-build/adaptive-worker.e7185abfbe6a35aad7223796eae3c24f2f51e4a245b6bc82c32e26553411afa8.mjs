@@ -1,0 +1,4701 @@
+const PIPELINE = "orvio-opus-pinned-pcm16-48k-v1";
+const DECODER = "8b67eda2a46e478f65c24c467dae9eac26293efae6484bfe762b9d1086058b4b";
+const hash = (x) => typeof x === "string" && /^[a-f0-9]{64}$/.test(x);
+const int = (x, a, b) => Number.isSafeInteger(x) && x >= a && x <= b;
+const keys = [
+	"schemaVersion",
+	"audioFormat",
+	"videoId",
+	"oggSha256",
+	"oggBytes",
+	"pcm16Sha256",
+	"sampleRate",
+	"channels",
+	"frames",
+	"preSkip",
+	"bitrateTargetKbps",
+	"encoderWasmSha256",
+	"decoderWasmSha256",
+	"pcm16Rule",
+	"source",
+	"parts"
+];
+const exact = (o, k) => o && typeof o === "object" && !Array.isArray(o) && Object.keys(o).length === k.length && k.every((x) => Object.hasOwn(o, x));
+function validOpusDescriptor(d) {
+	if (!exact(d, keys) || d.schemaVersion !== 1 || d.audioFormat !== "orvio-opus-v1" || typeof d.videoId !== "string" || !/^[A-Za-z0-9_-]{11}$/.test(d.videoId) || !hash(d.oggSha256) || !hash(d.pcm16Sha256) || !int(d.oggBytes, 1, 6e6) || d.sampleRate !== 48e3 || d.channels !== 2 || !int(d.frames, 1, 144e5) || !int(d.preSkip, 0, 65535) || ![
+		96,
+		80,
+		64
+	].includes(d.bitrateTargetKbps) || d.encoderWasmSha256 !== "4b0b17e171bb7469e1e32e7d3bb85ca59b4b89d0b2cd1a7a5d90e4c03ae04c09" || d.decoderWasmSha256 !== "8b67eda2a46e478f65c24c467dae9eac26293efae6484bfe762b9d1086058b4b" || d.pcm16Rule !== "s16le scale=32768 half-to-even-ties saturate-after-quantize reject-nonfinite") return false;
+	const s = d.source;
+	if (!exact(s, [
+		"sha256",
+		"bytes",
+		"sampleRate",
+		"channels",
+		"frames"
+	]) || !hash(s.sha256) || ![44100, 48e3].includes(s.sampleRate) || s.channels !== 2 || !int(s.frames, 1, s.sampleRate * 300) || !int(s.bytes, 44, 578e5) || s.bytes < s.frames * 4 + 44) return false;
+	if (!Array.isArray(d.parts) || d.parts.length < 1 || d.parts.length > 6) return false;
+	let sum = 0;
+	for (let i = 0; i < d.parts.length; i++) {
+		const p = d.parts[i];
+		if (!exact(p, [
+			"index",
+			"bytes",
+			"sha256"
+		]) || p.index !== i || !int(p.bytes, 1, 1048576) || !hash(p.sha256)) return false;
+		sum += p.bytes;
+	}
+	return sum === d.oggBytes;
+}
+async function sha256$1(bytes) {
+	return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+async function parseVerifiedDescriptor(bytes, expectedSha) {
+	if (!(bytes instanceof Uint8Array) || bytes.length > 32768 || !hash(expectedSha) || await sha256$1(bytes) !== expectedSha) throw Error("opus_descriptor_identity");
+	const d = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+	if (!validOpusDescriptor(d)) throw Error("opus_descriptor_shape");
+	return d;
+}
+// src/opus/opus-pcm-analysis.mjs
+function parsePinnedPcmAnalysis(pcm, frames) {
+	if (!(pcm instanceof Uint8Array) || !Number.isSafeInteger(frames) || frames < 1 || frames > 144e5 || pcm.length !== frames * 4) throw Error("opus_pcm_length");
+	const view = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength), ratio = 48e3 / 22050, samples = new Float32Array(Math.floor(frames / ratio));
+	const mono = (i) => Math.fround((view.getInt16(i * 4, true) / 32768 + view.getInt16(i * 4 + 2, true) / 32768) / 2);
+	for (let i = 0; i < samples.length; i++) {
+		const x = i * ratio, j = Math.floor(x), f = x - j, a = mono(j), b = j + 1 < frames ? mono(j + 1) : a;
+		samples[i] = a + (b - a) * f;
+	}
+	return {
+		sampleRate: 48e3,
+		frames,
+		samples
+	};
+}
+// node_modules/codec-parser/src/constants.js
+const symbol = Symbol;
+const mappingJoin = ", ";
+const channelMappings = (() => {
+	const left = "left";
+	const center = "center";
+	const right = "right";
+	return [
+		"",
+		"front ",
+		"side ",
+		"rear "
+	].map((x) => [
+		[left, right],
+		[
+			left,
+			right,
+			center
+		],
+		[
+			left,
+			center,
+			right
+		],
+		[
+			center,
+			left,
+			right
+		],
+		[center]
+	].flatMap((y) => y.map((z) => x + z).join(mappingJoin)));
+})();
+const monophonic = "monophonic (mono)";
+const stereo = "stereo";
+const surround = "surround";
+const getChannelMapping = (channelCount, ...mappings) => `${[
+	monophonic,
+	stereo,
+	`linear ${surround}`,
+	"quadraphonic",
+	`5.0 ${surround}`,
+	`5.1 ${surround}`,
+	`6.1 ${surround}`,
+	`7.1 ${surround}`
+][channelCount - 1]} (${mappings.join(mappingJoin)})`;
+const vorbisOpusChannelMapping = [
+	monophonic,
+	getChannelMapping(2, channelMappings[0][0]),
+	getChannelMapping(3, channelMappings[0][2]),
+	getChannelMapping(4, channelMappings[1][0], channelMappings[3][0]),
+	getChannelMapping(5, channelMappings[1][2], channelMappings[3][0]),
+	getChannelMapping(6, channelMappings[1][2], channelMappings[3][0], "LFE"),
+	getChannelMapping(7, channelMappings[1][2], channelMappings[2][0], channelMappings[3][4], "LFE"),
+	getChannelMapping(8, channelMappings[1][2], channelMappings[2][0], channelMappings[3][0], "LFE")
+];
+const rate192000 = 192e3;
+const rate176400 = 176400;
+const rate96000 = 96e3;
+const rate88200 = 88200;
+const rate64000 = 64e3;
+const rate48000 = 48e3;
+const rate44100 = 44100;
+const rate32000 = 32e3;
+const rate24000 = 24e3;
+const rate22050 = 22050;
+const rate16000 = 16e3;
+const rate12000 = 12e3;
+const rate11025 = 11025;
+const rate8000 = 8e3;
+const rate7350 = 7350;
+const absoluteGranulePosition$1 = "absoluteGranulePosition";
+const bandwidth = "bandwidth";
+const bitDepth = "bitDepth";
+const bitrate = "bitrate";
+const bitrateMaximum = "bitrateMaximum";
+const bitrateMinimum = "bitrateMinimum";
+const bitrateNominal = "bitrateNominal";
+const buffer = "buffer";
+const bufferFullness = "bufferFullness";
+const codec = "codec";
+const codecFrames$1 = "codecFrames";
+const coupledStreamCount$1 = "coupledStreamCount";
+const crc16 = "crc16";
+const crc32 = "crc32";
+const data$1 = "data";
+const description = "description";
+const duration = "duration";
+const emphasis = "emphasis";
+const hasOpusPadding = "hasOpusPadding";
+const header$1 = "header";
+const isContinuedPacket = "isContinuedPacket";
+const isCopyrighted = "isCopyrighted";
+const isFirstPage = "isFirstPage";
+const isHome = "isHome";
+const isLastPage$1 = "isLastPage";
+const isOriginal = "isOriginal";
+const isPrivate = "isPrivate";
+const isVbr = "isVbr";
+const layer = "layer";
+const length = "length";
+const mode = "mode";
+const modeExtension = "modeExtension";
+const mpeg = "mpeg";
+const mpegVersion = "mpegVersion";
+const numberAACFrames = "numberAACFrames";
+const outputGain = "outputGain";
+const preSkip$1 = "preSkip";
+const profile = "profile";
+const profileBits = symbol();
+const protection = "protection";
+const rawData = "rawData";
+const segments = "segments";
+const subarray = "subarray";
+const version = "version";
+const vorbis = "vorbis";
+const vorbisComments = "vorbisComments";
+const vorbisSetup = "vorbisSetup";
+const blockingStrategy = "blockingStrategy";
+const blockingStrategyBits = symbol();
+const blockSize = "blockSize";
+const blocksize0 = "blocksize0";
+const blocksize1 = "blocksize1";
+const blockSizeBits = symbol();
+const channelMappingFamily = "channelMappingFamily";
+const channelMappingTable$1 = "channelMappingTable";
+const channelMode = "channelMode";
+const channelModeBits = symbol();
+const channels$1 = "channels";
+const copyrightId = "copyrightId";
+const copyrightIdStart = "copyrightIdStart";
+const frame = "frame";
+const frameCount = "frameCount";
+const frameLength = "frameLength";
+const frameNumber = "frameNumber";
+const framePadding = "framePadding";
+const frameSize = "frameSize";
+const inputSampleRate = "inputSampleRate";
+const pageChecksum = "pageChecksum";
+const pageSegmentBytes = symbol();
+const pageSegmentTable = "pageSegmentTable";
+const pageSequenceNumber = "pageSequenceNumber";
+const sampleNumber = "sampleNumber";
+const sampleRate = "sampleRate";
+const sampleRateBits = symbol();
+const samples = "samples";
+const streamCount$1 = "streamCount";
+const streamInfo = "streamInfo";
+const streamSerialNumber = "streamSerialNumber";
+const streamStructureVersion = "streamStructureVersion";
+const totalBytesOut = "totalBytesOut";
+const totalDuration = "totalDuration";
+const totalSamples = "totalSamples";
+const readRawData = symbol();
+const incrementRawData = symbol();
+const mapCodecFrameStats = symbol();
+const mapFrameStats = symbol();
+const logWarning = symbol();
+const logError$1 = symbol();
+const syncFrame = symbol();
+const fixedLengthFrameSync = symbol();
+const getHeader = symbol();
+const setHeader = symbol();
+const getFrame = symbol();
+const parseFrame = symbol();
+const parseOggPage = symbol();
+const checkCodecUpdate = symbol();
+const reset = symbol();
+const enable = symbol();
+const getHeaderFromUint8Array = symbol();
+const checkFrameFooterCrc16 = symbol();
+const uint8Array = Uint8Array;
+const dataView = DataView;
+const reserved = "reserved";
+const free = "free";
+const none = "none";
+const sixteenBitCRC = "16bit CRC";
+// node_modules/codec-parser/src/utilities.js
+const getCrcTable = (crcTable, crcInitialValueFunction, crcFunction) => {
+	for (let byte = 0; byte < crcTable[length]; byte++) {
+		let crc = crcInitialValueFunction(byte);
+		for (let bit = 8; bit > 0; bit--) crc = crcFunction(crc);
+		crcTable[byte] = crc;
+	}
+	return crcTable;
+};
+const crc8Table = getCrcTable(new uint8Array(256), (b) => b, (crc) => crc & 128 ? 7 ^ crc << 1 : crc << 1);
+const flacCrc16Table = [getCrcTable(/* @__PURE__ */ new Uint16Array(256), (b) => b << 8, (crc) => crc << 1 ^ (crc & 32768 ? 32773 : 0))];
+const crc32Table = [getCrcTable(/* @__PURE__ */ new Uint32Array(256), (b) => b, (crc) => crc >>> 1 ^ (crc & 1) * 3988292384)];
+for (let i = 0; i < 15; i++) {
+	flacCrc16Table.push(/* @__PURE__ */ new Uint16Array(256));
+	crc32Table.push(/* @__PURE__ */ new Uint32Array(256));
+	for (let j = 0; j <= 255; j++) {
+		flacCrc16Table[i + 1][j] = flacCrc16Table[0][flacCrc16Table[i][j] >>> 8] ^ flacCrc16Table[i][j] << 8;
+		crc32Table[i + 1][j] = crc32Table[i][j] >>> 8 ^ crc32Table[0][crc32Table[i][j] & 255];
+	}
+}
+const crc8 = (data) => {
+	let crc = 0;
+	const dataLength = data[length];
+	for (let i = 0; i !== dataLength; i++) crc = crc8Table[crc ^ data[i]];
+	return crc;
+};
+const flacCrc16 = (data) => {
+	const dataLength = data[length];
+	const crcChunkSize = dataLength - 16;
+	let crc = 0;
+	let i = 0;
+	while (i <= crcChunkSize) {
+		crc ^= data[i++] << 8 | data[i++];
+		crc = flacCrc16Table[15][crc >> 8] ^ flacCrc16Table[14][crc & 255] ^ flacCrc16Table[13][data[i++]] ^ flacCrc16Table[12][data[i++]] ^ flacCrc16Table[11][data[i++]] ^ flacCrc16Table[10][data[i++]] ^ flacCrc16Table[9][data[i++]] ^ flacCrc16Table[8][data[i++]] ^ flacCrc16Table[7][data[i++]] ^ flacCrc16Table[6][data[i++]] ^ flacCrc16Table[5][data[i++]] ^ flacCrc16Table[4][data[i++]] ^ flacCrc16Table[3][data[i++]] ^ flacCrc16Table[2][data[i++]] ^ flacCrc16Table[1][data[i++]] ^ flacCrc16Table[0][data[i++]];
+	}
+	while (i !== dataLength) crc = (crc & 255) << 8 ^ flacCrc16Table[0][crc >> 8 ^ data[i++]];
+	return crc;
+};
+const crc32Function = (data) => {
+	const dataLength = data[length];
+	const crcChunkSize = dataLength - 16;
+	let crc = 0;
+	let i = 0;
+	while (i <= crcChunkSize) crc = crc32Table[15][(data[i++] ^ crc) & 255] ^ crc32Table[14][(data[i++] ^ crc >>> 8) & 255] ^ crc32Table[13][(data[i++] ^ crc >>> 16) & 255] ^ crc32Table[12][data[i++] ^ crc >>> 24] ^ crc32Table[11][data[i++]] ^ crc32Table[10][data[i++]] ^ crc32Table[9][data[i++]] ^ crc32Table[8][data[i++]] ^ crc32Table[7][data[i++]] ^ crc32Table[6][data[i++]] ^ crc32Table[5][data[i++]] ^ crc32Table[4][data[i++]] ^ crc32Table[3][data[i++]] ^ crc32Table[2][data[i++]] ^ crc32Table[1][data[i++]] ^ crc32Table[0][data[i++]];
+	while (i !== dataLength) crc = crc32Table[0][(crc ^ data[i++]) & 255] ^ crc >>> 8;
+	return crc ^ -1;
+};
+const concatBuffers = (...buffers) => {
+	const buffer = new uint8Array(buffers.reduce((acc, buf) => acc + buf[length], 0));
+	buffers.reduce((offset, buf) => {
+		buffer.set(buf, offset);
+		return offset + buf[length];
+	}, 0);
+	return buffer;
+};
+const bytesToString = (bytes) => String.fromCharCode(...bytes);
+const reverseTable = [
+	0,
+	8,
+	4,
+	12,
+	2,
+	10,
+	6,
+	14,
+	1,
+	9,
+	5,
+	13,
+	3,
+	11,
+	7,
+	15
+];
+const reverse = (val) => reverseTable[val & 15] << 4 | reverseTable[val >> 4];
+var BitReader = class {
+	constructor(data) {
+		this._data = data;
+		this._pos = data[length] * 8;
+	}
+	set position(position) {
+		this._pos = position;
+	}
+	get position() {
+		return this._pos;
+	}
+	read(bits) {
+		const byte = Math.floor(this._pos / 8);
+		const bit = this._pos % 8;
+		this._pos -= bits;
+		return (reverse(this._data[byte - 1]) << 8) + reverse(this._data[byte]) >> 7 - bit & 255;
+	}
+};
+/**
+* @todo Old versions of Safari do not support BigInt
+*/
+const readInt64le = (view, offset) => {
+	try {
+		return view.getBigInt64(offset, true);
+	} catch {
+		const sign = view.getUint8(offset + 7) & 128 ? -1 : 1;
+		let firstPart = view.getUint32(offset, true);
+		let secondPart = view.getUint32(offset + 4, true);
+		if (sign === -1) {
+			firstPart = ~firstPart + 1;
+			secondPart = ~secondPart + 1;
+		}
+		if (secondPart > 1048575) console.warn("This platform does not support BigInt");
+		return sign * (firstPart + secondPart * 2 ** 32);
+	}
+};
+// node_modules/codec-parser/src/codecs/HeaderCache.js
+var HeaderCache = class {
+	constructor(onCodecHeader, onCodecUpdate) {
+		this._onCodecHeader = onCodecHeader;
+		this._onCodecUpdate = onCodecUpdate;
+		this[reset]();
+	}
+	[enable]() {
+		this._isEnabled = true;
+	}
+	[reset]() {
+		this._headerCache = /* @__PURE__ */ new Map();
+		this._codecUpdateData = /* @__PURE__ */ new WeakMap();
+		this._codecHeaderSent = false;
+		this._codecShouldUpdate = false;
+		this._bitrate = null;
+		this._isEnabled = false;
+	}
+	[checkCodecUpdate](bitrate, totalDuration) {
+		if (this._onCodecUpdate) {
+			if (this._bitrate !== bitrate) {
+				this._bitrate = bitrate;
+				this._codecShouldUpdate = true;
+			}
+			const codecData = this._codecUpdateData.get(this._headerCache.get(this._currentHeader));
+			if (this._codecShouldUpdate && codecData) this._onCodecUpdate({
+				bitrate,
+				...codecData
+			}, totalDuration);
+			this._codecShouldUpdate = false;
+		}
+	}
+	[getHeader](key) {
+		const header = this._headerCache.get(key);
+		if (header) this._updateCurrentHeader(key);
+		return header;
+	}
+	[setHeader](key, header, codecUpdateFields) {
+		if (this._isEnabled) {
+			if (!this._codecHeaderSent) {
+				this._onCodecHeader({ ...header });
+				this._codecHeaderSent = true;
+			}
+			this._updateCurrentHeader(key);
+			this._headerCache.set(key, header);
+			this._codecUpdateData.set(header, codecUpdateFields);
+		}
+	}
+	_updateCurrentHeader(key) {
+		if (this._onCodecUpdate && key !== this._currentHeader) {
+			this._codecShouldUpdate = true;
+			this._currentHeader = key;
+		}
+	}
+};
+// node_modules/codec-parser/src/globals.js
+const headerStore = /* @__PURE__ */ new WeakMap();
+const frameStore = /* @__PURE__ */ new WeakMap();
+// node_modules/codec-parser/src/codecs/Parser.js
+/**
+* @abstract
+* @description Abstract class containing methods for parsing codec frames
+*/
+var Parser = class {
+	constructor(codecParser, headerCache) {
+		this._codecParser = codecParser;
+		this._headerCache = headerCache;
+	}
+	*[syncFrame]() {
+		let frameData;
+		do {
+			frameData = yield* this.Frame[getFrame](this._codecParser, this._headerCache, 0);
+			if (frameData) return frameData;
+			this._codecParser[incrementRawData](1);
+		} while (true);
+	}
+	/**
+	* @description Searches for Frames within bytes containing a sequence of known codec frames.
+	* @param {boolean} ignoreNextFrame Set to true to return frames even if the next frame may not exist at the expected location
+	* @returns {Frame}
+	*/
+	*[fixedLengthFrameSync](ignoreNextFrame) {
+		let frameData = yield* this[syncFrame]();
+		const frameLength = frameStore.get(frameData)[length];
+		if (ignoreNextFrame || this._codecParser._flushing || (yield* this.Header[getHeader](this._codecParser, this._headerCache, frameLength))) {
+			this._headerCache[enable]();
+			this._codecParser[incrementRawData](frameLength);
+			this._codecParser[mapFrameStats](frameData);
+			return frameData;
+		}
+		this._codecParser[logWarning](`Missing ${frame} at ${frameLength} bytes from current position.`, `Dropping current ${frame} and trying again.`);
+		this._headerCache[reset]();
+		this._codecParser[incrementRawData](1);
+	}
+};
+// node_modules/codec-parser/src/containers/Frame.js
+/**
+* @abstract
+*/
+var Frame = class {
+	constructor(headerValue, dataValue) {
+		frameStore.set(this, { [header$1]: headerValue });
+		this[data$1] = dataValue;
+	}
+};
+// node_modules/codec-parser/src/codecs/CodecFrame.js
+var CodecFrame = class extends Frame {
+	static *[getFrame](Header, Frame, codecParser, headerCache, readOffset) {
+		const headerValue = yield* Header[getHeader](codecParser, headerCache, readOffset);
+		if (headerValue) {
+			const frameLengthValue = headerStore.get(headerValue)[frameLength];
+			const samplesValue = headerStore.get(headerValue)[samples];
+			return new Frame(headerValue, (yield* codecParser[readRawData](frameLengthValue, readOffset))[subarray](0, frameLengthValue), samplesValue);
+		} else return null;
+	}
+	constructor(headerValue, dataValue, samplesValue) {
+		super(headerValue, dataValue);
+		this[header$1] = headerValue;
+		this[samples] = samplesValue;
+		this[duration] = samplesValue / headerValue[sampleRate] * 1e3;
+		this[frameNumber] = null;
+		this[totalBytesOut] = null;
+		this[totalSamples] = null;
+		this[totalDuration] = null;
+		frameStore.get(this)[length] = dataValue[length];
+	}
+};
+// node_modules/codec-parser/src/metadata/ID3v2.js
+const unsynchronizationFlag = "unsynchronizationFlag";
+const extendedHeaderFlag = "extendedHeaderFlag";
+const experimentalFlag = "experimentalFlag";
+const footerPresent = "footerPresent";
+var ID3v2 = class ID3v2 {
+	static *getID3v2Header(codecParser, headerCache, readOffset) {
+		const headerLength = 10;
+		const header = {};
+		let data = yield* codecParser[readRawData](3, readOffset);
+		if (data[0] !== 73 || data[1] !== 68 || data[2] !== 51) return null;
+		data = yield* codecParser[readRawData](headerLength, readOffset);
+		header[version] = `id3v2.${data[3]}.${data[4]}`;
+		if (data[5] & 15) return null;
+		header[unsynchronizationFlag] = !!(data[5] & 128);
+		header[extendedHeaderFlag] = !!(data[5] & 64);
+		header[experimentalFlag] = !!(data[5] & 32);
+		header[footerPresent] = !!(data[5] & 16);
+		if (data[6] & 128 || data[7] & 128 || data[8] & 128 || data[9] & 128) return null;
+		const dataLength = data[6] << 21 | data[7] << 14 | data[8] << 7 | data[9];
+		header[length] = headerLength + dataLength;
+		return new ID3v2(header);
+	}
+	constructor(header) {
+		this[version] = header[version];
+		this[unsynchronizationFlag] = header[unsynchronizationFlag];
+		this[extendedHeaderFlag] = header[extendedHeaderFlag];
+		this[experimentalFlag] = header[experimentalFlag];
+		this[footerPresent] = header[footerPresent];
+		this[length] = header[length];
+	}
+};
+// node_modules/codec-parser/src/codecs/CodecHeader.js
+var CodecHeader = class {
+	/**
+	* @private
+	*/
+	constructor(header) {
+		headerStore.set(this, header);
+		this[bitDepth] = header[bitDepth];
+		this[bitrate] = null;
+		this[channels$1] = header[channels$1];
+		this[channelMode] = header[channelMode];
+		this[sampleRate] = header[sampleRate];
+	}
+};
+// node_modules/codec-parser/src/codecs/mpeg/MPEGHeader.js
+const bitrateMatrix = {
+	0: [
+		free,
+		free,
+		free,
+		free,
+		free
+	],
+	16: [
+		32,
+		32,
+		32,
+		32,
+		8
+	],
+	240: [
+		"bad",
+		"bad",
+		"bad",
+		"bad",
+		"bad"
+	]
+};
+const calcBitrate = (idx, interval, intervalOffset) => 8 * ((idx + intervalOffset) % interval + interval) * (1 << (idx + intervalOffset) / interval) - 8 * interval * (interval / 8 | 0);
+for (let i = 2; i < 15; i++) bitrateMatrix[i << 4] = [
+	i * 32,
+	calcBitrate(i, 4, 0),
+	calcBitrate(i, 4, -1),
+	calcBitrate(i, 8, 4),
+	calcBitrate(i, 8, 0)
+];
+const v1Layer1 = 0;
+const v1Layer2 = 1;
+const v1Layer3 = 2;
+const v2Layer1 = 3;
+const v2Layer23 = 4;
+const bands = "bands ";
+const to31 = " to 31";
+const layer12ModeExtensions = {
+	0: bands + 4 + to31,
+	16: bands + 8 + to31,
+	32: bands + 12 + to31,
+	48: bands + 16 + to31
+};
+const bitrateIndex = "bitrateIndex";
+const v2 = "v2";
+const v1 = "v1";
+const intensityStereo = "Intensity stereo ";
+const msStereo = ", MS stereo ";
+const on = "on";
+const off = "off";
+const layer3ModeExtensions = {
+	0: intensityStereo + off + msStereo + off,
+	16: intensityStereo + on + msStereo + off,
+	32: intensityStereo + off + msStereo + on,
+	48: intensityStereo + on + msStereo + on
+};
+const layersValues = {
+	0: { [description]: reserved },
+	2: {
+		[description]: "Layer III",
+		[framePadding]: 1,
+		[modeExtension]: layer3ModeExtensions,
+		[v1]: {
+			[bitrateIndex]: v1Layer3,
+			[samples]: 1152
+		},
+		[v2]: {
+			[bitrateIndex]: v2Layer23,
+			[samples]: 576
+		}
+	},
+	4: {
+		[description]: "Layer II",
+		[framePadding]: 1,
+		[modeExtension]: layer12ModeExtensions,
+		[samples]: 1152,
+		[v1]: { [bitrateIndex]: v1Layer2 },
+		[v2]: { [bitrateIndex]: v2Layer23 }
+	},
+	6: {
+		[description]: "Layer I",
+		[framePadding]: 4,
+		[modeExtension]: layer12ModeExtensions,
+		[samples]: 384,
+		[v1]: { [bitrateIndex]: v1Layer1 },
+		[v2]: { [bitrateIndex]: v2Layer1 }
+	}
+};
+const mpegVersionDescription = "MPEG Version ";
+const isoIec = "ISO/IEC ";
+const mpegVersions = {
+	0: {
+		[description]: `${mpegVersionDescription}2.5 (later extension of MPEG 2)`,
+		[layer]: v2,
+		[sampleRate]: {
+			0: rate11025,
+			4: rate12000,
+			8: rate8000,
+			12: reserved
+		}
+	},
+	8: { [description]: reserved },
+	16: {
+		[description]: `${mpegVersionDescription}2 (${isoIec}13818-3)`,
+		[layer]: v2,
+		[sampleRate]: {
+			0: rate22050,
+			4: rate24000,
+			8: rate16000,
+			12: reserved
+		}
+	},
+	24: {
+		[description]: `${mpegVersionDescription}1 (${isoIec}11172-3)`,
+		[layer]: v1,
+		[sampleRate]: {
+			0: rate44100,
+			4: rate48000,
+			8: rate32000,
+			12: reserved
+		}
+	},
+	length
+};
+const protectionValues$1 = {
+	0: sixteenBitCRC,
+	1: none
+};
+const emphasisValues = {
+	0: none,
+	1: "50/15 ms",
+	2: reserved,
+	3: "CCIT J.17"
+};
+const channelModes = {
+	0: {
+		[channels$1]: 2,
+		[description]: stereo
+	},
+	64: {
+		[channels$1]: 2,
+		[description]: "joint stereo"
+	},
+	128: {
+		[channels$1]: 2,
+		[description]: "dual channel"
+	},
+	192: {
+		[channels$1]: 1,
+		[description]: monophonic
+	}
+};
+var MPEGHeader = class MPEGHeader extends CodecHeader {
+	static *[getHeader](codecParser, headerCache, readOffset) {
+		const header = {};
+		const id3v2Header = yield* ID3v2.getID3v2Header(codecParser, headerCache, readOffset);
+		if (id3v2Header) {
+			yield* codecParser[readRawData](id3v2Header[length], readOffset);
+			codecParser[incrementRawData](id3v2Header[length]);
+		}
+		const data = yield* codecParser[readRawData](4, readOffset);
+		const key = bytesToString(data[subarray](0, 4));
+		const cachedHeader = headerCache[getHeader](key);
+		if (cachedHeader) return new MPEGHeader(cachedHeader);
+		if (data[0] !== 255 || data[1] < 224) return null;
+		const mpegVersionValues = mpegVersions[data[1] & 24];
+		if (mpegVersionValues["description"] === "reserved") return null;
+		const layerBits = data[1] & 6;
+		if (layersValues[layerBits]["description"] === "reserved") return null;
+		const layerValues = {
+			...layersValues[layerBits],
+			...layersValues[layerBits][mpegVersionValues[layer]]
+		};
+		header[mpegVersion] = mpegVersionValues[description];
+		header[layer] = layerValues[description];
+		header[samples] = layerValues[samples];
+		header[protection] = protectionValues$1[data[1] & 1];
+		header[length] = 4;
+		header[bitrate] = bitrateMatrix[data[2] & 240][layerValues[bitrateIndex]];
+		if (header["bitrate"] === "bad") return null;
+		header[sampleRate] = mpegVersionValues[sampleRate][data[2] & 12];
+		if (header["sampleRate"] === "reserved") return null;
+		header[framePadding] = data[2] & 2 && layerValues["framePadding"];
+		header[isPrivate] = !!(data[2] & 1);
+		header[frameLength] = Math.floor(125 * header[bitrate] * header[samples] / header[sampleRate] + header[framePadding]);
+		if (!header["frameLength"]) return null;
+		const channelModeBits = data[3] & 192;
+		header[channelMode] = channelModes[channelModeBits][description];
+		header[channels$1] = channelModes[channelModeBits][channels$1];
+		header[modeExtension] = layerValues[modeExtension][data[3] & 48];
+		header[isCopyrighted] = !!(data[3] & 8);
+		header[isOriginal] = !!(data[3] & 4);
+		header[emphasis] = emphasisValues[data[3] & 3];
+		if (header["emphasis"] === "reserved") return null;
+		header[bitDepth] = 16;
+		{
+			const { length, frameLength, samples, ...codecUpdateFields } = header;
+			headerCache[setHeader](key, header, codecUpdateFields);
+		}
+		return new MPEGHeader(header);
+	}
+	/**
+	* @private
+	* Call MPEGHeader.getHeader(Array<Uint8>) to get instance
+	*/
+	constructor(header) {
+		super(header);
+		this[bitrate] = header[bitrate];
+		this[emphasis] = header[emphasis];
+		this[framePadding] = header[framePadding];
+		this[isCopyrighted] = header[isCopyrighted];
+		this[isOriginal] = header[isOriginal];
+		this[isPrivate] = header[isPrivate];
+		this[layer] = header[layer];
+		this[modeExtension] = header[modeExtension];
+		this[mpegVersion] = header[mpegVersion];
+		this[protection] = header[protection];
+	}
+};
+// node_modules/codec-parser/src/codecs/mpeg/MPEGFrame.js
+var MPEGFrame = class MPEGFrame extends CodecFrame {
+	static *[getFrame](codecParser, headerCache, readOffset) {
+		return yield* super[getFrame](MPEGHeader, MPEGFrame, codecParser, headerCache, readOffset);
+	}
+	constructor(header, frame, samples) {
+		super(header, frame, samples);
+	}
+};
+// node_modules/codec-parser/src/codecs/mpeg/MPEGParser.js
+var MPEGParser = class extends Parser {
+	constructor(codecParser, headerCache, onCodec) {
+		super(codecParser, headerCache);
+		this.Frame = MPEGFrame;
+		this.Header = MPEGHeader;
+		onCodec(this[codec]);
+	}
+	get [codec]() {
+		return mpeg;
+	}
+	*[parseFrame]() {
+		return yield* this[fixedLengthFrameSync]();
+	}
+};
+// node_modules/codec-parser/src/codecs/aac/AACHeader.js
+const mpegVersionValues = {
+	0: "MPEG-4",
+	8: "MPEG-2"
+};
+const layerValues = {
+	0: "valid",
+	2: "bad",
+	4: "bad",
+	6: "bad"
+};
+const protectionValues = {
+	0: sixteenBitCRC,
+	1: none
+};
+const profileValues = {
+	0: "AAC Main",
+	64: "AAC LC (Low Complexity)",
+	128: "AAC SSR (Scalable Sample Rate)",
+	192: "AAC LTP (Long Term Prediction)"
+};
+const sampleRates = {
+	0: rate96000,
+	4: rate88200,
+	8: rate64000,
+	12: rate48000,
+	16: rate44100,
+	20: rate32000,
+	24: rate24000,
+	28: rate22050,
+	32: rate16000,
+	36: rate12000,
+	40: rate11025,
+	44: rate8000,
+	48: rate7350,
+	52: reserved,
+	56: reserved,
+	60: "frequency is written explicitly"
+};
+const channelModeValues = {
+	0: {
+		[channels$1]: 0,
+		[description]: "Defined in AOT Specific Config"
+	},
+	64: {
+		[channels$1]: 1,
+		[description]: monophonic
+	},
+	128: {
+		[channels$1]: 2,
+		[description]: getChannelMapping(2, channelMappings[0][0])
+	},
+	192: {
+		[channels$1]: 3,
+		[description]: getChannelMapping(3, channelMappings[1][3])
+	},
+	256: {
+		[channels$1]: 4,
+		[description]: getChannelMapping(4, channelMappings[1][3], channelMappings[3][4])
+	},
+	320: {
+		[channels$1]: 5,
+		[description]: getChannelMapping(5, channelMappings[1][3], channelMappings[3][0])
+	},
+	384: {
+		[channels$1]: 6,
+		[description]: getChannelMapping(6, channelMappings[1][3], channelMappings[3][0], "LFE")
+	},
+	448: {
+		[channels$1]: 8,
+		[description]: getChannelMapping(8, channelMappings[1][3], channelMappings[2][0], channelMappings[3][0], "LFE")
+	}
+};
+var AACHeader = class AACHeader extends CodecHeader {
+	static *[getHeader](codecParser, headerCache, readOffset) {
+		const header = {};
+		const data = yield* codecParser[readRawData](7, readOffset);
+		const key = bytesToString([
+			data[0],
+			data[1],
+			data[2],
+			data[3] & 252 | data[6] & 3
+		]);
+		const cachedHeader = headerCache[getHeader](key);
+		if (!cachedHeader) {
+			if (data[0] !== 255 || data[1] < 240) return null;
+			header[mpegVersion] = mpegVersionValues[data[1] & 8];
+			header[layer] = layerValues[data[1] & 6];
+			if (header["layer"] === "bad") return null;
+			const protectionBit = data[1] & 1;
+			header[protection] = protectionValues[protectionBit];
+			header[length] = protectionBit ? 7 : 9;
+			header[profileBits] = data[2] & 192;
+			header[sampleRateBits] = data[2] & 60;
+			const privateBit = data[2] & 2;
+			header[profile] = profileValues[header[profileBits]];
+			header[sampleRate] = sampleRates[header[sampleRateBits]];
+			if (header["sampleRate"] === "reserved") return null;
+			header[isPrivate] = !!privateBit;
+			header[channelModeBits] = (data[2] << 8 | data[3]) & 448;
+			header[channelMode] = channelModeValues[header[channelModeBits]][description];
+			header[channels$1] = channelModeValues[header[channelModeBits]][channels$1];
+			header[isOriginal] = !!(data[3] & 32);
+			header[isHome] = !!(data[3] & 8);
+			header[copyrightId] = !!(data[3] & 8);
+			header[copyrightIdStart] = !!(data[3] & 4);
+			header[bitDepth] = 16;
+			header[samples] = 1024;
+			header[numberAACFrames] = data[6] & 3;
+			{
+				const { length, channelModeBits, profileBits, sampleRateBits, frameLength, samples, numberAACFrames, ...codecUpdateFields } = header;
+				headerCache[setHeader](key, header, codecUpdateFields);
+			}
+		} else Object.assign(header, cachedHeader);
+		header[frameLength] = (data[3] << 11 | data[4] << 3 | data[5] >> 5) & 8191;
+		if (!header["frameLength"]) return null;
+		const bufferFullnessBits = (data[5] << 6 | data[6] >> 2) & 2047;
+		header[bufferFullness] = bufferFullnessBits === 2047 ? "VBR" : bufferFullnessBits;
+		return new AACHeader(header);
+	}
+	/**
+	* @private
+	* Call AACHeader.getHeader(Array<Uint8>) to get instance
+	*/
+	constructor(header) {
+		super(header);
+		this[copyrightId] = header[copyrightId];
+		this[copyrightIdStart] = header[copyrightIdStart];
+		this[bufferFullness] = header[bufferFullness];
+		this[isHome] = header[isHome];
+		this[isOriginal] = header[isOriginal];
+		this[isPrivate] = header[isPrivate];
+		this[layer] = header[layer];
+		this[length] = header[length];
+		this[mpegVersion] = header[mpegVersion];
+		this[numberAACFrames] = header[numberAACFrames];
+		this[profile] = header[profile];
+		this[protection] = header[protection];
+	}
+	get audioSpecificConfig() {
+		const header = headerStore.get(this);
+		const audioSpecificConfig = header[profileBits] + 64 << 5 | header[sampleRateBits] << 5 | header[channelModeBits] >> 3;
+		const bytes = new uint8Array(2);
+		new dataView(bytes[buffer]).setUint16(0, audioSpecificConfig, false);
+		return bytes;
+	}
+};
+// node_modules/codec-parser/src/codecs/aac/AACFrame.js
+var AACFrame = class AACFrame extends CodecFrame {
+	static *[getFrame](codecParser, headerCache, readOffset) {
+		return yield* super[getFrame](AACHeader, AACFrame, codecParser, headerCache, readOffset);
+	}
+	constructor(header, frame, samples) {
+		super(header, frame, samples);
+	}
+};
+// node_modules/codec-parser/src/codecs/aac/AACParser.js
+var AACParser = class extends Parser {
+	constructor(codecParser, headerCache, onCodec) {
+		super(codecParser, headerCache);
+		this.Frame = AACFrame;
+		this.Header = AACHeader;
+		onCodec(this[codec]);
+	}
+	get [codec]() {
+		return "aac";
+	}
+	*[parseFrame]() {
+		return yield* this[fixedLengthFrameSync]();
+	}
+};
+// node_modules/codec-parser/src/codecs/flac/FLACFrame.js
+var FLACFrame = class FLACFrame extends CodecFrame {
+	static _getFrameFooterCrc16(data) {
+		return (data[data[length] - 2] << 8) + data[data[length] - 1];
+	}
+	static [checkFrameFooterCrc16](data) {
+		return FLACFrame._getFrameFooterCrc16(data) === flacCrc16(data[subarray](0, -2));
+	}
+	constructor(data, header, streamInfoValue) {
+		header[streamInfo] = streamInfoValue;
+		header[crc16] = FLACFrame._getFrameFooterCrc16(data);
+		super(header, data, headerStore.get(header)[samples]);
+	}
+};
+// node_modules/codec-parser/src/codecs/flac/FLACHeader.js
+const getFromStreamInfo = "get from STREAMINFO metadata block";
+const blockingStrategyValues = {
+	0: "Fixed",
+	1: "Variable"
+};
+const blockSizeValues = {
+	0: reserved,
+	16: 192
+};
+for (let i = 2; i < 16; i++) blockSizeValues[i << 4] = i < 6 ? 576 * 2 ** (i - 2) : 2 ** i;
+const sampleRateValues = {
+	0: getFromStreamInfo,
+	1: rate88200,
+	2: rate176400,
+	3: rate192000,
+	4: rate8000,
+	5: rate16000,
+	6: rate22050,
+	7: rate24000,
+	8: rate32000,
+	9: rate44100,
+	10: rate48000,
+	11: rate96000,
+	15: "bad"
+};
+const channelAssignments = {
+	0: {
+		[channels$1]: 1,
+		[description]: monophonic
+	},
+	16: {
+		[channels$1]: 2,
+		[description]: getChannelMapping(2, channelMappings[0][0])
+	},
+	32: {
+		[channels$1]: 3,
+		[description]: getChannelMapping(3, channelMappings[0][1])
+	},
+	48: {
+		[channels$1]: 4,
+		[description]: getChannelMapping(4, channelMappings[1][0], channelMappings[3][0])
+	},
+	64: {
+		[channels$1]: 5,
+		[description]: getChannelMapping(5, channelMappings[1][1], channelMappings[3][0])
+	},
+	80: {
+		[channels$1]: 6,
+		[description]: getChannelMapping(6, channelMappings[1][1], "LFE", channelMappings[3][0])
+	},
+	96: {
+		[channels$1]: 7,
+		[description]: getChannelMapping(7, channelMappings[1][1], "LFE", channelMappings[3][4], channelMappings[2][0])
+	},
+	112: {
+		[channels$1]: 8,
+		[description]: getChannelMapping(8, channelMappings[1][1], "LFE", channelMappings[3][0], channelMappings[2][0])
+	},
+	128: {
+		[channels$1]: 2,
+		[description]: `${stereo} (left, diff)`
+	},
+	144: {
+		[channels$1]: 2,
+		[description]: `${stereo} (diff, right)`
+	},
+	160: {
+		[channels$1]: 2,
+		[description]: `${stereo} (avg, diff)`
+	},
+	176: reserved,
+	192: reserved,
+	208: reserved,
+	224: reserved,
+	240: reserved
+};
+const bitDepthValues = {
+	0: getFromStreamInfo,
+	2: 8,
+	4: 12,
+	6: reserved,
+	8: 16,
+	10: 20,
+	12: 24,
+	14: reserved
+};
+var FLACHeader = class FLACHeader extends CodecHeader {
+	static _decodeUTF8Int(data) {
+		if (data[0] > 254) return null;
+		if (data[0] < 128) return {
+			value: data[0],
+			length: 1
+		};
+		let length = 1;
+		for (let zeroMask = 64; zeroMask & data[0]; zeroMask >>= 1) length++;
+		let idx = length - 1, value = 0, shift = 0;
+		for (; idx > 0; shift += 6, idx--) {
+			if ((data[idx] & 192) !== 128) return null;
+			value |= (data[idx] & 63) << shift;
+		}
+		value |= (data[idx] & 127 >> length) << shift;
+		return {
+			value,
+			length
+		};
+	}
+	static [getHeaderFromUint8Array](data, headerCache) {
+		const codecParserStub = { [readRawData]: function* () {
+			return data;
+		} };
+		return FLACHeader[getHeader](codecParserStub, headerCache, 0).next().value;
+	}
+	static *[getHeader](codecParser, headerCache, readOffset) {
+		let data = yield* codecParser[readRawData](6, readOffset);
+		if (data[0] !== 255 || !(data[1] === 248 || data[1] === 249)) return null;
+		const header = {};
+		const key = bytesToString(data[subarray](0, 4));
+		const cachedHeader = headerCache[getHeader](key);
+		if (!cachedHeader) {
+			header[blockingStrategyBits] = data[1] & 1;
+			header[blockingStrategy] = blockingStrategyValues[header[blockingStrategyBits]];
+			header[blockSizeBits] = data[2] & 240;
+			header[sampleRateBits] = data[2] & 15;
+			header[blockSize] = blockSizeValues[header[blockSizeBits]];
+			if (header["blockSize"] === "reserved") return null;
+			header[sampleRate] = sampleRateValues[header[sampleRateBits]];
+			if (header["sampleRate"] === "bad") return null;
+			if (data[3] & 1) return null;
+			const channelAssignment = channelAssignments[data[3] & 240];
+			if (channelAssignment === "reserved") return null;
+			header[channels$1] = channelAssignment[channels$1];
+			header[channelMode] = channelAssignment[description];
+			header[bitDepth] = bitDepthValues[data[3] & 14];
+			if (header["bitDepth"] === "reserved") return null;
+		} else Object.assign(header, cachedHeader);
+		header[length] = 5;
+		data = yield* codecParser[readRawData](header[length] + 8, readOffset);
+		const decodedUtf8 = FLACHeader._decodeUTF8Int(data[subarray](4));
+		if (!decodedUtf8) return null;
+		if (header[blockingStrategyBits]) header[sampleNumber] = decodedUtf8.value;
+		else header[frameNumber] = decodedUtf8.value;
+		header[length] += decodedUtf8[length];
+		if (header[blockSizeBits] === 96) {
+			if (data["length"] < header["length"]) data = yield* codecParser[readRawData](header[length], readOffset);
+			header[blockSize] = data[header[length] - 1] + 1;
+			header[length] += 1;
+		} else if (header[blockSizeBits] === 112) {
+			if (data["length"] < header["length"]) data = yield* codecParser[readRawData](header[length], readOffset);
+			header[blockSize] = (data[header[length] - 1] << 8) + data[header[length]] + 1;
+			header[length] += 2;
+		}
+		header[samples] = header[blockSize];
+		if (header[sampleRateBits] === 12) {
+			if (data["length"] < header["length"]) data = yield* codecParser[readRawData](header[length], readOffset);
+			header[sampleRate] = data[header[length] - 1] * 1e3;
+			header[length] += 1;
+		} else if (header[sampleRateBits] === 13) {
+			if (data["length"] < header["length"]) data = yield* codecParser[readRawData](header[length], readOffset);
+			header[sampleRate] = (data[header[length] - 1] << 8) + data[header[length]];
+			header[length] += 2;
+		} else if (header[sampleRateBits] === 14) {
+			if (data["length"] < header["length"]) data = yield* codecParser[readRawData](header[length], readOffset);
+			header[sampleRate] = ((data[header[length] - 1] << 8) + data[header[length]]) * 10;
+			header[length] += 2;
+		}
+		if (data["length"] < header["length"]) data = yield* codecParser[readRawData](header[length], readOffset);
+		header["crc"] = data[header[length] - 1];
+		if (header["crc"] !== crc8(data["subarray"](0, header["length"] - 1))) return null;
+		if (!cachedHeader) {
+			const { blockingStrategyBits, frameNumber, sampleNumber, samples, sampleRateBits, blockSizeBits, crc, length, ...codecUpdateFields } = header;
+			headerCache[setHeader](key, header, codecUpdateFields);
+		}
+		return new FLACHeader(header);
+	}
+	/**
+	* @private
+	* Call FLACHeader.getHeader(Array<Uint8>) to get instance
+	*/
+	constructor(header) {
+		super(header);
+		this[crc16] = null;
+		this[blockingStrategy] = header[blockingStrategy];
+		this[blockSize] = header[blockSize];
+		this[frameNumber] = header[frameNumber];
+		this[sampleNumber] = header[sampleNumber];
+		this[streamInfo] = null;
+	}
+};
+// node_modules/codec-parser/src/codecs/flac/FLACParser.js
+const MIN_FLAC_FRAME_SIZE = 2;
+const MAX_FLAC_FRAME_SIZE = 524288;
+var FLACParser = class extends Parser {
+	constructor(codecParser, headerCache, onCodec) {
+		super(codecParser, headerCache);
+		this.Frame = FLACFrame;
+		this.Header = FLACHeader;
+		onCodec(this[codec]);
+	}
+	get [codec]() {
+		return "flac";
+	}
+	*_getNextFrameSyncOffset(offset) {
+		const data = yield* this._codecParser[readRawData](2, 0);
+		const dataLength = data[length] - 2;
+		while (offset < dataLength) {
+			if (data[offset] === 255) {
+				const secondByte = data[offset + 1];
+				if (secondByte === 248 || secondByte === 249) break;
+				if (secondByte !== 255) offset++;
+			}
+			offset++;
+		}
+		return offset;
+	}
+	*[parseFrame]() {
+		do {
+			const header = yield* FLACHeader[getHeader](this._codecParser, this._headerCache, 0);
+			if (header) {
+				let nextHeaderOffset = headerStore.get(header)[length] + MIN_FLAC_FRAME_SIZE;
+				while (nextHeaderOffset <= MAX_FLAC_FRAME_SIZE) {
+					if (this._codecParser._flushing || (yield* FLACHeader[getHeader](this._codecParser, this._headerCache, nextHeaderOffset))) {
+						let frameData = yield* this._codecParser[readRawData](nextHeaderOffset);
+						if (!this._codecParser._flushing) frameData = frameData[subarray](0, nextHeaderOffset);
+						if (FLACFrame[checkFrameFooterCrc16](frameData)) {
+							const frame = new FLACFrame(frameData, header);
+							this._headerCache[enable]();
+							this._codecParser[incrementRawData](nextHeaderOffset);
+							this._codecParser[mapFrameStats](frame);
+							return frame;
+						}
+					}
+					nextHeaderOffset = yield* this._getNextFrameSyncOffset(nextHeaderOffset + 1);
+				}
+				this._codecParser[logWarning](`Unable to sync FLAC frame after searching ${nextHeaderOffset} bytes.`);
+				this._codecParser[incrementRawData](nextHeaderOffset);
+			} else this._codecParser[incrementRawData](yield* this._getNextFrameSyncOffset(1));
+		} while (true);
+	}
+	[parseOggPage](oggPage) {
+		if (oggPage["pageSequenceNumber"] === 0) {
+			this._headerCache[enable]();
+			this._streamInfo = oggPage[data$1][subarray](13);
+		} else if (oggPage["pageSequenceNumber"] === 1) {} else oggPage[codecFrames$1] = frameStore.get(oggPage)[segments].map((segment) => {
+			const header = FLACHeader[getHeaderFromUint8Array](segment, this._headerCache);
+			if (header) return new FLACFrame(segment, header, this._streamInfo);
+			else this._codecParser[logWarning]("Failed to parse Ogg FLAC frame", "Skipping invalid FLAC frame");
+		}).filter((frame) => !!frame);
+		return oggPage;
+	}
+};
+// node_modules/codec-parser/src/containers/ogg/OggPageHeader.js
+var OggPageHeader = class OggPageHeader {
+	static *[getHeader](codecParser, headerCache, readOffset) {
+		const header = {};
+		let data = yield* codecParser[readRawData](28, readOffset);
+		if (data[0] !== 79 || data[1] !== 103 || data[2] !== 103 || data[3] !== 83) return null;
+		header[streamStructureVersion] = data[4];
+		if (data[5] & 248) return null;
+		header[isLastPage$1] = !!(data[5] & 4);
+		header[isFirstPage] = !!(data[5] & 2);
+		header[isContinuedPacket] = !!(data[5] & 1);
+		const view = new dataView(uint8Array.from(data[subarray](0, 28))[buffer]);
+		header[absoluteGranulePosition$1] = readInt64le(view, 6);
+		header[streamSerialNumber] = view.getInt32(14, true);
+		header[pageSequenceNumber] = view.getInt32(18, true);
+		header[pageChecksum] = view.getInt32(22, true);
+		const pageSegmentTableLength = data[26];
+		header[length] = pageSegmentTableLength + 27;
+		data = yield* codecParser[readRawData](header[length], readOffset);
+		header[frameLength] = 0;
+		header[pageSegmentTable] = [];
+		header[pageSegmentBytes] = uint8Array.from(data[subarray](27, header[length]));
+		for (let i = 0, segmentLength = 0; i < pageSegmentTableLength; i++) {
+			const segmentByte = header[pageSegmentBytes][i];
+			header[frameLength] += segmentByte;
+			segmentLength += segmentByte;
+			if (segmentByte !== 255 || i === pageSegmentTableLength - 1) {
+				header[pageSegmentTable].push(segmentLength);
+				segmentLength = 0;
+			}
+		}
+		return new OggPageHeader(header);
+	}
+	/**
+	* @private
+	* Call OggPageHeader.getHeader(Array<Uint8>) to get instance
+	*/
+	constructor(header) {
+		headerStore.set(this, header);
+		this[absoluteGranulePosition$1] = header[absoluteGranulePosition$1];
+		this[isContinuedPacket] = header[isContinuedPacket];
+		this[isFirstPage] = header[isFirstPage];
+		this[isLastPage$1] = header[isLastPage$1];
+		this[pageSegmentTable] = header[pageSegmentTable];
+		this[pageSequenceNumber] = header[pageSequenceNumber];
+		this[pageChecksum] = header[pageChecksum];
+		this[streamSerialNumber] = header[streamSerialNumber];
+	}
+};
+// node_modules/codec-parser/src/containers/ogg/OggPage.js
+var OggPage = class OggPage extends Frame {
+	static *[getFrame](codecParser, headerCache, readOffset) {
+		const header = yield* OggPageHeader[getHeader](codecParser, headerCache, readOffset);
+		if (header) {
+			const frameLengthValue = headerStore.get(header)[frameLength];
+			const headerLength = headerStore.get(header)[length];
+			const totalLength = headerLength + frameLengthValue;
+			const rawDataValue = (yield* codecParser[readRawData](totalLength, 0))[subarray](0, totalLength);
+			const frame = rawDataValue[subarray](headerLength, totalLength);
+			return new OggPage(header, frame, rawDataValue);
+		} else return null;
+	}
+	constructor(header, frame, rawDataValue) {
+		super(header, frame);
+		frameStore.get(this)[length] = rawDataValue[length];
+		this[codecFrames$1] = [];
+		this[rawData] = rawDataValue;
+		this[absoluteGranulePosition$1] = header[absoluteGranulePosition$1];
+		this[crc32] = header[pageChecksum];
+		this[duration] = 0;
+		this[isContinuedPacket] = header[isContinuedPacket];
+		this[isFirstPage] = header[isFirstPage];
+		this[isLastPage$1] = header[isLastPage$1];
+		this[pageSequenceNumber] = header[pageSequenceNumber];
+		this[samples] = 0;
+		this[streamSerialNumber] = header[streamSerialNumber];
+	}
+};
+// node_modules/codec-parser/src/codecs/opus/OpusFrame.js
+var OpusFrame = class extends CodecFrame {
+	constructor(data, header, samples) {
+		super(header, data, samples);
+	}
+};
+// node_modules/codec-parser/src/codecs/opus/OpusHeader.js
+const channelMappingFamilies = {
+	0: vorbisOpusChannelMapping.slice(0, 2),
+	1: vorbisOpusChannelMapping
+};
+const silkOnly = "SILK-only";
+const celtOnly = "CELT-only";
+const hybrid = "Hybrid";
+const narrowBand = "narrowband";
+const mediumBand = "medium-band";
+const wideBand = "wideband";
+const superWideBand = "super-wideband";
+const fullBand = "fullband";
+const configTable = {
+	0: {
+		[mode]: silkOnly,
+		[bandwidth]: narrowBand,
+		[frameSize]: 10
+	},
+	8: {
+		[mode]: silkOnly,
+		[bandwidth]: narrowBand,
+		[frameSize]: 20
+	},
+	16: {
+		[mode]: silkOnly,
+		[bandwidth]: narrowBand,
+		[frameSize]: 40
+	},
+	24: {
+		[mode]: silkOnly,
+		[bandwidth]: narrowBand,
+		[frameSize]: 60
+	},
+	32: {
+		[mode]: silkOnly,
+		[bandwidth]: mediumBand,
+		[frameSize]: 10
+	},
+	40: {
+		[mode]: silkOnly,
+		[bandwidth]: mediumBand,
+		[frameSize]: 20
+	},
+	48: {
+		[mode]: silkOnly,
+		[bandwidth]: mediumBand,
+		[frameSize]: 40
+	},
+	56: {
+		[mode]: silkOnly,
+		[bandwidth]: mediumBand,
+		[frameSize]: 60
+	},
+	64: {
+		[mode]: silkOnly,
+		[bandwidth]: wideBand,
+		[frameSize]: 10
+	},
+	72: {
+		[mode]: silkOnly,
+		[bandwidth]: wideBand,
+		[frameSize]: 20
+	},
+	80: {
+		[mode]: silkOnly,
+		[bandwidth]: wideBand,
+		[frameSize]: 40
+	},
+	88: {
+		[mode]: silkOnly,
+		[bandwidth]: wideBand,
+		[frameSize]: 60
+	},
+	96: {
+		[mode]: hybrid,
+		[bandwidth]: superWideBand,
+		[frameSize]: 10
+	},
+	104: {
+		[mode]: hybrid,
+		[bandwidth]: superWideBand,
+		[frameSize]: 20
+	},
+	112: {
+		[mode]: hybrid,
+		[bandwidth]: fullBand,
+		[frameSize]: 10
+	},
+	120: {
+		[mode]: hybrid,
+		[bandwidth]: fullBand,
+		[frameSize]: 20
+	},
+	128: {
+		[mode]: celtOnly,
+		[bandwidth]: narrowBand,
+		[frameSize]: 2.5
+	},
+	136: {
+		[mode]: celtOnly,
+		[bandwidth]: narrowBand,
+		[frameSize]: 5
+	},
+	144: {
+		[mode]: celtOnly,
+		[bandwidth]: narrowBand,
+		[frameSize]: 10
+	},
+	152: {
+		[mode]: celtOnly,
+		[bandwidth]: narrowBand,
+		[frameSize]: 20
+	},
+	160: {
+		[mode]: celtOnly,
+		[bandwidth]: wideBand,
+		[frameSize]: 2.5
+	},
+	168: {
+		[mode]: celtOnly,
+		[bandwidth]: wideBand,
+		[frameSize]: 5
+	},
+	176: {
+		[mode]: celtOnly,
+		[bandwidth]: wideBand,
+		[frameSize]: 10
+	},
+	184: {
+		[mode]: celtOnly,
+		[bandwidth]: wideBand,
+		[frameSize]: 20
+	},
+	192: {
+		[mode]: celtOnly,
+		[bandwidth]: superWideBand,
+		[frameSize]: 2.5
+	},
+	200: {
+		[mode]: celtOnly,
+		[bandwidth]: superWideBand,
+		[frameSize]: 5
+	},
+	208: {
+		[mode]: celtOnly,
+		[bandwidth]: superWideBand,
+		[frameSize]: 10
+	},
+	216: {
+		[mode]: celtOnly,
+		[bandwidth]: superWideBand,
+		[frameSize]: 20
+	},
+	224: {
+		[mode]: celtOnly,
+		[bandwidth]: fullBand,
+		[frameSize]: 2.5
+	},
+	232: {
+		[mode]: celtOnly,
+		[bandwidth]: fullBand,
+		[frameSize]: 5
+	},
+	240: {
+		[mode]: celtOnly,
+		[bandwidth]: fullBand,
+		[frameSize]: 10
+	},
+	248: {
+		[mode]: celtOnly,
+		[bandwidth]: fullBand,
+		[frameSize]: 20
+	}
+};
+var OpusHeader = class OpusHeader extends CodecHeader {
+	static [getHeaderFromUint8Array](dataValue, packetData, headerCache) {
+		const header = {};
+		header[channels$1] = dataValue[9];
+		header[channelMappingFamily] = dataValue[18];
+		header[length] = header["channelMappingFamily"] !== 0 ? 21 + header[channels$1] : 19;
+		if (dataValue["length"] < header["length"]) throw new Error("Out of data while inside an Ogg Page");
+		const packetMode = packetData[0] & 3;
+		const packetLength = packetMode === 3 ? 2 : 1;
+		const key = bytesToString(dataValue[subarray](0, header[length])) + bytesToString(packetData[subarray](0, packetLength));
+		const cachedHeader = headerCache[getHeader](key);
+		if (cachedHeader) return new OpusHeader(cachedHeader);
+		if (key.substr(0, 8) !== "OpusHead") return null;
+		if (dataValue[8] !== 1) return null;
+		header[data$1] = uint8Array.from(dataValue[subarray](0, header[length]));
+		const view = new dataView(header[data$1][buffer]);
+		header[bitDepth] = 16;
+		header[preSkip$1] = view.getUint16(10, true);
+		header[inputSampleRate] = view.getUint32(12, true);
+		header[sampleRate] = rate48000;
+		header[outputGain] = view.getInt16(16, true);
+		if (header["channelMappingFamily"] in channelMappingFamilies) {
+			header[channelMode] = channelMappingFamilies[header[channelMappingFamily]][header[channels$1] - 1];
+			if (!header["channelMode"]) return null;
+		}
+		if (header["channelMappingFamily"] !== 0) {
+			header[streamCount$1] = dataValue[19];
+			header[coupledStreamCount$1] = dataValue[20];
+			header[channelMappingTable$1] = [...dataValue[subarray](21, header[channels$1] + 21)];
+		}
+		const packetConfig = configTable[248 & packetData[0]];
+		header[mode] = packetConfig[mode];
+		header[bandwidth] = packetConfig[bandwidth];
+		header[frameSize] = packetConfig[frameSize];
+		switch (packetMode) {
+			case 0:
+				header[frameCount] = 1;
+				break;
+			case 1:
+			case 2:
+				header[frameCount] = 2;
+				break;
+			case 3:
+				header[isVbr] = !!(128 & packetData[1]);
+				header[hasOpusPadding] = !!(64 & packetData[1]);
+				header[frameCount] = 63 & packetData[1];
+				break;
+			default: return null;
+		}
+		{
+			const { length, data: headerData, channelMappingFamily, ...codecUpdateFields } = header;
+			headerCache[setHeader](key, header, codecUpdateFields);
+		}
+		return new OpusHeader(header);
+	}
+	/**
+	* @private
+	* Call OpusHeader.getHeader(Array<Uint8>) to get instance
+	*/
+	constructor(header) {
+		super(header);
+		this[data$1] = header[data$1];
+		this[bandwidth] = header[bandwidth];
+		this[channelMappingFamily] = header[channelMappingFamily];
+		this[channelMappingTable$1] = header[channelMappingTable$1];
+		this[coupledStreamCount$1] = header[coupledStreamCount$1];
+		this[frameCount] = header[frameCount];
+		this[frameSize] = header[frameSize];
+		this[hasOpusPadding] = header[hasOpusPadding];
+		this[inputSampleRate] = header[inputSampleRate];
+		this[isVbr] = header[isVbr];
+		this[mode] = header[mode];
+		this[outputGain] = header[outputGain];
+		this[preSkip$1] = header[preSkip$1];
+		this[streamCount$1] = header[streamCount$1];
+	}
+};
+// node_modules/codec-parser/src/codecs/opus/OpusParser.js
+var OpusParser = class extends Parser {
+	constructor(codecParser, headerCache, onCodec) {
+		super(codecParser, headerCache);
+		this.Frame = OpusFrame;
+		this.Header = OpusHeader;
+		onCodec(this[codec]);
+		this._identificationHeader = null;
+		this._preSkipRemaining = null;
+	}
+	get [codec]() {
+		return "opus";
+	}
+	/**
+	* @todo implement continued page support
+	*/
+	[parseOggPage](oggPage) {
+		if (oggPage["pageSequenceNumber"] === 0) {
+			this._headerCache[enable]();
+			this._identificationHeader = oggPage[data$1];
+		} else if (oggPage["pageSequenceNumber"] === 1) {} else oggPage[codecFrames$1] = frameStore.get(oggPage)[segments].map((segment) => {
+			const header = OpusHeader[getHeaderFromUint8Array](this._identificationHeader, segment, this._headerCache);
+			if (header) {
+				if (this._preSkipRemaining === null) this._preSkipRemaining = header[preSkip$1];
+				let samples = header[frameSize] * header[frameCount] / 1e3 * header[sampleRate];
+				if (this._preSkipRemaining > 0) {
+					this._preSkipRemaining -= samples;
+					samples = this._preSkipRemaining < 0 ? -this._preSkipRemaining : 0;
+				}
+				return new OpusFrame(segment, header, samples);
+			}
+			this._codecParser[logError$1]("Failed to parse Ogg Opus Header", "Not a valid Ogg Opus file");
+		});
+		return oggPage;
+	}
+};
+// node_modules/codec-parser/src/codecs/vorbis/VorbisFrame.js
+var VorbisFrame = class extends CodecFrame {
+	constructor(data, header, samples) {
+		super(header, data, samples);
+	}
+};
+// node_modules/codec-parser/src/codecs/vorbis/VorbisHeader.js
+const blockSizes = {};
+for (let i = 0; i < 8; i++) blockSizes[i + 6] = 2 ** (6 + i);
+var VorbisHeader = class VorbisHeader extends CodecHeader {
+	static [getHeaderFromUint8Array](dataValue, headerCache, vorbisCommentsData, vorbisSetupData) {
+		if (dataValue["length"] < 30) throw new Error("Out of data while inside an Ogg Page");
+		const key = bytesToString(dataValue[subarray](0, 30));
+		const cachedHeader = headerCache[getHeader](key);
+		if (cachedHeader) return new VorbisHeader(cachedHeader);
+		const header = { [length]: 30 };
+		if (key.substr(0, 7) !== "vorbis") return null;
+		header[data$1] = uint8Array.from(dataValue[subarray](0, 30));
+		const view = new dataView(header[data$1][buffer]);
+		header[version] = view.getUint32(7, true);
+		if (header["version"] !== 0) return null;
+		header[channels$1] = dataValue[11];
+		header[channelMode] = vorbisOpusChannelMapping[header["channels"] - 1] || "application defined";
+		header[sampleRate] = view.getUint32(12, true);
+		header[bitrateMaximum] = view.getInt32(16, true);
+		header[bitrateNominal] = view.getInt32(20, true);
+		header[bitrateMinimum] = view.getInt32(24, true);
+		header[blocksize1] = blockSizes[(dataValue[28] & 240) >> 4];
+		header[blocksize0] = blockSizes[dataValue[28] & 15];
+		if (header["blocksize0"] > header["blocksize1"]) return null;
+		if (dataValue[29] !== 1) return null;
+		header[bitDepth] = 32;
+		header[vorbisSetup] = vorbisSetupData;
+		header[vorbisComments] = vorbisCommentsData;
+		{
+			const { length, data, version, vorbisSetup, vorbisComments, ...codecUpdateFields } = header;
+			headerCache[setHeader](key, header, codecUpdateFields);
+		}
+		return new VorbisHeader(header);
+	}
+	/**
+	* @private
+	* Call VorbisHeader.getHeader(Array<Uint8>) to get instance
+	*/
+	constructor(header) {
+		super(header);
+		this[bitrateMaximum] = header[bitrateMaximum];
+		this[bitrateMinimum] = header[bitrateMinimum];
+		this[bitrateNominal] = header[bitrateNominal];
+		this[blocksize0] = header[blocksize0];
+		this[blocksize1] = header[blocksize1];
+		this[data$1] = header[data$1];
+		this[vorbisComments] = header[vorbisComments];
+		this[vorbisSetup] = header[vorbisSetup];
+	}
+};
+// node_modules/codec-parser/src/codecs/vorbis/VorbisParser.js
+var VorbisParser = class extends Parser {
+	constructor(codecParser, headerCache, onCodec) {
+		super(codecParser, headerCache);
+		this.Frame = VorbisFrame;
+		onCodec(this[codec]);
+		this._identificationHeader = null;
+		this._setupComplete = false;
+		this._prevBlockSize = null;
+	}
+	get [codec]() {
+		return vorbis;
+	}
+	[parseOggPage](oggPage) {
+		oggPage[codecFrames$1] = [];
+		for (const oggPageSegment of frameStore.get(oggPage)[segments]) if (oggPageSegment[0] === 1) {
+			this._headerCache[enable]();
+			this._identificationHeader = oggPage[data$1];
+			this._setupComplete = false;
+		} else if (oggPageSegment[0] === 3) this._vorbisComments = oggPageSegment;
+		else if (oggPageSegment[0] === 5) {
+			this._vorbisSetup = oggPageSegment;
+			this._mode = this._parseSetupHeader(oggPageSegment);
+			this._setupComplete = true;
+		} else if (this._setupComplete) {
+			const header = VorbisHeader[getHeaderFromUint8Array](this._identificationHeader, this._headerCache, this._vorbisComments, this._vorbisSetup);
+			if (header) oggPage[codecFrames$1].push(new VorbisFrame(oggPageSegment, header, this._getSamples(oggPageSegment, header)));
+			else this._codecParser[logError]("Failed to parse Ogg Vorbis Header", "Not a valid Ogg Vorbis file");
+		}
+		return oggPage;
+	}
+	_getSamples(segment, header) {
+		const currentBlockSize = this._mode.blockFlags[segment[0] >> 1 & this._mode.mask] ? header[blocksize1] : header[blocksize0];
+		const samplesValue = this._prevBlockSize === null ? 0 : (this._prevBlockSize + currentBlockSize) / 4;
+		this._prevBlockSize = currentBlockSize;
+		return samplesValue;
+	}
+	_parseSetupHeader(setup) {
+		const bitReader = new BitReader(setup);
+		const mode = {
+			count: 0,
+			blockFlags: []
+		};
+		while ((bitReader.read(1) & 1) !== 1);
+		let modeBits;
+		while (mode.count < 64 && bitReader.position > 0) {
+			reverse(bitReader.read(8));
+			let currentByte = 0;
+			while (bitReader.read(8) === 0 && currentByte++ < 3);
+			if (currentByte === 4) {
+				modeBits = bitReader.read(7);
+				mode.blockFlags.unshift(modeBits & 1);
+				bitReader.position += 6;
+				mode.count++;
+			} else {
+				if (((reverse(modeBits) & 126) >> 1) + 1 !== mode.count) this._codecParser[logWarning]("vorbis derived mode count did not match actual mode count");
+				break;
+			}
+		}
+		mode.mask = (1 << Math.log2(mode.count)) - 1;
+		return mode;
+	}
+};
+// node_modules/codec-parser/src/containers/ogg/OggParser.js
+var OggStream = class {
+	constructor(codecParser, headerCache, onCodec) {
+		this._codecParser = codecParser;
+		this._headerCache = headerCache;
+		this._onCodec = onCodec;
+		this._continuedPacket = new uint8Array();
+		this._codec = null;
+		this._isSupported = null;
+		this._previousAbsoluteGranulePosition = null;
+	}
+	get [codec]() {
+		return this._codec || "";
+	}
+	_updateCodec(codec, Parser) {
+		if (this._codec !== codec) {
+			this._headerCache[reset]();
+			this._parser = new Parser(this._codecParser, this._headerCache, this._onCodec);
+			this._codec = codec;
+		}
+	}
+	_checkCodecSupport({ data }) {
+		const idString = bytesToString(data[subarray](0, 8));
+		switch (idString) {
+			case "fishead\0": return false;
+			case "OpusHead":
+				this._updateCodec("opus", OpusParser);
+				return true;
+			case /^\x7fFLAC/.test(idString) && idString:
+				this._updateCodec("flac", FLACParser);
+				return true;
+			case /^\x01vorbis/.test(idString) && idString:
+				this._updateCodec(vorbis, VorbisParser);
+				return true;
+			default: return false;
+		}
+	}
+	_checkPageSequenceNumber(oggPage) {
+		if (oggPage["pageSequenceNumber"] !== this._pageSequenceNumber + 1 && this._pageSequenceNumber > 1 && oggPage["pageSequenceNumber"] > 1) this._codecParser[logWarning]("Unexpected gap in Ogg Page Sequence Number.", `Expected: ${this._pageSequenceNumber + 1}, Got: ${oggPage[pageSequenceNumber]}`);
+		this._pageSequenceNumber = oggPage[pageSequenceNumber];
+	}
+	_parsePage(oggPage) {
+		if (this._isSupported === null) {
+			this._pageSequenceNumber = oggPage[pageSequenceNumber];
+			this._isSupported = this._checkCodecSupport(oggPage);
+		}
+		this._checkPageSequenceNumber(oggPage);
+		const oggPageStore = frameStore.get(oggPage);
+		const headerData = headerStore.get(oggPageStore[header$1]);
+		let offset = 0;
+		oggPageStore[segments] = headerData[pageSegmentTable].map((segmentLength) => oggPage[data$1][subarray](offset, offset += segmentLength));
+		if (this._continuedPacket["length"]) {
+			oggPageStore[segments][0] = concatBuffers(this._continuedPacket, oggPageStore[segments][0]);
+			this._continuedPacket = new uint8Array();
+		}
+		if (headerData[pageSegmentBytes][headerData[pageSegmentBytes]["length"] - 1] === 255) this._continuedPacket = concatBuffers(this._continuedPacket, oggPageStore[segments].pop());
+		if (this._previousAbsoluteGranulePosition !== null) oggPage[samples] = Number(oggPage[absoluteGranulePosition$1] - this._previousAbsoluteGranulePosition);
+		this._previousAbsoluteGranulePosition = oggPage[absoluteGranulePosition$1];
+		if (this._isSupported) {
+			const frame = this._parser[parseOggPage](oggPage);
+			this._codecParser[mapFrameStats](frame);
+			return frame;
+		} else return oggPage;
+	}
+};
+var OggParser = class extends Parser {
+	constructor(codecParser, headerCache, onCodec) {
+		super(codecParser, headerCache);
+		this._onCodec = onCodec;
+		this.Frame = OggPage;
+		this.Header = OggPageHeader;
+		this._streams = /* @__PURE__ */ new Map();
+		this._currentSerialNumber = null;
+	}
+	get [codec]() {
+		const oggStream = this._streams.get(this._currentSerialNumber);
+		return oggStream ? oggStream.codec : "";
+	}
+	*[parseFrame]() {
+		const oggPage = yield* this[fixedLengthFrameSync](true);
+		this._currentSerialNumber = oggPage[streamSerialNumber];
+		let oggStream = this._streams.get(this._currentSerialNumber);
+		if (!oggStream) {
+			oggStream = new OggStream(this._codecParser, this._headerCache, this._onCodec);
+			this._streams.set(this._currentSerialNumber, oggStream);
+		}
+		if (oggPage["isLastPage"]) this._streams.delete(this._currentSerialNumber);
+		return oggStream._parsePage(oggPage);
+	}
+};
+// node_modules/codec-parser/src/CodecParser.js
+const noOp = () => {};
+var CodecParser = class {
+	constructor(mimeType, { onCodec, onCodecHeader, onCodecUpdate, enableLogging = false, enableFrameCRC32 = true } = {}) {
+		this._inputMimeType = mimeType;
+		this._onCodec = onCodec || noOp;
+		this._onCodecHeader = onCodecHeader || noOp;
+		this._onCodecUpdate = onCodecUpdate;
+		this._enableLogging = enableLogging;
+		this._crc32 = enableFrameCRC32 ? crc32Function : noOp;
+		this[reset]();
+	}
+	/**
+	* @public
+	* @returns The detected codec
+	*/
+	get [codec]() {
+		return this._parser ? this._parser[codec] : "";
+	}
+	[reset]() {
+		this._headerCache = new HeaderCache(this._onCodecHeader, this._onCodecUpdate);
+		this._generator = this._getGenerator();
+		this._generator.next();
+	}
+	/**
+	* @public
+	* @description Generator function that yields any buffered CodecFrames and resets the CodecParser
+	* @returns {Iterable<CodecFrame|OggPage>} Iterator that operates over the codec data.
+	* @yields {CodecFrame|OggPage} Parsed codec or ogg page data
+	*/
+	*flush() {
+		this._flushing = true;
+		for (let i = this._generator.next(); i.value; i = this._generator.next()) yield i.value;
+		this._flushing = false;
+		this[reset]();
+	}
+	/**
+	* @public
+	* @description Generator function takes in a Uint8Array of data and returns a CodecFrame from the data for each iteration
+	* @param {Uint8Array} chunk Next chunk of codec data to read
+	* @returns {Iterable<CodecFrame|OggPage>} Iterator that operates over the codec data.
+	* @yields {CodecFrame|OggPage} Parsed codec or ogg page data
+	*/
+	*parseChunk(chunk) {
+		for (let i = this._generator.next(chunk); i.value; i = this._generator.next()) yield i.value;
+	}
+	/**
+	* @public
+	* @description Parses an entire file and returns all of the contained frames.
+	* @param {Uint8Array} fileData Coded data to read
+	* @returns {Array<CodecFrame|OggPage>} CodecFrames
+	*/
+	parseAll(fileData) {
+		return [...this.parseChunk(fileData), ...this.flush()];
+	}
+	/**
+	* @private
+	*/
+	*_getGenerator() {
+		if (this._inputMimeType.match(/aac/)) this._parser = new AACParser(this, this._headerCache, this._onCodec);
+		else if (this._inputMimeType.match(/mpeg/)) this._parser = new MPEGParser(this, this._headerCache, this._onCodec);
+		else if (this._inputMimeType.match(/flac/)) this._parser = new FLACParser(this, this._headerCache, this._onCodec);
+		else if (this._inputMimeType.match(/ogg/)) this._parser = new OggParser(this, this._headerCache, this._onCodec);
+		else throw new Error(`Unsupported Codec ${mimeType}`);
+		this._frameNumber = 0;
+		this._currentReadPosition = 0;
+		this._totalBytesIn = 0;
+		this._totalBytesOut = 0;
+		this._totalSamples = 0;
+		this._sampleRate = void 0;
+		this._rawData = /* @__PURE__ */ new Uint8Array(0);
+		while (true) {
+			const frame = yield* this._parser[parseFrame]();
+			if (frame) yield frame;
+		}
+	}
+	/**
+	* @protected
+	* @param {number} minSize Minimum bytes to have present in buffer
+	* @returns {Uint8Array} rawData
+	*/
+	*[readRawData](minSize = 0, readOffset = 0) {
+		let rawData;
+		while (this._rawData[length] <= minSize + readOffset) {
+			rawData = yield;
+			if (this._flushing) return this._rawData[subarray](readOffset);
+			if (rawData) {
+				this._totalBytesIn += rawData[length];
+				this._rawData = concatBuffers(this._rawData, rawData);
+			}
+		}
+		return this._rawData[subarray](readOffset);
+	}
+	/**
+	* @protected
+	* @param {number} increment Bytes to increment codec data
+	*/
+	[incrementRawData](increment) {
+		this._currentReadPosition += increment;
+		this._rawData = this._rawData[subarray](increment);
+	}
+	/**
+	* @protected
+	*/
+	[mapCodecFrameStats](frame) {
+		this._sampleRate = frame[header$1][sampleRate];
+		frame[header$1][bitrate] = frame["duration"] > 0 ? Math.round(frame[data$1][length] / frame[duration]) * 8 : 0;
+		frame[frameNumber] = this._frameNumber++;
+		frame[totalBytesOut] = this._totalBytesOut;
+		frame[totalSamples] = this._totalSamples;
+		frame[totalDuration] = this._totalSamples / this._sampleRate * 1e3;
+		frame[crc32] = this._crc32(frame[data$1]);
+		this._headerCache[checkCodecUpdate](frame[header$1][bitrate], frame[totalDuration]);
+		this._totalBytesOut += frame[data$1][length];
+		this._totalSamples += frame[samples];
+	}
+	/**
+	* @protected
+	*/
+	[mapFrameStats](frame) {
+		if (frame["codecFrames"]) {
+			if (frame["isLastPage"]) {
+				let absoluteGranulePositionSamples = frame[samples];
+				frame[codecFrames$1].forEach((codecFrame) => {
+					const untrimmedCodecSamples = codecFrame[samples];
+					if (absoluteGranulePositionSamples < untrimmedCodecSamples) {
+						codecFrame[samples] = absoluteGranulePositionSamples > 0 ? absoluteGranulePositionSamples : 0;
+						codecFrame[duration] = codecFrame[samples] / codecFrame[header$1][sampleRate] * 1e3;
+					}
+					absoluteGranulePositionSamples -= untrimmedCodecSamples;
+					this[mapCodecFrameStats](codecFrame);
+				});
+			} else {
+				frame[samples] = 0;
+				frame[codecFrames$1].forEach((codecFrame) => {
+					frame[samples] += codecFrame[samples];
+					this[mapCodecFrameStats](codecFrame);
+				});
+			}
+			frame[duration] = frame["samples"] / this._sampleRate * 1e3 || 0;
+			frame[totalSamples] = this._totalSamples;
+			frame[totalDuration] = this._totalSamples / this._sampleRate * 1e3 || 0;
+			frame[totalBytesOut] = this._totalBytesOut;
+		} else this[mapCodecFrameStats](frame);
+	}
+	/**
+	* @private
+	*/
+	_log(logger, messages) {
+		if (this._enableLogging) {
+			const stats = [
+				`${codec}:         ${this[codec]}`,
+				`inputMimeType: ${this._inputMimeType}`,
+				`readPosition:  ${this._currentReadPosition}`,
+				`totalBytesIn:  ${this._totalBytesIn}`,
+				`${totalBytesOut}: ${this._totalBytesOut}`
+			];
+			const width = Math.max(...stats.map((s) => s[length]));
+			messages.push(`--stats--${"-".repeat(width - 9)}`, ...stats, "-".repeat(width));
+			logger("codec-parser", messages.reduce((acc, message) => acc + "\n  " + message, ""));
+		}
+	}
+	/**
+	* @protected
+	*/
+	[logWarning](...messages) {
+		this._log(console.warn, messages);
+	}
+	/**
+	* @protected
+	*/
+	[logError$1](...messages) {
+		this._log(console.error, messages);
+	}
+};
+// node_modules/codec-parser/index.js
+var codec_parser_default = CodecParser;
+const absoluteGranulePosition = absoluteGranulePosition$1;
+const codecFrames = codecFrames$1;
+const coupledStreamCount = coupledStreamCount$1;
+const data = data$1;
+const header = header$1;
+const isLastPage = isLastPage$1;
+const preSkip = preSkip$1;
+const channelMappingTable = channelMappingTable$1;
+const channels = channels$1;
+const streamCount = streamCount$1;
+// node_modules/simple-yenc/dist/esm.js
+const t = (t, n = 4294967295, e = 79764919) => {
+	const r = /* @__PURE__ */ new Int32Array(256);
+	let o, s, i, c = n;
+	for (o = 0; o < 256; o++) {
+		for (i = o << 24, s = 8; s > 0; --s) i = 2147483648 & i ? i << 1 ^ e : i << 1;
+		r[o] = i;
+	}
+	for (o = 0; o < t.length; o++) c = c << 8 ^ r[255 & (c >> 24 ^ t[o])];
+	return c;
+};
+const e = (n, e = t) => {
+	const r = (t) => new Uint8Array(t.length / 2).map(((n, e) => parseInt(t.substring(2 * e, 2 * (e + 1)), 16))), o = (t) => r(t)[0], s = /* @__PURE__ */ new Map();
+	[
+		,
+		8364,
+		,
+		8218,
+		402,
+		8222,
+		8230,
+		8224,
+		8225,
+		710,
+		8240,
+		352,
+		8249,
+		338,
+		,
+		381,
+		,
+		,
+		8216,
+		8217,
+		8220,
+		8221,
+		8226,
+		8211,
+		8212,
+		732,
+		8482,
+		353,
+		8250,
+		339,
+		,
+		382,
+		376
+	].forEach(((t, n) => s.set(t, n)));
+	const i = new Uint8Array(n.length);
+	let c, a, l, f = !1, g = 0, h = 42, p = n.length > 13 && "dynEncode" === n.substring(0, 9), u = 0;
+	p && (u = 11, a = o(n.substring(9, u)), a <= 1 && (u += 2, h = o(n.substring(11, u))), 1 === a && (u += 8, l = ((t) => new DataView(r(t).buffer).getInt32(0, !0))(n.substring(13, u))));
+	const d = 256 - h;
+	for (let t = u; t < n.length; t++) if (c = n.charCodeAt(t), 61 !== c || f) {
+		if (92 === c && t < n.length - 5 && p) {
+			const e = n.charCodeAt(t + 1);
+			117 !== e && 85 !== e || (c = parseInt(n.substring(t + 2, t + 6), 16), t += 5);
+		}
+		if (c > 255) {
+			const t = s.get(c);
+			t && (c = t + 127);
+		}
+		f && (f = !1, c -= 64), i[g++] = c < h && c > 0 ? c + d : c - h;
+	} else f = !0;
+	const m = i.subarray(0, g);
+	if (p && 1 === a) {
+		const t = e(m);
+		if (t !== l) {
+			const n = "Decode failed crc32 validation";
+			throw console.error("`simple-yenc`\n", n + "\n", "Expected: " + l + "; Got: " + t + "\n", "Visit https://github.com/eshaz/simple-yenc for more information"), Error(n);
+		}
+	}
+	return m;
+};
+// node_modules/@wasm-audio-decoders/common/src/WASMAudioDecoderCommon.js
+function WASMAudioDecoderCommon() {
+	const uint8Array = Uint8Array;
+	const float32Array = Float32Array;
+	if (!WASMAudioDecoderCommon.modules) Object.defineProperties(WASMAudioDecoderCommon, {
+		modules: { value: /* @__PURE__ */ new WeakMap() },
+		setModule: { value(Ref, module) {
+			WASMAudioDecoderCommon.modules.set(Ref, Promise.resolve(module));
+		} },
+		getModule: { value(Ref, wasmString) {
+			let module = WASMAudioDecoderCommon.modules.get(Ref);
+			if (!module) {
+				if (!wasmString) {
+					wasmString = Ref.wasm;
+					module = WASMAudioDecoderCommon.inflateDynEncodeString(wasmString).then((data) => WebAssembly.compile(data));
+				} else module = WebAssembly.compile(e(wasmString));
+				WASMAudioDecoderCommon.modules.set(Ref, module);
+			}
+			return module;
+		} },
+		concatFloat32: { value(buffers, length) {
+			let ret = new float32Array(length), i = 0, offset = 0;
+			while (i < buffers.length) {
+				ret.set(buffers[i], offset);
+				offset += buffers[i++].length;
+			}
+			return ret;
+		} },
+		getDecodedAudio: { value: (errors, channelData, samplesDecoded, sampleRate, bitDepth) => ({
+			errors,
+			channelData,
+			samplesDecoded,
+			sampleRate,
+			bitDepth
+		}) },
+		getDecodedAudioMultiChannel: { value(errors, input, channelsDecoded, samplesDecoded, sampleRate, bitDepth) {
+			let channelData = [], i, j;
+			for (i = 0; i < channelsDecoded; i++) {
+				const channel = [];
+				for (j = 0; j < input.length;) channel.push(input[j++][i] || []);
+				channelData.push(WASMAudioDecoderCommon.concatFloat32(channel, samplesDecoded));
+			}
+			return WASMAudioDecoderCommon.getDecodedAudio(errors, channelData, samplesDecoded, sampleRate, bitDepth);
+		} },
+		inflateDynEncodeString: { value(source) {
+			source = e(source);
+			return new Promise((resolve) => {
+				const puffString = String.raw`dynEncode012804c7886d()((()>+*§§)§,§§§§)§+§§§)§+.-()(*)-+)(.7*§)i¸¸,3§(i¸¸,3/G+.¡*(,(,3+)2å:-),§H(P*DI*H(P*@I++hH)H*r,hH(H(P*<J,i)^*<H,H(P*4U((I-H(H*i0J,^*DH+H-H*I+H,I*4)33H(H*H)^*DH(H+H)^*@H+i§H)i§3æ*).§K(iHI/+§H,iHn,§H+i(H+i(rCJ0I,H*I-+hH,,hH(H-V)(i)J.H.W)(i)c)(H,i)I,H-i*I-4)33i(I.*hH(V)(H+n5(H(i*I-i(I,i)I.+hH,i*J+iHn,hi(I-i*I,+hH,H/H-c)(H,iFn,hi(I,+hH,H0n5-H*V)(J(,hH/H(i)J(H(V)(J(i)c)(H)H(i)H,c)(3H*i*I*H,i)I,4(3(-H(H,W)(H-I-H,i*I,4)3(3(3H,H-I1H+I,H.i)H1V)(J.i(v5(33H.-H(H,i(c)(H,i*I,4)333)-§i*I*+§H*iHn,hi73H,H(i)8(H+J+H)P*(H*V)(J-r,§H)P*,H.i)H+H,i)V)(-H*i*I*H+i)I+H-H.I.H,H-i)I,4)333Ã+)-§iø7i(^*(iü7I,*h+hH+iDn,h*hilI+i)I,+hH+,hH+iô7H,c)(i)H+i´8W)(H,I,H+i*I+4)-+hH(H)8*J-i(p5.*h*h*hH-i')u,hH(P*(J+,hH(P*0J,H(P*,n50H+H,H-b((3H(P*0i)I.4)3H-i¨*n5*H-iÅ*s,hi73H-i)J+V)&+I,H(H+V)æ,8(I.H(H*8*J-i(p51H-i)J+i¸7V)(H(H+iø7V)(8(J/H(P*0J+s,hi73H+H,H.J,I.H(P*(m5(H.H(P*,s5.+hH,m5*H(P*(J.H+H.H+H/U((b((H(H(P*0i)J+^*0H,i)I,4(3(3H(H.^*03H-i¨*o5)33i(73(3(3-H,H+i)c)(H,i*I,H+i)I+4)33i)I-3H-3!2)0§K(i2J,L(H,H(^*(H,H*^*4H,i(^*0H,i(^*DH,j(_*<H,H)P*(^*,H,H+P*(^*8*h*h+hH,i)8(I3i§I**h*h*h*h*h*h*hH,i*8(6+(),03H,j(_*@i*I-H,P*<J.i,J(H,P*8J/s50H,H.i+J0^*<i¦I*H.H,P*4J1J.U(*H.U((J2i')o5/H.U()I.H,H(^*<H0H1U((H.i0J.i§i0i')o5/H/H.H2J*H(J.q50H,P*0J/H*I-H,P*(J0,hH,P*,H-q,hi)I-423+hH*m5+H/H0H(H1U((b((H/i)I/H(i)I(H*i)I*4(3(3H,H.^*<H,H-^*04*3iØ1U((5+i(I(i¨7i1^*(i$6iè1^*(i°7iè6^*(i¬7iÈ6^*(+hH(iÈ*n,hiÈ*I(+hH(i¨,n,hi¨,I(+hH(iØ,n,hiØ,I(+hH(iè,o,hH,i-H(i0c)(H(i*I(4)33iè1i1H,i-iÈ*8)Bi(I(+hH(ido,hH,i-H(i-c)(H(i*I(4)33iÈ6iè6H,i-iF8)BiØ1i)b((41-H,i-H(i/c)(H(i*I(4)3(3(-H,i-H(i1c)(H(i*I(4)3(3(-H,i-H(i0c)(H(i*I(4)3(3(3H,H/^*0H,H(^*<3i(I*4*3H,H,i¸)^*TH,H,iø-^*PH,H,iX^*LH,H,i(^*HH,i-8(I(H,i-8(I-i¥I*H,i,8(I.H(iErH-iEr5)H(i©*I1H-i)I0i(i;H.i,J(i(H(i(rCJ(J*H*i;sCI*i¨1I-H(I/+hH/,hH,i-H-V)(i)H,i+8(c)(H/i)I/H-i*I-H*i)I*4)-H(i)i¨1I/+hH(H*o,hH,i-H/V)(i)i(c)(H/i*I/H(i)I(4)33i¤I*H,iø-H,i¸)H,i-i;8)5+H0H1I2i(I-+hH-H2p,hH,H,iP8*J*i(p5-H*i7u,hH,i-H-i)H*c)(H-i)I-4*3i(I/i+I.i+I(*h*h*hH*i86*(*)3H-m,hi£I*403H-i)H,W)-I/i*I(4)3i3I.i/I(3H2H,H(8(H.J(H-J.p,hi¢I*4.3H,i-H-i)I*+hH(,hH*H/c)(H*i*I*H(i)I(4)-H.I-4+3(3(33H,W)1m,hiI*4,3H,iø-H,i¸)H,i-H18)J(,hi¡I*H(i(p5,H1H,V)ú-H,V)ø-o5,3H,i(H,iXH,i-H1i)H08)J(,hi I*H(i(p5,H0H,V)H,V)o5,3H,H,iPH,iH8+I*4+3(3(3H,i$6i¬78+I*3H*H3m5(3i)I-H*i(r5)3H)H,P*0^*(H+H,P*<^*(H*I-3H,i2L(H-33Á)+(i¨03b+(,(-(.(/(0(1(2(3(5(7(9(;(?(C(G(K(S([(c(k({(((«(Ë(ë((*)(iø03O)()()()(*(*(*(*(+(+(+(+(,(,(,(,(-(-(-(-(i¨13M8(9(:(((0(/(1(.(2(-(3(,(4(+(5(*(6()(7(T7*S7US0U `;
+				WASMAudioDecoderCommon.getModule(WASMAudioDecoderCommon, puffString).then((wasm) => WebAssembly.instantiate(wasm, {})).then(({ exports }) => {
+					const instanceExports = new Map(Object.entries(exports));
+					const puff = instanceExports.get("puff");
+					const memory = instanceExports.get("memory")["buffer"];
+					const dataArray = new uint8Array(memory);
+					const heapView = new DataView(memory);
+					let heapPos = instanceExports.get("__heap_base");
+					const sourceLength = source.length;
+					const sourceLengthPtr = heapPos;
+					heapPos += 4;
+					heapView.setInt32(sourceLengthPtr, sourceLength, true);
+					const sourcePtr = heapPos;
+					heapPos += sourceLength;
+					dataArray.set(source, sourcePtr);
+					const destLengthPtr = heapPos;
+					heapPos += 4;
+					heapView.setInt32(destLengthPtr, dataArray.byteLength - heapPos, true);
+					puff(heapPos, destLengthPtr, sourcePtr, sourceLengthPtr);
+					resolve(dataArray.slice(heapPos, heapPos + heapView.getInt32(destLengthPtr, true)));
+				});
+			});
+		} }
+	});
+	Object.defineProperty(this, "wasm", {
+		enumerable: true,
+		get: () => this._wasm
+	});
+	this.getOutputChannels = (outputData, channelsDecoded, samplesDecoded) => {
+		let output = [], i = 0;
+		while (i < channelsDecoded) output.push(outputData.slice(i * samplesDecoded, i++ * samplesDecoded + samplesDecoded));
+		return output;
+	};
+	this.allocateTypedArray = (len, TypedArray, setPointer = true) => {
+		const ptr = this._wasm.malloc(TypedArray.BYTES_PER_ELEMENT * len);
+		if (setPointer) this._pointers.add(ptr);
+		return {
+			ptr,
+			len,
+			buf: new TypedArray(this._wasm.HEAP, ptr, len)
+		};
+	};
+	this.free = () => {
+		this._pointers.forEach((ptr) => {
+			this._wasm.free(ptr);
+		});
+		this._pointers.clear();
+	};
+	this.codeToString = (ptr) => {
+		const characters = [], heap = new Uint8Array(this._wasm.HEAP);
+		for (let character = heap[ptr]; character !== 0; character = heap[++ptr]) characters.push(character);
+		return String.fromCharCode.apply(null, characters);
+	};
+	this.addError = (errors, message, frameLength, frameNumber, inputBytes, outputSamples) => {
+		errors.push({
+			message,
+			frameLength,
+			frameNumber,
+			inputBytes,
+			outputSamples
+		});
+	};
+	this.instantiate = (_EmscriptenWASM, _module) => {
+		if (_module) WASMAudioDecoderCommon.setModule(_EmscriptenWASM, _module);
+		this._wasm = new _EmscriptenWASM(WASMAudioDecoderCommon).instantiate();
+		this._pointers = /* @__PURE__ */ new Set();
+		return this._wasm.ready.then(() => this);
+	};
+}
+// node_modules/opus-decoder/src/EmscriptenWasm.js
+function EmscriptenWASM(WASMAudioDecoderCommon) {
+	var Module = Module;
+	function ready() {}
+	Module = {};
+	/** @param {string|number=} what */ function abort(what) {
+		throw what;
+	}
+	var HEAPU8, wasmMemory;
+	function updateMemoryViews() {
+		var b = wasmMemory.buffer;
+		new Int8Array(b);
+		new Int16Array(b);
+		HEAPU8 = new Uint8Array(b);
+		new Uint16Array(b);
+		new Int32Array(b);
+		new Uint32Array(b);
+		new Float32Array(b);
+		new Float64Array(b);
+		new BigInt64Array(b);
+		new BigUint64Array(b);
+	}
+	var __abort_js = () => abort("");
+	var __emscripten_runtime_keepalive_clear = () => {};
+	var timers = {};
+	var callUserCallback = (func) => func();
+	var _emscripten_get_now = () => performance.now();
+	var __setitimer_js = (which, timeout_ms) => {
+		if (timers[which]) {
+			clearTimeout(timers[which].id);
+			delete timers[which];
+		}
+		if (!timeout_ms) return 0;
+		timers[which] = {
+			id: setTimeout(() => {
+				delete timers[which];
+				callUserCallback(() => __emscripten_timeout(which, _emscripten_get_now()));
+			}, timeout_ms),
+			timeout_ms
+		};
+		return 0;
+	};
+	var _emscripten_math_cos = Math.cos;
+	var _emscripten_resize_heap = (requestedSize) => {
+		HEAPU8.length;
+		requestedSize >>>= 0;
+		return false;
+	};
+	var _proc_exit = (code) => {
+		throw `exit(${code})`;
+	};
+	for (var base64ReverseLookup = /* @__PURE__ */ new Uint8Array(123), i = 25; i >= 0; --i) {
+		base64ReverseLookup[48 + i] = 52 + i;
+		base64ReverseLookup[65 + i] = i;
+		base64ReverseLookup[97 + i] = 26 + i;
+	}
+	base64ReverseLookup[43] = 62;
+	base64ReverseLookup[47] = 63;
+	var wasmImports = {
+		/** @export */ "d": __abort_js,
+		/** @export */ "c": __emscripten_runtime_keepalive_clear,
+		/** @export */ "e": __setitimer_js,
+		/** @export */ "a": _emscripten_math_cos,
+		/** @export */ "f": _emscripten_resize_heap,
+		/** @export */ "b": _proc_exit
+	};
+	function assignWasmExports(wasmExports) {
+		_opus_frame_decoder_create = wasmExports["i"];
+		_malloc = wasmExports["j"];
+		_opus_frame_decode_float_deinterleaved = wasmExports["k"];
+		_opus_frame_decoder_destroy = wasmExports["l"];
+		_free = wasmExports["m"];
+		__emscripten_timeout = wasmExports["o"];
+	}
+	var _opus_frame_decoder_create, _malloc, _opus_frame_decode_float_deinterleaved, _opus_frame_decoder_destroy, _free, __emscripten_timeout;
+	function initRuntime(wasmExports) {
+		wasmExports["h"]();
+	}
+	if (!EmscriptenWASM.wasm) Object.defineProperty(EmscriptenWASM, "wasm", { get: () => String.raw`dynEncode013bc58350c1Éð|@|O*XØ3R}@³ùÆöÁ¤½Cu­ÙFõ¶=}VònÐ¾ÑX³W~aGÕ5?Q= ÚÎN= WeÇ¸ß3í=MÛßÇ¹HÜjLvïêÀ:m°¹30>ÉX!¿býOýn
+®Fj{øú¢ç=}(ÝñÜn moÇ°¥àeò?È×µh
+ØW¨;Ñ aØX­æU{¤øàÖÕÀì·ÝÌ­íø±tâÔøeVO÷PÉ´È~ÃòsX1´ÊPyK·ÿKZçµ WÑ¡¡_ dÍí+]Õ~%Yïþîñ ¾Ú·p[òß ¶ó÷ylhnn«²ù*¶Ìéñ®ï(éÇÃRÊÆRÌ-¬ÐoÒÊ2z+ä$:ÄsxÏ#Ït!MlBq§%Jè	®Ä 3ó°á¸eÅ_Ö=}iTÐÍmoðbMpl¬EP°e,¼Æju®ix>#}NgdÿÇÄbç9WZÇ·n\Öá1ÚÈt.ú6bì:ûào¯ú4Ïø  ü­zå¯#ÆkM#úÿ9ë:üÒÝëÚà¡d%0ÒekÓ×mðÆ¸½ùÿâ¿Ò9	ÄgªÕÂ%ü¸»	HÁM#Âq²~èn¯Ûa_9j= ùÿRèæÊó%M
+¨,Àæq%98a9% T2)´z«9gsÒÖ!ZhRõRÛyÕ²Ý=M<Öcº	»~VFÕÖx:þrÞðn£x¦8.è$K9þÂ¹úSnÍ3¦v üuºsÕñ=}1=M5ZÊ¦CÿSÉ2×qÒ««Sa»ù±(¢º]ÀmÍh÷ /¥3@sns2	%7ù-Q|nÏoöjYÛ]}à2{EBêÎ6>ÁbÄü
+á,	[DAÐuùjeNDEëÔàZºlq» J/Ë²ájºßCÃÝ1b)øtN7Ê=}gÕ®òÍá§8² kDïû¤åÒÅóºc=M²= aË.ooèf.QZj@bñ>qV©?æxñRô|_xwê¸÷È¡ö"C¶2[¼ï¯¸©KmäºúZ¡%^°bóþ»-¼Ú¥ZI(pþµS%øµã*Ò±8f:t¡éþõz¶<Äfñ*öeP8AÓ¾/g×\Ð¡1Ï"= ¤ûGsW_¹ÔÈX	TãàuTíEKPüÝ¸#åB¢ñ?:µßÄ¬îFI8QY;X ¶í¦k{|¦éíà/fªi>´EÈoK= 6¼lÖr²ÿ*YÇvÄ­dàG{Ö,Gz½.gzSdïV%z¥8¶²bO¡2\nOßV¡S2KçK´UûuÛã~f¾K)ÊÖ#´?#»ÅYXOøò TCB}LUk,kÍ)]íiE^ÿyW)Ê»³= ô1_½úÌÞÊçýS¡
+»£jÆkhÐ1G<è^àÙç?æF¦Ç/ã«Eý6ZI¹tl.aëül|!&:MÓå?N@øËÅf 6cì$w,3~17F=Mð¸³°aõu\9æk	 I&>V®Æ/Øa´ %¶¢],ÿ:±wäé¬áS¥FK±U¢±ÓPóß&®e= ÍÍÜ¯Ï×À@= Ø#Ðk[NCó÷ÀÄÞGQRcnI}HGñ\ç­= öè^áygyDÔa©D¦'ß£Mß£PI¯à¨=}=MUÀ¸çy 9W½LíU·ôzwzÃsÝZòÓ3F¸Áè£âÑnÕ%Í¥ká®=M×GTÀÊøfëM-UF;uåÙ#X#
+n©ïÖDÅñ¸q ,Ô¹Ð¸;h¿åñ#µNÓ÷¸v} *Îª_= ãýØb6N=MH§'®Iu¯78ªÊÝ#42p´[/¿E= =MxåÄV§Ým©3?;bô9fb÷Ð'¨ÈIS7ñ>¬IÍÜK tçÖJ	7û6ß¥A/|BÏ=Mõªw¿T¼91ó íÒèÔ_6»Âõªvg2ý¡õ÷Ò=}Å3ýXm²¬bÛ}U¬0¸Ük~e
+aY¬ÈÛµ¨¢0Nñ¬t³VÉhÖYvx§"Ç5\N'ªÂ£æKlÂ?þ{m¼ôê±ñÔ|Lm¬t_2%¤E}Ù>ÎFûalSXø²tRªÀ8¥£Å|ÖW(Ù)\3Úwåì:oíý±Y4ì©géµC³¨Q\ÍõMÕ
+!J½6ë:Ëg ípoÒ=}I=}ëS¯¸F=}ÙT__U¾&\íÛ ¼Âkg#úÚ¡ÀsÏÔTµ³ÑËßxNÉæGç^4Ñ¡%.¦U±O[ø¼4 pÍº7ÜâªcÔ¦¢:ou¹8ÌzîXf¬56DC´Þ]Ó!=MOÀÕâGÖÓ«0¤¿Å2ú
+éÎ·NóÚÄr_Z)6y&2^F|#²ì36eòa¦rcLõ5Hö<r¼J!í¼©DøÓ@¨åPóf Ñ£®·§hQ®õ½c±M¥W,ÝàÜ««¿¢Vmù|	Ë·wj$témè±°&í9yòµfæuC:E@[RX\.qéuDýé(iao»]W5?I!z®¡±âàkËý¼LóFµUM¨cEu¼üÃFÔì<@y´ÜøÆ#y«µàdMå@ÛXüû¼á¾ù[CHºÀ[4ñ5z:ÓàV[BÒ/I!ÕÓÂXj«ýH&o³©sFÍ&-ö«7d\X#>¦yñÜÃMGc~#!Tüt? ªÌ·«á¨É»ÕBms¸Û®0úBjÛ(^ÓÅ®¤ÛF¹Ðma)'¨ë(²ÄÞÍm²¦á¡Bá|%«L¹a\×Ub= -f®¢Ü¢«GÌSÔxÖXcÃÈÄh½4e#"';P	>Rõo;%t ÐC$g%Ä>70* *©cX!C7yôîËtO'j?óíÛµÁûH= IróÛ= kòwiJ]]þßY÷{mûpLÿÊeLA¾À <½åi­WÎ?o©t¡caâB¼iBüÛÚ¯:_îOJ7"\¥^­EPHQ¼Cõ *{ÎÁIÅÅ$ÉVÇbo]XÆs)^H²®wójÔÎE6OÙÿsRÍ¨Eùï¼/²OÉQÿmå«õØÆZa;Ä{ <}¸°Ró=MÖ²ýÜz´|´pµÛá!cïÆ,@zÃT«¶d³åoÙ-KyÁÓ4gß-²ÂxÊØÏ\@q&}eÔÂè\ßÍT1Ï\ kì÷Úwé\ÀÄ~<à¢e«4E¡/«Ä­aõu½=}l°ÃNë/J­å=}ÿ®!.N8Ær)HÖ43¡C3Ôz/N:
+Ú7!Z1Þqö)Mî½%"O7^+TÉêaF 8øc2ú%ù3}Ô²dU(³ÍZÅ±£y¤af¿Ï][Hþs·Ù$EpFæt4¦$Vú
+í!h ãV53øKéâ=}Nå22Úú"AÃ5£áª6WÕæYôÈ^ AÜÍ)ýYÌúë¾a0= ºvéè:7Mô=MWsE²£²ÇL¿òÞ²Ü³J+= 5æ+,>
+¸M÷7jè;/_ý7ãzÈ)D÷·Ç4*È#Ú¹"ó­!z 0	º®µZ*ìx®
+R>sÚýP7:Â¯ZZ=MÍW²Dê6Ó^Nq= fÍbN¿VþÒª£;û<cVýîåª6§7dËÃ-²us¶Ò¹%·iÄs4òf N(á¨|õ-yZ$E)¹ï5¶Wí]Q\·1U9:[-zQ¼É7÷/þiÉõ	¿«Ob)Iµñ0
+lÁNpÊ¦Ë-+Kfø»
+cù@®W¡Y,îuC6ZK¤éÏ²µI=}= óáÔÁ4´-õfÔmõVÛvFÞ Àç*=}éåú6î®£³úÄßy'GD1dÕ±È"x^ù1)DÚ'ö\©^6§ö_³îªZ|¾S= @$^*- 'ªÈÄb7ÎÜt7Z4©ö§ÉUhY{ÓÚh£	±TÞÁÉýÒR7Ë¡t¨<#Ä¨¡@EK7Ïb3Uri)åw=}ø»n#MMuåÛÄ	 ¼ü÷´ÒuâÆ8¯¬»R6I¡WBòîtnP=Má-0óà¤ÕÆ+¯KæÛcâÑG½þÛÀFä7"ATMáu+mø¼?Ó^Ê?Ts÷ÁR7ñ³!åogã	_ËRª«J$¼­nÇ	h ýõgcíÿ·ÅºÊ§~Ì= @<Ûx¿a¥L¦ÃO·òi½ eûÎL~tÞ/'­=M$x@½tZÅYÖ&¼£]6o¹åÛÑvàMfgp£7Ç6ùßkØ5i>9àlÊ >Ð7w)ý;³(JKLª.z7ðfê2jÐ"£.SJ®.çòìV\3(ÎÍ­Êt"´»µ¾¸[
+¸8÷Ê+¶AúCñ&ÿøH]÷hly^Îàî®ðgåA6íKÊ7ÒäGo¿:¥G[Åþ¡«a¶GÞ¾!â
+=MnB»ªÖ1ÔIZò2»JkëÆwùºÃtª¯xÇ»×ut#jà:æîOÒ6P¿èrñË×ôm2¸ÓJ±*h«koâ}îµ»¯£F÷§÷¸#a®Å.ùÌ/³3Ú9VÏ[³22L[Ó,ö«W&$/UVq*	fÐ;F°®/Ñ¦·qo:SCÚÉ¼ñ|¨íu09é±|Þ'­ÏYÍ. 5Cm;Àúñ=MmW8ÒSM³¦äHmsA^mÞ¢£Â©}oO21*ÒÃÊFbäT~¿P'7ÑDØÖW®äO{Z»AØ;t£82Jb^:®ÇOß­v@r*o:×>·ûxGÌt/ë*F:7ÝÁwd¾º£D´{¢= ´¾3EK·<MÉ¿8ÂìiÔÁ°r6Ö!F{'H§Ü
+y¢rÍn(2RæQ{ Û»Ìg{¸ G%~»¥QÜm$BË¡[Ú®jþXè59[ô
+âRAÁïywìüwrz)yhX#p¼èt!Â1~^ h6kî^C6}hpB{£Q5x¿ÁoÐ= à £É<ó«¡ìè31ÜÌç±3X~:ÚÂS~«3/÷9ÚJ8Æ~­^\¨ÕÀvÈØýd9zX|ÿ1¨
+= S^bÅ]É:×l÷EÜ1= ¦¼Ê
+T4ÙCéhåìcÅ»èZ³}!©ð:~^¯ãó*Mï8rÚm}6S3#ùÊ(%òYï¬%a¶¯N½
+ïõ­î/Q	½É}I£Û£þ×ÍLtä,QMÊÚ0la; {Z½¥{é¹3§£:Nj´¸ÆbýÖÜÊÝizeµvýEärìY(£Î£Ô¾oþ39hn,9øÚ¯úõyä¿Ôb4q
+ÏTÊî·ÑÚQÆï+zy¥0ob;¢Àï­üÕçIòõ[I"îY°âÂp×AÕ	# }êN92Ü'Ú=}Å®Õà¹Xg[9ÿÐ58¿Cke.ÓÏ#êzü=}ÒGkÌ%Æ"èÏ^q±R3
+=}*@Å@¹æÛi r·÷Â³¸{Ôd«WÈHÒ=M®Ôææa!RqÄ×óÁá¯SÛ®?Ãëê ¨.ÃW §r+TSóÛ5_µ®cT8_WqPãtå!Wü= ºmµ¬È
+Ò+Kq¢¢ãgõ ËÁYbHG@¡yt]NÖ¥¼~0X+ûx85&Bù2×Ûßoç¤A:$'áôÑÀ9º|:ª °­zï:­$Jo¯«ËÜÛ÷àSWîK5´ÁË$fÙÓÂ¨ÃÞ1£L .uïÇ-ê{Â¹/&êÖVÆcí[>£µØ¢ÅµûÈ{-VÊm_°S³òÀmªQ©FlaÞñíÏW¬D©lÑñ)ðss½ÎÿVBt	LªS+¬KB\;ªå'þmd'=}ÈnÊu&þÚ®4Ps±ô°ñZ÷¹(ÌýlÜ*M»N «Ïö:[Õ.lrP½0w¬=Mâ×sWíQx_ó?CA'
+ZW-òªi±´¥²ÊMZ§ædÀZÐùõ«óZófÉÑüÔè­\rNÀóV6Á69f~6dOgD	Ð¿o>é#Y¾u?ØÞØ-Ù±¶WEÂ¯=M^ÏèbÈ½qÚäqjr½ZmFïâjÊ4áÃ1XÒ93OÊ´YöcÛj¥[Èñ£@!9+ÿIübFu#PB©
+DÑÌYíuÃàÓ+µ"8q1·ìÚ¸óTü-¤¯ïiõæ)êI÷ïÑýÙ¤£.Ð£Û	P¬A-|¸ëu¥ätj ì¬ÔåÔ8O¥	§IØqÍB¨|D8xò)ºmÕCÚßÒj&çþâ&}D#² ½Af9« ÛÐÑWï^Àþ°w4Ì÷ÿäÅ¦ü-yÑïc®Tú÷5YQp'ùÆ×Íçj1vaî@;åQÃÀ~¶´õ|}ñh×ébÔF4\BÂC&ÿé>SB0qç=}¤+«mÜp®¶-[j7ÈÁ­(bC´=}CÑ¼±§ =}Êx±µn!üÍ@je ¾Új¯q!Ró6×üv$2ÐCÿÞ2!ý^oäuÏtmQ»ý)ËgÏ_¦npËvõâ;þª«âÍ×;sbûûoD³auæ³e<=}ÿaSªrýô:kûÜuü>YÃWa³'ÞF{À¼ì ragïÞP-n£íñN¬Xª½Z43<yþ²]¡a®ãK[³'·	h~ÚW6xòv2ß:.Y¢vÐ|°3_+Æ×@8±+p e+©Æû|­Ã\|.	g è+âT%ç#0ÃêÛ|ò4Õ®ü= 6©Q?Ð¾ô=}Vnqæö«ø{ÕÝ­£y"ërkÜn§ÛVKý¯«¼2Ìäí½÷Á_9¸­O$6GÌljÜÁªYý»ï#ç[Þ&0¸5á# p*zÄÉ¦/¦ ßõè{»ú-%Ç.¥	×¾A?Ñ¥m0!{eõR,nÖ° íe .Ë= \pÈÞ=}4½²N\xÏnYÏÁÏ®»Ö½T¡Ðº.^¿èÝÛ.@¸u9¼pÖZ¹ÞÐöxjC%fÚl1	÷þ¬Ñ­qâ|Tí*mc~
+4:íd;8Å"7Jî^óðP<ª4ïîrØ¶gc
+
+m©°áÔ ßjf+áÁC®êAªiO!Ðp8!1ÇÒë-Jö9Õp+mz¸K#ôxpGS øQP@c1)Ó	¢_·=}ºøÁ9VÙ£ÞþôbF0C±ózHþ,	ÏÊ?dgºPÙ6	ìÒòÐMþz²ÓR½7d~t¾óÍw¼äN×3lVªk	·6­O@*%1ð®ÐùãÍ¸iæhÔ3é6åº¦ªÐN:A6xðéÝË =}¾\&¿§ß<Í=MS¼Ê¬ü8â÷/Þä:ô*4Äê¯b(çi@ñ¼(|«¥M$.'i3ÖL>\#qkºýþé;3éyM)"N\>'?9.Û6c7síÒÛ)°tU9QA5zòfvèð.+þèÃÐg?»|îb$±)|9äáàgJaJù[ÿh:©rÎxò¼ÿ*­ h5z«ÅØ¶KÚÛ¯èß«Àú½¾]½íDØÙ¼mñx½E¯T£E·*%eúÙ=}å>òGG7Õ.ì(ö,(lÙ³¶°çÿßrê§@óOcZßëÏ/m|Ñ4J­ô-@dbºX­þx.I*çÃ3éÙx9dÚ*zQÙP;Òönk·µ×ú­¤îB@ÇW[3îÉ"­Lhó Y["nÌH8<^ ¬ =}µ«|Í±^·+¤¬Å/3h^Óìçç» *ãöø5a¿3uýñÌ0 |jWp.mÞ.MÉÅw*iìe|î¼ÂSÈÊWÒ£éÜLbé4^&©SÉ«°çnx¨Jg­Ä9°XXî=MñÒ?Ñ¢öN¿= 
+AèWÜ õþ5¿¡~ì "3nßÐ×¿â¨Bª3ÎNdÖb(,,âÿé®wä¨Â[ þ4þè|Çaán?C¦°¼è{Üsîb>ûåxmîNúÿZ"Lß+û= ÞßOüwí·¨î®Ü_Rä± \Õì±g?Òst¢ÌcÂÉ,ÊE9<{{ì20Jùl{JDE¯= JõËaÿôÀbàè±Ô¥hV>¡%á:Æ¯îÈ%E3-8ð= öüönÑ[Q_fTpEFc½´ÇÖýc§PÄOOdâ+IÒR%Ï7	¦Ãe¬ô®9¢2Ù*4
+EòCñÔ·T¦aG¯a*1HOX®Ï=}J¦¿JæÂ m¯J1«uð¦JJw
+ÄtÌñVÔkMqÛÄ=MTÏ&ïÌÒ9}¨ânzìrµ³¤ñæ4lÔ=MÎ7l¾É-¿oÐwàâf¯RìàÅXÿbÃfõÈS$y^x{u=M~ÿõ	K¸x}ÏµRÌ&¸ÿÕ	Læ5;Â¬©Ü¤{³«0{ÿ¹g«êD¾ÓWFäQ ù]±koÊBÖUÁ!ìörH~.LHþwq>nGÂSÕáÁÜ´';§§SÕþïM]Ê"p'­ÚÅÞ«äÕãZöêAè(¦7fa&ÁÜ´§BçoGEñ¡SÕ±üµÁÜ£1;Þ.t±aJöL¥o:]ôáÉÊ"¨ªhì­*GÑ=} 1ÙBW'(ßk{­TÎ¾!ñi2kË¼´wô|&¤Õê·,Ú=M¡oV¡î|8HÔùK$¥J(mËßÝïOís¹Cÿ½au^<ï£Édó/%í²Ýá'_dKÉ;æó} :5­®Ì?9ÈdÒ¯Gúa}{=}¡bG23bØ26Þpâë@QÃÞoÜ«í¸Äî5ß:¶9¹4¨·ó5}A·~¯m¥©ªs{?ÓüôZ3rèzÔUª¬<ur¥}uµmT{~c3!ºù(h$ÙÄ5!8Ýö¨ç½ý½lÇ·ü^VfÉ£i§³væ·3Bm;«­ä³ãVÁ©Òò"³ñëíëß§T¬ý¦CÝHéôtàÔ1¦<¦e¶\qÚ$9­2¦>-oO
+!ú)h;qS£Ç@²äÃÔw×Õê99©¯Oñ^á|mæé4´áíiñI¥\¼)±Ù=MÛÈ¦cîõy4~1uh\é=Mòðs=MËhç¬¹Ã§ ¥Ò$IºQfK·|ëpÆ©{Ù3?ñêÑKòV¨ôÿ½ªÝyÎ'¯4oôØäï§cXfy¬q: <|µÿ9$9jÒ[ÙÌc#KHÜL4&g|ÎÝ&°¥ô££Öþ(µØ2u3:¾Jptjb^/X8½Þñ!°.^Î97ÚØ	úÉcDÉP0óï>Ì~y5ïÍ{ÿgµ'Næ¤ö¾+ÙÊîiìüXRjàF1Ïñ*
+>>¦s'ÉØð§ãñ¥A<uÍ'XV÷Fd}^ÿÑILÖÓAÅÉL^P?Y©Oð)]i$pÿõ}/Là)[­Øk¹Vìå6ÃÙYï0Iß#³{Ç(ù*1$q?àôb;MìÁÜ´§=}qpGvrH~.Ó½kGòû1G~.pklGöÁÜ´'ukoÂ¤\sñn}} Ì_ÜhùåÌ7oÊ¨»èVÁ!ìà£YV½èTÁ!ìL
+kïF1ãËÝ}ôÉFàß2¸½ò¿áW±RÄËÐðãó¾!òýù©
+N~%sL¬cv®)iUïJ«]R¸yJr\xÿö\P¸i¯e¿)JßÌÂM§ÈñI
+LUz¦
+1µØ,5ôq,:
+EC0P$Î¸>Âì¥ª+8ÌÀ]RPÄ¼£cÎü´éÿôÚÄî?sÜ$ÿÆSÇDô¸]O yÎ-j¦*<a¬ßÄ±Ô)é)%ÙéTGB>]åC½;DbM_ìOÎOCKà»O cè¸~)½=}4×«Ú¯Ù2=}!÷´âø®&Òsªï6³ªh
+¶**8º7¨;Çÿ2Ù»ªõef^n^n^^n^^^y iµÔÙ÷Ä>ÍÒ<.ø²±,À6<
+.VRF	é üÏ@¢®gsÖí'UQ×tF	×@¢¼@¢QÜÂûd±ûxªÐ	ÉäH§¸Ú+
+ÍuBý*
+¬E¤´a#±¯uÌyÊQåÑÏzâØåj¨sPðÉðn± Õ¼£ááH¬óGsz¶5$>àAÆbT§¸ßäÓB÷ûÀË{³á½À5ÍÞæÓ­«Éz5%Úþ±c*|ð)o÷ ·Kôàþÿ~Ùc0>ãvP«A° K8·¡¹ÚªÑÖ·ùgÆwÆÆ®,céuÎæ´ò'ü
+ÈeÚð?enojÉGþ±âRÙòõòõ1~%îPozá>zwVÊuR âÞR[¯¥J%ÕS æWT_Ñ7ËWø1*¡=MÀYµ:¥ðZ·üø ¦Âõ3JÂ5ýü¤FüºQÒªÖ êBvQT²ç)Û
+%çI¯«ù
+õç°|Õ	ïiÛê~b¼ZQ&ûÕN²ùC²(^Äv¥Äëk
+§.øÇü
+Ð|Q= á&	!I$±bö½Âí9îmÔ ¶IyÖg×!Ä¼i^(¬³óx}5'&¶2ÎgL~à"ÙÏã^ðãD~aíBÄøãS þ<@4¥è»iäb#ïèUÑUhèÏìªL[ÙQ]©â_Hi_¾°Yîµ7vn¶ieÕØÈF³Êå,ètKýKÉýBS&ØÅw»0¤ÈlûÍ¼l£[= ø5»]a8bÈUÎ-,zDÜ«dÏäsQ
+¹.Ýõã¡co$'ð§ éÞT-¦æm&Ã±äÄ1ÊÉLC|($àÛCØ³W/¸âÉÇ@âAtVb¸5À
+Ý%ËÞËÑ¼jÀß¶ÛN¿2âaä_oÃ'°^ÓåÞpòÏÏýóJHð¨6ñ  â×xà»öX5¯;|J Èº©(SèþÃ³MZìÞ+à#·7¼£W»©6zª ¯w±ÆAHcËæïøÝÈ­ÐF[þ\Wñ£Ò¨Éýóª<D éä;$-=MõmN·çeF³ï²½öaÎ­X´.&ICÃ~üK NßÚÉXKèa2C[ñëÇY³ÌøöµÀvÞÿRë>SJ®sºîÜwûöHÞ [8Y/£ä2Ï¾Ör÷2ûFI÷@+óWg#7,åûd¨×ÞyµOÊ wë¾B-~ö×/X3Íè|êÊ¹"Ê.A	¦óöDYêÖD J»5èI0*U»}:]\X]*»>Béúûücv= }#å
+âËª27,7]òÛ¼ìñýWÅ8'¼êe~»7¿ªFËruÃâWë	Ä«=M= ÄÏÓXIóoN8->Y/~6H_­Ð¥Ä	¬ª¢c]d)Málúr57§k~¼÷aÃÍL}WE;ÄÛG~Mêæ¦·Å'D^ñ<zJµ,ÂÅ8ùÈ©^Î¶Ëõihê?´à¿åh÷÷D3Ô2ëhð"èç°í½0°§Ä ëPHà:Yjuû])²®ØXÞÉç]Üiù±Zp}ZL¾r
+Iñ>ßv¼>O¡W}kbêîô¡AIØ²uïÖãíå¢Úpv¿!_ÿA¬¡!òË51@B¯~¨QÂQ¦G<ÜclHôµÓÊ¶=}©T¬3*ÂDà"ÃsI&=Mî¦ª p"EéjÊ;ÑÂ}¾¯,¶.Þ¦òò¸C!^kLØJ.Ð%~Á:Ê¹:xJ'wµ+z³TÊ%	Â+6zjx¯4ÂgU¯¬ç¨ÀZdútÚ=M¯^U¦rNPÔæO£EîÖ÷i§Â*ÄZþ^í¿Þ£|þÁ|:y&{6g(<«K-Y®ûðz©m-zQD¢ÄÃÅls(Ù$ÅK-ë3Îe´Ô j-¼µËüÍTITÐ)¡âZWäV­ëã>Ûß#ÜÆo3<= 2Ó£¬è	ZtFtLüªó#Å	Ct-é>¯¤Ë$¿ªBex ¦£õÌ!Ég©åÃ¯ÍB~Å4¬}­ÊÕåÄÑc©þ{¢ÆTêU!Ò,Ph}ä~ôçéU©h½Ð=}_0©ïþFn£k¨ÓýVFéýïc=Máv-÷Vn= v¹ÅgÍ¸^*5Ý$¯rÜÞRÄK&ÊfíåÃKÈÄA¦ò¯9iië:Ù0´ .V f$= ¥í. òùØËMIÆ«¦Ëý0ËõW6õ	8I¹]&kóNgì3Û¶M²«hc.ùN= TF%É1=}Ô;ñ_Öº6@Z² îë¤pò6]©rcºa¼o2ç¶á¡YçdDÌ±H×6íãí/f¹°Ö#Í¹G=}Ë¬Q°Åwõ ùYY$waì ÿ¿³Ä§ß³º¸xù4ÐøÒ¯)Ãé*-±øÐVöFÃ©ñ#ðj^´¬N Ã{þ0ø´-vHDå)LN¡ñ2¿ÇIÜªZ{Ñ ë:B6ßè>Ø=}ðaÃcJ-Á_ëâÀïþÇðÃ¯ð^¿åN]ÆX¦-Ô¼^&¢j~óFÅÜSÕß¼l bR»BØöÂÍ^<p$k(kCÚç§=d{()ÌJýv\ e*XÉ!¢)XÂ[¿ëö Êü¢JãÛW=}±«öuÃ¯^TÔâ«9¹O$ßÖY°LtZØ= qåN2UÔ}îÓÆ¯¼ÉÃ mÉM1g%²½£hÅq]÷hÂÂ¨oÊ$¼e>B¥]e^Ñ'QÿL= ó¤J¨yÉ õ<ÛJDáhG ³d[bñz-wWªxýÙcöcÎPÆx|«AXÚÎÉRLæ3cÁ+ôä\0Wyâ?î@·aº3z ¦ÅÁp³=}"	 Ë=  L0¨ÝK¶Úõpi¬Y{¸#ø³[¯zãBw¿øØ"å³ò(mpß³=MI-Ûp´69¬°Âe<JíªíXy¶)kô0¦8»ýmIó%SÑ'Ov³]ó§S|M	òs z	
+ËÁ..#ç¬A<ð<£ãOà'Ü\ò§"ùxÓh*ÅPC~
+Òá(a?-ÍJtUÿU?=}ó
+lÖöa­ß.Êl.f#þxñü÷D²WdÀTæ7ÔÁ'r¬Yï6£ëö&©ðÎ'ìÎð9(G©òä:·kãúñêUàs±=}àÛ¢Ud¸!;PN4RÝõ EKå¦í¥ë iuõ½ïÕ©?sx&ÌËjï=MÍè£Ï zÞ|\Ùâü%Ó§¿Ííà±Ço³×Op{vµ²Ä=}Å/Q£Ig&[UèY}oòÄ©.¥>½öÔ½ÃdRN:Î]åj­W'ÃYÒàßEqJòuJtBédIvRñyÂÖe?íb{ælWÆû°uÙ3-ÇQîfSÿK²sÉÃ$mm!¼MTª(·Û-Cß?-\HXÚ=M\é¤JÜô¦5ta,}Z±Í¨JÃÑX¢¨ÀÌÝÈFk@ª)ÄK®YvÄ}<h%&³ÀCn¶ØEß#êöp»n¬ÉäNÓ²WA>t@f½loso{'òÉÎ·øðÂ§Å¶=}ÊûNJ%ú/%:pû¹=}'µ»K'@'! åj1l?3XF<·Úå¯nûÜ¹jAÎFë »è®ò;1û Ç÷k{óvîæu{°q±ûL WùXöñKnî¥©ìM¼0ügUi©X²{¶vÒüËuÜ| XkÛÆmø÷af?÷°ªBé¶@G#fç¶ÛêHßQ¨õÒ±Ëà¤à0§H¿ÊÑÌç* WyTf|éw¼½2=}®
+ ÅÃÔn­VãoM+¨±fZò|ws´+çÄ6Kd3JÊl¯Éf¯}ïÄ^Ì¸¸8'Ãx[V ¦õÉ&+Ó\ÚÜ]©ÃIÄ^©u]3v'?êIÁpSymÒÙQ#Â7sæ¿¿ÕÞýèIt£1ªÔ=}Xàv$Õn¬Æþç-µ,Qñ*À·7wÊ¾äû¤z°á×K¬¿ÐtÝpWÌÄÌÂT óBGJ¦XÄÐÃkÜ^étpï 3·Mêo¤"Æ»(­Ä~jr¦æàè¨GñNß(1.©iõË=M©ÁuµSKù¹ãÝÐ ~ä¹s;©êÑ¤ rw¶O«m¾ùéÜ¡­Ú¢ÒÌ'"°3³ÿM{v*W¸¶]¿ÿôèxBÖÛO ï= ;n¹Îf;7:ÝÇ1½cÞ¾¼W+Ã3¸)ÿRHñ¢ÞÙô¢¨çt[¥Æa£hìl, ~ËäÔ
+7ª=Mû-ÅàêÒxýað!gGÃÿ³Ë_½)ýÚÅÜ %#ay!WÔxÀÀÝåTíÏ¤¹®ø;(gU¥´(ØMÈ²:gªýü(Ï0BÝc×éË@¹¦jÎoyì¯¶'½a>õiKÂÓ÷Åc$ÃãöËûÏy_UÏwø{ÿm«9 ?cÞT#Mê8=}¶Pôì_#µýì7¼c%?gÎ }ÕüéÖÿmNÐiF(ãqçoxh>Nä«Ï¤&ÈkûÈ´í´¿ªÕn?èÀ²ÆÿÔxoÚi÷ÃÚ
+]Ø;$3DÆ¼âW2ÚÝ= ÃBdQ}ø±W¢Ü ZUN×©ð´rr+ËÏ²º$)¨à>ê=M&Èt¬Ë,º/ê|ÈÇ*½U®î*¤ïßÚ=Má!$92ÕávJä
+°ò5gqa:#D8¹ÈXqøë±Ã:°:ô>+K¨U°*YnçÑ:32ùuÀ"öë%KæP¯]vÎ%¥§Ñ×@üþ±Y×Òd!ÀÚ_¨éH8ÄgÖíÙ«´äñ«TÀW4*½
+4G?ÊRÛÁ[ý©L@§÷MyjÐÎôzG{¯ZÏB¼[UGjmGÑÛcKÔÜýH¢>Qì"^Ý,XÇÈ~ÿ[ ÷âÑÔ«Gï/ò[3Ëm<¡IS?º+R|+Â¾í½ú¯e3Æ¡½úC½zÇê@ºÌM7ôx÷cC9µAç_3ÎRÉ]ÃÊÃ}üò¦?ºD9^zÎqü:s2k½¸|9½¨´x!{hÔ_iû7-w ýsÅõ»zz¼S R÷-²ma½üDy~½E
+Y¶:qgWýURDÏjr¥ú>ÏüP²¨!ê=Mº_¦ækÏ×¦ÏÃ§Ømx	,17Jds!¥á¨mòmý}ÉÍêÙzZïTò%¼ óõÓµÁQ9Ôõ= §òUB~Üáìsæi_.zWb$fc+îÏ$vD3ôì	i3u	z?ªD/9k¹.r¬ó)£êðY8ü¸£"BÆÁ£Ô¹Ëd¬jhôc¬¡GÐ×5u³Ð5è\é4-ÊsàlT2ºá¥øÉÜ6n6°Þbpw !×^ßdeÛ,cg rääÃqÈ ·1¤Å^ o8 ®â¦dæWÂßTÎaF1sºíD¶×ø¯
+Z"Ü/èïúÝ aè}ÅåãòlêÉAîÄ<óª}V=MbÏ>OÉl¥+ì'U¢ø¨Ñº?ùZ¦ï³»ºÛI©³+ÈuóÒÿ1,Üë¨¸Ç
+Y=}Dµ¤ç:¥áTdL÷Ï ï¢ G4¨Q¾îm1ü-ôîûYV=}æñoF§É·mO¯¯tÞx= ¥(ôÙ¸	ðXå©Ü5XF!mã^½³'5ÁïF×¼å×eÂc­kyß<QÞ,h òo·âªãÁêº4:¬kçÑÖñÂãNP»QÑ Xy°(¯°ºmö8tb[°rH]=}d^ØKäà=M§¾Ûä~RîûYpã ¥A©ð©qpµî3 (bèÜÿÜùêfÝÌ®F°I0Hê²'/e¶éàÞ,Q:À)#Èi=} $\Ê\ÿù]Ì<ÒþMÆ¢$¤üo1X¿÷9ÇHLlÑkÑÌØª6uG¶>²ÏäTÝñvÔÀwRa]÷pxZì¹ð>ëê¤÷ü= ÌJvÚ¬ØAÄáÝfçë]þú·ÚÇVêym3pÊÚÀDzÇ=}U"¾îÇÐhP8ËÂ¹	r8_ûL.ÕìÑ^ªÐ%	¹òì¥¿4L[ùÉcÛí8Ä@Ðhå1HåãYf¡hê6&ÈÔ¹~åAÇÿ¶ìï­½,iu¸+{
+Û0Çóæ8ÕãÑ¨z3z?Nýhg1ç^7È·= \ØwaV5QÅ¥FöÒÂÇ©Q'³%cogßgÓºÂò8_uÚó.Ä¹S¥©*¬h´þ¯¬²v2z-Æw&[ÿbIû^>;?ùÎ««nTjÅJÑQëóÈãÖ_öÔHeÞ®ËtÇ¤SÂpnáøó¿ÌuµØ~YPL½y4æÑ;!:«¸-ô"=}Ò±§»X ¨Ýñ¡Ì§>Uâ>Yã¾"çaFfe´·6e.Ã$NÉÔÃ_ü÷ÛßË:ücó'¬ð[øé.àú/hè#Nyq*¢½ûÀáÍ¦Bq!9;ögMgùÊ«®ºÊ$£ûÌÌ¤K[Ïnv(ó$±ãâÉÏ-
+ú{ÂÅ,<ÊT8ö¤ê}æõq¤!aü:Ê¨Ôû\¹I}ëT5Æ\Ïiÿ0QEïµ*ñKh7b¾gæ'ÐÂd[§hsYàm£¹KP®pýîöñè¼¸[u/Ú¸= Y6 ÀYu÷²ÖÖ]r[7bmj¨'æjòàlMO*Ç·¤ñ1(*TÙZûÇIîiÁþ.ÖûS6Õb6yYìÒ$©iêãâ{9DÖ[0t*4ÿÐzº0ð*µÝJ7ÐRbå§ G'Ká
+è2xêy­.êä:kñnËÞ8ÖúuqhÛâ|èä(Æ5õ}v÷êÍF=MîXé³mî´ü|pî´ÌõÆÅµÔ÷)jDoL¾6ücÖtÞÔ,Æ3 eð_ÄÏ.3,VöHDNå@ÔIØhÈ1¾¸ô"§wt]Càñìßï÷\kò§Ëk¡áÛØ<vÐJÞQi[ÂÇ¢Nª¹á¥¹$­t¹Ða&Á_r5×hzM8%
+Îf93é.¸E¿ÒZ_=}Ì¯Üµ±üù×fó ù2½NQXEÿZ ìt«î9^z?êfô0Hf4êêfá¤>P^^'­Öâhäª½
+à§÷ÊZ4t¯.®'cÎ÷þ!%n/	=}¤=}}Ú²Spêw½ËÖPçT¤õßªU,2õVuPT8ÌÍ!YVÕ,,]^éyào7=MRÇt]= .&ùdDÒh­P\ã¨-FRÆx3´¿¥ûOªÄ:{·ª7A=}ÛEx¥=}VîAOúõL*þ¥ÑÚ¬,t .²ÑO·(ùqò×Q1 Iì(é¡U©ª_L÷¼Ü jmªÑm_{ÞQQõÔ}óköJ%¡ÚL£²ÆÓuSU#zÓ*§ºl¶8BÐ"@b3ôÚzbÛvÈdÓÌg&á­êühSÍw3È[©tÄn*\2¢¦à
+v6ßyÜ0Íw)à×èS{Ñ.Ò¦Íæ ÙbÂµîÑ<eá_ñB.½®u÷\'&nRTx)= Í=}-ûô¥Í.>éô5) 'ý¨êëçõª·õJ+mvä¯1= 9×µÄúb3®:OaÌw;±QãJt= .÷g)^=}%9Òwq9D>èÅí:9º_À$ÒÁ{cÅ?°Nzíø~ÊY8Ä)#2b°µ#¢ix3ñÈiæ9z¨ÿJæäë%<êR MÑÄQÖ2Ô½aôc5}t5ìø#Vñb	Iòj&=M¶Êwd!
+é7[ÀÚU*l6¸ïÙ©¡NIn%ä Ì%GùÑ6¨ uo·6Å)=}PíÎîT=Mìª¤){èÐSX&P2¿ÜÍvHÎâ¶Á3ÇÌð¹õ-êÂâ©s¥¾¨ò-õ£seø«OÛÝ·ÔnW@e¤l4¯	ÏÞ¾QjAÞiòÈë,òPGPñ¾wfQdSu^ïÿ+l©ª£¡Eõ£){æ ìððõâ¡ÿ¬ Ôé
+£¶p¾løw³= ¡Km=}û5HàI§Ò%S5x÷i$¡;ÈwßôRxfaðZj&h6æé+4²èþ"ñ­Ð
+ú¤ UÚªôÆßØ°;¯Ê¹¸ùÊ§ÈÖßoÑZ!ÞôÙÙÊÃ¾#·/ÙÀ#P±/·/}¯1®¶¸zÉöóýaaâ%
+â]
+÷^ïCÙã¥þ]÷FvÈ­ÅHÒJ÷Ùñs¦ÖGúìtp»²Xæßñ 3ÞF}ÃéD½~Úkí]æd®ã±êµ×èÑèq1%¹ªÓåÌÇ-ùµFøI´ðìeò3ëí
+#1ñ)ì)Þ÷ÔÊ0­ÐÊ­ÈÊÐ­ØÊÝ÷D"¢×û>öÑ X>>>éÍ5u²m¦Ìd lÏg=MFSôSQÄ@×¬Gó^Å£y©ZIdÉÜÌýwË}E¬G0Tò0RñSòÜsÁ¡¬ßâ= É÷Ù¨+­Ò_)Mv«<§(ÁQbùÀÇ=}Þk¨ jl¿Ð±ðØ÷ÙjÕ²"éñpÑ¤ûØ±¸Ø1\âÙ= û÷áùTn¯8 1¢:«çùdõ¦ÖÝ'dd1&"w2uù$Ì$Ì%üÕÉïÁá~E£ÄâÅ¤ÆÂÚ¤ JÙ© ¡¤î= Wxòý%=}QÚÄ­ö ªÖþopgÇ Xr*ôMR#ìmÕ§Íõp-¥ÆÑaòÿL¼ÿÑ­Í±P3; Â^W])³Ïãþm¨8e»êÈÓ=MJ­UðPmr	¹-=}®	Äy H LúRX(,Ð:= Õ^',ÖnÂ¶jØÜiPW2(Ò7©<:4Ê:2N¸ÍÊ8²Ï.ýI4·I"k¦$ôq{ øâ¹f ñe1hªQ¼[_é2NÈ´jQ°*YÉîÍÏ¾ÿÑ
+Ív@Øiú!zÚ.>ÔZ³b]@ëú²çÝ+ ÑFP¹»áEZ¥4ÈJ-Û£-ºzUØÛq3= Å´Ôw© P±-ÊQÊfYcÊ×Á_~%*©{Øº)àÀÒ÷ø'Öd¯Ý²Yíì»Ço!LÍ9ËË$+À5)O½È¯¡ÉzØÊqAaûÔ4IæÊxâ&[CÊ.¥iÂw×9iW°ÀC¸(^'©ÇÊTºL±uvýÀQÉënðÈ¿·ö!CvH²ÇxÎÚÉ5ÒÃy¶ôÿúÍÅ-
+>ÉÿHìæ U4Î¯þ§½ûmÁÈÁÈ&mGx¹¨¾Tc²Ø
+ª|ð(JK¡+BN©ÅÝácÕ®O©ÅÝöd}´sã¶Ð©~Ýî#{µ/ÅÚM8özÂ)$WÜbªÀß÷ÙÏ²$Ì4Tú2Ö©q¥VµCÙ%<PÓHùQ^h ?Ü³óÞ38_Ó:Mu´[@®2	È,q~*:Câ©µÏ¶i¡Øb´_õRàag÷ÂÖ£á=MIÃ(\|MdX^¥dÞH¿¯¨®ÎEWöroODlÙ¶£¥²r±íòq%@Ë}\âÇi"PÖ àÂôÆß®YZ¹£Î ÞLð'7}=}:¢ÿÊ$¬­¥ßÐ:£v| M,¯ÚE¹y5§ôLóx*Ó¶¢ð¢©½é®#;8@ðn5;UI¾w$"-ÎÁuµí±ÜÚ. Jû2¦ÓBì+²¢!QÈ¹i¤Öù¿ìÃ ÿ¹·QlBa!¤kh)ý¹Rª¿}I2gÔ×BÔ¯Ï¬ª/@õ¦*;iÂØëÞpÝ= ÝÃd$= ?¦OrQÐ½Ì"x¤ÙR²fòW*s8|¼¸2Ô	õ ÂcÔQ´µªôÚ<ã6Ñ?{Â j®Rj(ÏKáWë³½ÓÛ[¢"kaå k¦Ðwï­±bëýF¦ÞàYvôrH¨Z>èç/Å¿ËTtºã#:}@÷æ(2Ö}væ } ÑØIxÕ¨NÏxúÿIMc¶ÒåwtJ»Ç¢Ð>Q{Ôòh.ph.ù¡]Æ¼Ô¹&¯áMÐy]­LÌÆ¥µÿ³·á*ùPwãSÛ|">4·[U8
+I®ð,õï4\\Aÿb5+]QRL&5ãh£\ÆE!s1ÏÄ±+2pÓôÏ9¶ÖR¡¶m)5!^PqÏRf%\hR'Ã±«òSßîÃÍH3íÿÌ'RÝ¯þÙJñÝ©\\PVQÞ{ewjÍî=}MåuçbÕõ·Ð?Âßmì\¡2Îd©EG¥G= Ê}-¶Ùw¸R ¢zy(Ï¡Xê¿q½ö±»ýø6vÞÄ7«¨¹Ü	Ø=MÕh {çÓ]ñ1)%Ðj£TNqõ~r¥à×õðè¥®x¹BûÛèbÍ¿õ-Ò¹Òæ\¤_BAýQ±¨4²|×>9WP®&ÊëMèØ¶&{ÑîGb¢è¦=MEèÀ¶eî¯a=MáÓ!jvñ#ÝÔ¦D¨¯|;ÈRRj"éFÅ{1ÿÏr<ÑÄwöå¾zÈùÇy© ­13'&7x.uzØ"
+Â£JßóÀ@ ù~TMS°@Ù\ê= óe%Ñâ§mþ÷f RôAäêtjõ3Iár4&¤×ùÍÜ´¼Ý|Õ¥ñ³çBä!vØéXxÕ²§DËR<=}~aXuä·%Ì Ðñ+µÁº
+%*g(Xâ±3÷ñX0ËOÊGË>Å=Md[[hg®1·D!v&/íjoô®bü= T?iBÔØ= ªX+óq6Eôyãa·ÂXI¡ªbp¬{q¦-¤É­õ¢ÀÕgÚCD®±±¶ÑN?fÇ¢Ò lÙ­ûnHê¸!zþThl¿VÖY5*Tº=M-füfè/4;)
+«éáh»¯ÜdFÎrhÈûåJSùáÎW¾^7<gøò¬
+ÃT{(êwq¥â~-ß§O yú^yåæ;íÎûPyÉ?÷øÆñÊµâþu¸|pa×ÅÐøj&
+>c*Ò¯ 1½xÈ«µwSîÃðIðO3XËKÉ(tì66þ<çÊñ2J /bÝ}tä ëåq¦¸â$à±­GSC°Þý§îá.èKëí
+a/Z¸ðWöI¦(|R)Ç³ÖL²,¦ÞëJ¡±âMô{Öã¨ñµ«¯Î'~7,[¸Ì,:Ø'zÊ9WÊlLAÄÊK/x¼<Æí·1äÕ:½Ö¦ }È¦qÑûÚá~p.
+
+-Ù0ùýÈ= H3Âm°nOzªxBÂ 4$o÷·V\nÐà+wÅV¬® âhþ	ä	t¶5Nþt*6FÎ§û¿¿}¾Ë\¥^igiî¸×/._'*öÃq=}Ì=M½£á9	?LÕÓ&­sÄ& Ø> :Áê7WP7'z4üºÓ.¦0àr"ËNÍ¨	°Yñ!Uñ¤¤Ó&¤0	;äL= ÝD¨KÃ÷Ò¿ëYFb#2¹ôñ¸ÑÑxì¾[/Ë·Ø¡ßy9?	7s*$OaìÃ=}ºñËÃàÏ¿ZCÉà×å}ÆÏ³ÃyÈ"¦ø7ã	L1	äÛqhlfó=MÈ¨ÐZ^sfúì¹9ÈLsrÂÝå|.Á%Jðó×zÆZ¶C÷òKI ÉÕkd
+Ü¹Ú·/vÍ6²å®v±i·4M0ñ d*-ÏÿFË Þ,X,Kîºi´å÷¹)Z6Â±ÊlãÙ, -G¡Y$Ò+þÒ"Y8/©txÙ$îæ±
+Ý±ZîÊ'bG0}av1¶µy©"²'ä0ô-^1Äly"â(-7pè½þ<Õk5}JÞ¦ýé":­Rí²g:»®ðuv²Io¥ÇUÝ{èÐ!Õ"fl.W²½'>4N¨cóxí*ÃÅöèì¼qiï	hò7·UÚ£«Ü	¬g$ÝèõÞ¨îÜ1cÌ(ßçÉå^cãÅ-%Q>ø$Î kKÿß·µØæ¬:è¼Ãyzµ.R­wÃkÈÚ,Ñ;Õ¸»^O¥' 
+ræï½|Ð:¯7Ú=}|ù¦õÇk'ð¯÷0Å·Ýêwµ²xï.WMyH¡Æ=M
+ÚÏò©ì/3_Ö=M ²ü|a÷²=MÄÙ¶We©ÏäN¹?ï×Ñ^W*szý~Næ«¤ÔèímÜ¸«óä³Ä´q9òKKZ³Û]ÂMÞÐµuÚÓOôxIäõx¼H&D'#È8Æö¥ÃrÉiª°ÅÎYGy	ñÃÐNXÛ³ÙªO2¨X¦Y=MÓ"¦&Æ'Zô2¸IÓÃw6-®Ð¯SïÉ÷À»-Q9ÅÛ¡TV\å>CÇØ¡òo[+lÞéQnU¨k®ïn ³_Î>ø9ß-§¼?A(QD]>ýßOÉªÝ:ï´hy'ÍRÔeL ÐÄº.jÚ-jÌº¤4Ò(põ§°7­>­·G|wÙP¦êyÉ[YÚ/Þ5?½³wòZ= V}Äú;5l>û(ôûíy ¬Ú}bT2W	lI7&Ò´j~®ÇvbñÁskóJ¶Â@æÞÚÀ"ÿ±
+Õ±6kVñ òòpù¸ÅªTyò½ÄE&Þë^·U­I¼HÍeÈÝ'©L½8"ýÓTÆ#PºnC6ÉÏàWíPÜ}9ÅÅhoÃ'ÃR9«x®]î *§__G¦TtòÛ×ÎJ}Þ(QjÈü³å /ìúJ®ó·ÿy'N"ÂÚVô/ %7IEô@äµ,»jlg~=}UQÃÌÉÁ dhÈ\SPbTzÒUUÔqøÖ±ÈÌGÕY.N	¾h=}ÔãiÆw{ÈèLºÒ;·$­k¥ç<p®×
+*¥2ÕÁbÆeý£³å¢ØRÅRwîé'øa&a-þ*Hl¶baiç%¦/EÐX33"Ý³êé|hÈp-ÆVÊ7= fþj<ÚgG°¹Êp8ÆAºùØ¼óU7S7hH9]G9ÑAºLAº¾úêB3HBºSrW7s¬ÞünÏ}éì·ïQA:Q,ÑAzPfô3cvüø ¥Zð>ßüfÃhÅ7 1¯ÃOEã®»gat|¸	@c¼âp³Qû¤ºßA*Næù i¸O²
+¬ÒQP{{×ºÅ¤ê3TðÒAó@U§â¤éóÃ ¤+ØÞ?Ò×â0TØq©ùÆÁ^úÜùëw©g-ÜÀ\¦ùý¸K¾4Nï×ÿ.>Oª²\Åm>Â,Ò"·ÇKU3ù²	$4ÖùÃ	ÐäO:»È<ÔøæU=}Ä¨J¥:¶¨éÚêòÏ§àÓÆx¸í0ËÜÜ±èüx"R¹÷l±Im°¾3wA­ðÄ(îB·2)7d×ÖÄê71÷·[çW.©ShêÞü6®àù°íNVR-0S5"aÄP*{ 3[9 vcXî= ¶lJ±øÕ¥4CqèÈ´Kõæk>âæiÚæo'ÇóÓÆö	3!7ìË¢Ö/õïæâC²,ZÝ' )í)¹Þ!iöFÆð¹>ïþTTwjd æäsºRø ÝI9EyFEÜß¼X?«dNö&gÊ6/ÝÁA:ÂR§5m1¨|ÊÑOë»±´=}3y½>i )JFß¥öÐ!í(¸×VcØS,£àe]ÅÛÓi¿cZäÀcHò«¹µc´ªy¾/÷Ò18 Õ÷¯ìHyñ²Öðëä"ÙÈdBt 8±YªJ2Ûx6×JÈréîe)^#!¢ê;-WYû9ÚSvM¹Ù^4<YÌS¢	6wÙh}ÿn!c ôN*5l~A¿â¶¨^2¾-2~ÂcçØù-£ò)¸ËÆªºtM~á*#xbÄõËD{ºöüuòª19NLO)LªöçªûYPô8z:µ4Çêººï¥L}æJ×U¹UJO(	uóyx!PÍ<"= ôj·ÆèÆé¤0É©òT©¥ù ÿ¡Th-íÓ½3E¶ó19O[©ÕW«IoTø~ÊCN;Ò<X
+8NIY$'ÕJ¢¡Ô·¶¨î2.b8¯²X^ÚØJØïPþ6ø,j})S¬D­ CÓr¿ÈXYìtï¯³§[r'÷tªìbWÊà|hÍj6;æ#1Ä2à
+Ï¨]ºÄturUÀ<xdS§iÖÑÿW´ÆHð×'Åæßpº<}sæjñ×	jþ0LÔ ì¢[$;3_KT%'Uì¹¨®ªðv!ß*þÒY§¯¾ïÆ·¼²·ä= <2üF Ú¸
+´ñÝÀúÇÉTãN>ås&juZ´­¼3RøÁ&~ë\rÑPÊç'iIcY{ªþ]»âæãZÐÂ+~ðZpj ZþÃ×ûÁ7îßpräÆçýÀûqEâ¾,¶éV¬tû³¦.ø
+¼æqÆQÆ¶ö¸Ó¢°ÜbKmjgøÃÖ×®²T,fIZa
+]Õë´U»°F°Ý³ÑTw<hÒühÇ üE¯ÐMë>É³Tä©lW4QJÂs©r'©> <e Ò¾Ys¨£¹@¾f¶ÈýíZ1¡DØê£Ù~Ò>ÞÅòñ2aÆâ2@gÕùñdªÉ#¿.ÙNë Îr:·Û-tÉtÜ®½¯qµ=Mû|èÏï±Ù}<L	%?g xÐÂfÈM¦Nî~ïîð 
+Ó^iÙÈÀ­K÷RgÛÅ%ÈÙ¨Þ¢×Ãp¡^gZ·t¸ã|­z£*Ø*2£Æ1ø+-[£çR°bb§8«sê,f­µ\Â±aß=}ØèÝ(ÜÈkÓÃ	Ô>¦½Ø©³ZÒÐ2uAjXø1øLDâU¼,gFV¿ãªèíB-Þs Xw­Nc³RI+ Xjr<ä-ëènÑÚå©|Ãi!K1yH{ob iµ)VÏR¾çh¢Ë÷Þ¨vg §±<EøÅ¥Þ¿/½=M³,váÂ ©ù4ûÅoÑÒÑª~&3]iéª@óÃÓKíÈíå².e,ÈþèJµôØ²'|bò6p¾øeKß(ð¥ÖnÄÝhóîú¨&ùÙîxE8ó¢vÛÈñøMl¥Û|Z¶ @ÕpÿËÏåÑSÇP²¶­Ï³hõºÜ!n¨kÞÝm7áü²ãüFrðýâ.s&ò_åì$=}U@ã$üD%ZJfo=}ó´(c×}^a¥Æ·Êâ'Bú5
+ª}"mù¼Ñü?W®ÑChÍ©"ÃÀù¦ÇEgIË´ÄÑ®ðRÕfËøA+ö©øP\GTuà-yAQä?=MÇì²Ð®$T~nÐ¢òG¤õph0¤¶Qs¹ù¶­1®öD ý-ÝZÇ|ég®<p p ÌEÑÖÛ|A
+>Ö>·AäÞ¡ïDïìoàÈ= ·N¨¯BÆïìoVìá@õvÖMAã@&æÉÀABL'?Ê¾)à¢Ñ
++oëR¡ÌÑF«nv5°ÏÙ%åiùEqÛëXã÷míQN1Xä!Hc
+"°tt­bïØ~Å>)qcÔÒ­) Òqv}ßÈýÈQõç¡.¼º|Ñÿï¦@Ðo®uØ×½|:}ÐpÜ±·ÿÖ·Fy£(Uî¶K;¦3>Y@ÁèSYÀtÛQèyM©>ÕÁÖ%ù¨÷¼J^Â¯ôtBíü³m¡V! ûÚ/QA ¿¼&Ñ/R¿qW.Û¬¼ñËÊhTÁºå{Ãâha]NÈÆPÙ9 ;bKwF[ñó+²æe²ÊWeÌ^2¡ã>1vÛÅé¶xØ÷5¸©ði=MiMH!UQ5çR/EÅÖm³Úö¬ûF¤ÑZjå[ÌrP =MxÂ	È®ãÄO/ÕÈ d¢Ø4Wì=}·'~T"Ô¶°'ûóu3ý îç&5MÉQ[7s¾¾¥©c"cë­¼'lÕà{î¦ÿVÙèOÈ
+YAM%£r¼Oª6TEú ?!©ò\Ký©1 d¦ÀÙ;Pª>kdÇjmQ=MßRD>_®ð/by©§9ËM¸	pð';hõîêe;R¤¦Ìù³ô @ãÛöa'Ã%´#= ¡¾g»ê°+9ß#,³è~>1[ð@÷Xeñ¸ÑÊ+>ý»ÃF;[aÿâ÷wKVÍÚmÌ
+?	ô!¯Údiø<f[2Ìz\Y8RÛå°CW§FÆ%â3ìÀY-lòÓEðÙ_²ÞW{¸£ ®(_4!¶WXx_0 cHüÜ|ÔÑG¦BKÑrwî?¦'Ô	Ä<­Q[YEý'ÝWÛæ8TÂ¯kÓ©z- Cîry­´OÈÑiù$I,ò,Þ¬Eà¤ÏÁ{Ù×¼Lá	ÎàæìÝÕ¾ãXòF0ã-¤·rê!nu[jZ"Þ¹ûq[cJkÏÑìö14kòo«Ûzä©u¢2Uúu}!º©ñ6øx¯ii'GBä«XÈp7)D'×æWm2[)íë8éª5DcNçZ),,ð+»­6ºÂìßÇ:Áâ¸Ù3ZÀ+¡³PY\®ßi?ns(Dõ¶ÈÇÁºëO	Ôg]eLÓåW¸1Ï",{4e­æÑ_ÄöoÅ<7?rLèÂ¶±Áç&k=}Î%L	Î¡)Q¦[õ·E§k\Þ,Rø§§	Ä×åJ  þ ALÊ­Ãð¬7Iã|X¢I=}¬#Vúo<µ;×²®w÷ºU")LíîÈÂNúEnMV5P³IH,6~)Øeÿ0¶¬= 9´MjR\þõËÓMVã¹I%-ªcöÇ.JJÈÎè=Mä ÃõV$õ1¿H+å<Tz?[«bú{·>µ=MÄHÊAN¦É{cðþlÖÑ-3Û u¶Pö6p1Y9UÊöL­£¶¿l3Ç²Ãð{¼Ê'h1yZÍ¯8ú>ÉJH¨If~«þy3³ð½Àjþ= Á«t;FÊ^	R³²c#ðÓq%Ë±¦½çcÀÕòkwé{éÿMèfQ	ßßD¥ð¶ÎSË>"ÿmå(<çó£âüï·B-]²ãñÜGþ¾RFÃbg®Ý.ì¶§ÎN\y©½öZshàw0ønÄ¥X¶ßùF³Ñ´Â¥¸µ!t\=MIÔ±:S
+¯E*t9|§äÅ6äÃTï9(×Ý«ÕôËWÉ¶©òó#í7¦âHoëÚUfðd0·hWÓc0¨\0Ë%#°´¾½f?[´ÖòpÕ-¿H uH',4\âæ/=M]=}yÌâWi¶û>lõÂÆq+IñA= =}5ëïx©ÆI	$Cùó8{Ñ·o8ÃµJ^¼+¶è"Ï \ëli)î2»B¢Ã tÁ=Mu/g~kY"Þü=}à42YÑì½ÅÈ9$sS@7ëHëï¾lQÆ
+ë¦¶è¿ÁÒeÇ£'»ïïZ4ÐzsñNùá· ôá= eË¸¬f&àÔDIÏÂ!6[µ¨Öýù«j+ad´_R6ÂÏóâÏíð'záaXD<Ç
+¨Çä	ni?P-oPæ¡¬-ÀÝóïM/Ð-¸½Åã<nyµ WL(H«3õ<4!:9Ù²©Öh+!8N¯ûÅ(zæ9B*ú¦oL´V^ÿ;öKåSëÁÙRÓE²«W_x7kÒß8ð!Æª A[ QÅôy²Ù°wyf=}4µ'g~L´#ÃÕ÷5ÈÛ#3÷1¬C= J>èGLÂ=MîtºôtRÏ?Ùôyê1?´u
+î7&­0L÷zãE¼.Ê¹N6)6?sG=M¹?BE.WÕ³!çÃÓ
+zÎä}"ú3Ö¢/µIê"þøÍ¢DZ	(ÕÿIõÒÙTIzL0fõjûNHÛ û]=M£WÐÓr@Gúi<ò,¾8bo µ¸ê ÐNØ9¯.eáVH^cxùê<÷pÂÆ¼&ÆmQ6þý¥XÖuE»Ö&´Ù<¿>Aö4K®%Ç äwiõ/#oF¦5B024¾ÞCYZ©eYêgðÂú³G[¼°þUõIkòsø0$­zY6ÒÑo<ñoå&&w÷*Px4H<Áë	rº?¯WìW®×î3¤öÚ6Ét´WÕ\.ô<¨ïmÑddòiV³1;JU&æI4A5
+9Ùz.ÖÊ¿>9ÂgEb§¦Vá>¯ËE»£ÀÉûÃ%TY%yrßMÁæ÷%nSÑZ	"¯Ê×H}Oþãmx9:M?+ ÃpY¦*þÅ2³æÏ«àjð7Ó6T³Ó6J9Ü	óÚþT2nê²¾·< ÆÛ!÷+æzÂ·¿ä¡=MôÌpPýØUb÷_â÷RãmÎ51Êï}·?þ³ógk'X//³Aþ0ËwfÌòYó[èu!áôÓ3$dY[¿Í)¯g$ÂåÈ7íHE¬ún~ÇÊB'y&LãëÅN¼ãÑ>¹µÓÄ¤50ì$9¶î&!ò8mÌh¹Yº	K/wºyÿÃ6(&< {¥á¹«?'ç(î£Ýf(þ§ÝÒwD¬]sãµDgÑE¢x¬{C[Zý>>VvÆåLH×ÝîÅ³gÚëÉÊXë§Ú?¸)Esuy¥Êu
+Ä~Ùå8[ÈÛÏÆÕ>\È´©@âñXÇGN%@ÝOþWÛlÇìu½äöÙ:øYïªpÜãr¬®2(¬Ú½õâêG×{ÈcxQ«vºx©Oÿ%ÙÁÆõfÈäL>ZUÀ¶JÃÐ$µ=MHÒ¨Ñ(Én7§4:¶¹²ÓñgÍµ_Mý'^½Ð}=M\¦E³-}ÉYâ£w¹ÉâGY\½«]=M­
+çªrò ¬&ÐÍà©îórÁAìàÖP ¨Ý°ÔìÑîa´¸ Ïë¹è{¢°µ¥Þ2x æô²âú-~êìíXÊ%ÕÂv
+ô~)hbüX µ¨Õ4~ìÑ_ÜIÏ¦	ë£"¤$#ç=}ø5( yW1Na.Ðêq)àüfÑüpà½fæ5®y\= ú/+
+Ï8«âP
+ê\.°ûé+<¦³ºcËJ@Ò0Ê°zµ$&EÄ¶ÁÏ2(³	dö©´kèqTßù*ÆÊ°óÛeÅk»)p;§UyJ¨ë¦YòOTrE÷%´eTrET¯Ñ¦0aZÞàò¸ãl²¨%Îñè4<¶E¢XÄëf¡Lð}ó;Ì}= Þ} ÛËðQZÏLÒ¨!@È¦îö¤Õ5oöüoöP â·\îÅ¢<®w}fÿ¼T¨T¨ÛÇ­Æà÷öÂÕïhvPöG6ì PP-nðþ$ôpû_~=MÃ«NXÃ ínîeÛÞµ[mª4ùGl»@i5ï9¾lX©ëîN«6G0´÷#J¸å×ï>RoîPîcV¡C.°2Olèo9	¡üGü)gëâ[¥=MÝÝÒ£â)îr|tSZKÀpX"fìà§»¬= HUmÍÔlôa2Ví9Y§¬k±W¡ñÍjéñ Z¹¥Ê«ú\ÉL)zfBÞ <_^>¬°p¥2= ûìÀàÁðuäe«¼\{&;Ç'v¢»óÄ_¾¸ ÐAÕ%H<J¡Nß?ßj= ¢©'aÉ°i> ;uËD¸XCï¦$;³wDÑRùJ®ýà/Pä%²ð~¾à§k)Ä³r$R:Y®¹xv6ªÖJ&CÖç}È´ÝÖ\×?¿Þt¿ð¨×´]kôCÍnaØý¹õúäøt8àv{ln3û«	ÓÇmË½×µ¡zü7eÏøVÙbø@FE§,î9 }~T)ÉªÂ¸C·-¸?zRf;êÈagÄîßÆm7JòË3aJÒúã¢9¹I¿fWÇç{%¨ÐÌI¡1Y¯Â
+½Ý:÷M²ipÌ²õùÇqgÜ5«w¯hI.[+¬Å£Ôáj¯Ï´^8Oµ­øþÒ¨qÜ?X÷o5é¢H¤èò¨@¹Ú2PY5¯DèFþRwy(Fg58ÿ'+ DÂhÏ|I¨EÛcD¤J'K
+	ËBðö:ò= ð,¼=M,yí¤l£bítÂ¶ìpE,óÑ¿3Ä$Hr§^+5ÖóP¬0_V®F¦ =}}ä3y¸ñé%HíÓHÊ;é Ä}<?zêÀòp1W§0ÆuáãE¬/E¦ÒZ8òÒêÏÚûïöí°¹!º6äBÔ:I*x5K,5(ØjzÚºP~q
+\\=MçEW^³æû;)!*ÊÁÍ¥8(78ævuüÿI×¡ÞEeo	OôCúÞ¹wp£t-¨YÉÑ}Â¾ÁJ ç¦B¸´¦þ-â5hô ëG
+RgêUjëG¼CÎ0íÇNUjPä-:5Úý,oáé-¼ðr]
+ñ|â39&9¨oe¼qôä nñ¯Ë$reú¼æ×Ó<Né^MÅ¨Ð~Nët¥/Sh6&«}7©ÃÔñl­ÙZÞè½Ð¹·ãU§'Ä¬¡Ã>²®Q4!iÀéc¬ø{ËtÔU3 7-_ì,?UÎì ;p¿;PÖ»õ'cîÑj1çjÓ
+«Ô%àõo	þvìÙ!íçsÌí" >ËfÎDL(D\ÏCcð"Wà±{d¾]³FsHÄ´wý6= "ÛèÌOÞ'Xñ,½Øä¿±QÆB×©;ËÏã®ÞYÍJóUýí	~t©V~ÒlÔ{Ù(¡Dk¨!§RrN®X3ªÏE/;¾3bH=}D¸ÿUÃ¹h¾»nO@äDø·ÎsËÒýV××/n-<¢ÝxTcÉiªm¬NnäÑìÄò¿{®OÁ2¦w0cmw§Jaq\c¾ðÖAQÿíÁs°N¦ôgv2QüûAÆìúÑîÕ8{æ%!¿1¦æ±&ßÒp±¶ÞD3ÇªtV5'Ñd/×ëÝH°5Þ.Ï	¡È®,­ÿ}þîphËãý7Ú7"ù=}ýûö\ ¡p;5ftñQ¦¯WyÖ&$Á>GÂU®µºÂåqöót¹7ÃïçZñ67o@Ä:@¼­N6­eñÀµ,ðË3= ë¾p¾+m,³Ão ý@JæAtª¼.í}ö­©×íLs= ¨*R1ú¬tar!ù %þb^ø\Q×ÖámfÏØ¡àdÚº¦Wð]íÓ	Øa¨§¬oãÏ³FÂZJõÖ2Akæè[&õmD ÞUÝ	änçòmÂ0
+áà®¥ÒDÕ=MÕí/³²ù+)ç+'&RIÙn0õ¨[<:OòëøÍ!¦ø±¨úÈßO¸~Ñu>ÿ5lçFùD"é¤s²Ô!ÒNU§mRu@â÷pÿÒ»qRNlÒ÷Qv0¡8ä¤ÿP.ÆÌk¾ògihUc=MÙ= úÓ9@ý6ôB²mUn(ÀÕ
+ý	)C!y'¿Wgõ#ïÜÑøÃ§«ã3ÔÛq¥m×3WÉ³÷.}Ax$«Ü9hÊ{çÕú²­t]¨oo¯
+­Ì¿Â§©ú,ê÷,M5)AÃN#Íp kÃm!?ê [%¿½¶¤¨{b>PªnH0%V®ÖäçÙv×þ0·}ôWOÅt»MÌ=MpeÕm¯WñÈtüb»½iØ3#sgHÙ,ºÏÇ!Êû[ñG¢s¹äfI±E]MeN¸¿FÈVy4®È[.:=MÈ­G¦Ãä
+9¯ñ:)ÿÓ95M¹AR{ëå´Y¸43ÓÞÉ©/Y¦Uµ!­)rÑH£;s1V8
+ÌO*Gã0d÷@è5¢öDt';>ÁÿÝltÊÛø Z1æ¡e,+©Á ×Þ ÝâjÒÚ9»DbÓåHS üì±H51q|¶íÂ*ÑÁ^ïªØÛb3-Ø°=}©}Ô{?jtÛÁ5ý¶?ÐôbXÐrhÞ8¯ðW"Úéî¦ÎNûò;ÊB¶Xê/<ÿçÀk¿ÖTgm÷ùÄEDö°gåXë&_/¡¥4Gö7ðÃMf9ã¥G9ËÏ=MÀaQh±Xì"Öô ï[ãGgnâ_dU}Æ°}[íáÀýí4Ú ùù@Ë¥= gæý(p1ÇGuÆ3ìâQFÙôLÉè»áUJÔM£'ÇÔKöÖÀQ£õ:gxq/c/-kMpí¯J%Ö!§ï<n§«¨Ø RGÿøjõqY!±¥¶°*ÔYP9h= ¯Þa]¡¹"º¥= Ðh·¯fGÙOéve^E¼ç¡ö ãH1¯Jä Ã¨ØÈ0¥Ä["³ïys/Ö¶¤nR<Ë"cg¹UÌ­a£¼¨ç­Æ³fuåÖ[÷JÆ¢9| â@­ÓD$Á= ÚÙ)üËæI	smOùÈkþRòI­aëÃlÑ1:Íi{¤w­²E¯Ôóm¦7kZÚÈY{øSeõ4'n:Ú¬(:ná:
+×*BåÓè<´wCP!ØpæÎ¿çÎË°%4E9{xÁU[ø©qéÒÿ­gÑwæ¾= 4\´ÉB-Ú©Ý0ÓÊ¼h§HeÌ:£Àø¨]-BÕÏï2w3xÓ®º°ùÊêDÊÒæyólÇpVÍ^µ¦ù±¿Ów!6Qòý*ï»Fkª¦;ÿÛÞ¬¹¦­ÜÖLÒ×óÓF<ÙäfÒãã3|À7ñêÒAu»ùª$Õ½ð3è¯ÁO¬(µ+6Ý^äÕeMÚ\åÄôä>¹0Õïté¾)xêl©Èû\&kfÍ5[~pv9¬ÊîRï:ÈtÅã¬äiÑ]è#Pï_ÿéA®Þ²#¦ân\¿³âC´w*W9ðpðO®W#¡F-C(61ÅõfÃ\¿Y´v¯»º¥Õdî	~¢;ÅvÊº²¿_1ðµmjW\6"h»%:ÈðäZÙ¶j6%XªíËr7{OÕhUsWvÉÃVã"Æsë³PÒB?Ï~²Ìß	x£z¿t¬Û¬´ ­"¯}4 åàwK·´Õñ°ÿJjý@_ÉÓS·~Y¶Ö&÷+AY8¦ª¹O4Ù¾ßRøÛüYl£Q¿þÝwþô9¨¿ÐZÙª¿2j6¿ìiîF6{íTjÎ&^-·ÃJqjqy~lÞS!ºdaâ¿bé[¼'®NªI²ÀÌ JùNÔ	?/7-¦tIç´=M¸^\ðÚcÏß%|Ú8µ¢¶,G58J58Mu=M-ýúÁO0zªÓ»®o%ÎÿaN=}Oï6.j*ÄÑ¤Ú9[q³èr.üS¦¹Äæ1ã1Q¨óú{Æ5^¬ ®$:}iQ	9ØTIáâ¤<<¸4@ífyë¼EæÓ!×ðk_8*6= T¨DÎ/®¯!ð½-ÑVª¨´[¯U&TyðÓÊÐ=} cÆÒ:ç*ü£À¯k»EÊ>õ Ñp¦éiÝ5ÓÒ¢¤@·ËôepÁ#qú®×nÍ÷â Sk@ÑÂ?3pIÑAk¯»×ý ½6÷þ öþ°@2Õþ0±Â&D)î7d±BM:ÚüE¼
+)f=}6i9§(Iñeë¨9)&=}6P7tëvÁûùÈzÂ±BOâ3®²ëh¼¸×zb±Bö
+-")aë.7tðv= ëJ,"9üIC'gºYX'ÛGñ×
+[¼àFI^Ö\­òlñ äÇÚw§ªÈ¬õQWF¾ßÓfá%})¶»ä©q¢^âè¸FÂ~aR9;È<Å3,ÉRO[P{ñf{;ø<m<Oö=}¯@ëõf{;Vö=}gD¦»ÝDp{õ;Ðfù4A'M7ìU÷¶¨¹ì;YP[Pû8ö=}ï?«¥»;b²@#Eÿé;x<WP;Â±@C±Û¥F;ÜV°Ý¦ù=M°n°Ï
+s¹&®7ÊúfÁ:'ö2"Xö:ö1¢Xòz.)ó8*Éz7)ó88*ÉÚµ²9 1ä®«¬6ªSJ=M§D;Z3XV^hÄyçäÐ=MÍÑn çp­Þ§¦ Âô=MrË¹ Õùü/·õ×fMkåÒ¥Ü(Úµ"2þìÔèr³Ýª2ìV¡ôÿóQ
+è	 Ñ§~-]DþÆOjÚ¦xµ5è5ù°Aðóß%}+à©¾ðÑ¶þÏéXùâµª,øð¶o8D®4yÇØ5¶qB¶2Ùúf
+= ßå6BË%ZùzT@çº'ZDÉó±OýÂÁòÊhÖð&Y#ÌoÿO- "d¶ø!= X¦_QÄA³/×¨=M¢-,ÇÁî¯VñhK1DóW:²­¶5Ìóðu£Ln7ÔráÔr%Î .¹ÞÃä{C<ÖÈ]¤NýxC:Å¯n¹³/*¸"£sWh¾Ï+Æ(³âóÆYt<0j]9LMsScÒíßr¹aÍ3	= ,­ýø¡U ¥9^f,u53Jµ­ìíÉ³Að#ç¾õH­¨hüÁTJt¶Md°JÛÝîtÅ+~ÈsOggËóÊ$«c§-,uY¸ÙZýÚn\8¾¼âéA#¹'à×Áàò&v¹É> =}7#PbWU<wíî"ÜV]Åx%U£¯ð]ÖÃçvâõ÷/S±@ÝË>DiT:ÿiHiì+;HQ]
+ßãT´j\è´gl2X£ /+SÒy\+#ÈÆ²t>äÏ(ô%²ÞóuôëÏÈAC¡ON¾
+p¥qTXü&ÛCæáÆhLH\°<ìñU*ñhÜlÙWîtxçÜd¢4É¦ÑèÕ æëdw÷HÏ~~äÀ/µ$ûE2à¶KÌ©KcfB°î»Q'ëÏà~¯¥+Þh\3víÈOÿú¾ívUÈWí¹ÊIWsVþl .²0K²·&%÷?=MSÝì^júï)r)
+³#eó§þ'6- Î²ÿ²URp§/c°,}êùzI5Ê\¦r(/rí³ZPRÁñÁo;ë;T"¯æ*£þ8 u.1= J¢iY8KmÙ:E
+iÞæ½õíÿòèÊÁ|°±ð0¨]ï°s!Ê­Cp:Ýx5"(z¦æ/Ü<Õ,¨9cÝM9@4= ¬À=M=MæãHóO×ªÊ*õD¼Ï¾j< ·WÈ%Bd,´?x\W¨ÞË=M/üÔÜ÷Ía¼H*òûGm­4I8ÖR²¨÷*NxÇÝeU¸I]îÝ[Çð@fzc:Ïy÷ÓgÙaSçy ½DP0D'= 1dü¸ø~Î^.ä×z+GBû0<o= È¯(Ôí{ÇM¬Õ«-uËá3üæßb&hX ¤(ÛæÄCYÞq8K\sÌðdØëÚðsvÍ
+k©ÖlVlXÒÛ{5ÿ ÇVaNîç5³¾YRPôä= wµb^Ùp\= )mbV= h°¦á6uÕbæQ!e°Yª¢ñN¶ÄLü,wÆìh-æxAûQÚ3uÿ\\ävòe¶OÏl8%µaªËeÒjö½dòìwÎÊãtÒ§-´×¿ ïYY¦Ë[Q=Mòa:yG/bÞ
+õ¦Kz0læð¢^D= ^ÞoâÛ²@Ð÷fãÏ0)À.u­ùa¥/iÌ e¥ÐÈïU¯=MMd­ÍÅtaæsóãôVÒpÚê³SäÞ?q¦¶]­î¥úpUäÙë ¿È¤ýQäùÕ§	=}³+VÑ¾ÿü±¬Ï:"O%oo@ú2¬l»{p©®"¬ÚÅñ,¤«æÆZ\9©2³Ø£±ä0íg|CÍDP¬cËa8»@¤ÂnàU'­Ö[¦ÙÁ×Åd Û¥Æò&G:r ¢x:j$¶âD¨ØaïÂ³¸?Æ ÿ7¿j×-oúFÆ3>}U[é>#ï}cÐå'ÍØnÒe!,gª2z YÎ°V
+u|êÂÖãmÉçñu1àX- ªbO&dùoVxÍoÊÄy­ãhúkäçË!¯äÂÏ©dá_µÛh£ôY,É¥åK4zC\Q.aïE,#´é6§,(¡ú$-3÷ÀÚËz¿^j)hâù&ð4³RÄ¸³êPÝ¥ó1ýÄ1w:= ñè>éÄï$z$Öh[Ü½KV?F{ÕÀ¡Rö!;|ì·¨oF*À~<tK ëØ-vç×Åd,?ß?1Öó¢ÓÔ´¡9nöwö²%Äg¦Ø½Ld§ÆyÂæÀÝ}Ûåß«ÅR--­´è4i®Z.Ñ<BAóI³ñGrqðqhp¬pô¥'©·#óÜÿ«¾ü¢ëçeÌ%Î& ©ÆH eTåÎ/]ÄösÉK¡ò@§¼bzÄ²Ù6ÐD¢*8ÄKU1 2ùS¥½¶ñ±¯0°õ±a7÷)ùé(J'úîúºöåòðqñsò'¤rÀqØ:¡7h0æ5½jÚb·é76$1ZÚ¸¸#³ú82òúº²ø¬Þí,¨~þ½ÁÜHX0ò&®%Î%¢¶Jèrç&0ãY´*Ä|û= IÖý´·ÜÃÀ¿·IÒÂì½íHWNLñü¤pLbÙ­ç
+¶¶\xïÓÍ/Ø~§éº.§oØùÇÇí!Á,ÆÛ¡õÑÉ{â#
+¯[¦÷AþB´]h¨ô¬
+F= ÞïMÈ¡Ü{ñÎ=M
+Ê?Æyëí#Un¢§%©Bx?ôÝ¥5oØ¿èù²øYûÅ,º/÷4¾ÁLJppïÁ1;3k5dXY	ZÄ\zøÚüö |º/²ÕÈ[Kp*â
+É	¹ü³ w6]f0KÄkÿ}X/õÌéÂ^B]Pe{zËB¦xæÓ°ÂÀ5$Ue#ýÉÇF$%Yg©_µ¾EupïY6&Z]YX'¨%÷ô= ¯AbùÐz 5ybðp]z¸ÂÎàY±Ó!g76Ç¸Yw¥Ö¢j¡:1.Ëp8v&ò)½Êsû|gWì45s§ceEóÃ~E?C0±ò¸´µ,{'Ý¤¼)^ÁÓ O\ÿ?·YÒþ¡Ü%Jæ)÷ë^¥ý|¡mL	"íÌ2¬LÈö¯%!õ Æ¡Á3¶uvIìÓTV#_É,ðÆêÑWs	O´ÄÜYþè[¼ËÆÉGÌ)Ñá:5+øj&JÙø[ð1ÔðeÎÊßÄýßøâ*Ô5Àê­ç/|> seoupö/ü¶ìÄè3%X@ÐªàÙÎöFéznsÁaXgçµ¢©"Xø){ ø·ÿÿÀ¦±¹-|¥m=Mº©	7Vêhxbi¸åà{¢:f²!Tu@iÇ4¡)siw¹üèrÁEBÚ4,¶ÛÁ,{âÛótà²&HA3
+Ãòúëà$ûJPªkî/Ùúo #Ô%AÔ¤Ð¤)ùñï,CÙö%#ôBZÇjÒ´-ýÎJ-ü	îM­	8y'ï v·¦!KOôd"} .
+!þbg²ë±¨.{¦Ê®Wx.ãü·ÇPÊO¸7	y­¥¼7ZAt³Èy²*S¼FT© lãüÇ{F_³ó«gVlX*üiDÐûõû&cyÿ|PëUÃQQ½jÛ½2[àa}ûêàè¾Î¹_ É± YZG³X²Ð±ðdQÙaEÆìiåñ]ÿ¬eZ¾{pÃuÁÈýWÀ¬}^¨ sh¢¾9ªÌØcBU>°K±ÌwY ÿÃUëÂºË*Ö³BùN«²ûmE®\-Ã,sÂE¶û±B+XaÎ¬TÃ¨ý;r+û}Ñ=}9ï¸3Ì²§\@Ð6M[¿ÛåóHÚ¼¦">ø¿.ä}£ëW|¬:¯a¾ä\À»É[¦Üë]u C³SâØq·Àõ¼dYÈÀ{à»£ô£÷#ÆW©>ÏÐ´§\âÉk{]Ë=}Ñv]Á~HtÆVDÞT»ÓýU]³·V«R/ÙEÎê±å?oþü5Ñs±{}Dvg¢Mÿ;A¨ò+j«2kòtÝO ëDöÄ"f,b«Òùn·fbÙûýa'$4¸dRÖWM!'oýü	µüÀ»ÿtgòòp¸¤³°ø'ª6òéPlvgû¸ßÈ;ÔÚ_³#}!ñ¸B2Zy³m©òt¼å®Ë²íL,Ä= |{Æ¸Ïà= Oz óCºÍC*¤ùÐ¬J Pád¶ÌÌÙPPÜ-0x:å÷÷ë( ÐfÀ¨é÷	ÇwÙL²$#Üè$jE®QX¥6øç÷k2æ¢vêùe£ù0£|¡(&çºùcóÙP9õwàçÅë/04Qø´«%c:ÉÝÇçÇÞê¢¸øh]¡ºÞ6oêç¯2ré$ãCûT¯¤máùÐÁ&l¢¸}tÒÄ¤eÙzû}¥ÝÀÝ¤uÈúÖ¡ã¤é³¼äÓM+ÁÇò/t<"%H¨Å|ôòyûüpPÏ7,iÙoî¶ÇêåÃ8ÈsÃJýkò:7»ÀË@ýÌ [{#sA?}F{ÍD¿»;LSHY(rPÒñ2ÿ4ÖÊ&dÎ7ágì¬êå¥Öÿëµ?
+Äë0ä-BH¥{$sq¹'Á(úQ¶+áqh³B­Yæ¬ìÀóë@f±Oö¿TG­-Iï­~!½FrÙ÷] ÑA
+ÕËñ*´&aÄ}$Wm¶¤ý^Ò*qN>§bÍï {¤ È4Í¼1)N"ÿç9ø7	îA}eò°¼»pI8¹4
+äôøû5ù÷Æ²·níí²IÕNø±nø:ñß¢r¥'ÿlæJQ¸3hÏÓJ°IÓTÔÓ¬ß#¾òMä=Mü =MÇ= D$BÐ:4åÄnZXKqj¥þ8ôR*ø¤QJS)Tí«°ÉÞ@àPÊ&kÌ	n³-ÈvÊØø,ãéyýn5)¢éê8aÍe(waõa.¤}%f'bÉÖ´ß#8rÏÙý¡Ï:Ï¤6Ü:¡x~f¦ôì&îÉQ¸êÿÑÉágØñB)Î5m¢7/4ÎnI×÷/ëöÙÛÌb	Ä°7'ZzP^÷âãr(8(Ðöp*9Ç/ØTTú\®:®GyÄ4«ÊÄK=}4>fÊ,Raá§z¶6.³m:øûCtìÆß§}HÜ ëþlVqdt«yYey^	^ñË?}HQ³Hk&6ã ÒLä0@Ü[æº©9Ö3°$°¤=}ôûæÂ]ÔÈ¢aqÙaùa$ÈÍ§þªÐÖ8YãêOLu·iBéA÷Ú[!p4Õ^îÇ'»ïÃòdR{u´?îôª¿Hçÿ?5Î/íÀÿb#\ôLj Ô)ûJÌÉ[¯7,º$Íh<xA¥vAWeûõK= ÝM¤<lÇrK'DËT­¦óC!òÀáÑ;0ÔÇOìG"Ä®%e CjÌE&½Z»YìÔix-ÿfäÀSlÈlêÏÐ>³©Ï¼#p¯zùjD[»ÃÒk:ÿ%ozÔ{Ñ×AÀv^äÌý&§F	¼ËWsæÔ5= Z-æÜI!0ANH¾üûöÅ¥!¼s^x¦léPõfØpÊ<"<æDTçÔè  Ë°ÎÏßÀÏ÷>ð¬»ÆISopJá:
+NÜx16;hiêéßÓöO÷ÀUG(GñÞ_ kÜ,Ý·÷Q¢Ë|¨¨Aa½Ëc¤ß©:À7úå#KÈÑô¦ëc%¼#[= à+Xß½Á+EúD
+:%RÌ^ôÙoâÓâF£ºÞp£½±Y7-
+Xyk~h~a[Í||jd®%ï©ñ8.æ½ÃkóAÛfûBèÂo÷|k0²Ìê¼JÝÐyùDy3«÷9øí¢®ÉWÍóµ 'í Æ!Â3É¯¯ëîìÓ$W2·63/  4bJ¡éÆÈEJÙ*"¢¤§{k:»	)v­ù3)ônÐRªó#&$YSzhw&üX²WÚANrg?÷ÐÑF­­î]÷·ÊQÊîñ:¬ã7£½Ýã7ÃÃÃ¯Q=}Í#íÓ-çYzÙ·³¨ßM¤Ä Ûv3©ÖÓS$òrmd\\]!èúÑw×ð4¬|"ÿ¦vÿÇë¿7µ'%ª¦nÑ§ï= %Ý%¡ÐúêúÊÊ Õ¹¿êÍ}Ö§¤$Î9ï^bfa¡¿%05º _áêÍìßcm21Ø Bëº÷§ýÐm]Ê_3= ,RÿàÊê½CÐMìBÙwNÜÕ¡æÍMÐòÇL·vïÌ8I0¾°
+NRé¤6òÚ$4qÛðãjR¤Ð.î wuØümÇóþá¤uÖ¶¿¡#¿³ÉäÔWÿcBaHW6G	?ÇdBàx^ûhÆ¬à4s5ÿ¯¹ßlÞo%bPÛÜ[G.ËCS?#SM]<×¢¦ú^_c«LFë{G]F<^m¿{Ë<=M=M×zêúó²ßl6ú)¦­qNàeÎC.DQy~­°8'£ª68"øöò	±®YnË_«Ü;´Üå>#4ú.{ËªBM1}Ú®«/L8³®z;êUû,¼v­{QH+zsM¿¥ÅÍâÛ5VÎR³|ÿÄ»>&ÅÔÔ2p2r]³¾9Xêh9ðeûµë{À4;nN^~>3ÎÃOÛ5ê:aùëS@sûiZ´ë= ­*(ò§ü;Jb¦F^lÁùr7°"þv=Méí¡£ÛÒÆÞ(¼!mDdìÌè\ÇG_O¿\iû~ÃÈKtSà4dñqLì5wÂ8'Sè¯®¸?ØM¼ãÚcþ\_è/m&)ý#ìSÆ ªÚk%¢Ó¨j¢éÔ¯ÃVâÎÈ½CâÜ¨òãÏ^'Í8=M  ¯ÖÝ*>¸¸'6ÿW{mçCêµaÒ")xØzà.º]­lÚÆp:ëdI3¨¥ö¸ºë¾L64+HvöÈs×	4>óX[2*o²XþTw3NÖíáOAU¢¶ÕñE4\(-Ù4.ªTr§ÿvTÕ¤ 8ïØ%p/¯
+ZVmÝÜ)ßlðz§: 8W^s=}qMnÎ= [C¤¤øÎäù3ºÍ'G:âà!OrVFCO½ÈþèA9¶2ÂæávàOÉ0õùÏ¢b,T x{ÊýòÂôD|1¡MÛÆÜ¶ö¦:×!mÇ.ô§ë/¯osï©ÿl~Hÿê4
+NçB#Î}yg~+
+YDø*
+â
+Ók¿%©9õh Ãy.êçÃ¾ç/U¸q{¨ ¼?%·Ñ§h{ØHÀÜaw¯¶þ£¸I%©4&flJ°ºåeÙt¿Êohj2hHSå
+øzU)bÂöccI%&3-/=M ¨È«»èéöHY¼Myîîï¸å9ÊxìN(Y¢Öt)5SZYÒ)ÄØaM«ÓLàÛÉãdÁ>¬ÎÈú
+kÝÙjPäÙmi%©µ¯·,«xIÝjjáÀH^Óx&ølYmqãYQa²oM»---ùà9~/TwÕZÈ²<Øî×m(ÚÙkÂÖKhõ!PbÎ"µIÍ¥0°ºª·«©2-KbôÓJ¤/¤ÈÇ¶³W°zT~Õ
+ Ètã¸r ø¨j®"Hãòø,µ»Ô;ïÉÑsVl[uúo¨óÏ3,á÷:[ö&±¹¸G6Ã¾\ÑZnd&ñ(Z*)<1l!OòÚ²·è!©Ã®T¯%Ì»iP°Ú	]îVy¾©A¾)¶ÕîÃH2&ä´SFYð
+røÈSSxèºØ§b!m%Êõ¤NAMW(»y9Ôîÿ Æâ2"ò¢R=Mâ@8#%eÊè+Å°#µÑ= "Él^sõ¦&ÖÅ×35ø¢o\¡.¿]ÔÔÐ(£*Û+ãÿh«öN¼¸^@Ùö3qÜªç1yün!xQTv4.ÝÑèØtj¯!7Cÿ}ÃLQÝ¸'yj¼¾|dÃ§!X@\;A5êúîü>e¿$wo.~î[ZöÒ$«o©JêöÂ "z:Â[ázÕä
+{»= §+;æZW}ÇÒÁZ{þ$&>§|@!/¼È( 0¥3UyêB&)$M-Ô¨T¿>Í·@Ü_sV/Fum¦g=M-A#kßÆ^{%ü1WOtC¯9µ@Wá]kHÜ
+[QQC¨@_)Û¶[ä~Á£i\yM{WÌ¿_ÁÇ;ÄÁ]BÉ½ÌE´òöKç+Ä¹ØGðoÒ$ãÚ¾>÷Ø'ÁÓØl\q­)/Ä9©ÞÁJSÄôC£~Åã4îá?B5óÊYyÿýÊ?ÖraèÅs¶Õ	u½î± ßéT.7ÔÎb4¶ô{!¼áÜÔ$¦Òjo¢µ#¿¬Yc çN2(ï¬%àLFýâA@{x¶t&¯	ÜØT¤&Næ!C{)1(ÖjØjisÔ®³O-é²^É¬lßÄÑH»ÈÌtG{Ä¯Oxö.f­§è¦¥.GòÇ "s:Dõ;:e@wktwïy²wWÞÙw- w9Á,wÖæKx@èex¿ýx!xLÄ½xÂÚÎxíàxùóxuúxêxOÅ2xI= By/MylZy£fyÅsykyÏZyúyÉ«yëÒºyÂyJÊyÓ Ñy´Ùy«)áyVêy6òyLöúybyòÝy³eyÏöyG%y(-yAÄ6yùK=}zZAz_ÚEzIzfQNGÔ>{×WûÖ¨±8í¨óÈô¡ñ¨1§¶ñÚ±Jma1-Ï<ÐJ\t=}½¨ëIÊ0ÔrSØI!×eî_"ØHý¼\ä	i«ÞíûÎJdyS5ÎVÃèC"Êkm=}^ícÕâô­nÙ±¢NôùoT³eYH-´Å×å5$WEÛ
+íÉý: qf®Ó®xÒRV-
+¢K@"PgEÝ2}ý{PÂÉæc#Þ!ìÁx¥é·n³ÓÛû«sk¶Ù±|n½Ù²?NCYøQ'9_c4is6«6ÊÛzüe9Êàþ$\QQpp4bÔUL=Mâ#f¸Æá=M2£cD¿ÐXÐï·LÚÔ®Á:ßùPÍ5fÓ,U2âo¤ÉÊ=}ò^ Ú Jà5Ö½Æ½dbß41FI¨L×d#p«ïëCâDíÞ@	y=}ÔÈìÉ¹ºüÅñ½Úºgå¹À¥7qåTxÈò®u¼öÕÔ5¥0nòùÕde©LòÀ¯PÔÔey3åsãê¢PáÐ·÷ä&±= ÉÐ÷-û|Ê¼8³ü	¨EoO7É ü¿qEe.¬Ú
+-Å·ÞßïynÖÞ´jÊ&.C
+ÞlÊî.3ÐÆ¢i©®«àé¦i«¤Itt7[Â!®Ë¡'§¿jVågg¢lbpFfggz¡m®aaÔÔS#¡3d¾ÌnSg
+[¶A&=M$óuØÓ¯Õ2â(o7âßÜËúº­·2äjÎ³Û×ã¶$lÑùÔ/A¦ ³Bs}üüàß=Mæ¢e*	â^jÀ ¾S²^Ô>]TÊLÝ§MþÎöÌG]é>MÄtÚû´=}¦vb«&{wLL,soÇ¢Õs¯×ºX×-7Í®tÁjäl§T~6H§®Ã¡¦ O¨b¬èOÚ1ÍXÖCQb½x«F¢¬ SòOÀ\X°!I¯C¼Ú¾,gC¡®Ò=MAìkÃ¢>TZ ;)T<CÈ;õÏ6ðÖzN5rÊT6·lñ1 4ÝJ¢··7ÖµlWä.Ý)À3%?ÀbZ:´« ÝBÖ³«øØÚhÔ)©oÖÖéóãÐFaà	w¦%Êç*¿v-1Â>mXS3	ÙrD1G¶©8[vo©íûÑÈ§qï¡¦ÑJëá·éP*¬±×= zT¢ü¶$?xIÕ®¬ßtQÕìãàTÂPá¿ÔËP}./=Ml¡M^IïkýyK
+"A²l ©¸Í6%ÎçÚJõoD=M lXÑI|®ÅqïóVß Â^ÕGS·Ê¡÷6£ïòÊ]ìcÁÊ_4	CGGu²s,Â¬ºS6²Jö¯mÁ«%©ÊU[H_=M¥[&QH{0øz÷5® zV2^s÷j2/ywÊ*È!Ìï(Æ,dxÔ¯÷Bö1ûuðvUöôV5±ãF±\yõnf±°]öbÙ@¯ õIÃÚ(Ù¬.ÑUþñe§þ¼èäSÕú-ozÍX-ê@Ñrb5¨nEÇÕsädVjra3p¡üÁ7Ëq¡HlÖ»qÒ%ìy½&Lô¾d9N?J;}{<; í¨ñ:ñ¨ñ¢ñ¨ñ¨¦¦:§V>E+µÇ¦^úrtëYb4µçü{òEðôÐÏÏ^ô÷GDMEPÞÃ=}Á¶"ÌùtÒy©	ÈA<V=M´ÑÚðd/«]ª¤]FÚXÞ±Gª®iÍË<LºF^åp¿ò½gE!À;¡ 5ÜùÒéÏg-ý¾^6)7¢eªuì_¼Ø1g¯ïà§áHF çã%¥%Â!¯n iNQT\lËº/dêà7½Iª½ïËåAP°°XPoÞÐËÞC´Q0Ï^.ÉGîÞß#öÍ*:¦:üº-6À'Ú5.Ø> Ô­F-ÑÚëS-Ìï÷²S%ú65FQ	·)~õ$, çÖ«¾cËø3¼®Ç$¶ÕKÚøxý(PBtñR²Ø=MËhB§['èþÍpÓ èç=M9)ÿá.´¦pÖ¡[t·e27aÍ7§Wn®r©sEÂ«µ{×í5jÆ^¯áónPÆÊ°ôõá'ÒM4ýÿÅé=Mý^è0Oe:Ø¿²ÑðóîcºNNÀ5W,)ðÏãF9hu;º;»:FWÀxÂ·x±ªxOxìxôxK&tx Ágx{]ZxgøLxí?xð(wRw±ówF¸Øwmê½w5üw9_UweJvÔâvvi¸ô=M¬öæöáÇb÷¼d÷Ä÷Ûkß÷'8ù÷î÷Ñ/÷lìBøÎQP?ü>SAO{ü¨ñ¨ñ¨È¨5jñ¨q*\-ºTë§ùSUêL±ô}ÿPd$45AøË-Ö* @tÕÛa(
+¯ ÿN	íÍºzsWJ$c+LîjüMozñP= Õj$kr1"ÐÐ²ÍyðuÆ²ï82NfÊ:O"z«6 Z=M²:ÊÅJµNðázfAìÜ³cn-ÆlS Éb±ÙÙÚÁÞ&É:sÒêÖQk¸l¶-ÒpPr­¦>6º½8(ÀGtÎsª¹×¼ÐâSr WEií$E¢UêNv.q*ª~$\*w¡´*âóuz^¥6Fù_6¦ú vG·²Ú7çêwÉû$÷MÊº\Ðÿ%WÇ1ThÁ¹âþ<=M"¹»<Â1TL¨ûF1p¢Îð@çãÊò!dg':	¼F8Ø3ÔFÄG²ÞÚB@ÀÙG7ÖÜEy£J-îÀzn>Ä0D5K­M}4:sÉL3ÅoZ-/³Ñù7z¯e_fÐU¤/ZÓüEÂèÚþzþ-{zÚë\À=MhÖ¼= Gcêt²Oek:öÅäªå4*Âê^íùÙi½<{é?<Ûwñ¨ñ¨ñzñ¨
+1Æ¬ùðv¶v97«2j¬À.:dÍMzc×8ãCqU¾7ºóv¢g+©W.&?-§bÍ2þ¹oÄ= gfì0ÃmVÓªá:å-¡ÕU½4:°1ªûyÎ¬wwáÀª¾qÁuçõÝþ|%W0s3ÈYá&Þ¢»h>éhotÃYUÌ÷ýÓSN¹¹¥ý¿á×Æp~&ÔTjÕR¨|.^Fyiìÿ\ÅÚªrÕòq¸¦~éÿÑê¨'ó® IÜÙIÏZ®~Ü^ºvýubqsÞ±þÔ½F¦áØ®âHâ©	þkJÑ9ü |/÷s¹Æùoª2Óþz·®ýÒÔ¹·,ûJ9woE[%;ÁÄ¼¯9W}ªK&Ð½$Z *KE¹cZÂ-M@«ªI"÷²?ª
+«[vÍÚ©mènÅX*ÞÃÙVÙGrò «fÑ¥´g´Ä¬c9R=M³9óN
+À1?a9Ùûã_ÌÂÎÓnrÄHsçgÀÀÖ#í 7	¡õßlõjÈuÊ¯BT"Ðü¾Tµ¡M­[NÔQ¹¶íc«!9§)!ËøqB¢¾uQ äÍwiùªyÁÊ.ô»)²@Wj4}×=}ÆSîòÃÆÙie!MÁ6côý7­iÐ=M#(h e	ä fã[-·@)ÐOèç*Ð·¥éÝ4:3ÀöôÕrÎ¥ó~#Òp÷Gç´hÎz=MÆ°óvkîY8µ½MVû ,Èçè¤ÅeÕS¥(Òÿ¶oÎqæÔ¾rÖ$E¤ÍQaw¥Âãñí7f#qÒò-ëÈçë±qj£b(vXWÓ|þ:uSë%bØÐö+g#êÓx(rÎö·øVhY)Ò/ÛòàÂJµ#,# ®ªjÉâµT6éRy)4ÀyiÈ*b= ùZ$8'"ì>'ÉU;¢Aë4¸»?*|ù£X11|±9mÃÜKzG,5K-\¯HsÇã¯SÀþóØZ5¡SVÂLGFcÚtý&N^7³²?xL¦Þ/°Ãë¿ LrÃ3×S±lñ ÃçªÆlÑ)\ É¿êA_^á}üjM5yód ¨ßÏ¨PÅà§^ $d¸dà1ôÏcPTh±m©À[§ÂGîTméêÎ¬$ÃGÈæmñ9_FTbD3UC÷²OFQSQ«eQëªM#WKÓs]<Î0=}f±DXP#ZP3)íûÇ:C4j=}P²@]YFïùKó.
+Ú=}-
+GÇ>¯<OÎñ¨öüöì¨Uúñ¨ñ¨ñ¨WÈ":ª *Üz:4 *ÊúE¸:cg:é4|ÜnÀ!rPýe'áKôÜÀ´EL<E¶öe¿£4æø¡ÝaÕtÑaøöT6úa·ÊÔÓmÈ;NbæÔ°	Ì÷ØÇ÷8©/e>
+ÞGsÑn«¶ÎÙhµ	%$ïTXV)¤ôàÄàU/7:.cÌveù_æøcýdæÃÒÀh8=}I¿P2¯y âÕw±ÛYø¿INrhÖtxÙaÔW ¹gØù°=MÔÔ×)õ±·ücd§&Ú)¼_Q_LÎ³=}æT®jÉ+¥¬çìÊ ·G â¡ºO.Ù­ñ§_+h×pÂ-³­C"?ÎóvÃ4â>T°n»8ø.~2ÒYú·4Ööº÷ó/Îwc2üØ»"©_¬ 0÷Fz2vn£ØNÊ¢t=Mã>ô1/CñÞµóS1þÁçïÅÞ6íqäJçµnìj(¼¬²ùVõlûðf°æ±ûðc®uMÍ<òQ(Ä³Ñ¬F+máp4°-}FIª®¤Á%¸Ng§À»wí£Ã(%5JèÆõÖð,ùAúb¢~Ê¥×õ@ú7sçÿÝàPkÐ"/íiþ®=M'ÙÍõè·lÑo3­±7ÍZ¢ùÄ¶Ê:&Øf0fùÏ¶Ú&%Ê8¼Gè­Ïú=  êö*Ò æF­51¶%Ï?§zi¶RYÌz^JØ½¸fò/\2¥ªÐÚr7.&-íEtVù²_Vg!Æ)7§TwªÁÙe6Í´ øÞàÿLÍTq}UGÍ²5QG ªÌ'ï	ÌÖ ö÷¿jÃËúp½ÿºëò_¹¯LÒvä³÷ê×#=M$[@z»ã­XêaÅ1Z¾;æt©±Ù).Ø¨§q¹óhñ¨ò(ybJö'hJ:ø¸³y1¬b9ÉeVM]°4eSøOÍ*Cxæ@ÅýäÓ¸ýoÐÈýÍ(Æ@H"¤}
+õÜh{g¿¨À~¿ÑxX¿u$õ+ãpq¬§i)çïQ½fï×Ve¶yã-Øîî6¤¸ÏÑo,ÈÈbýßJ @=MûHn= 6 3Q¤Ä¾²%ÖbèÐ)"öúÑ=MUàß¾¨Íö}ØâÉ#ýÖ	2ÚNB­L·¡xY[Ó-)2,·ÁåxZëÐÒU3+ â½³ë_z«xÙ
+I2Ù.l÷ô×BYc" Zâ¬Føwj©iî»vêåj"è,jT¦´ü5HóíÔ9.ð²,&¶ô<9£ýÊ,|j-ÅñE)l¿.¥Æî:=}Êæ!¬u©ù3eê·¾òv¯Örnjy:I÷7!zê³6º·2(÷$vi9z×:ýr+¸z3Õ°ú4t7´|f
+o¨BÐ(=M@ª7HÌU+çÿlXÌìáNï*½Çé#Haxëªg5F²6Û£9J¢½B[¹:{3°SÇt|~Ûð®ci:UÁfÉ^Ûð³_Ê|BèÎ¯ËYú&s~o V¢N£#ÔÜyWrÑÈS¦UÆÁ,i¯=}¹ÖÃIBhÛ¬Meè£S©¾&1=}ÿn3a÷¦Æ±ó¯ Y(:"»¹zXÜÝ)ÇFøKwýPbÇ+­çv)µùDh-½^.Á(¾ª¸L©%Â¨ºó2J{Ø[¹:Dÿð|+õLÇ×\Óó\O&þëdyWi=}À~]2vMé£/iÅü"/Åþþ¢¬K²²¡=}=}b}ÓCþ«¦O7´Õ½\®þö*¤sú¤Mu¶ßuÙè{Ýa·Z ¬Q=}µ¡^´qYI±ü3·ÀÐgJôe4£ØÐÊ¢ØE<£P]¸\QñOÝLßóOÇ9"Å¬ÿó?ÒÐÛ-ªD/^,ëíO6ÒÜ~¹T&qA(T}
+ÉÝtl àWjeWâ»µ@·)dëÛîMåñWA= ±e,î|Äý¹]Gç¯JRgÝìÃzö'Ìg÷i6nLÚzÃ9\Ý.z7ÚÃJ¨]ø9^=MÉr]ÔÅ__=M-GÌmé=M4%Ý_uæ[º²@ôúò¥fÞ¹ õåÏÁd\hðM% 		ïjóË÷^F]_ÚÅ-ãÒiHÜHJí£6ÁíH
+[ â¯zÍ>·¤ ¥]1i¼!ÂìÏäR~õc=MúW|öÁ»¦c¨hDáôV>¤ór¸¤&NªÍÙ´=M6)æÐBØ¯¼^= ðñ/$Ò+ÒçyÍ12ÙÊÞT|¾T0dqÜßQ~UáÖú$àÓ¯áµs(ZöâGÝv²6Î6ùÓÆÑ)'¯\ê¤æè¥/±¡Bm¬©Lôº Ô1	
+$¡®/= ..3º°ÒénYÙ&Ú¢tÈ'NçtKfZõÂhä-îGÈÐ'õç£Iv¸§eæ	i^=MnÊ¡KûÂvîúgÓ)´^ñ¨¡=M¾Àïäëç¿
+ýt$Ñ+ã&dµÜ´0OÜ¥ÚÊËo³ÛëõèÈ¦Öî= 2eW®æ})´Ñ&õ¸¢%ßiÈ¸c´²5\6¤«îø4*6^31)¡·ÂØH×ø!?.æÖMó*9W)¯üö?"V¥!-iQ³
+æ³íÉ#(7üÌøwè(kr­w Z!+3@93Xé­ÎvHô
+FÙ-Áì0÷7xzn-fÚ,b6ñÄÉ§BFPwYÝÉðzpLDúÒ¯£J31&Èæ64;kYÇ¼rÂ]n¦?1å¥OGm{0^g(¨Å$!8uAb¸^£
+rýAnSaýQ®ú^ÛÚNEbóÌâV=MþxxFþ¸û÷7ë¡};É1H}"çC ­ s©]9¸OgQ û_Id¢ì	hL¥Í+|8é'Õ?ø¯?)ûëjÔcãºI1Q] Yÿ4³öñ;ÒQ}tôCfÆ¬í?¡%àÅ¹mgnËÜØG l­¸j:o@@§ØÐS÷ÄfúÏ+]ÐÄsìÿ%Ö]WyÄsgÖ%òßf]&L@tTiÏ²æmõ}xõPêÄÀ¯²·y¤¥ þg5¦Ù|Æ¡ßÌEsÔ{ÑÍò¦OtF^PQÎ8d¤ørê«âf$	o¤ãx8x[Ë(%ÍtÉçnÞÔ6G$AXÝ½Ï¤mÃi2Üiyd0¯*ßá.9*oíÁr·2Ã(s´ÈÅz÷zY¢Á¼öÔ°ç0}Ñ4µEöÖ	r5l®Ä'1Æüç\ã>ÆøièLïÖÀ|e¨ùRBaEHÐ¢MßÏãØª$Äß=Mç. ·¼ªnD õ´÷"T·ñy)5¹ùÊÊ(·ÕJÏLr4jô*2÷5=Mù#¯v#Ñå~¶¢z>õ8ySæ	É{Úõ«:£¿!ÃrYØçµÐÜ ×>åÛ&¼¤æ¸kgz;Ö0}Ë«]WÒÁþwqIM,[x@UbG'1ÿôÃê(}/QÇÁÛâm¿p/|¼éBÐc«Q(ë3º(z2é¹:ºoû;@ÕS?¿GSk«70>³r<ÞaåUGÒ;BAi¤°óGåÅ¥Û7BëUi~vJ;ãG}@OUm½ÛXKÁnnál!kýKe[kWG¼ëÃì½ìÉìÔLs4F³SÆAvÌ{¾ÿ=M	 ~û=Müj[cowmuai\dpxnvbêÛãï÷íõáé|~zswuil= hnvúóçíáéìôøöªÏ¤n¢
+÷§ Õ°VrfSu5a¢Rð¯/×u®9=MVñ'¶3r)w·58ÝÅ9Ä@ðØ!iò¨*Î"ªy¹84òÛí¸°2ÇàV²Zx²(îòú_ øÞnVõaóÑØ6ó¹*$&J:Fãs!pÓú±"Ì.rZø5/Æfø5Õ8RZ¹7
+ä(Úð³4³Îæbg±'ÎÊºt°=}F6Wó15zö8½8²ùîTòèu8Åz÷µ1ÉfªMv3û¥Ôp8û®&7´âyîÕâ8»á«ôZgÉ&Zësª¶@JÛ<K'ô®áP¨ñåküJ{«974ñ>Óëâ@\S@;ýnñð±æ§ñ(ñ¨ñ¨+ò¨ !5¶½ÔTT7}÷ÂØu°û¼jÿ¦°%æâ(ØLT7}÷âÃÛRðõµ$=MàÞ²ÆGy0âÚy³«ÏÃÛRðõ¯974^±ÈGaúºM:fÍ cîK úD²àç?´=Ms¯]üoÓÄ·= rÄÈÿìÎR}j©ÍÔ!¢aØb' kÃÂO²Ü 
+o-ÛÈsUB4SïgtW¦I-ºô­ç= Á(w¦=}õ¬Ðpr4×¥©ðUrêÕ½¹àë®hùâÙ¶è
+ö¡Sd(îÏ¤!Ö¬ÏGI.ä=MÕ°ÏT ºÃ«ÐLç}¶ó¯!M\m¿·} rÔÿðîÒª©ûQQ¡R((hmÓÏ«Ì= ÿjo1ËÈtB6Óï"W<Én»¬·{´Ù°ÿïø"²éÌ¤!U¨¢VD()p=MÚ¶O¬ÙÓJ²Ú06¶
+ÇG"T ¡TÑ,Bx¡®ÉÌynU¨sqÖÈ7ÒV¥ÝÞFÒ$®mÔä¡æëÔ³±,í#þ¨Eu½!%óu'aÔ¸÷¨uÁ+ÓÍiñ_Æ4ÐaYñDÂ"KZVÆI×b,AmÙJäµfëÙ±+÷Ä#ü°-u÷"¥óU§bÌx÷©eA«ÚÝ	òc.4ÌA)ò<6 ;*ÖÄLwb Áí×z¤¬«×É+ô¤Tív'ÇºÏ°È ~¯µ3¯ Eô×iá+TñKélt¸ô~\"Ãt·2Òx_òê²
+Ù= ÑDú^q C$X%NÌF?tü[a+LPqKÉklxô|y¢ÓÊT·²ÎX_ñâr{Y@Q<z>q;äX#>nnÍºL!Eþüï/¿ht|¡5j\eGÃ¥6&zfêº¾ÞyTTQê28ÞºH¼°@{ë±VñÄ¨ñ4ñ¨6(ñ¨¡)®TòÙÑ$Tü¡ôO)ýÁµdOyGNùvùÜ[:=}Âýxý*ÔM¯ó]'°ÎÛ¹v\,çSf±âÎä'´fëàLyÒ((3sØìXBIB¾q×¹Í{ørñ+Ú-·½¹oâ@® /]ãTªÁGà!7a³:S	ÈÈ£gÖñÝAÕ|ðh0£®Ô%ë5OÆø
+ïH·ØrÌe¯Q(Ûá^Ð3ºSÏpß=}ªJ=Mâ­s|²¬W"½¤#ÍlyÑÝÁÀ:»uæPÛñ1TÈVÚÂÙÀª/IÝyÎ/§ï7|ò±#mmÛ,ãFjG~.¼)wºEù) ÍÒ(©aÁ;¹6x)zÉf¬½PÃÁ¥æmºÉÿ¤Fp±FÄæUwícÆïô
+[S¥#,4F<C§û4ü
+Óâï3DQ÷øOüN¹´f'Á	éñwl@ÀÆ(:l¯Z?;ÿkG>Ô h2¶ïY]gªp¢Ù"9ÓÇØtÔvUU£Ê÷nÎ\aíØyX=M uà¯$×)þ[gÁGÞëU¡rGþ-kHþsçJ.ëºÁ$»;;KC}l:å ¾ïÓa¤nÈ=M¥Õào¤Õñsèâ´Ê¼SNìl ÿ	SÅàlPg'ÈüWÎìt°)SÉ lXw·'
+>´ÙV.t
+Ø.u è.v
+ ø.w!"÷5wâÓyCg;S»;iKKÞ£ý6©ZÇaj¸²4¹±8
+é"0µ±øÚ&ì¦¸±(é8°Y±ØÊ" 4°Z±Ê2 8pJ±Â.7p±Ò.¡7ÐBö-'Ê´íf± é7B±0¾¸ºb±0Æ¸:±0Î¸ º¢±0Ö¸¢: ¼y À¹ Äù È9 Ìy Ð91Ó"÷¦ø¶èh¦Y1íâøØü××Øüûgÿ§ç'g§ç' [FÔíÍÔ'cÔíÑô'°{R¯}r¯¯²¯Ò¯ò¯¯2¯R°r°°²°Ò°ò°°2T¼DqSÀT±SÄdñSÈt1SÌqT Ð±ngüP»kGþ U´1-ÊwÛ§$.7÷ºùz:Ú.	4"ù®:Ô"Ò´nº1¹r6bÊÎ÷Í-ùv4âÊ/Îù=M5ú$v8ÂÂ+Lý³Eh7HÊþ"+u7I
+þ2+y7ÊJ3m9Ç3q9ÈÊ"3u9É
+23y9:gD<»{;»kÖLýÇ±ìøf<J=MÂ/]8=MÒ/a8Ê=Mâ/e8
+=Mò/i8J/m8/q8Ê"/u8
+2/y8
+J-Â7]:-Ò7a:Ê-â7e:
+-ò7i:J.7m:.7ñ"ºú¨£z	Ú.&7vz
+.67zYÃJÀ3\ÙÃjÈ3^YÄÐ3= ÙÄªØ3bYÅÊà3dÙÅêè3fYÆ
+ð3hÙÆ*ø3jYÇJ 3lÙÇj3nYÈ3pÙÈª3rYÉÊ 3tÙÉê(3vYÊ
+03xÙÊ*83ºíB@;»{K¿Å´î84¼QB!B.À4þ·¹lÓº-Î·= º¢-Ö·b:Â-Þ·dºâ-æ·f:-î·hº"-ö·j:B.þ·lºb.·.7.·/7/·070·1714)6?ü>}[;;;ëØ¨ñ¨ñ¨ñ¨ñ¨VxÜÈí5&éï%U¦êò-¥¦éî9ãÝ¼qµcÞÁau#Þ½u#Ý{p ¸PeàÕ$à×Õ$ßÚ%¤àÖ] z&Îx'.y(®	zÄmaÊ=M_Â·bÆM_Ô¥Á!Ô§ÕÔ!ÓªÅ$¡Ô¦ýßcö÷Ífî×-døç­Ï3&ªø6=Mæª÷8êø4	6jìA'ìUÖ'ë
+E&§ì½= «xÒ®X2¬h²ó¥V¨ò­¦¨ñ¹fèò©ÆÑ{@>§+{AH«ûB@¯ëû@<ÍãÃhÙÝÄdÉ3ÝÃiÑó]EpÇëþFtïkþDzÏþErÞÉl1³^Êq!sÊm5ÉSì¬'>Ç_;»úõñ¨êÞ¥§ñôW¢ñ¨@"Ó¢ÿ$èP.ÏñZ¼4ôôDk r­Wkt7"9ö= ¦î»÷n ºP>.mJ±Î}HQ?Û\ÂQWÃ{DxÓ¾½GUë\¿_E#ûÀSIü;MÙ'\ÐgD_Ù¬_M>à/Åjm¤ÿÑÍdßNt= ¾+j¤KDÁNSdÞJn7ÌN±¿ÜàÃiÃKG\Ö¸ßÊpü_Ív	îÚ­5lZposuÅ$ØWáÕ»ôtÆ_TÅB-ÆF¸¸êsv5½n¢"lëg|Cölü<Z]¼F<ÿÛ|ýQ}¾dÉ3MÄMD_Ñ³S¶lþDzÝÀV|ÿÌ»W¶÷D¢Z!so¥ç¬bÓ_Í¯!Ua<§ËÚþè6= &ÓÙ}K¶C;Ûà  Nh¹K8.;	üBSyLÆa8ô!JDï4±ñfR(Hº<a{.V«+n³ ®ÀzþýýøýèýðýÕë_j'CVýhw¢Âêyvø"ÁJúÉUÉVÊTÉ$Ê¤@8ìÅçÅ'Åçí'¼9ÃùÃdêdê°§YñµÿìFåÏ­nèÙ= 2XåfjdfpÑ*ª'vMlQVØðrzæ[ò_øcè3«¥  ¢åõÁ.èq²x¥9½ÆQÊõzå%pT&IâÐYih
+ehäk%ÖMÖÎÍAPlFü9ðÔì Ðè(Ìì>øxN®	i«ÞøñÊx¢,í~ÑrôyÕ°ócøë[úÍ×ÌÒ=MÕé%/ä¶o2'?i4@¢ÈSvÝö^A>}Á>ÊA	?hõ©õ(­Þ"ð²õy+ï(vñÆ1©Ê%5=M-E-f-Õðpdp6Vµ~Å Ëxö¢y7Á»°ûC£=M|ÁKaÛáÂ×ÉÙRï·×ÜÐSÉz]usöõ¶³´6354B??A@@Æ7uÜ"Î¤!­ãã=}Ò³öYÕ[ßPÑ[àXÙRgu{jC^ýÏ;[ó8d5ÐD3:9ä	÷ÐüWë?ç· iÉ»nEó>Ù»rF3>¼{k+R¾/OkDM¾<«¨*ªñ¨wñ¨ñ¨ñ¨6ñY¥wÒ_Íe$Íi4Od h0o=Mf(¯=Mj8GmcmgVîdÖî= îhî^vîföîb¶îj6®[B®cÂ®_®g®]b®eâ®a¢®i"®\R®dÒ®= ®h®^r®fò®b²®j2.[J.cÊ._.g
+.]j.eê.aª.i*.\Z.dÚ.= .h.^z.fú.bº.j:n²é4îË g tfNkÜ¿NoìÿÎmäßÎqôlàÏpðnèïrø/nkÞÇno1õÒAÌNôPt$ø§à·'wvþð7&·n µRÓV¼F(Dmõ£§¡ilnuÒÕDiÎdâi.E® ém1hÎp!ÿÀ¦((uÔèrb)Gë²¼µEÍë~Èp±ªÓØEò²L±m=MÙ£÷É0×*8aüªN8bºÎØ\Ëýo¢ávvþXÔ)­¢Éö®ËâÑ·pPåèÈ ¥h®Ô0[æ/èòx$ð|
+ÈµªÑ|Æg=MiÖT°å¡¸í&ÒÛgÂu]lTÊµ!íÚp¾ÈNn§ñkÞè¥¦n'ñr~~W²p³îÙ)¦¢2"{êJ1ÜùvªÉ/Þ8":xTbu&¢Ù%'n¬Ñö	¬"´)ù{HRæ péñf³Èê.H¥úJò% Ixàò¶/³úZ.^µºA¤ÔwbÖR/íçÐVí¶Á*->Ô¹g 7ÀçrkIì_O9åBxÙsä¢nñ6íñ¨E¶¦¨ñ(ñ¦¨Èút7¶º½ªº¼æºBB»<?sQãK×SATÀûAÐ;Î½Q¥0
+=}tZ÷= [Õû¯û;³ÞêBb©<­¢«2>:ck~)Cé<¬j
+»·J×Z{ÒûDÑFW= Cw[
+M?òÐ0Ò@!|i¤q#g'ÞgÐQ.QFnvÿõ\÷,K9è\7g¿çIéXÞ­:ÀDõ]Ã^]JË C	O¸O.Ïì4q	|qòtìaÁbîÓÞÊ1= Òbëþ9÷JÍÃpÓBÇèØÚÌÿFmg)@í¼ôõ½½ÂeL¦ºÀwßUb¾ùìAîhz×Â%è"ÿª%Ì"pKç\= Ä´Aô~¢±	}:zF6"¨xRsJ^!n1,·÷ÂQÒÄ³/]ÙÆ¬r½zõOîÇ­½Ðf,fìVÌøsæpÞr¦ü'Ó©þôÝX °Ï6²]n?>xã>µl0Ì6÷Z²)[µ\'ÁÌtBªXÀóµ?S §,÷p+Òèº¨·ÞþjéÊÔË£½nq|G6ùÌV§Ä.#îòü/ªº¶×²¨ìnb'Å7r½æ1{XóR¡Z­n2þ*ÊM«î@,C3lTÃü.ûªAÜ4KzW/ÛÚÁ3ºë÷[a@9&½Öhãô\7v~ÿrH®®]½5[½¹w-§* K$?æ%uFóì_G2ÎÁÛÔE×VkÓÔ(psÔHIby6aÀÔHEnnnnî
+ÕÕW¸0922hPåcA3åWãÜ·G»ñm=}ñ¾D=}n	;¡HsQkBs>5#AÕÉ»Ò³;®þBÓÇi»äKÛý¹BïÝb«ûIÇ¨ÔG/ýgIQ;ÉY;'*ÛRÇ>á³efæ<â<o¸T[:H»®²> ¬CÓ¿®{vAñ7@L»ÎLX§ÄëLÀú@[©Z¿!ß\®;ýt¥UKïUTÂãÒK6M¬²?¶Éû6>CõuÉýBMóè½è]#¿^?^¹}6lÄ¦uÍV|ÝL¾wúÌßÙrÌ>ÍñE¤R<IL«Öæ?/ãa<Ù4ûUãÀîC\-gR2òDì%ÀË)g)âÆ+÷Ô]%,´Lu_!ÿ'3l	ócáó©M×	#ZUuº±ÑÝ.àãdÙøÙg*£Ó×ö{É]@²w|²séûb¸Ð§&=}= bãe%+PI
+l5p UâGäÄL#+d^©®çlV°SêlÜ2ømÊp = A¡ç¯ÔTR§	SmâeÁàä= ïþM¡§tªî¡m.¨#ÖÑ¥±¤pypÑÆ* 21³D¶±ø>¢Ô(Ãu³uD¢W¯ ÔÄ'ºêÐ;eV;~Z»;= »1A{{s½×ÂC%rNÌÛQý%]ó|KªÑüÌÚ+¤n½BâüÞHT	+hæNç¨1¾Ë7sËVüê¦d¿õÉ>õÜI5Ù>WI¾ÌÂ+ÿGÞ®äY£=MÆO$uH"pÜtc·Ázìø2£áH´ØÑ/ó¡Ò/Ow¶öÛFQ1'µÃ6áÅÁ·RôOë<²­_¾µ°ý|ß/ öb=MR©¡µg*5ÑI6#ÜU²¸Û<n2ÛGºªáEW]ãt¿Àl¸-{+&å¡°ð3éð³¢ú¹Ù'7äö¨"÷øýìØèAµg#w¶L°ê7=}=MB¤C&hé#ñ4á´8 &2Éósnæï	î%í¢-ê·m|h*¤WåØ;AÀ>
+@3Å[ûNhDîQFü*Ý?uJûØ6ë
+A§²Âp[ôsFû .oCtï@ÝÚý#£=MÖ#wìîxýß½GÒÿDó|Ü}5jìÝNÈ°5EÇ>ïvßøNÀªfÈÆHøý	§åpª­( øç°ÓX*)· ©T0¢ÇÂ¹ÆÑB¿¤iÅ5mtímhâ¡'»BNiÇ©¦=}{fLÐË+¡ùC}ØûÀÓ}qb³.x;Ý<¸Ø<å¢ÆrEØø>¬Cä­ ·|ãKLQfäÕ65avTõÝýÃ®tÐ"¦6Ál¬¨6ñý>HG8¶$  =MøÄd»¥BGÁØÇ¼¹$=}¯ã)uYGz;C}pd¿\|6(L=Mf_ï#ß«WÞ¥§fp@0N6
+'¤sªQø÷Õ¬Åq¾>.øü·¢D5³TáhÅ8zDvO= ¯óÝyàÙåFÆÒçcËóz?Ê5cèúë.ÌðÐÞ~OË|¿ÓQ§v)BHX6øöÇ¥kÒÚa¡cÙ7¦x©nº¡6¾}®­iÏ< ÎWh2 9's"IÉ<»ïX\#F\Ë_4F[ eÚ¸ø¹2øH$ß9_xì9i2µã
+ã/¸Äyf"5TàyÊ0îEê²Þm6ëÞè6ð Ïâ§9¬k=}¼àt<¦Mdç6" p_î3,oO3p"pw÷´/(1ñøs.íA/ &ÏUÃ_XÍpÕ1hÌ80EQö
+ow÷!x.AÜ"¢j+ï¦¹¦¶®äRow÷!xêpnâ#ðù
+z AÍp\0NHJê´ªØ^U
+Iwu¸öôú!3å6³âVq£³¹´RN£%y10º:p#\:J:b9Hµ7h_:¢I9 _¼µV,þ<` });
+	var imports = { "a": wasmImports };
+	this.setModule = (data) => {
+		WASMAudioDecoderCommon.setModule(EmscriptenWASM, data);
+	};
+	this.getModule = () => WASMAudioDecoderCommon.getModule(EmscriptenWASM);
+	this.instantiate = () => {
+		this.getModule().then((wasm) => WebAssembly.instantiate(wasm, imports)).then((instance) => {
+			const wasmExports = instance.exports;
+			assignWasmExports(wasmExports);
+			wasmMemory = wasmExports["g"];
+			updateMemoryViews();
+			initRuntime(wasmExports);
+			ready();
+		});
+		this.ready = new Promise((resolve) => {
+			ready = resolve;
+		}).then(() => {
+			this.HEAP = wasmMemory.buffer;
+			this.malloc = _malloc;
+			this.free = _free;
+			this.opus_frame_decoder_create = _opus_frame_decoder_create;
+			this.opus_frame_decode_float_deinterleaved = _opus_frame_decode_float_deinterleaved;
+			this.opus_frame_decoder_destroy = _opus_frame_decoder_destroy;
+		});
+		return this;
+	};
+}
+// node_modules/opus-decoder/src/OpusDecoder.js
+function OpusDecoder(options = {}) {
+	if (!OpusDecoder.errors) Object.defineProperties(OpusDecoder, { errors: { value: /* @__PURE__ */ new Map([
+		[-1, "OPUS_BAD_ARG: One or more invalid/out of range arguments"],
+		[-2, "OPUS_BUFFER_TOO_SMALL: Not enough bytes allocated in the buffer"],
+		[-3, "OPUS_INTERNAL_ERROR: An internal error was detected"],
+		[-4, "OPUS_INVALID_PACKET: The compressed data passed is corrupted"],
+		[-5, "OPUS_UNIMPLEMENTED: Invalid/unsupported request number"],
+		[-6, "OPUS_INVALID_STATE: An encoder or decoder structure is invalid or already freed"],
+		[-7, "OPUS_ALLOC_FAIL: Memory allocation has failed"]
+	]) } });
+	this._init = () => new this._WASMAudioDecoderCommon(this).instantiate(this._EmscriptenWASM, this._module).then((common) => {
+		this._common = common;
+		this._inputBytes = 0;
+		this._outputSamples = 0;
+		this._frameNumber = 0;
+		this._input = this._common.allocateTypedArray(this._inputSize, Uint8Array);
+		this._output = this._common.allocateTypedArray(this._outputChannels * this._outputChannelSize, Float32Array);
+		const mapping = this._common.allocateTypedArray(this._channels, Uint8Array);
+		mapping.buf.set(this._channelMappingTable);
+		this._decoder = this._common.wasm.opus_frame_decoder_create(this._sampleRate, this._channels, this._streamCount, this._coupledStreamCount, mapping.ptr, this._preSkip, this._forceStereo);
+	});
+	Object.defineProperty(this, "ready", {
+		enumerable: true,
+		get: () => this._ready
+	});
+	this.reset = () => {
+		this.free();
+		return this._init();
+	};
+	this.free = () => {
+		this._common.free();
+		this._common.wasm.opus_frame_decoder_destroy(this._decoder);
+		this._common.wasm.free(this._decoder);
+	};
+	this._decode = (opusFrame) => {
+		if (!(opusFrame instanceof Uint8Array)) throw Error("Data to decode must be Uint8Array. Instead got " + typeof opusFrame);
+		this._input.buf.set(opusFrame);
+		let samplesDecoded = this._common.wasm.opus_frame_decode_float_deinterleaved(this._decoder, this._input.ptr, opusFrame.length, this._output.ptr);
+		let error;
+		if (samplesDecoded < 0) {
+			error = "libopus " + samplesDecoded + " " + (OpusDecoder.errors.get(samplesDecoded) || "Unknown Error");
+			console.error(error);
+			samplesDecoded = 0;
+		}
+		return {
+			outputBuffer: this._common.getOutputChannels(this._output.buf, this._outputChannels, samplesDecoded),
+			samplesDecoded,
+			error
+		};
+	};
+	this.decodeFrame = (opusFrame) => {
+		let errors = [];
+		const decoded = this._decode(opusFrame);
+		if (decoded.error) this._common.addError(errors, decoded.error, opusFrame.length, this._frameNumber, this._inputBytes, this._outputSamples);
+		this._frameNumber++;
+		this._inputBytes += opusFrame.length;
+		this._outputSamples += decoded.samplesDecoded;
+		return this._WASMAudioDecoderCommon.getDecodedAudioMultiChannel(errors, [decoded.outputBuffer], this._outputChannels, decoded.samplesDecoded, this._sampleRate);
+	};
+	this.decodeFrames = (opusFrames) => {
+		let outputBuffers = [], errors = [], samplesDecoded = 0, i = 0;
+		while (i < opusFrames.length) {
+			const opusFrame = opusFrames[i++];
+			const decoded = this._decode(opusFrame);
+			outputBuffers.push(decoded.outputBuffer);
+			samplesDecoded += decoded.samplesDecoded;
+			if (decoded.error) this._common.addError(errors, decoded.error, opusFrame.length, this._frameNumber, this._inputBytes, this._outputSamples);
+			this._frameNumber++;
+			this._inputBytes += opusFrame.length;
+			this._outputSamples += decoded.samplesDecoded;
+		}
+		return this._WASMAudioDecoderCommon.getDecodedAudioMultiChannel(errors, outputBuffers, this._outputChannels, samplesDecoded, this._sampleRate);
+	};
+	this._isWebWorker = OpusDecoder.isWebWorker;
+	this._WASMAudioDecoderCommon = OpusDecoder.WASMAudioDecoderCommon || WASMAudioDecoderCommon;
+	this._EmscriptenWASM = OpusDecoder.EmscriptenWASM || EmscriptenWASM;
+	this._module = OpusDecoder.module;
+	const MAX_FORCE_STEREO_CHANNELS = 8;
+	const isNumber = (param) => typeof param === "number";
+	const sampleRate = options.sampleRate;
+	const channels = options.channels;
+	const streamCount = options.streamCount;
+	const coupledStreamCount = options.coupledStreamCount;
+	const channelMappingTable = options.channelMappingTable;
+	const preSkip = options.preSkip;
+	const forceStereo = options.forceStereo ? 1 : 0;
+	if (channels > 2 && (!isNumber(streamCount) || !isNumber(coupledStreamCount) || !Array.isArray(channelMappingTable))) throw new Error("Invalid Opus Decoder Options for multichannel decoding.");
+	this._sampleRate = [
+		8e3,
+		12e3,
+		16e3,
+		24e3,
+		48e3
+	].includes(sampleRate) ? sampleRate : 48e3;
+	this._channels = isNumber(channels) ? channels : 2;
+	this._streamCount = isNumber(streamCount) ? streamCount : 1;
+	this._coupledStreamCount = isNumber(coupledStreamCount) ? coupledStreamCount : this._channels - 1;
+	this._channelMappingTable = channelMappingTable || (this._channels === 2 ? [0, 1] : [0]);
+	this._preSkip = preSkip || 0;
+	this._forceStereo = channels <= MAX_FORCE_STEREO_CHANNELS && channels != 2 ? forceStereo : 0;
+	this._inputSize = 3840 * this._channels;
+	this._outputChannelSize = 5760;
+	this._outputChannels = this._forceStereo ? 2 : this._channels;
+	this._ready = this._init();
+	return this;
+}
+// node_modules/@noble/hashes/utils.js
+/**
+* Utilities for hex, bytes, CSPRNG.
+* @module
+*/
+/*! noble-hashes - MIT License (c) 2022 Paul Miller (paulmillr.com) */
+/** Checks if something is Uint8Array. Be careful: nodejs Buffer will return true. */
+function isBytes(a) {
+	return a instanceof Uint8Array || ArrayBuffer.isView(a) && a.constructor.name === "Uint8Array";
+}
+/** Asserts something is Uint8Array. */
+function abytes(value, length, title = "") {
+	const bytes = isBytes(value);
+	const len = value?.length;
+	const needsLen = length !== void 0;
+	if (!bytes || needsLen && len !== length) {
+		const prefix = title && `"${title}" `;
+		const ofLen = needsLen ? ` of length ${length}` : "";
+		const got = bytes ? `length=${len}` : `type=${typeof value}`;
+		throw new Error(prefix + "expected Uint8Array" + ofLen + ", got " + got);
+	}
+	return value;
+}
+/** Asserts a hash instance has not been destroyed / finished */
+function aexists(instance, checkFinished = true) {
+	if (instance.destroyed) throw new Error("Hash instance has been destroyed");
+	if (checkFinished && instance.finished) throw new Error("Hash#digest() has already been called");
+}
+/** Asserts output is properly-sized byte array */
+function aoutput(out, instance) {
+	abytes(out, void 0, "digestInto() output");
+	const min = instance.outputLen;
+	if (out.length < min) throw new Error("\"digestInto() output\" expected to be of length >=" + min);
+}
+/** Zeroize a byte array. Warning: JS provides no guarantees. */
+function clean(...arrays) {
+	for (let i = 0; i < arrays.length; i++) arrays[i].fill(0);
+}
+/** Create DataView of an array for easy byte-level manipulation. */
+function createView(arr) {
+	return new DataView(arr.buffer, arr.byteOffset, arr.byteLength);
+}
+/** The rotate right (circular right shift) operation for uint32 */
+function rotr(word, shift) {
+	return word << 32 - shift | word >>> shift;
+}
+/** Creates function with outputLen, blockLen, create properties from a class constructor. */
+function createHasher(hashCons, info = {}) {
+	const hashC = (msg, opts) => hashCons(opts).update(msg).digest();
+	const tmp = hashCons(void 0);
+	hashC.outputLen = tmp.outputLen;
+	hashC.blockLen = tmp.blockLen;
+	hashC.create = (opts) => hashCons(opts);
+	Object.assign(hashC, info);
+	return Object.freeze(hashC);
+}
+/** Creates OID opts for NIST hashes, with prefix 06 09 60 86 48 01 65 03 04 02. */
+const oidNist = (suffix) => ({ oid: Uint8Array.from([
+	6,
+	9,
+	96,
+	134,
+	72,
+	1,
+	101,
+	3,
+	4,
+	2,
+	suffix
+]) });
+// node_modules/@noble/hashes/_md.js
+/**
+* Internal Merkle-Damgard hash utils.
+* @module
+*/
+/** Choice: a ? b : c */
+function Chi(a, b, c) {
+	return a & b ^ ~a & c;
+}
+/** Majority function, true if any two inputs is true. */
+function Maj(a, b, c) {
+	return a & b ^ a & c ^ b & c;
+}
+/**
+* Merkle-Damgard hash construction base class.
+* Could be used to create MD5, RIPEMD, SHA1, SHA2.
+*/
+var HashMD = class {
+	blockLen;
+	outputLen;
+	padOffset;
+	isLE;
+	buffer;
+	view;
+	finished = false;
+	length = 0;
+	pos = 0;
+	destroyed = false;
+	constructor(blockLen, outputLen, padOffset, isLE) {
+		this.blockLen = blockLen;
+		this.outputLen = outputLen;
+		this.padOffset = padOffset;
+		this.isLE = isLE;
+		this.buffer = new Uint8Array(blockLen);
+		this.view = createView(this.buffer);
+	}
+	update(data) {
+		aexists(this);
+		abytes(data);
+		const { view, buffer, blockLen } = this;
+		const len = data.length;
+		for (let pos = 0; pos < len;) {
+			const take = Math.min(blockLen - this.pos, len - pos);
+			if (take === blockLen) {
+				const dataView = createView(data);
+				for (; blockLen <= len - pos; pos += blockLen) this.process(dataView, pos);
+				continue;
+			}
+			buffer.set(data.subarray(pos, pos + take), this.pos);
+			this.pos += take;
+			pos += take;
+			if (this.pos === blockLen) {
+				this.process(view, 0);
+				this.pos = 0;
+			}
+		}
+		this.length += data.length;
+		this.roundClean();
+		return this;
+	}
+	digestInto(out) {
+		aexists(this);
+		aoutput(out, this);
+		this.finished = true;
+		const { buffer, view, blockLen, isLE } = this;
+		let { pos } = this;
+		buffer[pos++] = 128;
+		clean(this.buffer.subarray(pos));
+		if (this.padOffset > blockLen - pos) {
+			this.process(view, 0);
+			pos = 0;
+		}
+		for (let i = pos; i < blockLen; i++) buffer[i] = 0;
+		view.setBigUint64(blockLen - 8, BigInt(this.length * 8), isLE);
+		this.process(view, 0);
+		const oview = createView(out);
+		const len = this.outputLen;
+		if (len % 4) throw new Error("_sha2: outputLen must be aligned to 32bit");
+		const outLen = len / 4;
+		const state = this.get();
+		if (outLen > state.length) throw new Error("_sha2: outputLen bigger than state");
+		for (let i = 0; i < outLen; i++) oview.setUint32(4 * i, state[i], isLE);
+	}
+	digest() {
+		const { buffer, outputLen } = this;
+		this.digestInto(buffer);
+		const res = buffer.slice(0, outputLen);
+		this.destroy();
+		return res;
+	}
+	_cloneInto(to) {
+		to ||= new this.constructor();
+		to.set(...this.get());
+		const { blockLen, buffer, length, finished, destroyed, pos } = this;
+		to.destroyed = destroyed;
+		to.finished = finished;
+		to.length = length;
+		to.pos = pos;
+		if (length % blockLen) to.buffer.set(buffer);
+		return to;
+	}
+	clone() {
+		return this._cloneInto();
+	}
+};
+/**
+* Initial SHA-2 state: fractional parts of square roots of first 16 primes 2..53.
+* Check out `test/misc/sha2-gen-iv.js` for recomputation guide.
+*/
+/** Initial SHA256 state. Bits 0..32 of frac part of sqrt of primes 2..19 */
+const SHA256_IV = /* @__PURE__ */ Uint32Array.from([
+	1779033703,
+	3144134277,
+	1013904242,
+	2773480762,
+	1359893119,
+	2600822924,
+	528734635,
+	1541459225
+]);
+// node_modules/@noble/hashes/sha2.js
+/**
+* SHA2 hash function. A.k.a. sha256, sha384, sha512, sha512_224, sha512_256.
+* SHA256 is the fastest hash implementable in JS, even faster than Blake3.
+* Check out [RFC 4634](https://www.rfc-editor.org/rfc/rfc4634) and
+* [FIPS 180-4](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf).
+* @module
+*/
+/**
+* Round constants:
+* First 32 bits of fractional parts of the cube roots of the first 64 primes 2..311)
+*/
+const SHA256_K = /* @__PURE__ */ Uint32Array.from([
+	1116352408,
+	1899447441,
+	3049323471,
+	3921009573,
+	961987163,
+	1508970993,
+	2453635748,
+	2870763221,
+	3624381080,
+	310598401,
+	607225278,
+	1426881987,
+	1925078388,
+	2162078206,
+	2614888103,
+	3248222580,
+	3835390401,
+	4022224774,
+	264347078,
+	604807628,
+	770255983,
+	1249150122,
+	1555081692,
+	1996064986,
+	2554220882,
+	2821834349,
+	2952996808,
+	3210313671,
+	3336571891,
+	3584528711,
+	113926993,
+	338241895,
+	666307205,
+	773529912,
+	1294757372,
+	1396182291,
+	1695183700,
+	1986661051,
+	2177026350,
+	2456956037,
+	2730485921,
+	2820302411,
+	3259730800,
+	3345764771,
+	3516065817,
+	3600352804,
+	4094571909,
+	275423344,
+	430227734,
+	506948616,
+	659060556,
+	883997877,
+	958139571,
+	1322822218,
+	1537002063,
+	1747873779,
+	1955562222,
+	2024104815,
+	2227730452,
+	2361852424,
+	2428436474,
+	2756734187,
+	3204031479,
+	3329325298
+]);
+/** Reusable temporary buffer. "W" comes straight from spec. */
+const SHA256_W = /* @__PURE__ */ new Uint32Array(64);
+/** Internal 32-byte base SHA2 hash class. */
+var SHA2_32B = class extends HashMD {
+	constructor(outputLen) {
+		super(64, outputLen, 8, false);
+	}
+	get() {
+		const { A, B, C, D, E, F, G, H } = this;
+		return [
+			A,
+			B,
+			C,
+			D,
+			E,
+			F,
+			G,
+			H
+		];
+	}
+	set(A, B, C, D, E, F, G, H) {
+		this.A = A | 0;
+		this.B = B | 0;
+		this.C = C | 0;
+		this.D = D | 0;
+		this.E = E | 0;
+		this.F = F | 0;
+		this.G = G | 0;
+		this.H = H | 0;
+	}
+	process(view, offset) {
+		for (let i = 0; i < 16; i++, offset += 4) SHA256_W[i] = view.getUint32(offset, false);
+		for (let i = 16; i < 64; i++) {
+			const W15 = SHA256_W[i - 15];
+			const W2 = SHA256_W[i - 2];
+			const s0 = rotr(W15, 7) ^ rotr(W15, 18) ^ W15 >>> 3;
+			const s1 = rotr(W2, 17) ^ rotr(W2, 19) ^ W2 >>> 10;
+			SHA256_W[i] = s1 + SHA256_W[i - 7] + s0 + SHA256_W[i - 16] | 0;
+		}
+		let { A, B, C, D, E, F, G, H } = this;
+		for (let i = 0; i < 64; i++) {
+			const sigma1 = rotr(E, 6) ^ rotr(E, 11) ^ rotr(E, 25);
+			const T1 = H + sigma1 + Chi(E, F, G) + SHA256_K[i] + SHA256_W[i] | 0;
+			const T2 = (rotr(A, 2) ^ rotr(A, 13) ^ rotr(A, 22)) + Maj(A, B, C) | 0;
+			H = G;
+			G = F;
+			F = E;
+			E = D + T1 | 0;
+			D = C;
+			C = B;
+			B = A;
+			A = T1 + T2 | 0;
+		}
+		A = A + this.A | 0;
+		B = B + this.B | 0;
+		C = C + this.C | 0;
+		D = D + this.D | 0;
+		E = E + this.E | 0;
+		F = F + this.F | 0;
+		G = G + this.G | 0;
+		H = H + this.H | 0;
+		this.set(A, B, C, D, E, F, G, H);
+	}
+	roundClean() {
+		clean(SHA256_W);
+	}
+	destroy() {
+		this.set(0, 0, 0, 0, 0, 0, 0, 0);
+		clean(this.buffer);
+	}
+};
+/** Internal SHA2-256 hash class. */
+var _SHA256 = class extends SHA2_32B {
+	A = SHA256_IV[0] | 0;
+	B = SHA256_IV[1] | 0;
+	C = SHA256_IV[2] | 0;
+	D = SHA256_IV[3] | 0;
+	E = SHA256_IV[4] | 0;
+	F = SHA256_IV[5] | 0;
+	G = SHA256_IV[6] | 0;
+	H = SHA256_IV[7] | 0;
+	constructor() {
+		super(32);
+	}
+};
+/**
+* SHA2-256 hash function from RFC 4634. In JS it's the fastest: even faster than Blake3. Some info:
+*
+* - Trying 2^128 hashes would get 50% chance of collision, using birthday attack.
+* - BTC network is doing 2^70 hashes/sec (2^95 hashes/year) as per 2025.
+* - Each sha256 hash is executing 2^18 bit operations.
+* - Good 2024 ASICs can do 200Th/sec with 3500 watts of power, corresponding to 2^36 hashes/joule.
+*/
+const sha256 = /* @__PURE__ */ createHasher(() => new _SHA256(), /* @__PURE__ */ oidNist(1));
+// src/opus-codec/ogg-artifact.mjs
+const text = new TextDecoder();
+function oggCrc(bytes) {
+	let crc = 0;
+	for (let i = 0; i < bytes.length; i++) {
+		const x = i >= 22 && i < 26 ? 0 : bytes[i];
+		crc ^= x << 24;
+		for (let n = 0; n < 8; n++) crc = crc & 2147483648 ? crc << 1 ^ 79764919 : crc << 1;
+	}
+	return crc >>> 0;
+}
+function inspectOpusOgg(bytes, { expectedFrames, expectedChannels, expectedPreSkip } = {}) {
+	if (!(bytes instanceof Uint8Array) || bytes.length < 47) throw Error("ogg_bytes");
+	let off = 0, serial, seq = 0, pages = 0, ended = false, continued = false, packet = 0, packetSize = 0, head = [], preSkip, channels, lastGranule = null;
+	while (off < bytes.length) {
+		if (ended || off + 27 > bytes.length) throw Error("ogg_trailing_or_truncated");
+		const d = new DataView(bytes.buffer, bytes.byteOffset + off), flags = bytes[off + 5], laces = bytes[off + 26];
+		if (text.decode(bytes.subarray(off, off + 4)) !== "OggS" || bytes[off + 4] !== 0 || flags & -8) throw Error("ogg_header");
+		if (off + 27 + laces > bytes.length) throw Error("ogg_laces");
+		let size = 27 + laces;
+		for (let i = 0; i < laces; i++) size += bytes[off + 27 + i];
+		if (off + size > bytes.length) throw Error("ogg_body");
+		const page = bytes.subarray(off, off + size);
+		if (d.getUint32(22, true) !== oggCrc(page)) throw Error("ogg_crc");
+		const s = d.getUint32(14, true), q = d.getUint32(18, true);
+		if (pages === 0) {
+			serial = s;
+			if (!(flags & 2) || flags & 1) throw Error("ogg_bos");
+		} else if (s !== serial || flags & 2) throw Error("ogg_multiplex");
+		if (q !== seq++ || Boolean(flags & 1) !== continued) throw Error("ogg_sequence_or_continuation");
+		const granule = d.getBigUint64(6, true);
+		if (granule !== 18446744073709551615n) {
+			if (lastGranule !== null && granule < lastGranule) throw Error("ogg_granule_order");
+			lastGranule = granule;
+		}
+		let p = off + 27 + laces;
+		for (let i = 0; i < laces; i++) {
+			const n = bytes[off + 27 + i];
+			if (packet < 2 && head.length < 64) {
+				const take = Math.min(n, 64 - head.length);
+				for (let j = 0; j < take; j++) head.push(bytes[p + j]);
+			}
+			p += n;
+			packetSize += n;
+			continued = n === 255;
+			if (!continued) {
+				if (packet === 0) {
+					const h = Uint8Array.from(head), v = new DataView(h.buffer);
+					if (packetSize !== 19 || text.decode(h.subarray(0, 8)) !== "OpusHead" || h[8] !== 1 || ![1, 2].includes(h[9]) || h[18] !== 0) throw Error("opus_head");
+					channels = h[9];
+					preSkip = v.getUint16(10, true);
+				} else if (packet === 1 && text.decode(Uint8Array.from(head).subarray(0, 8)) !== "OpusTags") throw Error("opus_tags");
+				packet++;
+				head = [];
+				packetSize = 0;
+			}
+		}
+		if (flags & 4) {
+			if (continued || packet < 3 || granule === 18446744073709551615n) throw Error("ogg_eos");
+			ended = true;
+		}
+		off += size;
+		pages++;
+	}
+	if (!ended || lastGranule === null || lastGranule < BigInt(preSkip) || lastGranule - BigInt(preSkip) > 14400000n) throw Error("opus_duration");
+	const frames = Number(lastGranule - BigInt(preSkip));
+	if (frames < 1 || expectedFrames !== void 0 && frames !== expectedFrames || expectedChannels !== void 0 && channels !== expectedChannels || expectedPreSkip !== void 0 && preSkip !== expectedPreSkip) throw Error("opus_timing_mismatch");
+	return {
+		bytes: bytes.length,
+		pages,
+		serial,
+		frames,
+		sampleRate: 48e3,
+		channels,
+		preSkip
+	};
+}
+// src/opus-codec/verified-opus-client.mjs
+const DECODER_SHA256 = "8b67eda2a46e478f65c24c467dae9eac26293efae6484bfe762b9d1086058b4b";
+const hex$1 = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+const digest = async (bytes) => {
+	const subtle = globalThis.crypto?.subtle;
+	if (subtle) try {
+		return hex$1(new Uint8Array(await subtle.digest("SHA-256", bytes)));
+	} catch {}
+	return hex$1(sha256(bytes));
+};
+function quantize(v) {
+	if (!Number.isFinite(v)) throw Error("opus_nonfinite");
+	const x = v * 32768, f = Math.floor(x), d = x - f, q = d > .5 ? f + 1 : d < .5 ? f : f % 2 === 0 ? f : f + 1;
+	return Math.max(-32768, Math.min(32767, q));
+}
+async function decodeVerifiedOpus({ bytes, wasmBytes, expected, signal, chunkBytes = 65536 }) {
+	const check = () => signal?.throwIfAborted();
+	check();
+	if (!(bytes instanceof Uint8Array) || !(wasmBytes instanceof Uint8Array) || !expected) throw Error("opus_input");
+	wasmBytes = wasmBytes.slice();
+	for (const name of ["oggSha256", "pcm16Sha256"]) if (!/^[0-9a-f]{64}$/.test(expected[name])) throw Error("opus_identity");
+	if (expected.decoderWasmSha256 !== "8b67eda2a46e478f65c24c467dae9eac26293efae6484bfe762b9d1086058b4b" || await digest(wasmBytes) !== "8b67eda2a46e478f65c24c467dae9eac26293efae6484bfe762b9d1086058b4b") throw Error("opus_decoder_identity");
+	if (expected.sampleRate !== 48e3 || expected.channels !== 2 || !Number.isSafeInteger(expected.frames) || expected.frames < 1 || expected.frames > 144e5 || !Number.isSafeInteger(expected.oggBytes) || expected.oggBytes !== bytes.byteLength || !Number.isSafeInteger(chunkBytes) || chunkBytes < 1 || chunkBytes > 1048576) throw Error("opus_descriptor");
+	if (await digest(bytes) !== expected.oggSha256) throw Error("opus_encoded_identity");
+	inspectOpusOgg(bytes, {
+		expectedFrames: expected.frames,
+		expectedChannels: 2,
+		expectedPreSkip: expected.preSkip
+	});
+	check();
+	OpusDecoder.module = await WebAssembly.compile(wasmBytes);
+	check();
+	let dec;
+	let decodedTotal = 0;
+	const parser = new codec_parser_default("application/ogg", {
+		onCodec: (c) => {
+			if (c !== "opus") throw Error("opus_codec");
+		},
+		enableFrameCRC32: false
+	});
+	const pcm = new Uint8Array(expected.frames * 4), view = new DataView(pcm.buffer), i16 = new Int16Array(pcm.buffer), le = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
+	let frames = 0;
+	const consume = (r) => {
+		if (r.errors?.length) throw Error("opus_decode_error");
+		const n = r.samplesDecoded;
+		if (!Number.isSafeInteger(n) || n < 0 || frames + n > expected.frames || r.sampleRate !== 48e3 || r.channelData?.length !== 2 || r.channelData.some((c) => c.length !== n)) throw Error("opus_decode_shape");
+		if (le) for (let j = 0; j < n; j++) {
+			i16[(frames + j) * 2] = quantize(r.channelData[0][j]);
+			i16[(frames + j) * 2 + 1] = quantize(r.channelData[1][j]);
+		}
+		else for (let j = 0; j < n; j++) {
+			view.setInt16((frames + j) * 4, quantize(r.channelData[0][j]), true);
+			view.setInt16((frames + j) * 4 + 2, quantize(r.channelData[1][j]), true);
+		}
+		frames += n;
+	};
+	const pages = async (parsed) => {
+		for (const page of parsed) {
+			const packets = page[codecFrames].map((f) => f[data]);
+			if (!packets.length) continue;
+			if (!dec) {
+				const h = page[codecFrames][0][header];
+				if (h[channels] !== 2 || h[preSkip] !== expected.preSkip) throw Error("opus_header_binding");
+				dec = new OpusDecoder({
+					channels: h[channels],
+					streamCount: h[streamCount],
+					coupledStreamCount: h[coupledStreamCount],
+					channelMappingTable: h[channelMappingTable],
+					preSkip: expected.preSkip,
+					sampleRate: 48e3,
+					forceStereo: true
+				});
+				await dec.ready;
+			}
+			check();
+			const r = await dec.decodeFrames(packets), n = r.samplesDecoded;
+			let keep = n;
+			if (page[isLastPage]) {
+				if (page[absoluteGranulePosition] === void 0) throw Error("opus_trim_missing");
+				const N = Number(page[absoluteGranulePosition]) - expected.preSkip, excess = decodedTotal + n - N;
+				if (!Number.isSafeInteger(N) || N !== expected.frames || excess < 0 || excess > expected.preSkip + 1920 || decodedTotal > N) throw Error("opus_trim_unsupported");
+				keep = n - excess;
+			}
+			decodedTotal += n;
+			consume({
+				...r,
+				samplesDecoded: keep,
+				channelData: r.channelData.map((c) => c.subarray(0, keep))
+			});
+		}
+	};
+	try {
+		for (let off = 0; off < bytes.length; off += chunkBytes) {
+			check();
+			await pages([...parser.parseChunk(bytes.subarray(off, Math.min(off + chunkBytes, bytes.length)))]);
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		}
+		await pages([...parser.flush()]);
+		check();
+		if (frames !== expected.frames || hex$1(sha256(pcm)) !== expected.pcm16Sha256) throw Error("opus_pcm_identity");
+		check();
+		return {
+			pcm16: pcm,
+			sampleRate: 48e3,
+			channels: 2,
+			frames
+		};
+	} finally {
+		dec?.free();
+	}
+}
+// src/chart-rating.mjs
+const RATING_REFS = {
+	standard: {
+		nps: 8,
+		peakNps: 14,
+		chordShare: .5,
+		holdTimeShare: .35,
+		jackRate: .15
+	},
+	sc: {
+		nps: 10,
+		peakNps: 18,
+		chordShare: .6,
+		holdTimeShare: .4,
+		jackRate: .2
+	}
+};
+const RATING_WEIGHTS = {
+	nps: .45,
+	peakNps: .25,
+	chord: .15,
+	hold: .1,
+	jack: .05
+};
+function chartFeatures(notes, durationSec) {
+	if (!Array.isArray(notes) || notes.length === 0 || !Number.isFinite(durationSec) || durationSec <= 0) throw new Error("Invalid chart for rating");
+	const ts = notes.map((n) => n.time).sort((a, b) => a - b);
+	const n = notes.length;
+	let peak = 1, j = 0;
+	for (let i = 0; i < n; i++) {
+		while (ts[j] < ts[i] - 1 + 1e-9 && j < i) j++;
+		peak = Math.max(peak, i - j + 1);
+	}
+	let chords = 0, i = 0;
+	while (i < n) {
+		let k = i;
+		while (k + 1 < n && Math.abs(ts[k + 1] - ts[i]) < 1e-9) k++;
+		if (k > i) chords += k - i + 1;
+		i = k + 1;
+	}
+	const holdTime = notes.filter((x) => x.end !== void 0).reduce((s, x) => s + (x.end - x.time), 0);
+	let jacks = 0;
+	const byLane = /* @__PURE__ */ new Map();
+	for (const x of notes) {
+		const p = byLane.get(x.lane);
+		if (p !== void 0 && x.time - p < .15) jacks++;
+		byLane.set(x.lane, x.time);
+	}
+	return {
+		notes: n,
+		nps: n / durationSec,
+		peakNps: peak,
+		chordShare: chords / n,
+		holdTimeShare: holdTime / durationSec,
+		jackRate: jacks / n
+	};
+}
+function rateFeatures(f, scale) {
+	const R = RATING_REFS[scale];
+	if (!R) throw new Error("Unknown rating scale: " + scale);
+	const W = RATING_WEIGHTS;
+	const sub = (v, ref) => Math.min(15, v / ref * 15);
+	const composite = W.nps * sub(f.nps, R.nps) + W.peakNps * sub(f.peakNps, R.peakNps) + W.chord * sub(f.chordShare, R.chordShare) + W.hold * sub(f.holdTimeShare, R.holdTimeShare) + W.jack * sub(f.jackRate, R.jackRate);
+	return Math.max(1, Math.min(15, Math.round(composite)));
+}
+function rateDifficulty(notes, durationSec, scale) {
+	return rateFeatures(chartFeatures(notes, durationSec), scale);
+}
+// src/flux-tables.mjs
+const HANN = Float64Array.of(0, 943076911874563e-20, 3772272071722593e-20, 8487478753615996e-20, .00015088519085437735, .00023575144055643094, .00033947033522635506, .0004620379622682358, .0006034496980542037, .0007637002080985167, .0009427834472588992, .0011406926599646372, .0013574203804713747, .0015929584331427216, .0018472979327587291, .0021204292848509554, .0024123421860645644, .0027230256245468487, .003052467880362675, .003400656525936685, .003767578426521867, .004153219740695435, .00455756592088058, .004980601713895361, .005422311161528193, .005882677601139863, .006361683666291973, .006859311287402081, .007375541692425325, .007910355407562741, .008463732257995571, .009035651368646647, .009626091164967543, .010235029373752758, .010862443023979595, .011508308447674975, .012172601280808104, .012855296464209687, .013556368244517059, .014275790175145853, .01501353511728759, .015769575240933364, .01654388202592383, .01733642626302484, .018147178055029578, .01897610681788614, .01982318128185151, .020688369492670833, .021571638812783067, .022472955922552107, .023392286821523722, .02432959682970809, .025284850588888075, .026258012063953118, .02724904454425836, .028257910645009876, .02928457230867454, .030328990806415934, .03139112673955513, .03247094004105716, .0335683899770422, .034683435148322506, .03581603349196372, .03696614228287187, .038133718135405226, .03931871700501044, .0405210941898847, .04174080433266136, .04297780142212154, .044232038794929374, .04550346913739256, .046792044487247, .048097716235466326, .04942043512809524, .050760151268107845, .05211681411728969, .05349037249814442, .05488077459582419, .05628796796008434, .05771189950726191, .05915251552227829, .060609761660665395, .06208358295061572, .063573923795056, .06508072797374453, .06660393864539216, .06814349834980615, .06969934901005809, .0712714319346745, .07285968781985097, .07446405675168938, .0760844782084577, .07772089106287344, .0793732335844094, .08104144344162223, .0827254577045039, .08442521284685561, .08614064474868416, .08787168869862061, .08961827939636186, .09138035095513325, .09315783690417473, .09495067019124787, .09675878318516545, .0985821076783428, .10042057488937056, .1022741154656096, .10414265948580692, .10602613646273357, .1079244753458436, .10983760452395408, .11176545182794673, .1137079445334902, .11566500936378377, .11763657249232101, .11962255954567536, .12162289560630529, .12363750521538053, .12566631237562886, .12770924055420257, .1297662126855657, .13183715117440137, .13392197789853838, .13602061421189898, .1381329809474649, .1402589984202643, .14239858643037745, .14455166426596217, .14671815070629868, .14889796402485328, .15109102199236146, .15329724187992977, .15551654046215668, .15774883402027212, .1599940383452954, .16225206874121212, .16452284002816892, .16680626654568692, .16910226215589297, .17141074024676906, .17373161373541962, .17606479507135658, .17841019623980203, .18076772876500824, .1831373037135955, .18551883169790678, .1879122228793798, .19031738697193612, .19273423324538658, .19516267052885444, .19760260721421435, .20005395125954806, .20251661019261674, .20499049111434925, .20747550070234622, .20997154521440087, .21247853049203536, .21499636196405225, .21752494465010247, .22006418316426785, .2226139817186597, .22517424412703235, .22774487380841102, .2303257737907356, .23291684671451895, .2355179948365187, .23812912003342568, .24075012380556393, .24338090728060802, .24602137121731177, .24867141600925197, .2513309416885865, .25399984792982444, .2566780340536119, .2593653990305288, .2620618414849004, .2647672596986222, .2674815516149957, .2702046148425794, .272936346659051, .2756766440150822, .2784254035382263, .28118252153681766, .2839478940038831, .28672141662106565, .2895029847625594, .29229249349905667, .29508983760170626, .2978949115460823, .30070760951616615, .303527825408337, .30635545283537513, .309190385130475, .31203251535126864, .3148817362838605, .3177379404468714, .3206010200954933, .32347086722555374, .32634737357758986, .3292304306409326, .3321199296577997, .335015761627399, .3379178173100396, .340825987231253, .3437401616859229, .34666023074242347, .3495860842467663, .3525176118267561, .3554547028961537, .35839724665884803, .3613451321130356, .364298248055408, .367256483085347, .37021972560912597, .3731878638441208, .37616078582302565, .37913837939807754, .38212053224528636, .385107131868672, .38809806560450877, .3910932206255743, .3940924839454067, .3970957424225666, .40010288276490463, .40311379153383575, .4061283551486183, .40914645989063825, .41216799190769987, .4151928372183196, .4182208817160266, .42125201117366684, .42428611124771165, .42732306748257215, .43036276531491585, .4334050900779891, .43644992700594226, .43949716123815885, .44254667782358914, .4455983617250855, .4486520978237429, .45170777092324094, .45476526575418963, .4578244669784776, .460885259193623, .46394752693712715, .4670111546908299, .47007602688526684, .4731420279040302, .4762090420881288, .4792769537403521, .48234564712963435, .4854150064954201, .48848491605203115, .49155525999303445, .4946259224956109, .4976967877249241, .50076773983849, .5038386629905474, .5069094413364271, .5099799590369228, .5130501002626607, .5161197491984684, .5191887900477443, .5222571070368258, .5253245844193564, .5283911064806522, .531456557542067, .534520821965356, .5375837841570382, .5406453285727563, .5437053397216364, .5467637021706436, .5498203005489378, .5528750195522244, .5559277439471046, .558978358575423, .5620267483586104, .565072798302026, .5681163934992949, .5711574191366425, .5741957604972264, .5772313029654628, .5802639320313512, .5832935332947936, .5863199924699095, .5893431953893482, .5923630280085946, .595379376410272, .5983921268084391, .6014011655528819, .6044063791334021, .6074076541840977, .6104048774876404, .6133979359795466, .6163867167524417, .6193711070603203, .6223509943227981, .6253262661293602, .6282968102436011, .6312625146074574, .6342232673454371, .6371789567688378, .6401294713799617, .6430746998763204, .6460145311548339, .6489488543160223, .6518775586681886, .6548005337315943, .6577176692426278, .6606288551579629, .6635339816587107, .6664329391545624, .6693256182879223, .6722119099380344, .675091705225098, .6779648955143753, .6808313724202893, .6836910278105124, .6865437538100456, .689389442805288, .6922279874480959, .6950592806598326, .6978832156354079, .7006996858473067, .7035085850496078, .7063098072819918, .709103246873738, .7118887984477116, .7146663569243369, .7174358175255634, .720197075778817, .7229500275209416, .725694568902128, .7284305963898314, .7311580067726783, .7338766971643578, .7365865650075044, .7392875080775664, .7419794244866618, .7446622126874216, .7473357714768221, .7499999999999999, .7526547977540592, .755300064591861, .7579357007258021, .7605616067315792, .7631776835519389, .7657838325004158, .7683799552650534, .7709659539121142, .7735417308897734, .7761071890317994, .7786622315612182, .7812067620939651, .7837406846425203, .7862639036195297, .7887763238414108, .7912778505319435, .7937683893258454, .7962478462723304, .7987161278386553, .8011731409136453, .8036187928112085, .8060529912738315, .808475644476059, .8108866610279595, .8132859499785707, .8156734208193327, .8180489834874998, .8204125483695401, .8227640263045148, .8251033285874421, .8274303669726424, .8297450536770695, .8320473013836196, .834337023244426, .8366141328841364, .8388785444031694, .8411301723809563, .8433689318791624, .8455947384448923, .8478075081138745, .8500071574136294, .8521936033666186, .8543667634933741, .8565265558156103, .8586728988593157, .8608057116578284, .8629249137548873, .8650304252076702, .8671221665898072, .8692000589943786, .8712640240368896, .8733139838582298, .8753498611276077, .8773715790454695, .8793790613463954, .8813722323019773, .8833510167236747, .8853153399656513, .8872651279275916, .8892003070574949, .8911208043544511, .8930265473713936, .8949174642178332, .8967934835625686, .898654534636379, .9005005472346923, .902331451720234, .9041471790256541, .9059476606561327, .9077328286919637, .9095026157911166, .9112569551917773, .9129957807148665, .9147190267665359, .9164266283406433, .9181185210212033, .9197946409848194, .9214549250030899, .9230993104449938, .9247277352792532, .9263401380766738, .9279364580124613, .9295166348685169, .931080609035708, .9326283215161177, .9341597139252698, .935674728494331, .937173308072291, .9386553961281179, .9401209367528907, .9415698746619078, .9430021551967743, .9444177243274616, .9458165286543475, .9471985154102291, .9485636324623146, .9499118283141887, .9512430521077563, .9525572536251606, .9538543832906772, .9551343921725842, .9563972319850091, .957642855089749, .958871214498068, .9600822638724704, .9612759575284481, .9624522504362039, .9636110982223505, .9647524571715842, .9658762842283343, .9669825369983864, .968071173750483, .9691421534178966, .970195435599979, .9712309805636863, .9722487492450764, .9732487032507835, .9742308048594664, .9751950170232309, .9761413033690276, .9770696282000244, .9779799564969529, .978872253919429, .9797464868072486, .9806026221816581, .9814406277465968, .982260471889917, .9830621236845754, .9838455528897998, .9846107299522304, .9853576260070347, .9860862128789953, .9867964630835742, .9874883498279483, .9881618470120215, .9888169292294076, .9894535717683901, .990071750612854, .9906714424431913, .9912526246371813, .9918152752708436, .9923593731192655, .9928848976574018, .9933918290608507, .9938801482065998, .9943498366737487, .9948008767442034, .9952332514033447, .9956469443406706, .9960419399504106, .9964182233321149, .9967757802912172, .9971145973395684, .9974346616959475, .9977359612865423, .9980184847454051, .998282221414882, .9985271613460143, .9987532952989144, .9989606147431138, .9991491118578855, .999318779532538, .999469611366685, .9996016016704854, .999714745464859, .9998090384816739, .9998844771639073, .99994105866578, .9999787808528637, .9999976423021616, .9999976423021616, .9999787808528637, .99994105866578, .9998844771639073, .9998090384816739, .999714745464859, .9996016016704854, .999469611366685, .999318779532538, .9991491118578855, .9989606147431139, .9987532952989144, .9985271613460144, .998282221414882, .9980184847454051, .9977359612865423, .9974346616959475, .9971145973395684, .996775780291217, .9964182233321149, .9960419399504106, .9956469443406706, .9952332514033448, .9948008767442034, .9943498366737487, .9938801482065998, .9933918290608508, .9928848976574018, .9923593731192655, .9918152752708437, .9912526246371813, .9906714424431913, .990071750612854, .9894535717683901, .9888169292294076, .9881618470120215, .9874883498279484, .9867964630835742, .9860862128789953, .9853576260070347, .9846107299522304, .9838455528897998, .9830621236845754, .982260471889917, .9814406277465968, .9806026221816581, .9797464868072487, .978872253919429, .9779799564969529, .9770696282000244, .9761413033690276, .9751950170232309, .9742308048594666, .9732487032507837, .9722487492450764, .9712309805636864, .9701954355999791, .9691421534178966, .968071173750483, .9669825369983864, .9658762842283342, .9647524571715842, .9636110982223505, .962452250436204, .9612759575284482, .9600822638724705, .9588712144980681, .9576428550897489, .9563972319850091, .9551343921725843, .9538543832906772, .9525572536251605, .9512430521077564, .9499118283141887, .9485636324623146, .9471985154102293, .9458165286543476, .9444177243274617, .9430021551967742, .9415698746619079, .9401209367528907, .938655396128118, .937173308072291, .9356747284943311, .9341597139252698, .932628321516118, .9310806090357082, .9295166348685169, .9279364580124614, .9263401380766738, .9247277352792533, .9230993104449937, .92145492500309, .9197946409848194, .9181185210212034, .9164266283406433, .9147190267665362, .9129957807148665, .9112569551917774, .9095026157911167, .9077328286919637, .9059476606561327, .9041471790256541, .9023314517202341, .9005005472346923, .8986545346363792, .8967934835625688, .8949174642178331, .8930265473713939, .8911208043544512, .889200307057495, .8872651279275915, .8853153399656515, .8833510167236747, .8813722323019773, .8793790613463955, .8773715790454696, .8753498611276078, .8733139838582299, .8712640240368899, .8692000589943785, .8671221665898073, .8650304252076703, .8629249137548874, .8608057116578283, .858672898859316, .8565265558156102, .8543667634933743, .8521936033666189, .8500071574136296, .8478075081138745, .8455947384448924, .8433689318791626, .8411301723809563, .8388785444031694, .8366141328841366, .8343370232444263, .8320473013836195, .8297450536770697, .8274303669726426, .8251033285874423, .8227640263045148, .8204125483695403, .8180489834875, .8156734208193328, .8132859499785706, .8108866610279596, .8084756444760592, .8060529912738317, .8036187928112086, .8011731409136454, .7987161278386554, .7962478462723304, .7937683893258455, .7912778505319438, .7887763238414112, .7862639036195296, .7837406846425203, .7812067620939651, .7786622315612183, .7761071890317995, .7735417308897737, .7709659539121145, .7683799552650534, .7657838325004158, .763177683551939, .7605616067315796, .7579357007258022, .755300064591861, .7526547977540594, .7500000000000002, .747335771476822, .7446622126874216, .7419794244866621, .7392875080775665, .7365865650075045, .7338766971643579, .7311580067726784, .7284305963898313, .7256945689021281, .722950027520942, .7201970757788175, .7174358175255635, .714666356924337, .7118887984477117, .7091032468737379, .706309807281992, .7035085850496081, .700699685847307, .6978832156354079, .6950592806598327, .6922279874480959, .6893894428052881, .6865437538100458, .6836910278105126, .6808313724202896, .6779648955143752, .675091705225098, .6722119099380344, .6693256182879228, .6664329391545625, .6635339816587109, .6606288551579631, .6577176692426275, .6548005337315942, .6518775586681885, .6489488543160228, .646014531154834, .6430746998763205, .6401294713799619, .6371789567688381, .6342232673454369, .6312625146074577, .6282968102436013, .6253262661293603, .6223509943227981, .6193711070603203, .6163867167524419, .6133979359795464, .6104048774876407, .607407654184098, .6044063791334024, .601401165552882, .5983921268084391, .5953793764102722, .5923630280085943, .5893431953893483, .5863199924699097, .5832935332947938, .5802639320313512, .5772313029654628, .5741957604972264, .5711574191366431, .568116393499295, .5650727983020263, .5620267483586107, .5589783585754229, .5559277439471045, .5528750195522243, .5498203005489383, .5467637021706437, .5437053397216365, .5406453285727565, .5375837841570384, .5345208219653559, .5314565575420669, .5283911064806526, .5253245844193564, .5222571070368258, .5191887900477444, .5161197491984686, .5130501002626605, .5099799590369232, .5069094413364275, .5038386629905477, .50076773983849, .4976967877249241, .494625922495611, .4915552599930341, .48848491605203126, .4854150064954203, .4823456471296347, .4792769537403521, .4762090420881288, .4731420279040302, .4700760268852674, .46701115469083, .4639475269371274, .4608852591936232, .4578244669784774, .4547652657541895, .451707770923241, .44865209782374343, .4455983617250856, .44254667782358925, .43949716123815913, .43644992700594254, .433405090077989, .4303627653149158, .4273230674825725, .42428611124771165, .4212520111736669, .41822088171602684, .41519283721831984, .4121679919076997, .4091464598906386, .4061283551486186, .4031137915338362, .4001028827649047, .3970957424225666, .3940924839454068, .39109322062557395, .3880980656045089, .38510713186867235, .3821205322452867, .37913837939807754, .3761607858230257, .3731878638441208, .3702197256091265, .3672564830853471, .3642982480554083, .3613451321130358, .35839724665884787, .35545470289615366, .35251761182675617, .34958608424676685, .3466602307424236, .34374016168592303, .34082598723125324, .33791781731003984, .3350157616273989, .33211992965779963, .32923043064093294, .32634737357758986, .32347086722555385, .3206010200954935, .31773794044687165, .31488173628386035, .31203251535126897, .3091903851304753, .30635545283537513, .303527825408337, .30070760951616615, .2978949115460824, .295089837601706, .29229249349905695, .28950298476255976, .286721416621066, .2839478940038831, .28118252153681766, .2784254035382264, .2756766440150823, .2729363466590511, .27020461484257957, .26748155161499587, .26476725969862214, .26206184148490047, .2593653990305288, .25667803405361234, .25399984792982455, .25133094168858655, .24867141600925213, .2460213712173116, .24338090728060796, .24075012380556388, .23812912003342596, .2355179948365188, .23291684671451907, .23032577379073582, .22774487380841119, .22517424412703219, .22261398171865998, .22006418316426812, .21752494465010247, .2149963619640523, .21247853049203547, .20997154521440103, .207475500702346, .20499049111434942, .20251661019261702, .20005395125954833, .1976026072142143, .19516267052885444, .19273423324538663, .1903173869719359, .18791222287938003, .185518831697907, .1831373037135957, .18076772876500818, .17841019623980203, .17606479507135664, .17373161373542, .17141074024676917, .16910226215589308, .1668062665456871, .1645228400281688, .162252068741212, .15999403834529535, .15774883402027245, .15551654046215674, .15329724187992988, .15109102199236157, .14889796402485345, .14671815070629857, .1445516642659624, .14239858643037773, .1402589984202643, .13813298094746496, .13602061421189904, .1339219778985385, .1318371511744012, .12976621268556593, .1277092405542028, .12566631237562909, .12363750521538053, .12162289560630529, .11962255954567541, .11763657249232085, .11566500936378388, .11370794453349042, .11176545182794695, .10983760452395402, .1079244753458436, .10602613646273362, .10414265948580725, .10227411546560966, .10042057488937067, .09858210767834297, .0967587831851654, .09495067019124781, .09315783690417467, .09138035095513353, .08961827939636186, .08787168869862072, .08614064474868421, .08442521284685572, .08272545770450385, .0810414434416224, .07937323358440962, .0777208910628735, .0760844782084577, .07446405675168943, .07285968781985108, .07127143193467439, .0696993490100582, .06814349834980632, .06660393864539232, .06508072797374453, .063573923795056, .06208358295061578, .060609761660665284, .059152515522278404, .05771189950726202, .056287967960084506, .05488077459582419, .05349037249814442, .052116814117289745, .05076015126810807, .0494204351280953, .04809771623546638, .04679204448724711, .045503469137392505, .04423203879492932, .04297780142212154, .041740804332661585, .0405210941898847, .039318717005010495, .03813371813540528, .03696614228287198, .03581603349196366, .03468343514832262, .03356838997704237, .03247094004105716, .03139112673955513, .03032899080641599, .029284572308674595, .02825791064500982, .02724904454425847, .02625801206395323, .025284850588888075, .02432959682970809, .023392286821523778, .022472955922552162, .02157163881278301, .02068836949267089, .01982318128185162, .01897610681788625, .018147178055029578, .01733642626302484, .01654388202592383, .01576957524093342, .015013535117287646, .014275790175145908, .013556368244517114, .012855296464209631, .012172601280808104, .011508308447674975, .010862443023979707, .010235029373752758, .009626091164967598, .009035651368646702, .008463732257995571, .007910355407562741, .007375541692425325, .006859311287402137, .006361683666291973, .0058826776011399184, .005422311161528248, .004980601713895361, .004557565920880524, .004153219740695491, .0037675784265219225, .003400656525936685, .003052467880362675, .0027230256245468487, .0024123421860645644, .0021204292848509554, .0018472979327587291, .0015929584331427216, .0013574203804713747, .0011406926599646372, .0009427834472588992, .0007637002080985167, .0006034496980542037, .0004620379622682358, .00033947033522635506, .00023575144055643094, .00015088519085437735, 8487478753615996e-20, 3772272071722593e-20, 943076911874563e-20, 0);
+const WRE = Float64Array.of(1, .9999811752826011, .9999247018391445, .9998305817958234, .9996988186962042, .9995294175010931, .9993223845883495, .9990777277526454, .9987954562051724, .9984755805732948, .9981181129001492, .9977230666441916, .9972904566786902, .9968202992911657, .996312612182778, .9957674144676598, .9951847266721969, .9945645707342554, .9939069700023561, .9932119492347945, .99247953459871, .9917097536690995, .99090263542778, .9900582102622971, .989176509964781, .9882575677307495, .9873014181578584, .9863080972445987, .9852776423889412, .984210092386929, .9831054874312163, .9819638691095552, .9807852804032304, .9795697656854405, .9783173707196277, .9770281426577544, .9757021300385286, .9743393827855759, .9729399522055602, .9715038909862518, .970031253194544, .9685220942744174, .9669764710448521, .9653944416976894, .9637760657954398, .9621214042690416, .9604305194155658, .9587034748958716, .9569403357322088, .9551411683057708, .9533060403541939, .9514350209690083, .9495281805930367, .9475855910177411, .9456073253805213, .9435934581619604, .9415440651830208, .9394592236021899, .937339011912575, .9351835099389476, .932992798834739, .9307669610789837, .9285060804732156, .9262102421383114, .9238795325112867, .921514039342042, .9191138516900578, .9166790599210427, .9142097557035307, .9117060320054299, .9091679830905224, .9065957045149153, .9039892931234433, .901348847046022, .8986744656939538, .8959662497561852, .8932243011955153, .8904487232447579, .8876396204028539, .8847970984309378, .881921264348355, .8790122264286335, .8760700941954066, .8730949784182901, .8700869911087115, .8670462455156926, .8639728561215868, .8608669386377673, .8577286100002721, .8545579883654005, .8513551931052652, .8481203448032972, .8448535652497071, .8415549774368984, .8382247055548381, .83486287498638, .8314696123025452, .8280450452577558, .8245893027850253, .8211025149911046, .8175848131515837, .8140363297059484, .8104571982525948, .8068475535437993, .8032075314806449, .799537269107905, .7958369046088836, .7921065773002124, .7883464276266063, .7845565971555752, .7807372285720945, .7768884656732324, .773010453362737, .7691033376455797, .765167265622459, .7612023854842618, .7572088465064846, .7531867990436125, .7491363945234594, .7450577854414661, .7409511253549591, .7368165688773699, .7326542716724128, .7284643904482252, .724247082951467, .7200025079613817, .7157308252838186, .7114321957452164, .7071067811865476, .7027547444572253, .6983762494089729, .693971460889654, .6895405447370669, .6850836677727004, .6806009977954531, .676092703575316, .6715589548470183, .6669999223036375, .6624157775901718, .6578066932970786, .6531728429537768, .6485144010221126, .6438315428897915, .6391244448637757, .6343932841636455, .6296382389149271, .6248594881423865, .6200572117632892, .6152315905806268, .6103828062763095, .6055110414043255, .600616479383869, .5956993044924335, .5907597018588743, .5857978574564389, .5808139580957645, .5758081914178453, .5707807458869674, .5657318107836132, .560661576197336, .5555702330196023, .5504579729366048, .5453249884220465, .540171472729893, .5349976198870973, .5298036246862948, .5245896826784688, .5193559901655895, .5141027441932217, .508830142543107, .5035383837257176, .49822766697278187, .4928981922297841, .48755016014843605, .48218377207912283, .47679923006332225, .4713967368259978, .4659764957679661, .46053871095824, .45508358712634384, .4496113296546066, .44412214457042926, .4386162385385277, .433093818853152, .4275550934302822, .4220002707997998, .4164295600976373, .4108431710579039, .40524131400498986, .3996241998456468, .3939920400610481, .3883450466988263, .38268343236508984, .3770074102164183, .3713171939518376, .36561299780477396, .3598950365349883, .3541635254204905, .3484186802494345, .3426607173119944, .33688985339222005, .33110630575987643, .325310292162263, .31950203081601575, .3136817403988916, .307849640041535, .3020059493192282, .29615088824362396, .29028467725446233, .2844075372112718, .27851968938505306, .272621355449949, .2667127574748984, .26079411791527557, .2548656596045146, .24892760574572026, .24298017990326398, .23702360599436734, .23105810828067128, .22508391135979278, .21910124015686977, .21311031991609136, .20711137619221856, .20110463484209196, .19509032201612833, .18906866414980628, .18303988795514106, .17700422041214886, .17096188876030136, .1649131204899701, .1588581433338614, .1527971852584434, .14673047445536175, .14065823933284924, .13458070850712622, .12849811079379322, .12241067519921628, .11631863091190488, .11022220729388318, .10412163387205473, .09801714032956077, .0919089564971327, .08579731234443988, .07968243797143013, .07356456359966745, .0674439195636641, .06132073630220865, .05519524434969003, .049067674327418126, .04293825693494096, .03680722294135899, .03067480317663658, .024541228522912264, .01840672990580482, .012271538285719944, .006135884649154515, 6123233995736766e-32, -.006135884649154393, -.012271538285719823, -.018406729905804695, -.024541228522912142, -.03067480317663646, -.036807222941358866, -.042938256934940834, -.04906767432741801, -.05519524434968991, -.06132073630220853, -.06744391956366398, -.07356456359966733, -.07968243797143001, -.08579731234443976, -.09190895649713257, -.09801714032956065, -.1041216338720546, -.11022220729388306, -.11631863091190475, -.12241067519921615, -.1284981107937931, -.1345807085071261, -.14065823933284913, -.14673047445536164, -.1527971852584433, -.15885814333386128, -.16491312048996995, -.17096188876030124, -.17700422041214875, -.18303988795514092, -.18906866414980616, -.1950903220161282, -.20110463484209182, -.20711137619221845, -.21311031991609125, -.21910124015686966, -.22508391135979267, -.23105810828067114, -.23702360599436723, -.24298017990326387, -.24892760574572012, -.2548656596045145, -.26079411791527546, -.2667127574748983, -.27262135544994887, -.27851968938505295, -.2844075372112717, -.29028467725446216, -.29615088824362384, -.3020059493192281, -.30784964004153487, -.3136817403988914, -.31950203081601564, -.32531029216226287, -.3311063057598763, -.33688985339221994, -.34266071731199427, -.3484186802494344, -.3541635254204904, -.35989503653498817, -.36561299780477385, -.3713171939518375, -.3770074102164182, -.3826834323650897, -.3883450466988262, -.393992040061048, -.3996241998456467, -.40524131400498975, -.4108431710579038, -.416429560097637, -.4220002707997997, -.42755509343028186, -.4330938188531519, -.4386162385385274, -.44412214457042914, -.4496113296546067, -.4550835871263437, -.46053871095824006, -.465976495767966, -.4713967368259977, -.4767992300633219, -.4821837720791227, -.4875501601484357, -.492898192229784, -.4982276669727816, -.5035383837257175, -.5088301425431071, -.5141027441932217, -.5193559901655896, -.5245896826784687, -.5298036246862947, -.534997619887097, -.5401714727298929, -.5453249884220462, -.5504579729366047, -.555570233019602, -.5606615761973359, -.5657318107836132, -.5707807458869671, -.5758081914178453, -.5808139580957644, -.5857978574564389, -.590759701858874, -.5956993044924334, -.6006164793838688, -.6055110414043254, -.6103828062763096, -.6152315905806267, -.6200572117632892, -.6248594881423862, -.6296382389149271, -.6343932841636454, -.6391244448637757, -.6438315428897913, -.6485144010221124, -.6531728429537765, -.6578066932970786, -.6624157775901719, -.6669999223036374, -.6715589548470184, -.6760927035753158, -.680600997795453, -.6850836677727002, -.6895405447370669, -.6939714608896538, -.6983762494089728, -.7027547444572251, -.7071067811865475, -.7114321957452165, -.7157308252838186, -.7200025079613817, -.7242470829514668, -.7284643904482252, -.7326542716724127, -.7368165688773699, -.7409511253549589, -.745057785441466, -.7491363945234591, -.7531867990436124, -.7572088465064846, -.7612023854842617, -.765167265622459, -.7691033376455795, -.773010453362737, -.7768884656732323, -.7807372285720945, -.784556597155575, -.7883464276266062, -.7921065773002122, -.7958369046088835, -.7995372691079051, -.8032075314806448, -.8068475535437993, -.8104571982525947, -.8140363297059484, -.8175848131515836, -.8211025149911046, -.8245893027850251, -.8280450452577557, -.8314696123025453, -.83486287498638, -.8382247055548381, -.8415549774368983, -.8448535652497071, -.8481203448032971, -.8513551931052652, -.8545579883654004, -.857728610000272, -.8608669386377671, -.8639728561215867, -.8670462455156928, -.8700869911087113, -.8730949784182901, -.8760700941954065, -.8790122264286335, -.8819212643483549, -.8847970984309378, -.8876396204028538, -.8904487232447579, -.8932243011955152, -.8959662497561851, -.8986744656939539, -.9013488470460219, -.9039892931234433, -.9065957045149153, -.9091679830905224, -.9117060320054298, -.9142097557035307, -.9166790599210426, -.9191138516900578, -.9215140393420418, -.9238795325112867, -.9262102421383114, -.9285060804732155, -.9307669610789837, -.9329927988347388, -.9351835099389476, -.9373390119125748, -.9394592236021899, -.9415440651830207, -.9435934581619604, -.9456073253805212, -.9475855910177411, -.9495281805930367, -.9514350209690083, -.9533060403541939, -.9551411683057707, -.9569403357322088, -.9587034748958715, -.9604305194155658, -.9621214042690415, -.9637760657954398, -.9653944416976893, -.9669764710448521, -.9685220942744174, -.970031253194544, -.9715038909862518, -.9729399522055601, -.9743393827855759, -.9757021300385285, -.9770281426577544, -.9783173707196275, -.9795697656854405, -.9807852804032304, -.9819638691095552, -.9831054874312163, -.984210092386929, -.9852776423889412, -.9863080972445986, -.9873014181578584, -.9882575677307495, -.989176509964781, -.990058210262297, -.99090263542778, -.9917097536690995, -.99247953459871, -.9932119492347945, -.9939069700023561, -.9945645707342554, -.9951847266721968, -.9957674144676598, -.996312612182778, -.9968202992911657, -.9972904566786902, -.9977230666441916, -.9981181129001492, -.9984755805732948, -.9987954562051724, -.9990777277526454, -.9993223845883495, -.9995294175010931, -.9996988186962042, -.9998305817958234, -.9999247018391445, -.9999811752826011);
+const WIM = Float64Array.of(-0, -.006135884649154475, -.012271538285719925, -.01840672990580482, -.024541228522912288, -.030674803176636626, -.03680722294135883, -.04293825693494082, -.049067674327418015, -.055195244349689934, -.06132073630220858, -.06744391956366405, -.07356456359966743, -.07968243797143013, -.0857973123444399, -.09190895649713272, -.0980171403295606, -.10412163387205459, -.11022220729388306, -.11631863091190475, -.1224106751992162, -.12849811079379317, -.13458070850712617, -.1406582393328492, -.14673047445536175, -.15279718525844344, -.15885814333386145, -.16491312048996992, -.17096188876030122, -.17700422041214875, -.18303988795514095, -.1890686641498062, -.19509032201612825, -.2011046348420919, -.20711137619221856, -.21311031991609136, -.2191012401568698, -.22508391135979283, -.2310581082806711, -.2370236059943672, -.24298017990326387, -.24892760574572015, -.25486565960451457, -.2607941179152755, -.26671275747489837, -.272621355449949, -.27851968938505306, -.2844075372112719, -.29028467725446233, -.2961508882436238, -.3020059493192281, -.30784964004153487, -.3136817403988915, -.3195020308160157, -.3253102921622629, -.33110630575987643, -.33688985339222005, -.3426607173119944, -.34841868024943456, -.35416352542049034, -.3598950365349881, -.36561299780477385, -.37131719395183754, -.37700741021641826, -.3826834323650898, -.38834504669882625, -.3939920400610481, -.3996241998456468, -.40524131400498986, -.4108431710579039, -.41642956009763715, -.4220002707997997, -.4275550934302821, -.43309381885315196, -.43861623853852766, -.4441221445704292, -.44961132965460654, -.45508358712634384, -.46053871095824, -.4659764957679662, -.47139673682599764, -.4767992300633221, -.4821837720791227, -.487550160148436, -.49289819222978404, -.49822766697278187, -.5035383837257176, -.508830142543107, -.5141027441932217, -.5193559901655896, -.524589682678469, -.5298036246862946, -.5349976198870972, -.5401714727298929, -.5453249884220465, -.5504579729366048, -.5555702330196022, -.560661576197336, -.5657318107836131, -.5707807458869673, -.5758081914178453, -.5808139580957645, -.5857978574564389, -.5907597018588742, -.5956993044924334, -.600616479383869, -.6055110414043255, -.6103828062763095, -.6152315905806268, -.6200572117632891, -.6248594881423863, -.629638238914927, -.6343932841636455, -.6391244448637757, -.6438315428897914, -.6485144010221124, -.6531728429537768, -.6578066932970786, -.6624157775901718, -.6669999223036375, -.6715589548470183, -.6760927035753159, -.680600997795453, -.6850836677727004, -.6895405447370668, -.693971460889654, -.6983762494089729, -.7027547444572253, -.7071067811865475, -.7114321957452164, -.7157308252838186, -.7200025079613817, -.7242470829514669, -.7284643904482252, -.7326542716724128, -.7368165688773698, -.7409511253549591, -.745057785441466, -.7491363945234593, -.7531867990436124, -.7572088465064845, -.7612023854842618, -.765167265622459, -.7691033376455796, -.773010453362737, -.7768884656732324, -.7807372285720944, -.7845565971555752, -.7883464276266062, -.7921065773002124, -.7958369046088835, -.799537269107905, -.8032075314806448, -.8068475535437992, -.8104571982525948, -.8140363297059483, -.8175848131515837, -.8211025149911046, -.8245893027850253, -.8280450452577558, -.8314696123025452, -.83486287498638, -.838224705554838, -.8415549774368983, -.844853565249707, -.8481203448032971, -.8513551931052652, -.8545579883654005, -.8577286100002721, -.8608669386377673, -.8639728561215867, -.8670462455156926, -.8700869911087113, -.8730949784182901, -.8760700941954066, -.8790122264286334, -.8819212643483549, -.8847970984309378, -.8876396204028539, -.8904487232447579, -.8932243011955153, -.8959662497561851, -.8986744656939538, -.901348847046022, -.9039892931234433, -.9065957045149153, -.9091679830905223, -.9117060320054299, -.9142097557035307, -.9166790599210427, -.9191138516900578, -.9215140393420419, -.9238795325112867, -.9262102421383113, -.9285060804732155, -.9307669610789837, -.9329927988347388, -.9351835099389475, -.937339011912575, -.9394592236021899, -.9415440651830208, -.9435934581619604, -.9456073253805213, -.9475855910177411, -.9495281805930367, -.9514350209690083, -.9533060403541938, -.9551411683057707, -.9569403357322089, -.9587034748958716, -.9604305194155658, -.9621214042690416, -.9637760657954398, -.9653944416976894, -.9669764710448521, -.9685220942744173, -.970031253194544, -.9715038909862518, -.9729399522055601, -.9743393827855759, -.9757021300385286, -.9770281426577544, -.9783173707196277, -.9795697656854405, -.9807852804032304, -.9819638691095552, -.9831054874312163, -.984210092386929, -.9852776423889412, -.9863080972445987, -.9873014181578584, -.9882575677307495, -.989176509964781, -.9900582102622971, -.99090263542778, -.9917097536690995, -.99247953459871, -.9932119492347945, -.9939069700023561, -.9945645707342554, -.9951847266721968, -.9957674144676598, -.996312612182778, -.9968202992911657, -.9972904566786902, -.9977230666441916, -.9981181129001492, -.9984755805732948, -.9987954562051724, -.9990777277526454, -.9993223845883495, -.9995294175010931, -.9996988186962042, -.9998305817958234, -.9999247018391445, -.9999811752826011, -1, -.9999811752826011, -.9999247018391445, -.9998305817958234, -.9996988186962042, -.9995294175010931, -.9993223845883495, -.9990777277526454, -.9987954562051724, -.9984755805732948, -.9981181129001492, -.9977230666441916, -.9972904566786902, -.9968202992911658, -.996312612182778, -.9957674144676598, -.9951847266721969, -.9945645707342554, -.9939069700023561, -.9932119492347945, -.99247953459871, -.9917097536690995, -.99090263542778, -.9900582102622971, -.989176509964781, -.9882575677307495, -.9873014181578584, -.9863080972445987, -.9852776423889412, -.984210092386929, -.9831054874312163, -.9819638691095552, -.9807852804032304, -.9795697656854405, -.9783173707196277, -.9770281426577544, -.9757021300385286, -.9743393827855759, -.9729399522055602, -.9715038909862518, -.970031253194544, -.9685220942744174, -.9669764710448521, -.9653944416976894, -.9637760657954398, -.9621214042690416, -.9604305194155659, -.9587034748958716, -.9569403357322089, -.9551411683057707, -.9533060403541939, -.9514350209690083, -.9495281805930367, -.9475855910177412, -.9456073253805214, -.9435934581619604, -.9415440651830208, -.9394592236021899, -.937339011912575, -.9351835099389476, -.9329927988347388, -.9307669610789837, -.9285060804732156, -.9262102421383114, -.9238795325112867, -.921514039342042, -.9191138516900578, -.9166790599210427, -.9142097557035307, -.9117060320054299, -.9091679830905225, -.9065957045149153, -.9039892931234434, -.901348847046022, -.8986744656939539, -.8959662497561852, -.8932243011955152, -.890448723244758, -.8876396204028539, -.8847970984309379, -.881921264348355, -.8790122264286335, -.8760700941954066, -.8730949784182902, -.8700869911087115, -.8670462455156928, -.8639728561215868, -.8608669386377672, -.8577286100002721, -.8545579883654005, -.8513551931052652, -.8481203448032972, -.8448535652497072, -.8415549774368984, -.8382247055548382, -.8348628749863801, -.8314696123025455, -.8280450452577558, -.8245893027850252, -.8211025149911048, -.8175848131515837, -.8140363297059485, -.8104571982525948, -.8068475535437994, -.8032075314806449, -.7995372691079052, -.7958369046088836, -.7921065773002123, -.7883464276266063, -.7845565971555751, -.7807372285720946, -.7768884656732324, -.7730104533627371, -.7691033376455796, -.7651672656224591, -.7612023854842619, -.7572088465064847, -.7531867990436125, -.7491363945234593, -.7450577854414661, -.740951125354959, -.73681656887737, -.7326542716724128, -.7284643904482253, -.7242470829514669, -.7200025079613818, -.7157308252838187, -.7114321957452167, -.7071067811865476, -.7027547444572252, -.6983762494089729, -.693971460889654, -.689540544737067, -.6850836677727004, -.6806009977954532, -.6760927035753159, -.6715589548470186, -.6669999223036376, -.662415777590172, -.6578066932970787, -.6531728429537766, -.6485144010221126, -.6438315428897914, -.6391244448637758, -.6343932841636455, -.6296382389149272, -.6248594881423863, -.6200572117632894, -.6152315905806269, -.6103828062763097, -.6055110414043257, -.6006164793838689, -.5956993044924335, -.5907597018588742, -.585797857456439, -.5808139580957645, -.5758081914178454, -.5707807458869673, -.5657318107836135, -.5606615761973361, -.5555702330196022, -.5504579729366049, -.5453249884220464, -.540171472729893, -.5349976198870972, -.5298036246862948, -.524589682678469, -.5193559901655898, -.5141027441932218, -.5088301425431073, -.5035383837257177, -.49822766697278176, -.49289819222978415, -.4875501601484359, -.4821837720791229, -.4767992300633221, -.47139673682599786, -.4659764957679662, -.4605387109582402, -.4550835871263439, -.4496113296546069, -.4441221445704293, -.43861623853852755, -.43309381885315207, -.42755509343028203, -.42200027079979985, -.41642956009763715, -.41084317105790413, -.4052413140049899, -.39962419984564707, -.39399204006104815, -.3883450466988266, -.3826834323650899, -.37700741021641815, -.3713171939518377, -.3656129978047738, -.35989503653498833, -.3541635254204904, -.3484186802494348, -.34266071731199443, -.33688985339222033, -.3311063057598765, -.32531029216226326, -.3195020308160158, -.3136817403988914, -.30784964004153503, -.30200594931922803, -.296150888243624, -.2902846772544624, -.2844075372112721, -.27851968938505317, -.27262135544994925, -.2667127574748985, -.26079411791527585, -.2548656596045147, -.2489276057457201, -.24298017990326407, -.23702360599436717, -.23105810828067133, -.22508391135979283, -.21910124015687005, -.21311031991609142, -.20711137619221884, -.201104634842092, -.1950903220161286, -.18906866414980636, -.1830398879551409, -.17700422041214894, -.17096188876030122, -.16491312048997014, -.15885814333386147, -.15279718525844369, -.1467304744553618, -.14065823933284954, -.13458070850712628, -.12849811079379309, -.12241067519921635, -.11631863091190471, -.11022220729388324, -.10412163387205457, -.09801714032956083, -.09190895649713275, -.08579731234444016, -.0796824379714302, -.07356456359966773, -.06744391956366418, -.06132073630220849, -.055195244349690094, -.049067674327417966, -.04293825693494102, -.03680722294135883, -.030674803176636865, -.024541228522912326, -.0184067299058051, -.012271538285720007, -.006135884649154799);
+// src/flux-research.mjs
+function fft(re, im) {
+	const n = re.length;
+	for (let i = 1, j = 0; i < n; i++) {
+		let bit = n >> 1;
+		for (; j & bit; bit >>= 1) j ^= bit;
+		j ^= bit;
+		if (i < j) {
+			const tr = re[i];
+			re[i] = re[j];
+			re[j] = tr;
+			const ti = im[i];
+			im[i] = im[j];
+			im[j] = ti;
+		}
+	}
+	for (let len = 2; len <= n; len <<= 1) {
+		const half = len >> 1, step = n / len;
+		for (let i = 0; i < n; i += len) for (let j = 0; j < half; j++) {
+			const t = j * step, cwr = WRE[t], cwi = WIM[t];
+			const ur = re[i + j], ui = im[i + j];
+			const vr = re[i + j + half] * cwr - im[i + j + half] * cwi;
+			const vi = re[i + j + half] * cwi + im[i + j + half] * cwr;
+			re[i + j] = ur + vr;
+			im[i + j] = ui + vi;
+			re[i + j + half] = ur - vr;
+			im[i + j + half] = ui - vi;
+		}
+	}
+}
+const BANDS$1 = {
+	low: [20, 250],
+	mid: [250, 2e3],
+	high: [2e3, 11025]
+};
+function analyzeFluxV2(samples, sampleRate, opts = {}) {
+	const hop = opts.hop ?? 512, window = opts.window ?? 1024, merge = opts.merge ?? .06;
+	if (window !== HANN.length) throw new Error("table only for window=1024");
+	const binHz = sampleRate / window;
+	const bandBins = {};
+	for (const [b, [lo, hi]] of Object.entries(BANDS$1)) bandBins[b] = [Math.max(1, Math.floor(lo / binHz)), Math.min(window / 2 - 1, Math.ceil(hi / binHz))];
+	const re = new Float64Array(window), im = new Float64Array(window);
+	let prev = null;
+	const flux = {
+		low: [],
+		mid: [],
+		high: []
+	};
+	const times = [];
+	for (let i = 0; i + window < samples.length; i += hop) {
+		for (let j = 0; j < window; j++) {
+			re[j] = samples[i + j] * HANN[j];
+			im[j] = 0;
+		}
+		fft(re, im);
+		const mag = new Float64Array(window / 2);
+		for (let k = 0; k < window / 2; k++) mag[k] = Math.sqrt(re[k] * re[k] + im[k] * im[k]);
+		if (prev) {
+			for (const [b, [lo, hi]] of Object.entries(bandBins)) {
+				let s = 0;
+				for (let k = lo; k <= hi; k++) {
+					const d = mag[k] - prev[k];
+					if (d > 0) s += d;
+				}
+				flux[b].push(s / (hi - lo + 1));
+			}
+			times.push((i + window / 2) / sampleRate);
+		}
+		prev = mag;
+	}
+	function pick(series) {
+		const sorted = [...series].sort((a, b) => a - b), floor = sorted[Math.floor(sorted.length * .65)] || 0;
+		const absFloor = (sorted[sorted.length - 1] || 0) * 1e-4;
+		const peaks = [];
+		for (let i = 2; i < series.length - 2; i++) {
+			const local = series.slice(Math.max(0, i - 20), i + 1).sort((a, b) => a - b);
+			const median = local[Math.floor(local.length / 2)];
+			const thr = Math.max(floor * 2.5, median * 3, absFloor);
+			if (series[i] > thr && series[i] >= series[i - 1] && series[i] > series[i + 1]) {
+				const time = times[i];
+				const margin = (series[i] - thr) / (thr || 1);
+				if (peaks.length && time - peaks[peaks.length - 1].time < merge) {
+					if (series[i] > peaks[peaks.length - 1].strength) peaks[peaks.length - 1] = {
+						time,
+						strength: series[i],
+						margin
+					};
+				} else peaks.push({
+					time,
+					strength: series[i],
+					margin
+				});
+			}
+		}
+		return peaks;
+	}
+	const bandPeaks = {
+		low: pick(flux.low),
+		mid: pick(flux.mid),
+		high: pick(flux.high)
+	};
+	const all = [];
+	for (const [b, ps] of Object.entries(bandPeaks)) for (const p of ps) all.push({
+		time: p.time,
+		strength: p.strength,
+		band: b,
+		margin: p.margin
+	});
+	all.sort((a, b) => a.time - b.time);
+	const combined = [];
+	for (const p of all) if (combined.length && p.time - combined[combined.length - 1].time < merge) {
+		const c = combined[combined.length - 1];
+		c.strength += p.strength;
+		c.bands.add(p.band);
+		c.margin = Math.min(c.margin, p.margin);
+		c.time = Math.min(c.time, p.time);
+	} else combined.push({
+		time: p.time,
+		strength: p.strength,
+		bands: /* @__PURE__ */ new Set([p.band]),
+		margin: p.margin
+	});
+	return {
+		times,
+		flux,
+		bandPeaks,
+		combined,
+		sampleRate,
+		hop,
+		window
+	};
+}
+// src/flux-chart-research.mjs
+function analyzePcm(samples, rate) {
+	const r = analyzeFluxV2(samples, rate);
+	return {
+		...r,
+		peaks: r.combined,
+		duration: samples.length / rate,
+		bpm: 0,
+		beatConfidence: 0
+	};
+}
+function choose(source, ratio, gap, burst) {
+	const selected = [], byTime = [...source].sort((a, b) => a.time - b.time);
+	const accept = (p) => {
+		if (selected.some((q) => Math.abs(q.time - p.time) < gap)) return false;
+		const t = [...selected, p].sort((a, b) => a.time - b.time);
+		let j = 0;
+		for (let i = 0; i < t.length; i++) {
+			while (t[i].time - t[j].time >= 1) j++;
+			if (i - j + 1 > burst) return false;
+		}
+		selected.push(p);
+		return true;
+	};
+	const phrases = [];
+	for (const p of byTime) {
+		if (!phrases.length || p.time - phrases.at(-1).at(-1).time >= 1.5) phrases.push([]);
+		phrases.at(-1).push(p);
+	}
+	for (const phrase of phrases) {
+		const ranked = [...phrase].sort((a, b) => b.strength - a.strength || a.time - b.time);
+		for (const p of ranked) if (accept(p)) break;
+	}
+	const bins = /* @__PURE__ */ new Map();
+	for (const p of byTime) {
+		const k = Math.floor(p.time / 4);
+		if (!bins.has(k)) bins.set(k, []);
+		bins.get(k).push(p);
+	}
+	for (const ps of bins.values()) {
+		const target = Math.max(1, Math.ceil(ps.length * ratio));
+		for (const p of [...ps].sort((a, b) => b.strength - a.strength || a.time - b.time)) {
+			if (selected.filter((q) => Math.floor(q.time / 4) === Math.floor(p.time / 4)).length >= target) break;
+			accept(p);
+		}
+	}
+	return selected.sort((a, b) => a.time - b.time);
+}
+const cache = /* @__PURE__ */ new WeakMap();
+function chartFromAnalysis(a, difficulty, lanes = 5) {
+	let bundle = cache.get(a);
+	if (!bundle) {
+		const strengths = a.peaks.map((p) => p.strength).sort((x, y) => x - y), floor = strengths[Math.floor(strengths.length * .15)] || 0;
+		const high = choose(a.peaks.filter((p) => p.strength >= floor), 1, .1, 8), mid = choose(high, .65, .2, 4);
+		bundle = {
+			high,
+			mid,
+			low: choose(mid, .55, .32, 3)
+		};
+		cache.set(a, bundle);
+	}
+	const groups = lanes === 5 ? {
+		low: [0, 1],
+		mid: [2],
+		high: [3, 4]
+	} : {
+		low: [0, 1],
+		mid: [
+			2,
+			3,
+			4
+		],
+		high: [5, 6]
+	}, count = {
+		low: 0,
+		mid: 0,
+		high: 0
+	}, scale = {};
+	for (const b of [
+		"low",
+		"mid",
+		"high"
+	]) {
+		const ss = a.bandPeaks[b].map((p) => p.strength).sort((x, y) => x - y);
+		scale[b] = ss[ss.length >> 1] || 1;
+	}
+	const laneMap = /* @__PURE__ */ new Map();
+	for (const p of bundle.high) {
+		const rel = [];
+		for (const b of [
+			"low",
+			"mid",
+			"high"
+		]) {
+			const bp = a.bandPeaks[b].find((q) => Math.abs(q.time - p.time) < .07);
+			if (bp) rel.push({
+				band: b,
+				score: bp.strength / scale[b]
+			});
+		}
+		rel.sort((x, y) => y.score - x.score || [
+			"low",
+			"mid",
+			"high"
+		].indexOf(x.band) - [
+			"low",
+			"mid",
+			"high"
+		].indexOf(y.band));
+		const band = rel[0]?.band || "mid", g = groups[band];
+		laneMap.set(p.time, g[count[band]++ % g.length]);
+	}
+	return bundle[difficulty].map((p, id) => ({
+		id,
+		time: p.time,
+		lane: laneMap.get(p.time)
+	}));
+}
+// src/c3-core.mjs
+const C3_DEFAULT_PARAMS = {
+	sustainRel: .25,
+	sustainFloorMul: 1.5,
+	stayFrames: 3,
+	minHold: .3,
+	capHold: 2,
+	holdSpacing: 2,
+	chordRatio: .6,
+	chordSpacing: .5,
+	chordHoldMargin: .15,
+	tailClipMargin: .2,
+	chordCap: {
+		low: 0,
+		mid: .05,
+		high: .15
+	},
+	holdTierStrengthMul: {
+		low: 1.5,
+		mid: 1,
+		high: .7
+	},
+	holdMinSustain: {
+		low: .6,
+		mid: .3,
+		high: .3
+	},
+	holdCapShare: {
+		low: .1,
+		mid: .15,
+		high: .25
+	},
+	bandWindow: .07
+};
+function makeOnsetInfo(analysis, bm, P = C3_DEFAULT_PARAMS) {
+	const { times, mags, frameDur } = bm;
+	const floors = {};
+	for (const b of [
+		"low",
+		"mid",
+		"high"
+	]) {
+		const s = [...mags[b]].sort((x, y) => x - y);
+		floors[b] = s[Math.floor(s.length * .2)];
+	}
+	const scale = {};
+	for (const b of [
+		"low",
+		"mid",
+		"high"
+	]) {
+		const ss = analysis.bandPeaks[b].map((p) => p.strength).sort((x, y) => x - y);
+		scale[b] = ss[ss.length >> 1] || 1;
+	}
+	function bandScores(t) {
+		const r = [];
+		for (const b of [
+			"low",
+			"mid",
+			"high"
+		]) {
+			let best = 0;
+			for (const p of analysis.bandPeaks[b]) if (Math.abs(p.time - t) < P.bandWindow && p.strength / scale[b] > best) best = p.strength / scale[b];
+			if (best > 0) r.push({
+				band: b,
+				score: best
+			});
+		}
+		r.sort((x, y) => y.score - x.score || [
+			"low",
+			"mid",
+			"high"
+		].indexOf(x.band) - [
+			"low",
+			"mid",
+			"high"
+		].indexOf(y.band));
+		return r;
+	}
+	function sustainAt(t, dom) {
+		let fi = 0, best = 1e9;
+		for (let i = 0; i < times.length; i++) {
+			const d = Math.abs(times[i] - t);
+			if (d < best) {
+				best = d;
+				fi = i;
+			}
+		}
+		const thr = Math.max(P.sustainRel * mags[dom][fi], floors[dom] * P.sustainFloorMul);
+		let below = 0, end = fi;
+		for (let i = fi + 1; i < times.length; i++) if (mags[dom][i] >= thr) {
+			below = 0;
+			end = i;
+		} else {
+			below++;
+			if (below >= P.stayFrames) break;
+		}
+		return (end - fi) * frameDur;
+	}
+	const info = /* @__PURE__ */ new Map();
+	for (const p of analysis.peaks) {
+		const bs = bandScores(p.time);
+		const dom = bs[0]?.band || "mid";
+		info.set(p.time, {
+			bands: bs,
+			dom,
+			chord: bs.length >= 2 && bs[1].score >= P.chordRatio * bs[0].score,
+			sustain: sustainAt(p.time, dom),
+			strength: p.strength
+		});
+	}
+	return {
+		info,
+		scale
+	};
+}
+const C3_SC_PARAMS = {
+	...C3_DEFAULT_PARAMS,
+	chordRatio: C3_DEFAULT_PARAMS.chordRatio,
+	chordSpacing: .3,
+	holdSpacing: 1.2,
+	chordCap: {
+		low: 0,
+		mid: .05,
+		high: .15,
+		sc: .3
+	},
+	holdTierStrengthMul: {
+		low: 1.5,
+		mid: 1,
+		high: .7,
+		sc: .5
+	},
+	holdMinSustain: {
+		low: .6,
+		mid: .3,
+		high: .3,
+		sc: .2
+	},
+	holdCapShare: {
+		low: .1,
+		mid: .15,
+		high: .25,
+		sc: .4
+	}
+};
+// src/opus/opus468-generator.mjs
+const OPUS468_LANES = [
+	4,
+	6,
+	8
+];
+const OPUS468_CHART_KEYS = [
+	"4:low",
+	"4:mid",
+	"4:high",
+	"4:sc",
+	"6:low",
+	"6:mid",
+	"6:high",
+	"6:sc",
+	"8:low",
+	"8:mid",
+	"8:high",
+	"8:sc"
+];
+const OPUS468_TIER_NOTE_CAP = {
+	low: 910,
+	mid: 1270,
+	high: 2770,
+	sc: 3130
+};
+const OPUS468_SC_MARKER = "sc_collapsed_into_mx";
+function adaptDecoratedChart468(raw, lanes, duration) {
+	if (![
+		4,
+		6,
+		8
+	].includes(lanes) || !Number.isFinite(duration) || duration <= 0 || !Array.isArray(raw) || !raw.length || raw.length > 1e4) throw new Error("opus468_invalid_candidate_chart");
+	const ids = /* @__PURE__ */ new Set();
+	const laneUntil = /* @__PURE__ */ new Map();
+	let previous = -Infinity;
+	return raw.map((candidate) => {
+		if (!candidate || typeof candidate !== "object") throw new Error("opus468_invalid_candidate_note");
+		const n = candidate;
+		if (!Number.isInteger(n.id) || ids.has(n.id) || !Number.isInteger(n.lane) || n.lane < 0 || n.lane >= lanes || !Number.isFinite(n.time) || n.time < 0 || n.time < previous || n.time >= duration || !["tap", "hold"].includes(n.type) || (laneUntil.get(n.lane) ?? -Infinity) >= n.time) throw new Error("opus468_invalid_candidate_note");
+		ids.add(n.id);
+		previous = n.time;
+		const note = {
+			id: n.id,
+			time: n.time,
+			lane: n.lane
+		};
+		if (n.type === "hold") {
+			if (!Number.isFinite(n.duration) || n.duration <= 0 || n.time + n.duration > duration) throw new Error("opus468_invalid_candidate_hold");
+			note.end = n.time + n.duration;
+		} else if (n.duration !== void 0) throw new Error("opus468_tap_hold_duration");
+		laneUntil.set(n.lane, note.end ?? note.time);
+		return note;
+	});
+}
+// src/opus/opus468-record.mjs
+const OPUS468_EXTENSION_KIND = "orvio-opus-chart-extension-v1";
+const OPUS468_EXTENSION_FAMILY = "468-v1";
+const OPUS468_GENERATOR_VERSION = "opus468-testonly-c2nested-gap010-burst8-decor17c-union468-v0-unqualified";
+const ROOTS = [
+	"videoId",
+	"baseSourceRecordSha256",
+	"baseChartSetSha256",
+	"audioSha256",
+	"audioDescriptorSha256",
+	"encodedAudioSha256",
+	"decoderWasmSha256",
+	"pipelineVersion",
+	"frames",
+	"sampleRate",
+	"channels"
+];
+const TIER_FAMILY = {
+	low: "NM",
+	mid: "HD",
+	high: "MX",
+	sc: "SC"
+};
+const MAX_STORED_BYTES = 1572864;
+const TE$1 = new TextEncoder();
+const hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+const sha256Hex = (bytes) => hex(sha256(bytes));
+const sha = (s) => sha256Hex(TE$1.encode(s));
+const HASH = (v) => typeof v === "string" && /^[a-f0-9]{64}$/.test(v);
+function checkOpus468GeneratorVersion(generatorVersion, baseAnalyzerVersion) {
+	if (typeof generatorVersion !== "string" || !generatorVersion || generatorVersion.length > 128 || generatorVersion.startsWith("research-c3") || generatorVersion === "orvio-current35-v1") throw Error("opus468_generator_version");
+	if (baseAnalyzerVersion !== void 0 && generatorVersion === baseAnalyzerVersion) throw Error("opus468_base_analyzer_is_not_extension_generator");
+}
+function normalizeNotes468(raw, lanes, duration, tier) {
+	if (!Array.isArray(raw) || !raw.length || raw.length > OPUS468_TIER_NOTE_CAP[tier]) throw Error("opus468_note_count_" + tier);
+	const out = raw.map((n, i) => {
+		if (!n || typeof n !== "object" || Array.isArray(n) || !Object.keys(n).every((k) => [
+			"id",
+			"time",
+			"lane",
+			"end"
+		].includes(k)) || n.id !== i || !Number.isSafeInteger(n.lane) || n.lane < 0 || n.lane >= lanes || !Number.isFinite(n.time) || n.time < 0 || n.time >= duration || Object.hasOwn(n, "end") && (!Number.isFinite(n.end) || n.end <= n.time || n.end > duration)) throw Error("opus468_note");
+		return {
+			id: n.id,
+			time: n.time,
+			lane: n.lane,
+			...Object.hasOwn(n, "end") ? { end: n.end } : {}
+		};
+	});
+	const until = /* @__PURE__ */ new Map();
+	let previous = -Infinity;
+	for (const n of out) {
+		if (n.time < previous || (until.get(n.lane) ?? -Infinity) >= n.time) throw Error("opus468_note_order");
+		previous = n.time;
+		until.set(n.lane, n.end ?? n.time);
+	}
+	return out;
+}
+function deepEqualJson(a, b) {
+	if (a === b) return true;
+	if (typeof a !== typeof b || !a || !b || typeof a !== "object") return false;
+	if (Array.isArray(a) !== Array.isArray(b)) return false;
+	if (Array.isArray(a)) return a.length === b.length && a.every((x, i) => deepEqualJson(x, b[i]));
+	const ka = Object.keys(a);
+	return ka.length === Object.keys(b).length && ka.every((k) => Object.hasOwn(b, k) && deepEqualJson(a[k], b[k]));
+}
+function bindOpus468Base({ baseRecordRaw, baseRecord, descriptor: d, descriptorSha256 }) {
+	if (typeof baseRecordRaw !== "string" || TE$1.encode(baseRecordRaw).length > MAX_STORED_BYTES) throw Error("opus468_base_record_bytes");
+	if (!baseRecord || typeof baseRecord !== "object" || Array.isArray(baseRecord)) throw Error("opus468_base_record");
+	let parsedRaw;
+	try {
+		parsedRaw = JSON.parse(baseRecordRaw);
+	} catch {
+		throw Error("opus468_base_record_json");
+	}
+	if (!deepEqualJson(parsedRaw, baseRecord)) throw Error("opus468_base_record_raw_binding");
+	if (!d || typeof d !== "object") throw Error("opus468_descriptor");
+	if (!HASH(descriptorSha256)) throw Error("opus468_descriptor_sha");
+	const r = baseRecord;
+	if (r.videoId !== d.videoId || r.audioSha256 !== d.pcm16Sha256 || r.audioDescriptorSha256 !== descriptorSha256 || r.encodedAudioSha256 !== d.oggSha256 || r.decoderWasmSha256 !== "8b67eda2a46e478f65c24c467dae9eac26293efae6484bfe762b9d1086058b4b" || r.pipelineVersion !== "orvio-opus-pinned-pcm16-48k-v1" || r.frames !== d.frames || r.sampleRate !== 48e3 || d.sampleRate !== 48e3 || d.channels !== 2 || !Number.isSafeInteger(d.frames) || d.frames < 1) throw Error("opus468_base_audio_binding");
+	return {
+		videoId: r.videoId,
+		baseSourceRecordSha256: sha(baseRecordRaw),
+		baseChartSetSha256: r.chartSetSha256,
+		audioSha256: r.audioSha256,
+		audioDescriptorSha256: descriptorSha256,
+		encodedAudioSha256: r.encodedAudioSha256,
+		decoderWasmSha256: DECODER,
+		pipelineVersion: PIPELINE,
+		frames: d.frames,
+		sampleRate: 48e3,
+		channels: 2
+	};
+}
+function assembleOpus468Extension({ baseRecordRaw, baseRecord, descriptor: d, descriptorSha256, generatedCharts, generatorVersion = OPUS468_GENERATOR_VERSION }) {
+	checkOpus468GeneratorVersion(generatorVersion, baseRecord && baseRecord.analyzerVersion);
+	const bound = bindOpus468Base({
+		baseRecordRaw,
+		baseRecord,
+		descriptor: d,
+		descriptorSha256
+	});
+	if (!generatedCharts || typeof generatedCharts !== "object" || Array.isArray(generatedCharts)) throw Error("opus468_charts");
+	for (const k of Object.keys(generatedCharts)) if (!OPUS468_CHART_KEYS.includes(k)) throw Error("opus468_unknown_slot_" + k);
+	const duration = d.frames / 48e3;
+	const charts = {};
+	const chartMeta = {};
+	let total = 0;
+	for (const key of OPUS468_CHART_KEYS) {
+		const lanes = Number(key[0]);
+		const tier = key.slice(2);
+		const raw = generatedCharts[key];
+		if (!Array.isArray(raw)) throw Error("opus468_missing_slot_" + key);
+		const notes = normalizeNotes468(raw, lanes, duration, tier);
+		total += notes.length;
+		charts[key] = {
+			notes,
+			sha256: sha(JSON.stringify(notes))
+		};
+		chartMeta[key] = {
+			family: TIER_FAMILY[tier],
+			rating: {
+				scale: tier === "sc" ? "sc" : "standard",
+				level: rateDifficulty(notes, duration, tier === "sc" ? "sc" : "standard")
+			},
+			scAvailable: true
+		};
+	}
+	if (total > 24300) throw Error("opus468_note_count_total");
+	for (const lanes of [
+		4,
+		6,
+		8
+	]) {
+		const scKey = `${lanes}:sc`;
+		const highKey = `${lanes}:high`;
+		if (JSON.stringify(charts[scKey].notes) === JSON.stringify(charts[highKey].notes)) {
+			total -= charts[scKey].notes.length;
+			charts[scKey] = { unavailable: OPUS468_SC_MARKER };
+			chartMeta[scKey] = {
+				family: "SC",
+				rating: null,
+				scAvailable: false
+			};
+		}
+	}
+	const canonical = {
+		kind: OPUS468_EXTENSION_KIND,
+		version: 1,
+		family: OPUS468_EXTENSION_FAMILY,
+		...bound,
+		generatorVersion,
+		config: baseRecord.config,
+		charts,
+		chartMeta
+	};
+	const extensionSha256 = sha(JSON.stringify(canonical));
+	const stored = {
+		...canonical,
+		extensionSha256
+	};
+	if (TE$1.encode(JSON.stringify(stored)).length > MAX_STORED_BYTES) throw Error("opus468_stored_bytes");
+	selfVerifyOpus468Extension(stored, {
+		baseRecordRaw,
+		baseRecord,
+		descriptor: d,
+		descriptorSha256
+	});
+	return stored;
+}
+function selfVerifyOpus468Extension(stored, { baseRecordRaw, baseRecord, descriptor: d, descriptorSha256 }) {
+	const bound = bindOpus468Base({
+		baseRecordRaw,
+		baseRecord,
+		descriptor: d,
+		descriptorSha256
+	});
+	if (!stored || typeof stored !== "object" || Array.isArray(stored)) throw Error("opus468_verify_shape");
+	const expectedKeys = [
+		"kind",
+		"version",
+		"family",
+		...ROOTS,
+		"generatorVersion",
+		"config",
+		"charts",
+		"chartMeta",
+		"extensionSha256"
+	];
+	if (!Object.keys(stored).every((k, i) => k === expectedKeys[i])) throw Error("opus468_verify_field_order");
+	if (stored.kind !== "orvio-opus-chart-extension-v1" || stored.version !== 1 || stored.family !== "468-v1") throw Error("opus468_verify_shape");
+	for (const k of ROOTS) if (stored[k] !== bound[k]) throw Error("opus468_verify_root_" + k);
+	checkOpus468GeneratorVersion(stored.generatorVersion, baseRecord && baseRecord.analyzerVersion);
+	if (stored.config !== baseRecord.config) throw Error("opus468_verify_config");
+	const duration = d.frames / 48e3;
+	let total = 0;
+	if (!stored.charts || !stored.chartMeta || Object.keys(stored.charts).length !== OPUS468_CHART_KEYS.length || Object.keys(stored.chartMeta).length !== OPUS468_CHART_KEYS.length || !OPUS468_CHART_KEYS.every((k) => Object.hasOwn(stored.charts, k)) || !OPUS468_CHART_KEYS.every((k) => Object.hasOwn(stored.chartMeta, k))) throw Error("opus468_verify_slots");
+	for (const key of OPUS468_CHART_KEYS) {
+		const c = stored.charts[key];
+		const m = stored.chartMeta[key];
+		const tier = key.slice(2);
+		const cKeys = Object.keys(c);
+		if (cKeys.length === 1 && cKeys[0] === "unavailable") {
+			if (tier !== "sc" || c.unavailable !== "sc_collapsed_into_mx") throw Error("opus468_verify_unavailable");
+			if (m.family !== "SC" || m.rating !== null || m.scAvailable !== false || Object.keys(m).length !== 3) throw Error("opus468_verify_metadata");
+			continue;
+		}
+		if (cKeys.length !== 2 || !cKeys.includes("notes") || !cKeys.includes("sha256")) throw Error("opus468_verify_chart_shape");
+		const notes = normalizeNotes468(c.notes, Number(key[0]), duration, tier);
+		if (sha(JSON.stringify(notes)) !== c.sha256) throw Error("opus468_verify_chart_hash");
+		total += notes.length;
+		if (m.family !== TIER_FAMILY[tier] || m.scAvailable !== true || !m.rating || Object.keys(m.rating).length !== 2 || m.rating.scale !== (tier === "sc" ? "sc" : "standard") || !Number.isInteger(m.rating.level) || m.rating.level < 1 || m.rating.level > 15 || Object.keys(m).length !== 3) throw Error("opus468_verify_metadata");
+		if (m.rating.level !== rateDifficulty(notes, duration, tier === "sc" ? "sc" : "standard")) throw Error("opus468_verify_rating");
+	}
+	if (total > 24300) throw Error("opus468_verify_total");
+	for (const lanes of [
+		4,
+		6,
+		8
+	]) {
+		const sc = stored.charts[`${lanes}:sc`];
+		if (sc.notes && JSON.stringify(sc.notes) === JSON.stringify(stored.charts[`${lanes}:high`].notes)) throw Error("opus468_verify_sc_duplicate");
+	}
+	const { extensionSha256, ...rest } = stored;
+	if (sha(JSON.stringify(rest)) !== extensionSha256) throw Error("opus468_verify_extension_hash");
+	if (TE$1.encode(JSON.stringify(stored)).length > MAX_STORED_BYTES) throw Error("opus468_verify_bytes");
+	return true;
+}
+// src/opus/opus468-adaptive-recipe.mjs
+const OPUS468_ADAPTIVE_RECIPE_SOURCES = [
+	["src/opus/opus468-generator-adaptive.mjs", "356c0706487287e3e82ae7f359ed5b0e7226f25a843322a883448432503477c9"],
+	["src/opus/opus468-lanes-adaptive.mjs", "92423fe70e7d56fda7c1cf23271ee48eba3ca953d831c44042658f7299f119f1"],
+	["src/opus/opus468-fftfix-mirror.mjs", "917ec460d62887b6c4d27665e8311a5d46766fe3c631caa1d18d9c5ee5de1f91"],
+	["src/opus/opus468-generator.mjs", "b0ea727c9a070b20d2f28716390deb2a24d06f6830902646079393b1f0f5bd48"],
+	["src/opus/opus468-record.mjs", "55e9c385c1d24eebbcb561e39136ad69ec03a9469275662492875eac09697aa4"],
+	["src/opus/opus-pcm-analysis.mjs", "2717009bf0c5b4f18facd516fa4e8311fe0a5dcb89ee415d92d7771fea415ae6"],
+	["src/opus/opus-descriptor.mjs", "57484f51a1d96bbf07ffd9b6a4e55a104f20827bf71faedb25acf74062478ec9"],
+	["src/c3-core.mjs", "2373e5502f343314cd8452b886fac2ef7b10e08300e5dac352d892e7ed0015dc"],
+	["src/chart-rating.mjs", "842bc9fe221ca9ab934b400c946641893ca9df0bcc949ed978af0f9e66007004"],
+	["src/flux-chart-research.mjs", "c71f3f060e618efea4da1348609539d9432994cdc11c9248dc6f03dd1d1608ed"],
+	["src/flux-research.mjs", "391dd093b7f73f4fe05a818723c4c45114245ea4e568163604f9cbc582c9195c"],
+	["src/flux-tables.mjs", "6950e7bbf7a824375d9f807da524fe7362fce9fdd4575b737b7cf82c12bca884"],
+	["src/fused-resampler.mjs", "48b62490a4e3a40d27718050ad2a002b61a0018b6284767a95a59e9d7002f401"]
+];
+function opus468RecipeHash(sources = OPUS468_ADAPTIVE_RECIPE_SOURCES) {
+	return sha256Hex(new TextEncoder().encode(sources.map(([p, s]) => p + " " + s).join("\n") + "\n"));
+}
+for (const row of OPUS468_ADAPTIVE_RECIPE_SOURCES) Object.freeze(row);
+Object.freeze(OPUS468_ADAPTIVE_RECIPE_SOURCES);
+const OPUS468_ADAPTIVE_RECIPE_IDENTITY = Object.freeze({
+	generatorVersion: "opus468-testonly-c2nested-gap010-burst8-decor17c-adaptivebands-v2-unqualified",
+	recipeHash: opus468RecipeHash(),
+	sources: OPUS468_ADAPTIVE_RECIPE_SOURCES
+});
+function verifyOpus468AdaptiveRecipeClosure(record, loadFile) {
+	const identity = OPUS468_ADAPTIVE_RECIPE_IDENTITY;
+	const failures = [];
+	if (!record || typeof record !== "object") failures.push("record_shape");
+	if (!identity.sources.length) failures.push("manifest_empty");
+	if (!/^[0-9a-f]{64}$/.test(identity.recipeHash)) failures.push("manifest_recipe_hash_invalid");
+	const seen = /* @__PURE__ */ new Set();
+	const loaded = [];
+	for (const [path, expected] of identity.sources) {
+		if (typeof path !== "string" || !path) {
+			failures.push("manifest_path_invalid");
+			continue;
+		}
+		if (!/^[0-9a-f]{64}$/.test(expected)) {
+			failures.push("manifest_sha_invalid:" + path);
+			continue;
+		}
+		if (seen.has(path)) {
+			failures.push("manifest_path_duplicate:" + path);
+			continue;
+		}
+		seen.add(path);
+		let bytes;
+		try {
+			bytes = loadFile(path);
+		} catch {
+			failures.push("source_unreadable:" + path);
+			continue;
+		}
+		const actual = sha256Hex(typeof bytes === "string" ? new TextEncoder().encode(bytes) : bytes);
+		loaded.push([path, actual]);
+		if (actual !== expected) failures.push("source_hash_mismatch:" + path);
+	}
+	if (loaded.length !== identity.sources.length) failures.push("manifest_coverage_incomplete");
+	else if (opus468RecipeHash(loaded) !== identity.recipeHash) failures.push("recipe_hash_mismatch");
+	if (record && record.generatorVersion !== identity.generatorVersion) failures.push("record_generator_version_mismatch");
+	return {
+		ok: failures.length === 0,
+		scope: "source_binding",
+		generatorVersion: identity.generatorVersion,
+		recipeHash: identity.recipeHash,
+		sources: identity.sources.map(([path, sha]) => ({
+			path,
+			sha256: sha
+		})),
+		failures
+	};
+}
+// src/opus/opus468-fftfix-mirror.mjs
+const BANDS = {
+	low: [20, 250],
+	mid: [250, 2e3],
+	high: [2e3, 11025]
+};
+function fftFixed(re, im, WRE_, WIM_) {
+	const n = re.length;
+	for (let i = 1, j = 0; i < n; i++) {
+		let bit = n >> 1;
+		for (; j & bit; bit >>= 1) j ^= bit;
+		j ^= bit;
+		if (i < j) {
+			const tr = re[i];
+			re[i] = re[j];
+			re[j] = tr;
+			const ti = im[i];
+			im[i] = im[j];
+			im[j] = ti;
+		}
+	}
+	for (let len = 2; len <= n; len <<= 1) {
+		const half = len >> 1, step = n / len;
+		for (let i = 0; i < n; i += len) for (let j = 0; j < half; j++) {
+			const t = j * step, cwr = WRE_[t], cwi = WIM_[t];
+			const ur = re[i + j], ui = im[i + j];
+			const vr = re[i + j + half] * cwr - im[i + j + half] * cwi;
+			const vi = re[i + j + half] * cwi + im[i + j + half] * cwr;
+			re[i + j] = ur + vr;
+			im[i + j] = ui + vi;
+			re[i + j + half] = ur - vr;
+			im[i + j + half] = ui - vi;
+		}
+	}
+}
+function computeBandMagsFixed(samples, sampleRate, tables, hop = 512, window = 1024) {
+	const { HANN: H_, WRE: WR_, WIM: WI_ } = tables;
+	const binHz = sampleRate / window;
+	const bandBins = {};
+	for (const [b, [lo, hi]] of Object.entries(BANDS)) bandBins[b] = [Math.max(1, Math.floor(lo / binHz)), Math.min(window / 2 - 1, Math.ceil(hi / binHz))];
+	const re = new Float64Array(window), im = new Float64Array(window);
+	const times = [], mags = {
+		low: [],
+		mid: [],
+		high: []
+	};
+	for (let i = 0; i + window < samples.length; i += hop) {
+		for (let j = 0; j < window; j++) {
+			re[j] = samples[i + j] * H_[j];
+			im[j] = 0;
+		}
+		fftFixed(re, im, WR_, WI_);
+		const sums = {
+			low: 0,
+			mid: 0,
+			high: 0
+		};
+		for (let k = 1; k < window / 2; k++) {
+			const m = Math.sqrt(re[k] * re[k] + im[k] * im[k]);
+			for (const [b, [lo, hi]] of Object.entries(bandBins)) if (k >= lo && k <= hi) {
+				sums[b] += m;
+				break;
+			}
+		}
+		for (const b of Object.keys(BANDS)) mags[b].push(sums[b] / (bandBins[b][1] - bandBins[b][0] + 1));
+		times.push((i + window / 2) / sampleRate);
+	}
+	return {
+		times,
+		mags,
+		frameDur: hop / sampleRate
+	};
+}
+const FFTFIX_TABLES = {
+	HANN,
+	WRE,
+	WIM
+};
+// src/opus/opus468-lanes-adaptive.mjs
+function assignAdaptiveLanes468(highPeaks, a, lanes) {
+	if (![
+		4,
+		6,
+		8
+	].includes(lanes)) throw Error("adaptive468_lanes");
+	if (!Array.isArray(highPeaks) || !highPeaks.length) throw Error("adaptive468_empty_heads");
+	const scale = {};
+	for (const b of [
+		"low",
+		"mid",
+		"high"
+	]) {
+		const ss = a.bandPeaks[b].map((p) => p.strength).sort((x, y) => x - y);
+		scale[b] = ss[ss.length >> 1] || 1;
+	}
+	const bandOf = /* @__PURE__ */ new Map();
+	const counts = {
+		low: 0,
+		mid: 0,
+		high: 0
+	};
+	for (const p of highPeaks) {
+		const rel = [];
+		for (const b of [
+			"low",
+			"mid",
+			"high"
+		]) {
+			const bp = a.bandPeaks[b].find((q) => Math.abs(q.time - p.time) < .07);
+			if (bp) rel.push({
+				band: b,
+				score: bp.strength / scale[b]
+			});
+		}
+		rel.sort((x, y) => y.score - x.score || [
+			"low",
+			"mid",
+			"high"
+		].indexOf(x.band) - [
+			"low",
+			"mid",
+			"high"
+		].indexOf(y.band));
+		const band = rel[0]?.band || "mid";
+		bandOf.set(p.time, band);
+		counts[band]++;
+	}
+	const total = Math.max(1, counts.low + counts.mid + counts.high);
+	const size = {
+		low: 1,
+		mid: 1,
+		high: 1
+	};
+	let left = lanes - 3;
+	const frac = [
+		"low",
+		"mid",
+		"high"
+	].map((b) => ({
+		b,
+		exact: counts[b] / total * lanes - 1
+	}));
+	frac.sort((x, y) => y.exact - Math.floor(y.exact) - (x.exact - Math.floor(x.exact)) || y.exact - x.exact);
+	const base = {
+		low: 0,
+		mid: 0,
+		high: 0
+	};
+	for (const f of frac) base[f.b] = Math.max(0, Math.floor(f.exact));
+	let assigned = base.low + base.mid + base.high;
+	while (assigned > left) {
+		const donor = [
+			"low",
+			"mid",
+			"high"
+		].filter((b) => base[b] > 0).sort((a, b) => base[b] - base[a] || counts[b] - counts[a])[0];
+		base[donor]--;
+		assigned--;
+	}
+	for (const f of frac) {
+		if (assigned >= left) break;
+		base[f.b]++;
+		assigned++;
+	}
+	for (const b of [
+		"low",
+		"mid",
+		"high"
+	]) size[b] += base[b];
+	const groups = {};
+	let at = 0;
+	for (const b of [
+		"low",
+		"mid",
+		"high"
+	]) {
+		groups[b] = [];
+		for (let i = 0; i < size[b]; i++) groups[b].push(at++);
+	}
+	const lastAt = new Array(lanes).fill(-1e9);
+	const MIN_SAME = .12;
+	const laneMap = /* @__PURE__ */ new Map();
+	for (const p of highPeaks) {
+		const g = groups[bandOf.get(p.time)];
+		let lane = g[0];
+		for (const l of g) if (lastAt[l] < lastAt[lane]) lane = l;
+		if (p.time - lastAt[lane] < MIN_SAME) {
+			const neighbors = [];
+			if (g[0] > 0) neighbors.push(g[0] - 1);
+			if (g[g.length - 1] < lanes - 1) neighbors.push(g[g.length - 1] + 1);
+			for (const nl of neighbors) if (p.time - lastAt[nl] >= MIN_SAME) {
+				lane = nl;
+				break;
+			}
+		}
+		lastAt[lane] = p.time;
+		laneMap.set(p.time, lane);
+	}
+	return {
+		laneMap,
+		size,
+		groups,
+		bandCounts: counts,
+		bandOf
+	};
+}
+function fixedAdaptiveLaneMap468(analysis, highTimes, lanes, scale, onsetInfo, P = C3_DEFAULT_PARAMS, minGap = .15) {
+	const allocation = assignAdaptiveLanes468(highTimes.map((time) => ({ time })), analysis, lanes);
+	const orig = allocation.laneMap, groups = allocation.groups;
+	const groupOf = (l) => {
+		for (const arr of Object.values(groups)) if (arr.includes(l)) return arr;
+		return [l];
+	};
+	const medStr = [...onsetInfo.info.values()].map((i) => i.strength).sort((x, y) => x - y);
+	const med = medStr[Math.floor(medStr.length / 2)] || 0;
+	const candHeads = /* @__PURE__ */ new Set();
+	for (const t of highTimes) {
+		const info = onsetInfo.info.get(t);
+		if (!info) continue;
+		for (const tier of [
+			"low",
+			"mid",
+			"high"
+		]) if (info.sustain >= P.holdMinSustain[tier] && info.sustain >= P.minHold && (info.strength || 0) >= med * P.holdTierStrengthMul[tier]) {
+			candHeads.add(t);
+			break;
+		}
+	}
+	const origByLaneTime = /* @__PURE__ */ new Map();
+	for (const t of highTimes) {
+		const l = orig.get(t);
+		if (!origByLaneTime.has(l)) origByLaneTime.set(l, []);
+		origByLaneTime.get(l).push(t);
+	}
+	for (const arr of origByLaneTime.values()) arr.sort((a, b) => a - b);
+	const origNextAfter = (l, t) => {
+		const a = origByLaneTime.get(l) || [];
+		for (const x of a) if (x > t + 1e-9) return x;
+		return Infinity;
+	};
+	const lastTime = new Array(lanes).fill(-Infinity);
+	const placedHeads = /* @__PURE__ */ new Map();
+	const fixed = /* @__PURE__ */ new Map();
+	const moves = [];
+	const residual = [];
+	const room = P.minHold + P.tailClipMargin;
+	const laneOK = (l, t) => {
+		if (t - lastTime[l] < minGap) return false;
+		for (const hc of placedHeads.get(l) || []) if (t > hc && t - hc < room) return false;
+		if (candHeads.has(t) && origNextAfter(l, t) - t < room) return false;
+		return true;
+	};
+	const pref = (from, t) => {
+		const out = [];
+		const seen = /* @__PURE__ */ new Set();
+		const push = (l) => {
+			if (l >= 0 && l < lanes && !seen.has(l)) {
+				seen.add(l);
+				out.push(l);
+			}
+		};
+		for (const l of groupOf(from)) if (l !== from) push(l);
+		const info = onsetInfo.info.get(t);
+		const sec = info && info.bands && info.bands[1] ? info.bands[1].band : null;
+		if (sec) for (const l of groups[sec]) push(l);
+		for (let d = 1; d < lanes; d++) {
+			push(from - d);
+			push(from + d);
+		}
+		return out;
+	};
+	const sorted = [...highTimes].sort((a, b) => a - b);
+	for (const t of sorted) {
+		const ol = orig.get(t);
+		let target = ol;
+		if (t - lastTime[ol] < minGap) {
+			target = -1;
+			for (const l of pref(ol, t)) if (laneOK(l, t)) {
+				target = l;
+				break;
+			}
+			if (target < 0) {
+				target = ol;
+				residual.push(t);
+			} else moves.push({
+				time: t,
+				from: ol,
+				to: target
+			});
+		}
+		fixed.set(t, target);
+		lastTime[target] = t;
+		if (candHeads.has(t)) {
+			if (!placedHeads.has(target)) placedHeads.set(target, []);
+			placedHeads.get(target).push(t);
+		}
+	}
+	return {
+		map: fixed,
+		moves,
+		residual,
+		groups,
+		bandCounts: allocation.bandCounts
+	};
+}
+function decorateAdaptiveTier468(base, tier, onsetInfo, lanes, P = C3_DEFAULT_PARAMS, groups) {
+	if (!groups || Object.values(groups).flat().length !== lanes) throw Error("adaptive468_groups");
+	const medStr = [...onsetInfo.info.values()].map((i) => i.strength).sort((x, y) => x - y);
+	const med = medStr[Math.floor(medStr.length / 2)] || 0;
+	const getStr = (n) => (onsetInfo.info.get(n.time) || {}).strength || 0;
+	const cand = base.filter((n) => {
+		const info = onsetInfo.info.get(n.time);
+		return info && info.sustain >= P.holdMinSustain[tier] && info.sustain >= P.minHold && getStr(n) >= med * P.holdTierStrengthMul[tier];
+	}).map((n) => ({
+		...n,
+		info: onsetInfo.info.get(n.time)
+	})).sort((x, y) => getStr(y) - getStr(x) || x.time - y.time);
+	const holds = [];
+	const holdCapN = Math.floor(base.length * P.holdCapShare[tier]);
+	for (const c of cand) {
+		if (holds.length >= holdCapN) break;
+		if (holds.some((h) => Math.abs(h.time - c.time) < P.holdSpacing)) continue;
+		const next = base.filter((q) => q.time > c.time && q.lane === c.lane).sort((x, y) => x.time - y.time)[0];
+		let dur = Math.min(P.capHold, c.info.sustain);
+		if (next) dur = Math.min(dur, next.time - c.time - P.tailClipMargin);
+		if (dur >= P.minHold) holds.push({
+			time: c.time,
+			duration: +dur.toFixed(4)
+		});
+	}
+	const holdMap = new Map(holds.map((h) => [h.time, h.duration]));
+	const chordCapN = Math.floor(base.length * P.chordCap[tier]);
+	const chordCands = base.filter((n) => onsetInfo.info.get(n.time)?.chord).sort((x, y) => getStr(y) - getStr(x) || x.time - y.time);
+	const chordPicks = [];
+	for (const c of chordCands) {
+		if (chordPicks.length >= chordCapN) break;
+		if (chordPicks.some((h) => Math.abs(h.time - c.time) < P.chordSpacing)) continue;
+		const g2 = groups[onsetInfo.info.get(c.time).bands[1].band];
+		const used = new Set(base.filter((q) => Math.abs(q.time - c.time) < .001).map((q) => q.lane));
+		for (const h of holds) if (c.time >= h.time - P.chordHoldMargin && c.time < h.time + h.duration + P.chordHoldMargin) used.add((base.find((q) => q.time === h.time) || {}).lane);
+		const laneTimes = /* @__PURE__ */ new Map();
+		for (const q of base) {
+			if (!laneTimes.has(q.lane)) laneTimes.set(q.lane, []);
+			laneTimes.get(q.lane).push(q.time);
+		}
+		let pickLane = -1;
+		for (const l of g2) {
+			if (used.has(l)) continue;
+			if ((laneTimes.get(l) || []).some((t) => Math.abs(t - c.time) < .15 && Math.abs(t - c.time) > .001)) continue;
+			pickLane = l;
+			break;
+		}
+		if (pickLane >= 0) chordPicks.push({
+			time: c.time,
+			lane: pickLane
+		});
+	}
+	const notes = [];
+	for (const n of base) {
+		const d = holdMap.get(n.time);
+		notes.push({
+			time: n.time,
+			lane: n.lane,
+			type: d ? "hold" : "tap",
+			...d ? { duration: d } : {}
+		});
+	}
+	for (const cp of chordPicks) notes.push({
+		time: cp.time,
+		lane: cp.lane,
+		type: "tap"
+	});
+	notes.sort((x, y) => x.time - y.time || x.lane - y.lane);
+	notes.forEach((n, i) => n.id = i);
+	return notes;
+}
+// src/opus/opus468-generator-adaptive.mjs
+function generateOpus468ChartsAdaptive(parsed) {
+	if (!parsed || !(parsed.samples instanceof Float32Array) || !parsed.samples.length || parsed.sampleRate !== 48e3 || !Number.isSafeInteger(parsed.frames) || parsed.frames < 1 || parsed.frames > 144e5 || parsed.samples.length !== Math.floor(parsed.frames / (48e3 / 22050))) throw new Error("opus468_pcm_shape");
+	const samples = parsed.samples;
+	const rate = 22050;
+	const analysis = analyzePcm(samples, rate);
+	const info = makeOnsetInfo(analysis, computeBandMagsFixed(samples, rate, FFTFIX_TABLES));
+	const charts = {};
+	let totalNotes = 0;
+	for (const lanes of OPUS468_LANES) {
+		const low = chartFromAnalysis(analysis, "low", lanes).map((n) => n.time);
+		const mid = chartFromAnalysis(analysis, "mid", lanes).map((n) => n.time);
+		const high = chartFromAnalysis(analysis, "high", lanes).map((n) => n.time);
+		const lanePlacement = fixedAdaptiveLaneMap468(analysis, high, lanes, info.scale, info);
+		const laneMap = lanePlacement.map, groups = lanePlacement.groups;
+		for (const [tier, times] of [
+			["low", low],
+			["mid", mid],
+			["high", high]
+		]) {
+			const base = times.map((time) => {
+				const lane = laneMap.get(time);
+				if (lane === void 0) throw Error("opus468_missing_inherited_lane");
+				return {
+					time,
+					lane
+				};
+			});
+			const key = `${lanes}:${tier}`;
+			const adapted = adaptDecoratedChart468(decorateAdaptiveTier468(base, tier, info, lanes, void 0, groups), lanes, samples.length / rate);
+			if (adapted.length > OPUS468_TIER_NOTE_CAP[tier]) throw Error("opus468_cap_" + tier);
+			totalNotes += adapted.length;
+			charts[key] = adapted;
+		}
+		const scBase = high.map((time) => {
+			const lane = laneMap.get(time);
+			if (lane === void 0) throw Error("opus468_missing_inherited_lane");
+			return {
+				time,
+				lane
+			};
+		});
+		const scKey = `${lanes}:sc`;
+		const scAdapted = adaptDecoratedChart468(decorateAdaptiveTier468(scBase, "sc", info, lanes, C3_SC_PARAMS, groups), lanes, samples.length / rate);
+		if (scAdapted.length > OPUS468_TIER_NOTE_CAP.sc) throw Error("opus468_cap_sc");
+		totalNotes += scAdapted.length;
+		charts[scKey] = scAdapted;
+	}
+	if (totalNotes > 24300) throw Error("opus468_cap_total");
+	return {
+		charts,
+		duration: samples.length / rate,
+		analysis
+	};
+}
+// src/opus/opus468-adaptive-derivation.mjs
+const TE = new TextEncoder();
+function verifyOpus468AdaptiveDerivation({ samples, frames, record, baseRecordRaw, baseRecord, descriptor, descriptorSha256 }) {
+	const failures = [];
+	if (!record || typeof record !== "object") return {
+		ok: false,
+		scope: "regeneration",
+		failures: ["record_shape"]
+	};
+	if (record.generatorVersion !== "opus468-testonly-c2nested-gap010-burst8-decor17c-adaptivebands-v2-unqualified") failures.push("generator_version_mismatch");
+	let gen;
+	try {
+		gen = generateOpus468ChartsAdaptive({
+			samples,
+			sampleRate: 48e3,
+			frames
+		});
+	} catch (e) {
+		return {
+			ok: false,
+			scope: "regeneration",
+			failures: ["generation_failed:" + String(e.message || e)]
+		};
+	}
+	const duration = frames / 48e3;
+	const slots = {};
+	for (const key of OPUS468_CHART_KEYS) {
+		const stored = record.charts?.[key];
+		if (!stored || !Array.isArray(stored.notes)) {
+			failures.push("slot_missing:" + key);
+			continue;
+		}
+		const tier = key.slice(2);
+		const lanes = Number(key[0]);
+		let storedNorm, regenNorm;
+		try {
+			storedNorm = normalizeNotes468(stored.notes, lanes, duration, tier);
+		} catch (e) {
+			failures.push("slot_stored_invalid:" + key + ":" + String(e.message || e));
+			continue;
+		}
+		try {
+			regenNorm = normalizeNotes468(gen.charts[key], lanes, duration, tier);
+		} catch (e) {
+			failures.push("slot_regen_invalid:" + key + ":" + String(e.message || e));
+			continue;
+		}
+		const storedSha = sha256Hex(TE.encode(JSON.stringify(storedNorm)));
+		const regenSha = sha256Hex(TE.encode(JSON.stringify(regenNorm)));
+		const match = storedSha === regenSha && stored.sha256 === storedSha;
+		if (!match) failures.push("slot_derivation_mismatch:" + key);
+		slots[key] = {
+			match,
+			storedNotes: storedNorm.length,
+			regenNotes: regenNorm.length,
+			storedSha,
+			regenSha
+		};
+	}
+	const out = {
+		ok: failures.length === 0,
+		scope: "regeneration",
+		level: 1,
+		slots,
+		failures
+	};
+	if (baseRecordRaw !== void 0 && baseRecord && descriptor && descriptorSha256) {
+		const reExt = assembleOpus468Extension({
+			baseRecordRaw,
+			baseRecord,
+			descriptor,
+			descriptorSha256,
+			generatedCharts: gen.charts,
+			generatorVersion: record.generatorVersion
+		});
+		const canon = (x) => JSON.stringify(x);
+		out.level = 2;
+		out.extensionSha256Match = reExt.extensionSha256 === record.extensionSha256;
+		out.canonicalRecordMatch = canon(reExt) === canon(record);
+		if (!out.extensionSha256Match) failures.push("extension_sha_mismatch");
+		if (!out.canonicalRecordMatch) failures.push("canonical_record_mismatch");
+		out.ok = failures.length === 0;
+	}
+	return out;
+}
+// src/opus/opus468-adaptive-provenance.mjs
+const SCOPES = [
+	"source_binding",
+	"descriptor_pin",
+	"pcm_pin",
+	"regeneration"
+];
+async function verifyOpus468AdaptiveProvenance({ descriptorBytes, audioBytes, decoderWasmBytes, record, baseRecordRaw, loadFile }) {
+	const failures = [];
+	const steps = {};
+	if (typeof loadFile !== "function") failures.push("missing_input:loadFile");
+	if (!(descriptorBytes instanceof Uint8Array)) failures.push("missing_input:descriptorBytes");
+	if (!(audioBytes instanceof Uint8Array)) failures.push("missing_input:audioBytes");
+	if (!(decoderWasmBytes instanceof Uint8Array)) failures.push("missing_input:decoderWasmBytes");
+	if (!record || typeof record !== "object") failures.push("missing_input:record");
+	if (typeof baseRecordRaw !== "string" || !baseRecordRaw.length) failures.push("missing_input:baseRecordRaw");
+	if (failures.length) return {
+		ok: false,
+		scope: "provenance_chain",
+		scopes: SCOPES,
+		steps,
+		failures
+	};
+	const descriptorSnap = descriptorBytes.slice();
+	const audioSnap = audioBytes.slice();
+	const wasmSnap = decoderWasmBytes.slice();
+	const recordSnap = structuredClone(record);
+	const baseRawSnap = baseRecordRaw.slice();
+	let baseRecordSnap;
+	try {
+		baseRecordSnap = JSON.parse(baseRawSnap);
+	} catch {
+		return {
+			ok: false,
+			scope: "provenance_chain",
+			scopes: SCOPES,
+			steps,
+			failures: ["base_record_unparseable"]
+		};
+	}
+	if (!/^[0-9a-f]{64}$/.test(baseRecordSnap?.audioDescriptorSha256 || "")) return {
+		ok: false,
+		scope: "provenance_chain",
+		scopes: SCOPES,
+		steps,
+		failures: ["base_record_descriptor_root_missing"]
+	};
+	const recipe = verifyOpus468AdaptiveRecipeClosure(recordSnap, loadFile);
+	steps.source_binding = {
+		ok: recipe.ok,
+		recipeHash: recipe.recipeHash,
+		sources: recipe.sources.length
+	};
+	if (!recipe.ok) return {
+		ok: false,
+		scope: "provenance_chain",
+		scopes: SCOPES,
+		steps,
+		failures: recipe.failures.map((f) => "source_binding:" + f)
+	};
+	let d;
+	let descriptorSha256;
+	try {
+		descriptorSha256 = sha256Hex(descriptorSnap);
+		if (descriptorSha256 !== baseRecordSnap.audioDescriptorSha256) throw new Error("descriptor_root_mismatch");
+		d = await parseVerifiedDescriptor(descriptorSnap, descriptorSha256);
+		if (baseRecordSnap.decoderWasmSha256 && d.decoderWasmSha256 !== baseRecordSnap.decoderWasmSha256) throw new Error("descriptor_decoder_pin_mismatch");
+		if (Number.isSafeInteger(baseRecordSnap.frames) && d.frames !== baseRecordSnap.frames) throw new Error("descriptor_frames_mismatch");
+		steps.descriptor_pin = {
+			ok: true,
+			descriptorSha256,
+			trustedRoot: "baseRecord.audioDescriptorSha256",
+			pcm16Sha256: d.pcm16Sha256,
+			frames: d.frames,
+			decoderWasmSha256: d.decoderWasmSha256
+		};
+	} catch (e) {
+		steps.descriptor_pin = { ok: false };
+		return {
+			ok: false,
+			scope: "provenance_chain",
+			scopes: SCOPES,
+			steps,
+			failures: ["descriptor_pin:" + String(e && e.message || e)]
+		};
+	}
+	let dec;
+	try {
+		dec = await decodeVerifiedOpus({
+			bytes: audioSnap,
+			wasmBytes: wasmSnap,
+			expected: d
+		});
+		steps.pcm_pin = {
+			ok: true,
+			decoderSha256: DECODER_SHA256,
+			frames: dec.frames,
+			pcm16Sha256: d.pcm16Sha256
+		};
+	} catch (e) {
+		steps.pcm_pin = { ok: false };
+		return {
+			ok: false,
+			scope: "provenance_chain",
+			scopes: SCOPES,
+			steps,
+			failures: ["pcm_pin:" + String(e && e.message || e)]
+		};
+	}
+	const parsed = parsePinnedPcmAnalysis(dec.pcm16, dec.frames);
+	steps.analysis = { samples: parsed.samples.length };
+	const der = verifyOpus468AdaptiveDerivation({
+		samples: parsed.samples,
+		frames: dec.frames,
+		record: recordSnap,
+		baseRecordRaw: baseRawSnap,
+		baseRecord: baseRecordSnap,
+		descriptor: d,
+		descriptorSha256
+	});
+	steps.regeneration = {
+		ok: der.ok,
+		level: der.level,
+		extensionSha256Match: der.extensionSha256Match === true,
+		canonicalRecordMatch: der.canonicalRecordMatch === true
+	};
+	const regenFailures = [];
+	if (der.level !== 2) regenFailures.push("regeneration_level2_required");
+	if (der.extensionSha256Match !== true) regenFailures.push("regeneration_extension_sha_not_matched");
+	if (der.canonicalRecordMatch !== true) regenFailures.push("regeneration_canonical_record_not_matched");
+	if (!der.ok) regenFailures.push(...der.failures);
+	if (regenFailures.length) return {
+		ok: false,
+		scope: "provenance_chain",
+		scopes: SCOPES,
+		steps,
+		failures: regenFailures.map((f) => "regeneration:" + f)
+	};
+	return {
+		ok: true,
+		scope: "provenance_chain",
+		scopes: SCOPES,
+		steps,
+		failures: []
+	};
+}
+// src/opus/opus468-adaptive-build-recipe.generated.mjs
+const recipeSources = Object.freeze({
+	"src/opus/opus468-generator-adaptive.mjs": "// Separate private unqualified adaptive-band lane candidate.\n// Same onset selection and decoration thresholds as1056FFTfix; demand-proportional\n// lane groups + LRU from current35; adaptive groups also used for secondary chords.\n// Original5/7,1056,main entry and policy are unchanged.\nimport { analyzePcm, chartFromAnalysis } from '../flux-chart-research.mjs';\nimport { makeOnsetInfo, C3_SC_PARAMS } from '../c3-core.mjs';\nimport { computeBandMagsFixed, FFTFIX_TABLES } from './opus468-fftfix-mirror.mjs';\nimport {\n  OPUS468_LANES,\n  OPUS468_TIER_NOTE_CAP,\n  OPUS468_MAX_TOTAL_NOTES,\n  adaptDecoratedChart468,\n} from './opus468-generator.mjs';\nimport {fixedAdaptiveLaneMap468,decorateAdaptiveTier468} from './opus468-lanes-adaptive.mjs';\n\nexport const OPUS468_ADAPTIVE_GENERATOR_VERSION =\n  'opus468-testonly-c2nested-gap010-burst8-decor17c-adaptivebands-v2-unqualified';\n\nexport function generateOpus468ChartsAdaptive(parsed) {\n  if (\n    !parsed ||\n    !(parsed.samples instanceof Float32Array) ||\n    !parsed.samples.length ||\n    parsed.sampleRate !== 48000 ||\n    !Number.isSafeInteger(parsed.frames) ||\n    parsed.frames < 1 ||\n    parsed.frames > 14400000 ||\n    parsed.samples.length !== Math.floor(parsed.frames / (48000 / 22050))\n  )\n    throw new Error('opus468_pcm_shape');\n  const samples = parsed.samples;\n  const rate = 22050;\n  const analysis = analyzePcm(samples, rate);\n  const bands = computeBandMagsFixed(samples, rate, FFTFIX_TABLES);\n  const info = makeOnsetInfo(analysis, bands);\n  const charts = {};\n  let totalNotes = 0;\n  for (const lanes of OPUS468_LANES) {\n    const low = chartFromAnalysis(analysis, 'low', lanes).map((n) => n.time);\n    const mid = chartFromAnalysis(analysis, 'mid', lanes).map((n) => n.time);\n    const high = chartFromAnalysis(analysis, 'high', lanes).map((n) => n.time);\n    const lanePlacement = fixedAdaptiveLaneMap468(analysis, high, lanes, info.scale, info);\n    const laneMap = lanePlacement.map, groups=lanePlacement.groups;\n    for (const [tier, times] of [['low', low], ['mid', mid], ['high', high]]) {\n      const base = times.map((time) => {\n        const lane = laneMap.get(time);\n        if (lane === undefined) throw Error('opus468_missing_inherited_lane');\n        return { time, lane };\n      });\n      const key = `${lanes}:${tier}`;\n      const adapted = adaptDecoratedChart468(decorateAdaptiveTier468(base, tier, info, lanes, undefined, groups), lanes, samples.length / rate);\n      if (adapted.length > OPUS468_TIER_NOTE_CAP[tier]) throw Error('opus468_cap_' + tier);\n      totalNotes += adapted.length;\n      charts[key] = adapted;\n    }\n    const scBase = high.map((time) => {\n      const lane = laneMap.get(time);\n      if (lane === undefined) throw Error('opus468_missing_inherited_lane');\n      return { time, lane };\n    });\n    const scKey = `${lanes}:sc`;\n    const scAdapted = adaptDecoratedChart468(\n      decorateAdaptiveTier468(scBase, 'sc', info, lanes, C3_SC_PARAMS, groups),\n      lanes,\n      samples.length / rate,\n    );\n    if (scAdapted.length > OPUS468_TIER_NOTE_CAP.sc) throw Error('opus468_cap_sc');\n    totalNotes += scAdapted.length;\n    charts[scKey] = scAdapted;\n  }\n  if (totalNotes > OPUS468_MAX_TOTAL_NOTES) throw Error('opus468_cap_total');\n  return { charts, duration: samples.length / rate, analysis };\n}\n",
+	"src/opus/opus468-lanes-adaptive.mjs": "// Private isolated test-only lane candidate. Existing5/7 and1056 sources unchanged.\n// Demand-proportional contiguous band groups and LRU mirror actual current35 assignLanesV3,\n// not equal note-share quotas. Selection/decoration thresholds remain unchanged.\nimport { C3_DEFAULT_PARAMS } from '../c3-core.mjs';\nexport function assignAdaptiveLanes468(highPeaks, a, lanes) {\n  if (![4,6,8].includes(lanes)) throw Error('adaptive468_lanes');\n  if (!Array.isArray(highPeaks) || !highPeaks.length) throw Error('adaptive468_empty_heads');\n  const scale = {};\n  for (const b of ['low', 'mid', 'high']) {\n    const ss = a.bandPeaks[b].map((p) => p.strength).sort((x, y) => x - y);\n    scale[b] = ss[ss.length >> 1] || 1;\n  }\n  const bandOf = /* @__PURE__ */ new Map();\n  const counts = { low: 0, mid: 0, high: 0 };\n  for (const p of highPeaks) {\n    const rel = [];\n    for (const b of ['low', 'mid', 'high']) {\n      const bp = a.bandPeaks[b].find((q) => Math.abs(q.time - p.time) < 0.07);\n      if (bp) rel.push({ band: b, score: bp.strength / scale[b] });\n    }\n    rel.sort(\n      (x, y) =>\n        y.score - x.score ||\n        ['low', 'mid', 'high'].indexOf(x.band) -\n          ['low', 'mid', 'high'].indexOf(y.band),\n    );\n    const band = rel[0]?.band || 'mid';\n    bandOf.set(p.time, band);\n    counts[band]++;\n  }\n  const total = Math.max(1, counts.low + counts.mid + counts.high);\n  const size = { low: 1, mid: 1, high: 1 };\n  let left = lanes - 3;\n  const frac = ['low', 'mid', 'high'].map((b) => ({\n    b,\n    exact: (counts[b] / total) * lanes - 1,\n  }));\n  frac.sort(\n    (x, y) =>\n      y.exact - Math.floor(y.exact) - (x.exact - Math.floor(x.exact)) ||\n      y.exact - x.exact,\n  );\n  const base = { low: 0, mid: 0, high: 0 };\n  for (const f of frac) {\n    base[f.b] = Math.max(0, Math.floor(f.exact));\n  }\n  let assigned = base.low + base.mid + base.high;\n  // Minimum one lane per band must not let rounded quotas exceed the keyboard.\n  // Only overflowing allocations change; preserve the qualified mapping otherwise.\n  while (assigned > left) {\n    const donor = ['low', 'mid', 'high']\n      .filter((b) => base[b] > 0)\n      .sort((a, b) => base[b] - base[a] || counts[b] - counts[a])[0];\n    base[donor]--;\n    assigned--;\n  }\n  for (const f of frac) {\n    if (assigned >= left) break;\n    base[f.b]++;\n    assigned++;\n  }\n  for (const b of ['low', 'mid', 'high']) size[b] += base[b];\n  const groups = {};\n  let at = 0;\n  for (const b of ['low', 'mid', 'high']) {\n    groups[b] = [];\n    for (let i = 0; i < size[b]; i++) groups[b].push(at++);\n  }\n  const lastAt = new Array(lanes).fill(-1e9);\n  const MIN_SAME = 0.12;\n  const laneMap = /* @__PURE__ */ new Map();\n  for (const p of highPeaks) {\n    const band = bandOf.get(p.time),\n      g = groups[band];\n    let lane = g[0];\n    for (const l of g) if (lastAt[l] < lastAt[lane]) lane = l;\n    if (p.time - lastAt[lane] < MIN_SAME) {\n      const neighbors = [];\n      if (g[0] > 0) neighbors.push(g[0] - 1);\n      if (g[g.length - 1] < lanes - 1) neighbors.push(g[g.length - 1] + 1);\n      for (const nl of neighbors)\n        if (p.time - lastAt[nl] >= MIN_SAME) {\n          lane = nl;\n          break;\n        }\n    }\n    lastAt[lane] = p.time;\n    laneMap.set(p.time, lane);\n  }\n  return { laneMap, size, groups, bandCounts: counts, bandOf };\n}\n\nexport function fixedAdaptiveLaneMap468(\n  analysis,\n  highTimes,\n  lanes,\n  scale,\n  onsetInfo,\n  P = C3_DEFAULT_PARAMS,\n  minGap = 0.15,\n) {\n  const allocation = assignAdaptiveLanes468(highTimes.map(time=>({time})), analysis, lanes);\n  const orig = allocation.laneMap, groups = allocation.groups;\n  const groupOf = (l) => {\n    for (const arr of Object.values(groups)) if (arr.includes(l)) return arr;\n    return [l];\n  };\n  const medStr = [...onsetInfo.info.values()].map((i) => i.strength).sort((x, y) => x - y);\n  const med = medStr[Math.floor(medStr.length / 2)] || 0;\n  const candHeads = new Set();\n  for (const t of highTimes) {\n    const info = onsetInfo.info.get(t);\n    if (!info) continue;\n    for (const tier of ['low', 'mid', 'high']) {\n      if (\n        info.sustain >= P.holdMinSustain[tier] &&\n        info.sustain >= P.minHold &&\n        (info.strength || 0) >= med * P.holdTierStrengthMul[tier]\n      ) {\n        candHeads.add(t);\n        break;\n      }\n    }\n  }\n  const origByLaneTime = new Map();\n  for (const t of highTimes) {\n    const l = orig.get(t);\n    if (!origByLaneTime.has(l)) origByLaneTime.set(l, []);\n    origByLaneTime.get(l).push(t);\n  }\n  for (const arr of origByLaneTime.values()) arr.sort((a, b) => a - b);\n  const origNextAfter = (l, t) => {\n    const a = origByLaneTime.get(l) || [];\n    for (const x of a) if (x > t + 1e-9) return x;\n    return Infinity;\n  };\n  const lastTime = new Array(lanes).fill(-Infinity);\n  const placedHeads = new Map();\n  const fixed = new Map();\n  const moves = [];\n  const residual = [];\n  const room = P.minHold + P.tailClipMargin;\n  const laneOK = (l, t) => {\n    if (t - lastTime[l] < minGap) return false;\n    for (const hc of placedHeads.get(l) || [])\n      if (t > hc && t - hc < room) return false;\n    if (candHeads.has(t) && origNextAfter(l, t) - t < room) return false;\n    return true;\n  };\n  const pref = (from, t) => {\n    const out = [];\n    const seen = new Set();\n    const push = (l) => {\n      if (l >= 0 && l < lanes && !seen.has(l)) {\n        seen.add(l);\n        out.push(l);\n      }\n    };\n    for (const l of groupOf(from)) if (l !== from) push(l);\n    const info = onsetInfo.info.get(t);\n    const sec = info && info.bands && info.bands[1] ? info.bands[1].band : null;\n    if (sec) for (const l of groups[sec]) push(l);\n    for (let d = 1; d < lanes; d++) {\n      push(from - d);\n      push(from + d);\n    }\n    return out;\n  };\n  const sorted = [...highTimes].sort((a, b) => a - b);\n  for (const t of sorted) {\n    const ol = orig.get(t);\n    let target = ol;\n    if (t - lastTime[ol] < minGap) {\n      target = -1;\n      for (const l of pref(ol, t)) {\n        if (laneOK(l, t)) {\n          target = l;\n          break;\n        }\n      }\n      if (target < 0) {\n        target = ol;\n        residual.push(t);\n      } else moves.push({ time: t, from: ol, to: target });\n    }\n    fixed.set(t, target);\n    lastTime[target] = t;\n    if (candHeads.has(t)) {\n      if (!placedHeads.has(target)) placedHeads.set(target, []);\n      placedHeads.get(target).push(t);\n    }\n  }\n  return { map: fixed, moves, residual, groups, bandCounts: allocation.bandCounts };\n}\n\nexport function decorateAdaptiveTier468(base, tier, onsetInfo, lanes, P = C3_DEFAULT_PARAMS, groups) {\n  if (!groups || Object.values(groups).flat().length !== lanes) throw Error('adaptive468_groups');\n  const medStr = [...onsetInfo.info.values()].map((i) => i.strength).sort((x, y) => x - y);\n  const med = medStr[Math.floor(medStr.length / 2)] || 0;\n  const getStr = (n) => (onsetInfo.info.get(n.time) || {}).strength || 0;\n  const cand = base\n    .filter((n) => {\n      const info = onsetInfo.info.get(n.time);\n      return (\n        info &&\n        info.sustain >= P.holdMinSustain[tier] &&\n        info.sustain >= P.minHold &&\n        getStr(n) >= med * P.holdTierStrengthMul[tier]\n      );\n    })\n    .map((n) => ({ ...n, info: onsetInfo.info.get(n.time) }))\n    .sort((x, y) => getStr(y) - getStr(x) || x.time - y.time);\n  const holds = [];\n  const holdCapN = Math.floor(base.length * P.holdCapShare[tier]);\n  for (const c of cand) {\n    if (holds.length >= holdCapN) break;\n    if (holds.some((h) => Math.abs(h.time - c.time) < P.holdSpacing)) continue;\n    const next = base\n      .filter((q) => q.time > c.time && q.lane === c.lane)\n      .sort((x, y) => x.time - y.time)[0];\n    let dur = Math.min(P.capHold, c.info.sustain);\n    if (next) dur = Math.min(dur, next.time - c.time - P.tailClipMargin);\n    if (dur >= P.minHold) holds.push({ time: c.time, duration: +dur.toFixed(4) });\n  }\n  const holdMap = new Map(holds.map((h) => [h.time, h.duration]));\n  const chordCapN = Math.floor(base.length * P.chordCap[tier]);\n  const chordCands = base\n    .filter((n) => onsetInfo.info.get(n.time)?.chord)\n    .sort((x, y) => getStr(y) - getStr(x) || x.time - y.time);\n  const chordPicks = [];\n  for (const c of chordCands) {\n    if (chordPicks.length >= chordCapN) break;\n    if (chordPicks.some((h) => Math.abs(h.time - c.time) < P.chordSpacing)) continue;\n    const info = onsetInfo.info.get(c.time);\n    const g2 = groups[info.bands[1].band];\n    const used = new Set(base.filter((q) => Math.abs(q.time - c.time) < 0.001).map((q) => q.lane));\n    for (const h of holds) {\n      if (c.time >= h.time - P.chordHoldMargin && c.time < h.time + h.duration + P.chordHoldMargin)\n        used.add((base.find((q) => q.time === h.time) || {}).lane);\n    }\n    const laneTimes = new Map();\n    for (const q of base) {\n      if (!laneTimes.has(q.lane)) laneTimes.set(q.lane, []);\n      laneTimes.get(q.lane).push(q.time);\n    }\n    let pickLane = -1;\n    for (const l of g2) {\n      if (used.has(l)) continue;\n      const ts = laneTimes.get(l) || [];\n      if (ts.some((t) => Math.abs(t - c.time) < 0.15 && Math.abs(t - c.time) > 0.001)) continue;\n      pickLane = l;\n      break;\n    }\n    if (pickLane >= 0) chordPicks.push({ time: c.time, lane: pickLane });\n  }\n  const notes = [];\n  for (const n of base) {\n    const d = holdMap.get(n.time);\n    notes.push({\n      time: n.time,\n      lane: n.lane,\n      type: d ? 'hold' : 'tap',\n      ...(d ? { duration: d } : {}),\n    });\n  }\n  for (const cp of chordPicks) notes.push({ time: cp.time, lane: cp.lane, type: 'tap' });\n  notes.sort((x, y) => x.time - y.time || x.lane - y.lane);\n  notes.forEach((n, i) => (n.id = i));\n  return notes;\n}\n\n",
+	"src/opus/opus468-fftfix-mirror.mjs": "// TEST-ONLY measurement mirror: computeBandMags with the corrected\n// bit-reversal permutation (single added line `j ^= bit;`). Used to quantify\n// the behavioral delta of the pinned-fft defect (c3-core.mjs:32,\n// current35-budget-v1.mjs:444, canonical-generator.mjs:335) on decoration\n// semantics. The pinned modules are NOT modified; this mirror changes no\n// shipped or candidate recipe. No runtime import. No generatorVersion claim.\n// makeOnsetInfo from c3-core is pure given band mags, so only the band-mag\n// stage is mirrored here; tests pair it with the EXISTING makeOnsetInfo.\nimport { HANN, WRE, WIM } from '../flux-tables.mjs';\n\nconst BANDS = { low: [20, 250], mid: [250, 2000], high: [2000, 11025] };\n\n// Corrected copy of c3-core fft: adds the missing `j ^= bit;` increment.\nfunction fftFixed(re, im, WRE_, WIM_) {\n  const n = re.length;\n  for (let i = 1, j = 0; i < n; i++) {\n    let bit = n >> 1;\n    for (; j & bit; bit >>= 1) j ^= bit;\n    j ^= bit; // <-- the single line missing from the pinned copies\n    if (i < j) {\n      const tr = re[i];\n      re[i] = re[j];\n      re[j] = tr;\n      const ti = im[i];\n      im[i] = im[j];\n      im[j] = ti;\n    }\n  }\n  for (let len = 2; len <= n; len <<= 1) {\n    const half = len >> 1,\n      step = n / len;\n    for (let i = 0; i < n; i += len) {\n      for (let j = 0; j < half; j++) {\n        const t = j * step,\n          cwr = WRE_[t],\n          cwi = WIM_[t];\n        const ur = re[i + j],\n          ui = im[i + j];\n        const vr = re[i + j + half] * cwr - im[i + j + half] * cwi;\n        const vi = re[i + j + half] * cwi + im[i + j + half] * cwr;\n        re[i + j] = ur + vr;\n        im[i + j] = ui + vi;\n        re[i + j + half] = ur - vr;\n        im[i + j + half] = ui - vi;\n      }\n    }\n  }\n}\n\n// Copy of c3-core computeBandMags with fftFixed instead of the pinned fft.\nexport function computeBandMagsFixed(samples, sampleRate, tables, hop = 512, window = 1024) {\n  const { HANN: H_, WRE: WR_, WIM: WI_ } = tables;\n  const binHz = sampleRate / window;\n  const bandBins = {};\n  for (const [b, [lo, hi]] of Object.entries(BANDS))\n    bandBins[b] = [\n      Math.max(1, Math.floor(lo / binHz)),\n      Math.min(window / 2 - 1, Math.ceil(hi / binHz)),\n    ];\n  const re = new Float64Array(window),\n    im = new Float64Array(window);\n  const times = [],\n    mags = { low: [], mid: [], high: [] };\n  for (let i = 0; i + window < samples.length; i += hop) {\n    for (let j = 0; j < window; j++) {\n      re[j] = samples[i + j] * H_[j];\n      im[j] = 0;\n    }\n    fftFixed(re, im, WR_, WI_);\n    const sums = { low: 0, mid: 0, high: 0 };\n    for (let k = 1; k < window / 2; k++) {\n      const m = Math.sqrt(re[k] * re[k] + im[k] * im[k]);\n      for (const [b, [lo, hi]] of Object.entries(bandBins))\n        if (k >= lo && k <= hi) {\n          sums[b] += m;\n          break;\n        }\n    }\n    for (const b of Object.keys(BANDS))\n      mags[b].push(sums[b] / (bandBins[b][1] - bandBins[b][0] + 1));\n    times.push((i + window / 2) / sampleRate);\n  }\n  return { times, mags, frameDur: hop / sampleRate };\n}\n\nexport const FFTFIX_TABLES = { HANN, WRE, WIM };\n",
+	"src/opus/opus468-generator.mjs": "// opus468-generator.mjs — NEW isolated 4/6/8-lane chart generator (ORV29 sub-scope).\n//\n// Isolation contract:\n//  - Imports ONLY lane-independent pure math from the existing pinned modules\n//    (analyzePcm/chartFromAnalysis tier TIMES, computeBandMags, makeOnsetInfo,\n//    denseHighSelection, C3 params). The existing 5/7 modules are never edited:\n//    their laneGroups/adapt paths throw for lanes outside [5,7], so the four\n//    lane-dependent functions are mirrored HERE with explicit 4/6/8 groups.\n//  - 4/6/8 lane groups mirror the retained old29 producer semantics exactly:\n//    4={low:[0],mid:[1,2],high:[3]}, 6={low:[0,1],mid:[2,3],high:[4,5]},\n//    8={low:[0,1],mid:[2,3,4,5],high:[6,7]}.\n//  - chartFromAnalysis is used for tier TIME selection only (same as the\n//    retained producer); its internal lane field is discarded, so its 5/7\n//    group literal never influences 4/6/8 output.\n//  - NOT the same version claim as any 5/7 pipeline: distinct generatorVersion\n//    is supplied by the caller (record module rejects old-family literals).\nimport { analyzePcm, chartFromAnalysis } from '../flux-chart-research.mjs';\nimport {\n  computeBandMags,\n  makeOnsetInfo,\n  denseHighSelection,\n  C3_DEFAULT_PARAMS,\n  C3_SC_PARAMS,\n} from '../c3-core.mjs';\nimport { HANN, WRE, WIM } from '../flux-tables.mjs';\n\nexport const OPUS468_LANES = [4, 6, 8];\nexport const OPUS468_TIERS = ['low', 'mid', 'high', 'sc'];\nexport const OPUS468_CHART_KEYS = [\n  '4:low', '4:mid', '4:high', '4:sc',\n  '6:low', '6:mid', '6:high', '6:sc',\n  '8:low', '8:mid', '8:high', '8:sc',\n];\n// csx/1 contract caps (fixed 12-slot family): per-tier caps + total + body cap.\nexport const OPUS468_TIER_NOTE_CAP = { low: 910, mid: 1270, high: 2770, sc: 3130 };\nexport const OPUS468_MAX_TOTAL_NOTES = 24300;\nexport const OPUS468_SC_MARKER = 'sc_collapsed_into_mx';\n\nexport function laneGroups468(lanes) {\n  if (lanes === 4) return { low: [0], mid: [1, 2], high: [3] };\n  if (lanes === 6) return { low: [0, 1], mid: [2, 3], high: [4, 5] };\n  if (lanes === 8) return { low: [0, 1], mid: [2, 3, 4, 5], high: [6, 7] };\n  throw new Error('opus468_unsupported_lanes: ' + lanes);\n}\n\n// Mirror of c3-core assignLanes (C2 rule) with 4/6/8 groups. Identical scoring.\nexport function assignLanes468(analysis, highTimes, lanes, scale) {\n  const groups = laneGroups468(lanes);\n  const count = { low: 0, mid: 0, high: 0 };\n  const laneMap = new Map();\n  for (const t of highTimes) {\n    const rel = [];\n    for (const b of ['low', 'mid', 'high']) {\n      const bp = analysis.bandPeaks[b].find((q) => Math.abs(q.time - t) < 0.07);\n      if (bp) rel.push({ band: b, score: bp.strength / scale[b] });\n    }\n    rel.sort(\n      (x, y) =>\n        y.score - x.score ||\n        ['low', 'mid', 'high'].indexOf(x.band) - ['low', 'mid', 'high'].indexOf(y.band),\n    );\n    const band = rel[0]?.band || 'mid';\n    const g = groups[band];\n    laneMap.set(t, g[count[band]++ % g.length]);\n  }\n  return laneMap;\n}\n\n// Mirror of c3-lane-placement fixedLaneMap with 4/6/8 groups. Same policy.\nexport function fixedLaneMap468(\n  analysis,\n  highTimes,\n  lanes,\n  scale,\n  onsetInfo,\n  P = C3_DEFAULT_PARAMS,\n  minGap = 0.15,\n) {\n  const orig = assignLanes468(analysis, highTimes, lanes, scale);\n  const groups = laneGroups468(lanes);\n  const groupOf = (l) => {\n    for (const arr of Object.values(groups)) if (arr.includes(l)) return arr;\n    return [l];\n  };\n  const medStr = [...onsetInfo.info.values()].map((i) => i.strength).sort((x, y) => x - y);\n  const med = medStr[Math.floor(medStr.length / 2)] || 0;\n  const candHeads = new Set();\n  for (const t of highTimes) {\n    const info = onsetInfo.info.get(t);\n    if (!info) continue;\n    for (const tier of ['low', 'mid', 'high']) {\n      if (\n        info.sustain >= P.holdMinSustain[tier] &&\n        info.sustain >= P.minHold &&\n        (info.strength || 0) >= med * P.holdTierStrengthMul[tier]\n      ) {\n        candHeads.add(t);\n        break;\n      }\n    }\n  }\n  const origByLaneTime = new Map();\n  for (const t of highTimes) {\n    const l = orig.get(t);\n    if (!origByLaneTime.has(l)) origByLaneTime.set(l, []);\n    origByLaneTime.get(l).push(t);\n  }\n  for (const arr of origByLaneTime.values()) arr.sort((a, b) => a - b);\n  const origNextAfter = (l, t) => {\n    const a = origByLaneTime.get(l) || [];\n    for (const x of a) if (x > t + 1e-9) return x;\n    return Infinity;\n  };\n  const lastTime = new Array(lanes).fill(-Infinity);\n  const placedHeads = new Map();\n  const fixed = new Map();\n  const moves = [];\n  const residual = [];\n  const room = P.minHold + P.tailClipMargin;\n  const laneOK = (l, t) => {\n    if (t - lastTime[l] < minGap) return false;\n    for (const hc of placedHeads.get(l) || [])\n      if (t > hc && t - hc < room) return false;\n    if (candHeads.has(t) && origNextAfter(l, t) - t < room) return false;\n    return true;\n  };\n  const pref = (from, t) => {\n    const out = [];\n    const seen = new Set();\n    const push = (l) => {\n      if (l >= 0 && l < lanes && !seen.has(l)) {\n        seen.add(l);\n        out.push(l);\n      }\n    };\n    for (const l of groupOf(from)) if (l !== from) push(l);\n    const info = onsetInfo.info.get(t);\n    const sec = info && info.bands && info.bands[1] ? info.bands[1].band : null;\n    if (sec) for (const l of groups[sec]) push(l);\n    for (let d = 1; d < lanes; d++) {\n      push(from - d);\n      push(from + d);\n    }\n    return out;\n  };\n  const sorted = [...highTimes].sort((a, b) => a - b);\n  for (const t of sorted) {\n    const ol = orig.get(t);\n    let target = ol;\n    if (t - lastTime[ol] < minGap) {\n      target = -1;\n      for (const l of pref(ol, t)) {\n        if (laneOK(l, t)) {\n          target = l;\n          break;\n        }\n      }\n      if (target < 0) {\n        target = ol;\n        residual.push(t);\n      } else moves.push({ time: t, from: ol, to: target });\n    }\n    fixed.set(t, target);\n    lastTime[target] = t;\n    if (candHeads.has(t)) {\n      if (!placedHeads.has(target)) placedHeads.set(target, []);\n      placedHeads.get(target).push(t);\n    }\n  }\n  return { map: fixed, moves, residual };\n}\n\n// Mirror of c3-core decorateTier with 4/6/8 groups. Identical hold/chord policy.\nexport function decorateTier468(base, tier, onsetInfo, lanes, P = C3_DEFAULT_PARAMS) {\n  const groups = laneGroups468(lanes);\n  const medStr = [...onsetInfo.info.values()].map((i) => i.strength).sort((x, y) => x - y);\n  const med = medStr[Math.floor(medStr.length / 2)] || 0;\n  const getStr = (n) => (onsetInfo.info.get(n.time) || {}).strength || 0;\n  const cand = base\n    .filter((n) => {\n      const info = onsetInfo.info.get(n.time);\n      return (\n        info &&\n        info.sustain >= P.holdMinSustain[tier] &&\n        info.sustain >= P.minHold &&\n        getStr(n) >= med * P.holdTierStrengthMul[tier]\n      );\n    })\n    .map((n) => ({ ...n, info: onsetInfo.info.get(n.time) }))\n    .sort((x, y) => getStr(y) - getStr(x) || x.time - y.time);\n  const holds = [];\n  const holdCapN = Math.floor(base.length * P.holdCapShare[tier]);\n  for (const c of cand) {\n    if (holds.length >= holdCapN) break;\n    if (holds.some((h) => Math.abs(h.time - c.time) < P.holdSpacing)) continue;\n    const next = base\n      .filter((q) => q.time > c.time && q.lane === c.lane)\n      .sort((x, y) => x.time - y.time)[0];\n    let dur = Math.min(P.capHold, c.info.sustain);\n    if (next) dur = Math.min(dur, next.time - c.time - P.tailClipMargin);\n    if (dur >= P.minHold) holds.push({ time: c.time, duration: +dur.toFixed(4) });\n  }\n  const holdMap = new Map(holds.map((h) => [h.time, h.duration]));\n  const chordCapN = Math.floor(base.length * P.chordCap[tier]);\n  const chordCands = base\n    .filter((n) => onsetInfo.info.get(n.time)?.chord)\n    .sort((x, y) => getStr(y) - getStr(x) || x.time - y.time);\n  const chordPicks = [];\n  for (const c of chordCands) {\n    if (chordPicks.length >= chordCapN) break;\n    if (chordPicks.some((h) => Math.abs(h.time - c.time) < P.chordSpacing)) continue;\n    const info = onsetInfo.info.get(c.time);\n    const g2 = groups[info.bands[1].band];\n    const used = new Set(base.filter((q) => Math.abs(q.time - c.time) < 0.001).map((q) => q.lane));\n    for (const h of holds) {\n      if (c.time >= h.time - P.chordHoldMargin && c.time < h.time + h.duration + P.chordHoldMargin)\n        used.add((base.find((q) => q.time === h.time) || {}).lane);\n    }\n    const laneTimes = new Map();\n    for (const q of base) {\n      if (!laneTimes.has(q.lane)) laneTimes.set(q.lane, []);\n      laneTimes.get(q.lane).push(q.time);\n    }\n    let pickLane = -1;\n    for (const l of g2) {\n      if (used.has(l)) continue;\n      const ts = laneTimes.get(l) || [];\n      if (ts.some((t) => Math.abs(t - c.time) < 0.15 && Math.abs(t - c.time) > 0.001)) continue;\n      pickLane = l;\n      break;\n    }\n    if (pickLane >= 0) chordPicks.push({ time: c.time, lane: pickLane });\n  }\n  const notes = [];\n  for (const n of base) {\n    const d = holdMap.get(n.time);\n    notes.push({\n      time: n.time,\n      lane: n.lane,\n      type: d ? 'hold' : 'tap',\n      ...(d ? { duration: d } : {}),\n    });\n  }\n  for (const cp of chordPicks) notes.push({ time: cp.time, lane: cp.lane, type: 'tap' });\n  notes.sort((x, y) => x.time - y.time || x.lane - y.lane);\n  notes.forEach((n, i) => (n.id = i));\n  return notes;\n}\n\n// Mirror of external-chart-adapter adaptDecoratedChart accepting lanes [4,6,8].\n// Same representation change only; never timing or lanes.\nexport function adaptDecoratedChart468(raw, lanes, duration) {\n  if (\n    ![4, 6, 8].includes(lanes) ||\n    !Number.isFinite(duration) ||\n    duration <= 0 ||\n    !Array.isArray(raw) ||\n    !raw.length ||\n    raw.length > 10000\n  )\n    throw new Error('opus468_invalid_candidate_chart');\n  const ids = new Set();\n  const laneUntil = new Map();\n  let previous = -Infinity;\n  return raw.map((candidate) => {\n    if (!candidate || typeof candidate !== 'object') throw new Error('opus468_invalid_candidate_note');\n    const n = candidate;\n    if (\n      !Number.isInteger(n.id) ||\n      ids.has(n.id) ||\n      !Number.isInteger(n.lane) ||\n      n.lane < 0 ||\n      n.lane >= lanes ||\n      !Number.isFinite(n.time) ||\n      n.time < 0 ||\n      n.time < previous ||\n      n.time >= duration ||\n      !['tap', 'hold'].includes(n.type) ||\n      (laneUntil.get(n.lane) ?? -Infinity) >= n.time\n    )\n      throw new Error('opus468_invalid_candidate_note');\n    ids.add(n.id);\n    previous = n.time;\n    const note = { id: n.id, time: n.time, lane: n.lane };\n    if (n.type === 'hold') {\n      if (!Number.isFinite(n.duration) || n.duration <= 0 || n.time + n.duration > duration)\n        throw new Error('opus468_invalid_candidate_hold');\n      note.end = n.time + n.duration;\n    } else if (n.duration !== undefined)\n      throw new Error('opus468_tap_hold_duration');\n    laneUntil.set(n.lane, note.end ?? note.time);\n    return note;\n  });\n}\n\n// Core generation: parsed = {samples: Float32Array @22050, sampleRate: 48000, frames}.\n// Returns { charts: {key: Note[]}, duration } for the 12 keys (SC always present\n// pre-collapse; collapse is applied at record assembly, same as retained producer).\nexport function generateOpus468Charts(parsed) {\n  if (\n    !parsed ||\n    !(parsed.samples instanceof Float32Array) ||\n    !parsed.samples.length ||\n    parsed.sampleRate !== 48000 ||\n    !Number.isSafeInteger(parsed.frames) ||\n    parsed.frames < 1 ||\n    parsed.frames > 14400000 ||\n    // frames must actually describe the samples (parsePinnedPcmAnalysis relation)\n    parsed.samples.length !== Math.floor(parsed.frames / (48000 / 22050))\n  )\n    throw new Error('opus468_pcm_shape');\n  const samples = parsed.samples;\n  const rate = 22050;\n  const analysis = analyzePcm(samples, rate);\n  const bands = computeBandMags(samples, rate, { HANN, WRE, WIM });\n  const info = makeOnsetInfo(analysis, bands);\n  const charts = {};\n  let totalNotes = 0;\n  for (const lanes of OPUS468_LANES) {\n    const low = chartFromAnalysis(analysis, 'low', lanes).map((n) => n.time);\n    const mid = chartFromAnalysis(analysis, 'mid', lanes).map((n) => n.time);\n    const high = chartFromAnalysis(analysis, 'high', lanes).map((n) => n.time);\n    const laneMap = fixedLaneMap468(analysis, high, lanes, info.scale, info).map;\n    for (const [tier, times] of [['low', low], ['mid', mid], ['high', high]]) {\n      const base = times.map((time) => {\n        const lane = laneMap.get(time);\n        if (lane === undefined) throw Error('opus468_missing_inherited_lane');\n        return { time, lane };\n      });\n      const key = `${lanes}:${tier}`;\n      const adapted = adaptDecoratedChart468(decorateTier468(base, tier, info, lanes), lanes, samples.length / rate);\n      if (adapted.length > OPUS468_TIER_NOTE_CAP[tier]) throw Error('opus468_cap_' + tier);\n      totalNotes += adapted.length;\n      charts[key] = adapted;\n    }\n    const scBase = high.map((time) => {\n      const lane = laneMap.get(time);\n      if (lane === undefined) throw Error('opus468_missing_inherited_lane');\n      return { time, lane };\n    });\n    const scKey = `${lanes}:sc`;\n    const scAdapted = adaptDecoratedChart468(\n      decorateTier468(scBase, 'sc', info, lanes, C3_SC_PARAMS),\n      lanes,\n      samples.length / rate,\n    );\n    if (scAdapted.length > OPUS468_TIER_NOTE_CAP.sc) throw Error('opus468_cap_sc');\n    totalNotes += scAdapted.length;\n    charts[scKey] = scAdapted;\n  }\n  if (totalNotes > OPUS468_MAX_TOTAL_NOTES) throw Error('opus468_cap_total');\n  return { charts, duration: samples.length / rate, analysis };\n}\n",
+	"src/opus/opus468-record.mjs": "// opus468-record.mjs — NEW isolated 468 extension record assembly (ORV29 sub-scope).\n//\n// Assembles the orvio-opus-chart-extension-v1 / family 468-v1 record in the exact\n// fixed field order and root names of the independent pure binding validator\n// (opus-extension-binding.mjs, separate owner). This module does NOT import that\n// validator: it mirrors the contract and self-checks against independently\n// re-derived roots. Journal/DO authority is verified by the binding validator at\n// integration time, never here.\n//\n// Contract preserved verbatim:\n//  - kind orvio-opus-chart-extension-v1, version 1, family 468-v1\n//  - roots in fixed order: videoId, baseSourceRecordSha256 (SHA256 of the RAW base\n//    record JSON bytes, never reserialized), baseChartSetSha256, audioSha256,\n//    audioDescriptorSha256, encodedAudioSha256, decoderWasmSha256, pipelineVersion,\n//    frames, sampleRate, channels\n//  - then generatorVersion, config (must equal the frozen base record config\n//    verbatim), charts, chartMeta; extensionSha256 appended on the stored object\n//  - exactly 12 ordered slots 4/6/8 x low/mid/high/sc in charts and chartMeta;\n//    SC collapse marker {unavailable:'sc_collapsed_into_mx'} occupies its slot\n//  - per-chart sha256 = SHA256 of UTF8 JSON of normalized notes; tier note caps\n//    910/1270/2770/3130, total 24300, stored bytes <= 1572864\n//  - no qualified generator identity is claimed: the shipped literal is a\n//    labeled test-only value and old-family literals are rejected.\nimport { sha256 as nobleSha256 } from '@noble/hashes/sha2.js';\nimport { rateDifficulty } from '../chart-rating.mjs';\nimport { PIPELINE, DECODER } from './opus-descriptor.mjs';\nimport {\n  OPUS468_CHART_KEYS,\n  OPUS468_TIER_NOTE_CAP,\n  OPUS468_MAX_TOTAL_NOTES,\n  OPUS468_SC_MARKER,\n} from './opus468-generator.mjs';\n\nexport const OPUS468_EXTENSION_KIND = 'orvio-opus-chart-extension-v1';\nexport const OPUS468_EXTENSION_FAMILY = '468-v1';\n// Labeled test-only identity. Not a qualified generator: the binding validator\n// fails closed unless trusted integration code lists this exact string, and old\n// family literals are rejected outright.\n// Labeled test-only identity that also truthfully names the actual 468 derive\n// recipe (the contract binds config to the base record verbatim, so the recipe\n// truth lives here): nested-c2 tier selection gap0.10/burst8, m17c band-sustain\n// hold-chord-tail20 decoration, union-v3 lane placement mirrored to 468 groups.\n// Not a qualified generator: the binding validator fails closed unless trusted\n// integration code lists this exact string, and old family literals are rejected.\nexport const OPUS468_GENERATOR_VERSION =\n  'opus468-testonly-c2nested-gap010-burst8-decor17c-union468-v0-unqualified';\n\n// Fail-closed admission descriptor for a produced extension record. A record\n// carrying a test-only generator identity is NOT admissible at any consuming\n// boundary (persistence/install/share/play); the qualified-generator list\n// defaults to [] and only trusted integration code may flip qualified to true\n// AFTER actual producer qualification. Consumers must gate on this, not on\n// worker success alone.\nexport function opus468Admission(record, trustedQualifiedGeneratorVersions = []) {\n  const list = Array.isArray(trustedQualifiedGeneratorVersions)\n    ? trustedQualifiedGeneratorVersions\n    : [];\n  const qualified =\n    !!record &&\n    typeof record.generatorVersion === 'string' &&\n    list.includes(record.generatorVersion);\n  return {\n    qualified,\n    qualifiedGeneratorVersions: list,\n    persist: qualified,\n    install: qualified,\n    share: qualified,\n    play: qualified,\n    reason: qualified ? 'qualified-generator' : 'generator-not-qualified',\n  };\n}\n\nconst ROOTS = [\n  'videoId',\n  'baseSourceRecordSha256',\n  'baseChartSetSha256',\n  'audioSha256',\n  'audioDescriptorSha256',\n  'encodedAudioSha256',\n  'decoderWasmSha256',\n  'pipelineVersion',\n  'frames',\n  'sampleRate',\n  'channels',\n];\nconst TIER_FAMILY = { low: 'NM', mid: 'HD', high: 'MX', sc: 'SC' };\nconst MAX_STORED_BYTES = 1572864;\nconst TE = new TextEncoder();\nconst hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');\nexport const sha256Hex = (bytes) => hex(nobleSha256(bytes));\nconst sha = (s) => sha256Hex(TE.encode(s));\nconst HASH = (v) => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v);\n\nexport function checkOpus468GeneratorVersion(generatorVersion, baseAnalyzerVersion) {\n  if (\n    typeof generatorVersion !== 'string' ||\n    !generatorVersion ||\n    generatorVersion.length > 128 ||\n    generatorVersion.startsWith('research-c3') ||\n    generatorVersion === 'orvio-current35-v1'\n  )\n    throw Error('opus468_generator_version');\n  if (baseAnalyzerVersion !== undefined && generatorVersion === baseAnalyzerVersion)\n    throw Error('opus468_base_analyzer_is_not_extension_generator');\n}\n\n// Strict note normalization mirroring the binding validator: keys id,time,lane\n// plus optional end; sequential ids, non-decreasing time, lane bounds, no\n// same-lane overlap, end within duration.\nfunction normalizeNotes468(raw, lanes, duration, tier) {\n  if (!Array.isArray(raw) || !raw.length || raw.length > OPUS468_TIER_NOTE_CAP[tier])\n    throw Error('opus468_note_count_' + tier);\n  const out = raw.map((n, i) => {\n    if (\n      !n ||\n      typeof n !== 'object' ||\n      Array.isArray(n) ||\n      !Object.keys(n).every((k) => ['id', 'time', 'lane', 'end'].includes(k)) ||\n      n.id !== i ||\n      !Number.isSafeInteger(n.lane) ||\n      n.lane < 0 ||\n      n.lane >= lanes ||\n      !Number.isFinite(n.time) ||\n      n.time < 0 ||\n      n.time >= duration ||\n      (Object.hasOwn(n, 'end') &&\n        (!Number.isFinite(n.end) || n.end <= n.time || n.end > duration))\n    )\n      throw Error('opus468_note');\n    return { id: n.id, time: n.time, lane: n.lane, ...(Object.hasOwn(n, 'end') ? { end: n.end } : {}) };\n  });\n  const until = new Map();\n  let previous = -Infinity;\n  for (const n of out) {\n    if (n.time < previous || (until.get(n.lane) ?? -Infinity) >= n.time) throw Error('opus468_note_order');\n    previous = n.time;\n    until.set(n.lane, n.end ?? n.time);\n  }\n  return out;\n}\n\nfunction deepEqualJson(a, b) {\n  if (a === b) return true;\n  if (typeof a !== typeof b || !a || !b || typeof a !== 'object') return false;\n  if (Array.isArray(a) !== Array.isArray(b)) return false;\n  if (Array.isArray(a)) return a.length === b.length && a.every((x, i) => deepEqualJson(x, b[i]));\n  const ka = Object.keys(a);\n  return ka.length === Object.keys(b).length && ka.every((k) => Object.hasOwn(b, k) && deepEqualJson(a[k], b[k]));\n}\n\n// Verify the frozen base v2 record + descriptor binding the same way the\n// producer worker does before generating (fail-closed, typed errors).\nexport function bindOpus468Base({ baseRecordRaw, baseRecord, descriptor: d, descriptorSha256 }) {\n  if (typeof baseRecordRaw !== 'string' || TE.encode(baseRecordRaw).length > MAX_STORED_BYTES)\n    throw Error('opus468_base_record_bytes');\n  if (!baseRecord || typeof baseRecord !== 'object' || Array.isArray(baseRecord))\n    throw Error('opus468_base_record');\n  // The raw bytes being hashed must BE the parsed base record: a different\n  // valid record object alongside foreign raw bytes is not a binding.\n  let parsedRaw;\n  try { parsedRaw = JSON.parse(baseRecordRaw); } catch { throw Error('opus468_base_record_json'); }\n  if (!deepEqualJson(parsedRaw, baseRecord)) throw Error('opus468_base_record_raw_binding');\n  if (!d || typeof d !== 'object') throw Error('opus468_descriptor');\n  if (!HASH(descriptorSha256)) throw Error('opus468_descriptor_sha');\n  const r = baseRecord;\n  if (\n    r.videoId !== d.videoId ||\n    r.audioSha256 !== d.pcm16Sha256 ||\n    r.audioDescriptorSha256 !== descriptorSha256 ||\n    r.encodedAudioSha256 !== d.oggSha256 ||\n    r.decoderWasmSha256 !== DECODER ||\n    r.pipelineVersion !== PIPELINE ||\n    r.frames !== d.frames ||\n    r.sampleRate !== 48000 ||\n    d.sampleRate !== 48000 ||\n    d.channels !== 2 ||\n    !Number.isSafeInteger(d.frames) ||\n    d.frames < 1\n  )\n    throw Error('opus468_base_audio_binding');\n  return {\n    videoId: r.videoId,\n    baseSourceRecordSha256: sha(baseRecordRaw),\n    baseChartSetSha256: r.chartSetSha256,\n    audioSha256: r.audioSha256,\n    audioDescriptorSha256: descriptorSha256,\n    encodedAudioSha256: r.encodedAudioSha256,\n    decoderWasmSha256: DECODER,\n    pipelineVersion: PIPELINE,\n    frames: d.frames,\n    sampleRate: 48000,\n    channels: 2,\n  };\n}\n\n// Assemble the full extension from generated charts (key -> adapted Note[]).\n// Applies SC collapse, ratings, hashes, caps and the stored-bytes bound, then\n// self-verifies the stored record against independently re-derived roots.\nexport function assembleOpus468Extension({\n  baseRecordRaw,\n  baseRecord,\n  descriptor: d,\n  descriptorSha256,\n  generatedCharts,\n  generatorVersion = OPUS468_GENERATOR_VERSION,\n}) {\n  checkOpus468GeneratorVersion(generatorVersion, baseRecord && baseRecord.analyzerVersion);\n  const bound = bindOpus468Base({ baseRecordRaw, baseRecord, descriptor: d, descriptorSha256 });\n  if (!generatedCharts || typeof generatedCharts !== 'object' || Array.isArray(generatedCharts))\n    throw Error('opus468_charts');\n  // Strict 12-slot contract: unknown generated slots are rejected, never\n  // silently dropped; partial completion is not allowed.\n  for (const k of Object.keys(generatedCharts))\n    if (!OPUS468_CHART_KEYS.includes(k)) throw Error('opus468_unknown_slot_' + k);\n  const duration = d.frames / 48000;\n  const charts = {};\n  const chartMeta = {};\n  let total = 0;\n  for (const key of OPUS468_CHART_KEYS) {\n    const lanes = Number(key[0]);\n    const tier = key.slice(2);\n    const raw = generatedCharts[key];\n    if (!Array.isArray(raw)) throw Error('opus468_missing_slot_' + key);\n    const notes = normalizeNotes468(raw, lanes, duration, tier);\n    total += notes.length;\n    charts[key] = { notes, sha256: sha(JSON.stringify(notes)) };\n    chartMeta[key] = {\n      family: TIER_FAMILY[tier],\n      rating: { scale: tier === 'sc' ? 'sc' : 'standard', level: rateDifficulty(notes, duration, tier === 'sc' ? 'sc' : 'standard') },\n      scAvailable: true,\n    };\n  }\n  if (total > OPUS468_MAX_TOTAL_NOTES) throw Error('opus468_note_count_total');\n  // SC collapse: byte-equal SC and MX notes are not playable as SC; the slot is\n  // occupied by the explicit marker and unrated metadata.\n  for (const lanes of [4, 6, 8]) {\n    const scKey = `${lanes}:sc`;\n    const highKey = `${lanes}:high`;\n    if (JSON.stringify(charts[scKey].notes) === JSON.stringify(charts[highKey].notes)) {\n      total -= charts[scKey].notes.length;\n      charts[scKey] = { unavailable: OPUS468_SC_MARKER };\n      chartMeta[scKey] = { family: 'SC', rating: null, scAvailable: false };\n    }\n  }\n  const canonical = {\n    kind: OPUS468_EXTENSION_KIND,\n    version: 1,\n    family: OPUS468_EXTENSION_FAMILY,\n    ...bound,\n    generatorVersion,\n    config: baseRecord.config,\n    charts,\n    chartMeta,\n  };\n  const extensionSha256 = sha(JSON.stringify(canonical));\n  const stored = { ...canonical, extensionSha256 };\n  if (TE.encode(JSON.stringify(stored)).length > MAX_STORED_BYTES) throw Error('opus468_stored_bytes');\n  selfVerifyOpus468Extension(stored, { baseRecordRaw, baseRecord, descriptor: d, descriptorSha256 });\n  return stored;\n}\n\n// Independent re-derivation self-check of a stored extension record: re-binds\n// the roots from the raw inputs and re-validates every slot, hash and cap.\n// Mirrors the non-journal checks of the binding validator; journal authority is\n// out of scope here by design.\nexport function selfVerifyOpus468Extension(stored, { baseRecordRaw, baseRecord, descriptor: d, descriptorSha256 }) {\n  const bound = bindOpus468Base({ baseRecordRaw, baseRecord, descriptor: d, descriptorSha256 });\n  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) throw Error('opus468_verify_shape');\n  const expectedKeys = [\n    'kind', 'version', 'family', ...ROOTS, 'generatorVersion', 'config', 'charts', 'chartMeta', 'extensionSha256',\n  ];\n  if (!Object.keys(stored).every((k, i) => k === expectedKeys[i])) throw Error('opus468_verify_field_order');\n  if (stored.kind !== OPUS468_EXTENSION_KIND || stored.version !== 1 || stored.family !== OPUS468_EXTENSION_FAMILY)\n    throw Error('opus468_verify_shape');\n  for (const k of ROOTS) if (stored[k] !== bound[k]) throw Error('opus468_verify_root_' + k);\n  checkOpus468GeneratorVersion(stored.generatorVersion, baseRecord && baseRecord.analyzerVersion);\n  if (stored.config !== baseRecord.config) throw Error('opus468_verify_config');\n  const duration = d.frames / 48000;\n  let total = 0;\n  if (\n    !stored.charts || !stored.chartMeta ||\n    Object.keys(stored.charts).length !== OPUS468_CHART_KEYS.length ||\n    Object.keys(stored.chartMeta).length !== OPUS468_CHART_KEYS.length ||\n    !OPUS468_CHART_KEYS.every((k) => Object.hasOwn(stored.charts, k)) ||\n    !OPUS468_CHART_KEYS.every((k) => Object.hasOwn(stored.chartMeta, k))\n  )\n    throw Error('opus468_verify_slots');\n  for (const key of OPUS468_CHART_KEYS) {\n    const c = stored.charts[key];\n    const m = stored.chartMeta[key];\n    const tier = key.slice(2);\n    const cKeys = Object.keys(c);\n    if (cKeys.length === 1 && cKeys[0] === 'unavailable') {\n      if (tier !== 'sc' || c.unavailable !== OPUS468_SC_MARKER)\n        throw Error('opus468_verify_unavailable');\n      if (m.family !== 'SC' || m.rating !== null || m.scAvailable !== false || Object.keys(m).length !== 3)\n        throw Error('opus468_verify_metadata');\n      continue;\n    }\n    if (cKeys.length !== 2 || !cKeys.includes('notes') || !cKeys.includes('sha256'))\n      throw Error('opus468_verify_chart_shape');\n    const notes = normalizeNotes468(c.notes, Number(key[0]), duration, tier);\n    if (sha(JSON.stringify(notes)) !== c.sha256) throw Error('opus468_verify_chart_hash');\n    total += notes.length;\n    if (\n      m.family !== TIER_FAMILY[tier] ||\n      m.scAvailable !== true ||\n      !m.rating ||\n      Object.keys(m.rating).length !== 2 ||\n      m.rating.scale !== (tier === 'sc' ? 'sc' : 'standard') ||\n      !Number.isInteger(m.rating.level) ||\n      m.rating.level < 1 ||\n      m.rating.level > 15 ||\n      Object.keys(m).length !== 3\n    )\n      throw Error('opus468_verify_metadata');\n    // Rating is derived, not merely bounded: recompute from the notes.\n    if (m.rating.level !== rateDifficulty(notes, duration, tier === 'sc' ? 'sc' : 'standard'))\n      throw Error('opus468_verify_rating');\n  }\n  if (total > OPUS468_MAX_TOTAL_NOTES) throw Error('opus468_verify_total');\n  for (const lanes of [4, 6, 8]) {\n    const sc = stored.charts[`${lanes}:sc`];\n    if (sc.notes && JSON.stringify(sc.notes) === JSON.stringify(stored.charts[`${lanes}:high`].notes))\n      throw Error('opus468_verify_sc_duplicate');\n  }\n  const { extensionSha256, ...rest } = stored;\n  if (sha(JSON.stringify(rest)) !== extensionSha256) throw Error('opus468_verify_extension_hash');\n  if (TE.encode(JSON.stringify(stored)).length > MAX_STORED_BYTES) throw Error('opus468_verify_bytes');\n  return true;\n}\n\n// Additive test-only export (no behavior change): direct access to the note\n// normalizer for cap-boundary unit proofs in the qualification harness.\nexport { normalizeNotes468 as normalizeNotes468ForTest };\n",
+	"src/opus/opus-pcm-analysis.mjs": "// Matches existing parseWavAnalysis quantization/order without allocating a WAV.\nexport function parsePinnedPcmAnalysis(pcm,frames){\n if(!(pcm instanceof Uint8Array)||!Number.isSafeInteger(frames)||frames<1||frames>14400000||pcm.length!==frames*4)throw Error('opus_pcm_length');\n const view=new DataView(pcm.buffer,pcm.byteOffset,pcm.byteLength),ratio=48000/22050,samples=new Float32Array(Math.floor(frames/ratio));\n const mono=i=>Math.fround((view.getInt16(i*4,true)/32768+view.getInt16(i*4+2,true)/32768)/2);\n for(let i=0;i<samples.length;i++){const x=i*ratio,j=Math.floor(x),f=x-j,a=mono(j),b=j+1<frames?mono(j+1):a;samples[i]=a+(b-a)*f;}\n return {sampleRate:48000,frames,samples};\n}\n",
+	"src/opus/opus-descriptor.mjs": "export const FORMAT='orvio-opus-v1',PIPELINE='orvio-opus-pinned-pcm16-48k-v1';\nexport const ENCODER='4b0b17e171bb7469e1e32e7d3bb85ca59b4b89d0b2cd1a7a5d90e4c03ae04c09',DECODER='8b67eda2a46e478f65c24c467dae9eac26293efae6484bfe762b9d1086058b4b';\nexport const RULE='s16le scale=32768 half-to-even-ties saturate-after-quantize reject-nonfinite';\nconst hash=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x),int=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;\nconst keys=['schemaVersion','audioFormat','videoId','oggSha256','oggBytes','pcm16Sha256','sampleRate','channels','frames','preSkip','bitrateTargetKbps','encoderWasmSha256','decoderWasmSha256','pcm16Rule','source','parts'];\nconst exact=(o,k)=>o&&typeof o==='object'&&!Array.isArray(o)&&Object.keys(o).length===k.length&&k.every(x=>Object.hasOwn(o,x));\nexport function validOpusDescriptor(d){\n if(!exact(d,keys)||d.schemaVersion!==1||d.audioFormat!==FORMAT||typeof d.videoId!=='string'||!/^[A-Za-z0-9_-]{11}$/.test(d.videoId)||!hash(d.oggSha256)||!hash(d.pcm16Sha256)||!int(d.oggBytes,1,6000000)||d.sampleRate!==48000||d.channels!==2||!int(d.frames,1,14400000)||!int(d.preSkip,0,65535)||![96,80,64].includes(d.bitrateTargetKbps)||d.encoderWasmSha256!==ENCODER||d.decoderWasmSha256!==DECODER||d.pcm16Rule!==RULE)return false;\n const s=d.source;if(!exact(s,['sha256','bytes','sampleRate','channels','frames'])||!hash(s.sha256)||![44100,48000].includes(s.sampleRate)||s.channels!==2||!int(s.frames,1,s.sampleRate*300)||!int(s.bytes,44,57800000)||s.bytes<s.frames*4+44)return false;\n if(!Array.isArray(d.parts)||d.parts.length<1||d.parts.length>6)return false;\n let sum=0;for(let i=0;i<d.parts.length;i++){const p=d.parts[i];if(!exact(p,['index','bytes','sha256'])||p.index!==i||!int(p.bytes,1,1048576)||!hash(p.sha256))return false;sum+=p.bytes;}\n return sum===d.oggBytes;\n}\nexport async function sha256(bytes){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');}\nexport async function parseVerifiedDescriptor(bytes,expectedSha){\n if(!(bytes instanceof Uint8Array)||bytes.length>32768||!hash(expectedSha)||await sha256(bytes)!==expectedSha)throw Error('opus_descriptor_identity');\n const d=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));if(!validOpusDescriptor(d))throw Error('opus_descriptor_shape');return d;\n}\nexport async function verifyEncodedParts(bytes,d){\n if(!validOpusDescriptor(d)||!(bytes instanceof Uint8Array)||bytes.length!==d.oggBytes||await sha256(bytes)!==d.oggSha256)throw Error('opus_encoded_identity');\n let off=0;for(const p of d.parts){if(await sha256(bytes.subarray(off,off+p.bytes))!==p.sha256)throw Error('opus_part_identity');off+=p.bytes;}\n}\n",
+	"src/c3-core.mjs": "// c3-core.mjs — PURE browser-safe C3 core. No fs/crypto/path, no absolute imports, no globals.\n// All table bytes (HANN/WRE/WIM) are INJECTED by the caller so the host's own pinned tables\n// are used (identical numerics to the host analyzer). Owns: band magnitudes, sustain,\n// lane assignment (C2 rule, 5K/7K), hold/chord decoration, dense-high seeded selection.\n// Host (frontend) owns: analyzePcm/chartFromAnalysis, runtime adapter, pin/version, tests.\n\nexport const C3_DEFAULT_PARAMS = {\n  sustainRel: 0.25,\n  sustainFloorMul: 1.5,\n  stayFrames: 3,\n  minHold: 0.3,\n  capHold: 2.0,\n  holdSpacing: 2.0,\n  chordRatio: 0.6,\n  chordSpacing: 0.5,\n  chordHoldMargin: 0.15,\n  tailClipMargin: 0.2, // >= tail late-release threshold 116.67ms + buffer (frontend runtime semantics)\n  chordCap: { low: 0.0, mid: 0.05, high: 0.15 },\n  holdTierStrengthMul: { low: 1.5, mid: 1.0, high: 0.7 },\n  holdMinSustain: { low: 0.6, mid: 0.3, high: 0.3 },\n  holdCapShare: { low: 0.1, mid: 0.15, high: 0.25 },\n  bandWindow: 0.07,\n};\nexport const C3D_DENSE = { gap: 0.08, burst: 12 }; // dense-high candidate values\n\nexport function laneGroups(lanes) {\n  if (lanes === 5) return { low: [0, 1], mid: [2], high: [3, 4] };\n  if (lanes === 7) return { low: [0, 1], mid: [2, 3, 4], high: [5, 6] };\n  throw new Error('unsupported lanes: ' + lanes);\n}\n\nfunction fft(re, im, WRE, WIM) {\n  const n = re.length;\n  for (let i = 1, j = 0; i < n; i++) {\n    let bit = n >> 1;\n    for (; j & bit; bit >>= 1) j ^= bit;\n    if (i < j) {\n      const tr = re[i];\n      re[i] = re[j];\n      re[j] = tr;\n      const ti = im[i];\n      im[i] = im[j];\n      im[j] = ti;\n    }\n  }\n  for (let len = 2; len <= n; len <<= 1) {\n    const half = len >> 1,\n      step = n / len;\n    for (let i = 0; i < n; i += len) {\n      for (let j = 0; j < half; j++) {\n        const t = j * step,\n          cwr = WRE[t],\n          cwi = WIM[t];\n        const ur = re[i + j],\n          ui = im[i + j];\n        const vr = re[i + j + half] * cwr - im[i + j + half] * cwi;\n        const vi = re[i + j + half] * cwi + im[i + j + half] * cwr;\n        re[i + j] = ur + vr;\n        im[i + j] = ui + vi;\n        re[i + j + half] = ur - vr;\n        im[i + j + half] = ui - vi;\n      }\n    }\n  }\n}\nconst BANDS = { low: [20, 250], mid: [250, 2000], high: [2000, 11025] };\n\n// Per-frame band magnitude sums. tables={HANN,WRE,WIM} injected (host's pinned tables).\nexport function computeBandMags(\n  samples,\n  sampleRate,\n  tables,\n  hop = 512,\n  window = 1024,\n) {\n  const { HANN, WRE, WIM } = tables;\n  const binHz = sampleRate / window;\n  const bandBins = {};\n  for (const [b, [lo, hi]] of Object.entries(BANDS))\n    bandBins[b] = [\n      Math.max(1, Math.floor(lo / binHz)),\n      Math.min(window / 2 - 1, Math.ceil(hi / binHz)),\n    ];\n  const re = new Float64Array(window),\n    im = new Float64Array(window);\n  const times = [],\n    mags = { low: [], mid: [], high: [] };\n  for (let i = 0; i + window < samples.length; i += hop) {\n    for (let j = 0; j < window; j++) {\n      re[j] = samples[i + j] * HANN[j];\n      im[j] = 0;\n    }\n    fft(re, im, WRE, WIM);\n    const sums = { low: 0, mid: 0, high: 0 };\n    for (let k = 1; k < window / 2; k++) {\n      const m = Math.sqrt(re[k] * re[k] + im[k] * im[k]);\n      for (const [b, [lo, hi]] of Object.entries(bandBins))\n        if (k >= lo && k <= hi) {\n          sums[b] += m;\n          break;\n        }\n    }\n    for (const b of Object.keys(BANDS))\n      mags[b].push(sums[b] / (bandBins[b][1] - bandBins[b][0] + 1));\n    times.push((i + window / 2) / sampleRate);\n  }\n  return { times, mags, frameDur: hop / sampleRate };\n}\n\n// analysis: {peaks, bandPeaks, duration} (host analyzePcm result)\nexport function makeOnsetInfo(analysis, bm, P = C3_DEFAULT_PARAMS) {\n  const { times, mags, frameDur } = bm;\n  const floors = {};\n  for (const b of ['low', 'mid', 'high']) {\n    const s = [...mags[b]].sort((x, y) => x - y);\n    floors[b] = s[Math.floor(s.length * 0.2)];\n  }\n  const scale = {};\n  for (const b of ['low', 'mid', 'high']) {\n    const ss = analysis.bandPeaks[b]\n      .map((p) => p.strength)\n      .sort((x, y) => x - y);\n    scale[b] = ss[ss.length >> 1] || 1;\n  }\n  function bandScores(t) {\n    const r = [];\n    for (const b of ['low', 'mid', 'high']) {\n      let best = 0;\n      for (const p of analysis.bandPeaks[b])\n        if (Math.abs(p.time - t) < P.bandWindow && p.strength / scale[b] > best)\n          best = p.strength / scale[b];\n      if (best > 0) r.push({ band: b, score: best });\n    }\n    r.sort(\n      (x, y) =>\n        y.score - x.score ||\n        ['low', 'mid', 'high'].indexOf(x.band) -\n          ['low', 'mid', 'high'].indexOf(y.band),\n    );\n    return r;\n  }\n  function sustainAt(t, dom) {\n    let fi = 0,\n      best = 1e9;\n    for (let i = 0; i < times.length; i++) {\n      const d = Math.abs(times[i] - t);\n      if (d < best) {\n        best = d;\n        fi = i;\n      }\n    }\n    const thr = Math.max(\n      P.sustainRel * mags[dom][fi],\n      floors[dom] * P.sustainFloorMul,\n    );\n    let below = 0,\n      end = fi;\n    for (let i = fi + 1; i < times.length; i++) {\n      if (mags[dom][i] >= thr) {\n        below = 0;\n        end = i;\n      } else {\n        below++;\n        if (below >= P.stayFrames) break;\n      }\n    }\n    return (end - fi) * frameDur;\n  }\n  const info = new Map();\n  for (const p of analysis.peaks) {\n    const bs = bandScores(p.time);\n    const dom = bs[0]?.band || 'mid';\n    info.set(p.time, {\n      bands: bs,\n      dom,\n      chord: bs.length >= 2 && bs[1].score >= P.chordRatio * bs[0].score,\n      sustain: sustainAt(p.time, dom),\n      strength: p.strength,\n    });\n  }\n  return { info, scale };\n}\n\n// C2 lane rule over an arbitrary ordered note-time set (bundle.high or dense high).\nexport function assignLanes(analysis, highTimes, lanes, scale) {\n  const groups = laneGroups(lanes);\n  const count = { low: 0, mid: 0, high: 0 };\n  const laneMap = new Map();\n  const bandGroup = { low: 'low', mid: 'mid', high: 'high' };\n  for (const t of highTimes) {\n    const rel = [];\n    for (const b of ['low', 'mid', 'high']) {\n      const bp = analysis.bandPeaks[b].find((q) => Math.abs(q.time - t) < 0.07);\n      if (bp) rel.push({ band: b, score: bp.strength / scale[b] });\n    }\n    rel.sort(\n      (x, y) =>\n        y.score - x.score ||\n        ['low', 'mid', 'high'].indexOf(x.band) -\n          ['low', 'mid', 'high'].indexOf(y.band),\n    );\n    const band = rel[0]?.band || 'mid';\n    const g = groups[band];\n    laneMap.set(t, g[count[band]++ % g.length]);\n  }\n  return laneMap;\n}\n\n// Dense high: mid seeded, full pool, gap/burst. Returns peak objects sorted by time. Nested: mid ⊆ high.\nexport function denseHighSelection(analysis, midPeaks, dense = C3D_DENSE) {\n  const selected = [...midPeaks];\n  const byTime = [...analysis.peaks].sort((a, b) => a.time - b.time);\n  const seedTimes = new Set(midPeaks.map((p) => p.time));\n  const accept = (p) => {\n    if (selected.some((q) => Math.abs(q.time - p.time) < dense.gap))\n      return false;\n    const t = [...selected, p].sort((a, b) => a.time - b.time);\n    let j = 0;\n    for (let i = 0; i < t.length; i++) {\n      while (t[i].time - t[j].time >= 1) j++;\n      if (i - j + 1 > dense.burst) return false;\n    }\n    selected.push(p);\n    return true;\n  };\n  const phrases = [];\n  for (const p of byTime) {\n    if (!phrases.length || p.time - phrases.at(-1).at(-1).time >= 1.5)\n      phrases.push([]);\n    phrases.at(-1).push(p);\n  }\n  for (const phrase of phrases) {\n    if (phrase.some((p) => seedTimes.has(p.time))) continue;\n    const ranked = [...phrase].sort(\n      (a, b) => b.strength - a.strength || a.time - b.time,\n    );\n    for (const p of ranked) if (accept(p)) break;\n  }\n  for (const p of byTime) if (!selected.includes(p)) accept(p);\n  return selected.sort((a, b) => a.time - b.time);\n}\n\n// Decorate one tier's base chart [{time,lane}] with holds + chords.\nexport function decorateTier(\n  base,\n  tier,\n  onsetInfo,\n  lanes,\n  P = C3_DEFAULT_PARAMS,\n) {\n  const groups = laneGroups(lanes);\n  const bandGroup = { low: 'low', mid: 'mid', high: 'high' };\n  const medStr = [...onsetInfo.info.values()]\n    .map((i) => i.strength)\n    .sort((x, y) => x - y);\n  const med = medStr[Math.floor(medStr.length / 2)] || 0;\n  const getStr = (n) => (onsetInfo.info.get(n.time) || {}).strength || 0;\n  // holds\n  const cand = base\n    .filter((n) => {\n      const info = onsetInfo.info.get(n.time);\n      return (\n        info &&\n        info.sustain >= P.holdMinSustain[tier] &&\n        info.sustain >= P.minHold &&\n        getStr(n) >= med * P.holdTierStrengthMul[tier]\n      );\n    })\n    .map((n) => ({ ...n, info: onsetInfo.info.get(n.time) }))\n    .sort((x, y) => getStr(y) - getStr(x) || x.time - y.time);\n  const holds = [];\n  const holdCapN = Math.floor(base.length * P.holdCapShare[tier]);\n  for (const c of cand) {\n    if (holds.length >= holdCapN) break;\n    if (holds.some((h) => Math.abs(h.time - c.time) < P.holdSpacing)) continue;\n    const next = base\n      .filter((q) => q.time > c.time && q.lane === c.lane)\n      .sort((x, y) => x.time - y.time)[0];\n    let dur = Math.min(P.capHold, c.info.sustain);\n    if (next) dur = Math.min(dur, next.time - c.time - P.tailClipMargin);\n    if (dur >= P.minHold)\n      holds.push({ time: c.time, duration: +dur.toFixed(4) });\n  }\n  const holdMap = new Map(holds.map((h) => [h.time, h.duration]));\n  // chords\n  const chordCapN = Math.floor(base.length * P.chordCap[tier]);\n  const chordCands = base\n    .filter((n) => onsetInfo.info.get(n.time)?.chord)\n    .sort((x, y) => getStr(y) - getStr(x) || x.time - y.time);\n  const chordPicks = [];\n  for (const c of chordCands) {\n    if (chordPicks.length >= chordCapN) break;\n    if (chordPicks.some((h) => Math.abs(h.time - c.time) < P.chordSpacing))\n      continue;\n    const info = onsetInfo.info.get(c.time);\n    const g2 = groups[info.bands[1].band];\n    const used = new Set(\n      base.filter((q) => Math.abs(q.time - c.time) < 0.001).map((q) => q.lane),\n    );\n    for (const h of holds) {\n      if (\n        c.time >= h.time - P.chordHoldMargin &&\n        c.time < h.time + h.duration + P.chordHoldMargin\n      )\n        used.add((base.find((q) => q.time === h.time) || {}).lane);\n    }\n    const laneTimes = new Map();\n    for (const q of base) {\n      if (!laneTimes.has(q.lane)) laneTimes.set(q.lane, []);\n      laneTimes.get(q.lane).push(q.time);\n    }\n    let pickLane = -1;\n    for (const l of g2) {\n      if (used.has(l)) continue;\n      const ts = laneTimes.get(l) || [];\n      if (\n        ts.some(\n          (t) => Math.abs(t - c.time) < 0.15 && Math.abs(t - c.time) > 0.001,\n        )\n      )\n        continue;\n      pickLane = l;\n      break;\n    }\n    if (pickLane >= 0) chordPicks.push({ time: c.time, lane: pickLane });\n  }\n  const notes = [];\n  for (const n of base) {\n    const d = holdMap.get(n.time);\n    notes.push({\n      time: n.time,\n      lane: n.lane,\n      type: d ? 'hold' : 'tap',\n      ...(d ? { duration: d } : {}),\n    });\n  }\n  for (const cp of chordPicks)\n    notes.push({ time: cp.time, lane: cp.lane, type: 'tap' });\n  notes.sort((x, y) => x.time - y.time || x.lane - y.lane);\n  notes.forEach((n, i) => (n.id = i));\n  return notes;\n}\n\n// --- A4 additive: SC family decoration (Orvio-own special chart arrangement) ---\n// SC uses the SAME proved onset times and inherited lanes as the high tier (union-v3\n// placement). Only decoration differs: chord/hold emphasis from the proved multi-band\n// (chord score ratio) and sustain channels. C3_DEFAULT_PARAMS is NOT mutated; the\n// existing low/mid/high outputs are byte-identical with or without this export.\n// Coefficients are Orvio's own estimates, not a DJMAX calibration.\nexport const C3_SC_PARAMS = {\n  ...C3_DEFAULT_PARAMS,\n  chordRatio: C3_DEFAULT_PARAMS.chordRatio, // reuse proved multi-band onset evidence\n  chordSpacing: 0.3, // standard: 0.5\n  holdSpacing: 1.2, // standard: 2.0\n  chordCap: { low: 0.0, mid: 0.05, high: 0.15, sc: 0.3 },\n  holdTierStrengthMul: { low: 1.5, mid: 1.0, high: 0.7, sc: 0.5 },\n  holdMinSustain: { low: 0.6, mid: 0.3, high: 0.3, sc: 0.2 },\n  holdCapShare: { low: 0.1, mid: 0.15, high: 0.25, sc: 0.4 },\n};\n",
+	"src/chart-rating.mjs": "// chart-rating.mjs — Orvio-own estimated chart difficulty rating. Pure, deterministic.\n// The rating is computed from the chart itself (notes + duration), so the same chart\n// yields the same rating in selection, result and replay. Coefficients are Orvio's own\n// estimates: they are NOT a DJMAX calibration\n// and make no equivalence claim. 'standard' scale rates NM/HD/MX charts; 'sc' scale rates\n// SC charts against the SC population's density range. Integer 1..15 on both scales.\n\n// Feature reference points (full marks) per scale. Own estimates, see RATING.md.\nexport const RATING_REFS = {\n  standard: {\n    nps: 8.0,\n    peakNps: 14.0,\n    chordShare: 0.5,\n    holdTimeShare: 0.35,\n    jackRate: 0.15,\n  },\n  sc: {\n    nps: 10.0,\n    peakNps: 18.0,\n    chordShare: 0.6,\n    holdTimeShare: 0.4,\n    jackRate: 0.2,\n  },\n};\nexport const RATING_WEIGHTS = {\n  nps: 0.45,\n  peakNps: 0.25,\n  chord: 0.15,\n  hold: 0.1,\n  jack: 0.05,\n};\n\nexport function chartFeatures(notes, durationSec) {\n  if (\n    !Array.isArray(notes) ||\n    notes.length === 0 ||\n    !Number.isFinite(durationSec) ||\n    durationSec <= 0\n  )\n    throw new Error('Invalid chart for rating');\n  const ts = notes.map((n) => n.time).sort((a, b) => a - b);\n  const n = notes.length;\n  // peak NPS: max notes inside any 1s window [t, t+1)\n  let peak = 1,\n    j = 0;\n  for (let i = 0; i < n; i++) {\n    while (ts[j] < ts[i] - 1 + 1e-9 && j < i) j++;\n    peak = Math.max(peak, i - j + 1);\n  }\n  let chords = 0,\n    i = 0;\n  while (i < n) {\n    let k = i;\n    while (k + 1 < n && Math.abs(ts[k + 1] - ts[i]) < 1e-9) k++;\n    if (k > i) chords += k - i + 1;\n    i = k + 1;\n  }\n  const holds = notes.filter((x) => x.end !== undefined);\n  const holdTime = holds.reduce((s, x) => s + (x.end - x.time), 0);\n  let jacks = 0;\n  const byLane = new Map();\n  for (const x of notes) {\n    const p = byLane.get(x.lane);\n    if (p !== undefined && x.time - p < 0.15) jacks++;\n    byLane.set(x.lane, x.time);\n  }\n  return {\n    notes: n,\n    nps: n / durationSec,\n    peakNps: peak,\n    chordShare: chords / n,\n    holdTimeShare: holdTime / durationSec,\n    jackRate: jacks / n,\n  };\n}\n\nexport function rateFeatures(f, scale) {\n  const R = RATING_REFS[scale];\n  if (!R) throw new Error('Unknown rating scale: ' + scale);\n  const W = RATING_WEIGHTS;\n  const sub = (v, ref) => Math.min(15, (v / ref) * 15);\n  const composite =\n    W.nps * sub(f.nps, R.nps) +\n    W.peakNps * sub(f.peakNps, R.peakNps) +\n    W.chord * sub(f.chordShare, R.chordShare) +\n    W.hold * sub(f.holdTimeShare, R.holdTimeShare) +\n    W.jack * sub(f.jackRate, R.jackRate);\n  return Math.max(1, Math.min(15, Math.round(composite)));\n}\n\nexport function rateDifficulty(notes, durationSec, scale) {\n  return rateFeatures(chartFeatures(notes, durationSec), scale);\n}\n",
+	"src/flux-chart-research.mjs": "// Single isolated C-derived evaluation candidate. No old pin migration.\nimport { analyzeFluxV2 } from './flux-research.mjs';\nexport function analyzePcm(samples, rate) {\n  const r = analyzeFluxV2(samples, rate);\n  return {\n    ...r,\n    peaks: r.combined,\n    duration: samples.length / rate,\n    bpm: 0,\n    beatConfidence: 0,\n  };\n}\nfunction choose(source, ratio, gap, burst) {\n  const selected = [],\n    byTime = [...source].sort((a, b) => a.time - b.time);\n  const accept = (p) => {\n    if (selected.some((q) => Math.abs(q.time - p.time) < gap)) return false;\n    const t = [...selected, p].sort((a, b) => a.time - b.time);\n    let j = 0;\n    for (let i = 0; i < t.length; i++) {\n      while (t[i].time - t[j].time >= 1) j++;\n      if (i - j + 1 > burst) return false;\n    }\n    selected.push(p);\n    return true;\n  };\n  // One strongest representative for each source phrase, where feasible under timing policy.\n  const phrases = [];\n  for (const p of byTime) {\n    if (!phrases.length || p.time - phrases.at(-1).at(-1).time >= 1.5)\n      phrases.push([]);\n    phrases.at(-1).push(p);\n  }\n  for (const phrase of phrases) {\n    const ranked = [...phrase].sort(\n      (a, b) => b.strength - a.strength || a.time - b.time,\n    );\n    for (const p of ranked) if (accept(p)) break;\n  }\n  // Four-second active windows cap local note counts by a ratio, not a song-length NPS target.\n  const bins = new Map();\n  for (const p of byTime) {\n    const k = Math.floor(p.time / 4);\n    if (!bins.has(k)) bins.set(k, []);\n    bins.get(k).push(p);\n  }\n  for (const ps of bins.values()) {\n    const target = Math.max(1, Math.ceil(ps.length * ratio));\n    for (const p of [...ps].sort(\n      (a, b) => b.strength - a.strength || a.time - b.time,\n    )) {\n      const count = selected.filter(\n        (q) => Math.floor(q.time / 4) === Math.floor(p.time / 4),\n      ).length;\n      if (count >= target) break;\n      accept(p);\n    }\n  }\n  return selected.sort((a, b) => a.time - b.time);\n}\nconst cache = new WeakMap();\nexport function chartFromAnalysis(a, difficulty, lanes = 5) {\n  let bundle = cache.get(a);\n  if (!bundle) {\n    const strengths = a.peaks.map((p) => p.strength).sort((x, y) => x - y),\n      floor = strengths[Math.floor(strengths.length * 0.15)] || 0;\n    const pool = a.peaks.filter((p) => p.strength >= floor);\n    const high = choose(pool, 1, 0.1, 8),\n      mid = choose(high, 0.65, 0.2, 4),\n      low = choose(mid, 0.55, 0.32, 3);\n    bundle = { high, mid, low };\n    cache.set(a, bundle);\n  }\n  const groups =\n      lanes === 5\n        ? { low: [0, 1], mid: [2], high: [3, 4] }\n        : { low: [0, 1], mid: [2, 3, 4], high: [5, 6] },\n    count = { low: 0, mid: 0, high: 0 },\n    scale = {};\n  for (const b of ['low', 'mid', 'high']) {\n    const ss = a.bandPeaks[b].map((p) => p.strength).sort((x, y) => x - y);\n    scale[b] = ss[ss.length >> 1] || 1;\n  }\n  const laneMap = new Map();\n  for (const p of bundle.high) {\n    const rel = [];\n    for (const b of ['low', 'mid', 'high']) {\n      const bp = a.bandPeaks[b].find((q) => Math.abs(q.time - p.time) < 0.07);\n      if (bp) rel.push({ band: b, score: bp.strength / scale[b] });\n    }\n    rel.sort(\n      (x, y) =>\n        y.score - x.score ||\n        ['low', 'mid', 'high'].indexOf(x.band) -\n          ['low', 'mid', 'high'].indexOf(y.band),\n    );\n    const band = rel[0]?.band || 'mid',\n      g = groups[band];\n    laneMap.set(p.time, g[count[band]++ % g.length]);\n  }\n  return bundle[difficulty].map((p, id) => ({\n    id,\n    time: p.time,\n    lane: laneMap.get(p.time),\n  }));\n}\n",
+	"src/flux-research.mjs": "// analyze-flux-v2.mjs — RESEARCH PROTOTYPE, separate version. Pin 변경 아님.\n// Determinism-hardened spectral flux: NO Math.sin/cos/exp/log at runtime.\n// Hann window and FFT twiddles come from flux-tables.mjs (embedded decimal literals —\n// identical doubles on every JS engine). Remaining arithmetic: +,-,*,/,Math.sqrt —\n// all exactly rounded per IEEE-754/ECMAScript, so output is bitwise identical across\n// engines/CPUs. (Math.sqrt is correctly rounded per spec; transcendentals are not.)\nimport { HANN, WRE, WIM } from './flux-tables.mjs';\n\nfunction fft(re, im) {\n  // iterative radix-2 with table twiddles, no recurrence, no transcendentals\n  const n = re.length;\n  for (let i = 1, j = 0; i < n; i++) {\n    let bit = n >> 1;\n    for (; j & bit; bit >>= 1) j ^= bit;\n    j ^= bit;\n    if (i < j) {\n      const tr = re[i];\n      re[i] = re[j];\n      re[j] = tr;\n      const ti = im[i];\n      im[i] = im[j];\n      im[j] = ti;\n    }\n  }\n  for (let len = 2; len <= n; len <<= 1) {\n    const half = len >> 1,\n      step = n / len;\n    for (let i = 0; i < n; i += len) {\n      for (let j = 0; j < half; j++) {\n        const t = j * step,\n          cwr = WRE[t],\n          cwi = WIM[t];\n        const ur = re[i + j],\n          ui = im[i + j];\n        const vr = re[i + j + half] * cwr - im[i + j + half] * cwi;\n        const vi = re[i + j + half] * cwi + im[i + j + half] * cwr;\n        re[i + j] = ur + vr;\n        im[i + j] = ui + vi;\n        re[i + j + half] = ur - vr;\n        im[i + j + half] = ui - vi;\n      }\n    }\n  }\n}\n\nconst BANDS = { low: [20, 250], mid: [250, 2000], high: [2000, 11025] };\n\nexport function analyzeFluxV2(samples, sampleRate, opts = {}) {\n  const hop = opts.hop ?? 512,\n    window = opts.window ?? 1024,\n    merge = opts.merge ?? 0.06;\n  if (window !== HANN.length) throw new Error('table only for window=1024');\n  const binHz = sampleRate / window;\n  const bandBins = {};\n  for (const [b, [lo, hi]] of Object.entries(BANDS)) {\n    bandBins[b] = [\n      Math.max(1, Math.floor(lo / binHz)),\n      Math.min(window / 2 - 1, Math.ceil(hi / binHz)),\n    ];\n  }\n  const re = new Float64Array(window),\n    im = new Float64Array(window);\n  let prev = null;\n  const flux = { low: [], mid: [], high: [] };\n  const times = [];\n  for (let i = 0; i + window < samples.length; i += hop) {\n    for (let j = 0; j < window; j++) {\n      re[j] = samples[i + j] * HANN[j];\n      im[j] = 0;\n    }\n    fft(re, im);\n    const mag = new Float64Array(window / 2);\n    for (let k = 0; k < window / 2; k++)\n      mag[k] = Math.sqrt(re[k] * re[k] + im[k] * im[k]);\n    if (prev) {\n      for (const [b, [lo, hi]] of Object.entries(bandBins)) {\n        let s = 0;\n        for (let k = lo; k <= hi; k++) {\n          const d = mag[k] - prev[k];\n          if (d > 0) s += d;\n        }\n        flux[b].push(s / (hi - lo + 1));\n      }\n      times.push((i + window / 2) / sampleRate);\n    }\n    prev = mag;\n  }\n  function pick(series) {\n    const sorted = [...series].sort((a, b) => a - b),\n      floor = sorted[Math.floor(sorted.length * 0.65)] || 0;\n    const maxAbs = sorted[sorted.length - 1] || 0,\n      absFloor = maxAbs * 1e-4;\n    const peaks = [];\n    for (let i = 2; i < series.length - 2; i++) {\n      const local = series\n        .slice(Math.max(0, i - 20), i + 1)\n        .sort((a, b) => a - b);\n      const median = local[Math.floor(local.length / 2)];\n      const thr = Math.max(floor * 2.5, median * 3, absFloor);\n      if (\n        series[i] > thr &&\n        series[i] >= series[i - 1] &&\n        series[i] > series[i + 1]\n      ) {\n        const time = times[i];\n        // boundary margin: how far above threshold (relative). Near-0 margins are tie-risk notes.\n        const margin = (series[i] - thr) / (thr || 1);\n        if (peaks.length && time - peaks[peaks.length - 1].time < merge) {\n          if (series[i] > peaks[peaks.length - 1].strength)\n            peaks[peaks.length - 1] = { time, strength: series[i], margin };\n        } else peaks.push({ time, strength: series[i], margin });\n      }\n    }\n    return peaks;\n  }\n  const bandPeaks = {\n    low: pick(flux.low),\n    mid: pick(flux.mid),\n    high: pick(flux.high),\n  };\n  const all = [];\n  for (const [b, ps] of Object.entries(bandPeaks))\n    for (const p of ps)\n      all.push({\n        time: p.time,\n        strength: p.strength,\n        band: b,\n        margin: p.margin,\n      });\n  all.sort((a, b) => a.time - b.time);\n  const combined = [];\n  for (const p of all) {\n    if (\n      combined.length &&\n      p.time - combined[combined.length - 1].time < merge\n    ) {\n      const c = combined[combined.length - 1];\n      c.strength += p.strength;\n      c.bands.add(p.band);\n      c.margin = Math.min(c.margin, p.margin);\n      c.time = Math.min(c.time, p.time);\n    } else\n      combined.push({\n        time: p.time,\n        strength: p.strength,\n        bands: new Set([p.band]),\n        margin: p.margin,\n      });\n  }\n  return { times, flux, bandPeaks, combined, sampleRate, hop, window };\n}\n",
+	"src/flux-tables.mjs": "// flux-tables.mjs — precomputed constants embedded as decimal literals.\n// Every JS engine parses each literal to the identical double (ECMAScript numeric\n// literal parsing is exact-to-nearest), so no Math.sin/cos is needed at runtime\n// and all downstream arithmetic is +,-,*,sqrt (exactly rounded) => bitwise deterministic.\nexport const N = 1024;\nexport const HANN = Float64Array.of(\n  0.0,\n  9.43076911874563e-6,\n  3.772272071722593e-5,\n  8.487478753615996e-5,\n  0.00015088519085437735,\n  0.00023575144055643094,\n  0.00033947033522635506,\n  0.0004620379622682358,\n  0.0006034496980542037,\n  0.0007637002080985167,\n  0.0009427834472588992,\n  0.0011406926599646372,\n  0.0013574203804713747,\n  0.0015929584331427216,\n  0.0018472979327587291,\n  0.0021204292848509554,\n  0.0024123421860645644,\n  0.0027230256245468487,\n  0.003052467880362675,\n  0.003400656525936685,\n  0.003767578426521867,\n  0.004153219740695435,\n  0.00455756592088058,\n  0.004980601713895361,\n  0.005422311161528193,\n  0.005882677601139863,\n  0.006361683666291973,\n  0.006859311287402081,\n  0.007375541692425325,\n  0.007910355407562741,\n  0.008463732257995571,\n  0.009035651368646647,\n  0.009626091164967543,\n  0.010235029373752758,\n  0.010862443023979595,\n  0.011508308447674975,\n  0.012172601280808104,\n  0.012855296464209687,\n  0.013556368244517059,\n  0.014275790175145853,\n  0.01501353511728759,\n  0.015769575240933364,\n  0.01654388202592383,\n  0.01733642626302484,\n  0.018147178055029578,\n  0.01897610681788614,\n  0.01982318128185151,\n  0.020688369492670833,\n  0.021571638812783067,\n  0.022472955922552107,\n  0.023392286821523722,\n  0.02432959682970809,\n  0.025284850588888075,\n  0.026258012063953118,\n  0.02724904454425836,\n  0.028257910645009876,\n  0.02928457230867454,\n  0.030328990806415934,\n  0.03139112673955513,\n  0.03247094004105716,\n  0.0335683899770422,\n  0.034683435148322506,\n  0.03581603349196372,\n  0.03696614228287187,\n  0.038133718135405226,\n  0.03931871700501044,\n  0.0405210941898847,\n  0.04174080433266136,\n  0.04297780142212154,\n  0.044232038794929374,\n  0.04550346913739256,\n  0.046792044487247,\n  0.048097716235466326,\n  0.04942043512809524,\n  0.050760151268107845,\n  0.05211681411728969,\n  0.05349037249814442,\n  0.05488077459582419,\n  0.05628796796008434,\n  0.05771189950726191,\n  0.05915251552227829,\n  0.060609761660665395,\n  0.06208358295061572,\n  0.063573923795056,\n  0.06508072797374453,\n  0.06660393864539216,\n  0.06814349834980615,\n  0.06969934901005809,\n  0.0712714319346745,\n  0.07285968781985097,\n  0.07446405675168938,\n  0.0760844782084577,\n  0.07772089106287344,\n  0.0793732335844094,\n  0.08104144344162223,\n  0.0827254577045039,\n  0.08442521284685561,\n  0.08614064474868416,\n  0.08787168869862061,\n  0.08961827939636186,\n  0.09138035095513325,\n  0.09315783690417473,\n  0.09495067019124787,\n  0.09675878318516545,\n  0.0985821076783428,\n  0.10042057488937056,\n  0.1022741154656096,\n  0.10414265948580692,\n  0.10602613646273357,\n  0.1079244753458436,\n  0.10983760452395408,\n  0.11176545182794673,\n  0.1137079445334902,\n  0.11566500936378377,\n  0.11763657249232101,\n  0.11962255954567536,\n  0.12162289560630529,\n  0.12363750521538053,\n  0.12566631237562886,\n  0.12770924055420257,\n  0.1297662126855657,\n  0.13183715117440137,\n  0.13392197789853838,\n  0.13602061421189898,\n  0.1381329809474649,\n  0.1402589984202643,\n  0.14239858643037745,\n  0.14455166426596217,\n  0.14671815070629868,\n  0.14889796402485328,\n  0.15109102199236146,\n  0.15329724187992977,\n  0.15551654046215668,\n  0.15774883402027212,\n  0.1599940383452954,\n  0.16225206874121212,\n  0.16452284002816892,\n  0.16680626654568692,\n  0.16910226215589297,\n  0.17141074024676906,\n  0.17373161373541962,\n  0.17606479507135658,\n  0.17841019623980203,\n  0.18076772876500824,\n  0.1831373037135955,\n  0.18551883169790678,\n  0.1879122228793798,\n  0.19031738697193612,\n  0.19273423324538658,\n  0.19516267052885444,\n  0.19760260721421435,\n  0.20005395125954806,\n  0.20251661019261674,\n  0.20499049111434925,\n  0.20747550070234622,\n  0.20997154521440087,\n  0.21247853049203536,\n  0.21499636196405225,\n  0.21752494465010247,\n  0.22006418316426785,\n  0.2226139817186597,\n  0.22517424412703235,\n  0.22774487380841102,\n  0.2303257737907356,\n  0.23291684671451895,\n  0.2355179948365187,\n  0.23812912003342568,\n  0.24075012380556393,\n  0.24338090728060802,\n  0.24602137121731177,\n  0.24867141600925197,\n  0.2513309416885865,\n  0.25399984792982444,\n  0.2566780340536119,\n  0.2593653990305288,\n  0.2620618414849004,\n  0.2647672596986222,\n  0.2674815516149957,\n  0.2702046148425794,\n  0.272936346659051,\n  0.2756766440150822,\n  0.2784254035382263,\n  0.28118252153681766,\n  0.2839478940038831,\n  0.28672141662106565,\n  0.2895029847625594,\n  0.29229249349905667,\n  0.29508983760170626,\n  0.2978949115460823,\n  0.30070760951616615,\n  0.303527825408337,\n  0.30635545283537513,\n  0.309190385130475,\n  0.31203251535126864,\n  0.3148817362838605,\n  0.3177379404468714,\n  0.3206010200954933,\n  0.32347086722555374,\n  0.32634737357758986,\n  0.3292304306409326,\n  0.3321199296577997,\n  0.335015761627399,\n  0.3379178173100396,\n  0.340825987231253,\n  0.3437401616859229,\n  0.34666023074242347,\n  0.3495860842467663,\n  0.3525176118267561,\n  0.3554547028961537,\n  0.35839724665884803,\n  0.3613451321130356,\n  0.364298248055408,\n  0.367256483085347,\n  0.37021972560912597,\n  0.3731878638441208,\n  0.37616078582302565,\n  0.37913837939807754,\n  0.38212053224528636,\n  0.385107131868672,\n  0.38809806560450877,\n  0.3910932206255743,\n  0.3940924839454067,\n  0.3970957424225666,\n  0.40010288276490463,\n  0.40311379153383575,\n  0.4061283551486183,\n  0.40914645989063825,\n  0.41216799190769987,\n  0.4151928372183196,\n  0.4182208817160266,\n  0.42125201117366684,\n  0.42428611124771165,\n  0.42732306748257215,\n  0.43036276531491585,\n  0.4334050900779891,\n  0.43644992700594226,\n  0.43949716123815885,\n  0.44254667782358914,\n  0.4455983617250855,\n  0.4486520978237429,\n  0.45170777092324094,\n  0.45476526575418963,\n  0.4578244669784776,\n  0.460885259193623,\n  0.46394752693712715,\n  0.4670111546908299,\n  0.47007602688526684,\n  0.4731420279040302,\n  0.4762090420881288,\n  0.4792769537403521,\n  0.48234564712963435,\n  0.4854150064954201,\n  0.48848491605203115,\n  0.49155525999303445,\n  0.4946259224956109,\n  0.4976967877249241,\n  0.50076773983849,\n  0.5038386629905474,\n  0.5069094413364271,\n  0.5099799590369228,\n  0.5130501002626607,\n  0.5161197491984684,\n  0.5191887900477443,\n  0.5222571070368258,\n  0.5253245844193564,\n  0.5283911064806522,\n  0.531456557542067,\n  0.534520821965356,\n  0.5375837841570382,\n  0.5406453285727563,\n  0.5437053397216364,\n  0.5467637021706436,\n  0.5498203005489378,\n  0.5528750195522244,\n  0.5559277439471046,\n  0.558978358575423,\n  0.5620267483586104,\n  0.565072798302026,\n  0.5681163934992949,\n  0.5711574191366425,\n  0.5741957604972264,\n  0.5772313029654628,\n  0.5802639320313512,\n  0.5832935332947936,\n  0.5863199924699095,\n  0.5893431953893482,\n  0.5923630280085946,\n  0.595379376410272,\n  0.5983921268084391,\n  0.6014011655528819,\n  0.6044063791334021,\n  0.6074076541840977,\n  0.6104048774876404,\n  0.6133979359795466,\n  0.6163867167524417,\n  0.6193711070603203,\n  0.6223509943227981,\n  0.6253262661293602,\n  0.6282968102436011,\n  0.6312625146074574,\n  0.6342232673454371,\n  0.6371789567688378,\n  0.6401294713799617,\n  0.6430746998763204,\n  0.6460145311548339,\n  0.6489488543160223,\n  0.6518775586681886,\n  0.6548005337315943,\n  0.6577176692426278,\n  0.6606288551579629,\n  0.6635339816587107,\n  0.6664329391545624,\n  0.6693256182879223,\n  0.6722119099380344,\n  0.675091705225098,\n  0.6779648955143753,\n  0.6808313724202893,\n  0.6836910278105124,\n  0.6865437538100456,\n  0.689389442805288,\n  0.6922279874480959,\n  0.6950592806598326,\n  0.6978832156354079,\n  0.7006996858473067,\n  0.7035085850496078,\n  0.7063098072819918,\n  0.709103246873738,\n  0.7118887984477116,\n  0.7146663569243369,\n  0.7174358175255634,\n  0.720197075778817,\n  0.7229500275209416,\n  0.725694568902128,\n  0.7284305963898314,\n  0.7311580067726783,\n  0.7338766971643578,\n  0.7365865650075044,\n  0.7392875080775664,\n  0.7419794244866618,\n  0.7446622126874216,\n  0.7473357714768221,\n  0.7499999999999999,\n  0.7526547977540592,\n  0.755300064591861,\n  0.7579357007258021,\n  0.7605616067315792,\n  0.7631776835519389,\n  0.7657838325004158,\n  0.7683799552650534,\n  0.7709659539121142,\n  0.7735417308897734,\n  0.7761071890317994,\n  0.7786622315612182,\n  0.7812067620939651,\n  0.7837406846425203,\n  0.7862639036195297,\n  0.7887763238414108,\n  0.7912778505319435,\n  0.7937683893258454,\n  0.7962478462723304,\n  0.7987161278386553,\n  0.8011731409136453,\n  0.8036187928112085,\n  0.8060529912738315,\n  0.808475644476059,\n  0.8108866610279595,\n  0.8132859499785707,\n  0.8156734208193327,\n  0.8180489834874998,\n  0.8204125483695401,\n  0.8227640263045148,\n  0.8251033285874421,\n  0.8274303669726424,\n  0.8297450536770695,\n  0.8320473013836196,\n  0.834337023244426,\n  0.8366141328841364,\n  0.8388785444031694,\n  0.8411301723809563,\n  0.8433689318791624,\n  0.8455947384448923,\n  0.8478075081138745,\n  0.8500071574136294,\n  0.8521936033666186,\n  0.8543667634933741,\n  0.8565265558156103,\n  0.8586728988593157,\n  0.8608057116578284,\n  0.8629249137548873,\n  0.8650304252076702,\n  0.8671221665898072,\n  0.8692000589943786,\n  0.8712640240368896,\n  0.8733139838582298,\n  0.8753498611276077,\n  0.8773715790454695,\n  0.8793790613463954,\n  0.8813722323019773,\n  0.8833510167236747,\n  0.8853153399656513,\n  0.8872651279275916,\n  0.8892003070574949,\n  0.8911208043544511,\n  0.8930265473713936,\n  0.8949174642178332,\n  0.8967934835625686,\n  0.898654534636379,\n  0.9005005472346923,\n  0.902331451720234,\n  0.9041471790256541,\n  0.9059476606561327,\n  0.9077328286919637,\n  0.9095026157911166,\n  0.9112569551917773,\n  0.9129957807148665,\n  0.9147190267665359,\n  0.9164266283406433,\n  0.9181185210212033,\n  0.9197946409848194,\n  0.9214549250030899,\n  0.9230993104449938,\n  0.9247277352792532,\n  0.9263401380766738,\n  0.9279364580124613,\n  0.9295166348685169,\n  0.931080609035708,\n  0.9326283215161177,\n  0.9341597139252698,\n  0.935674728494331,\n  0.937173308072291,\n  0.9386553961281179,\n  0.9401209367528907,\n  0.9415698746619078,\n  0.9430021551967743,\n  0.9444177243274616,\n  0.9458165286543475,\n  0.9471985154102291,\n  0.9485636324623146,\n  0.9499118283141887,\n  0.9512430521077563,\n  0.9525572536251606,\n  0.9538543832906772,\n  0.9551343921725842,\n  0.9563972319850091,\n  0.957642855089749,\n  0.958871214498068,\n  0.9600822638724704,\n  0.9612759575284481,\n  0.9624522504362039,\n  0.9636110982223505,\n  0.9647524571715842,\n  0.9658762842283343,\n  0.9669825369983864,\n  0.968071173750483,\n  0.9691421534178966,\n  0.970195435599979,\n  0.9712309805636863,\n  0.9722487492450764,\n  0.9732487032507835,\n  0.9742308048594664,\n  0.9751950170232309,\n  0.9761413033690276,\n  0.9770696282000244,\n  0.9779799564969529,\n  0.978872253919429,\n  0.9797464868072486,\n  0.9806026221816581,\n  0.9814406277465968,\n  0.982260471889917,\n  0.9830621236845754,\n  0.9838455528897998,\n  0.9846107299522304,\n  0.9853576260070347,\n  0.9860862128789953,\n  0.9867964630835742,\n  0.9874883498279483,\n  0.9881618470120215,\n  0.9888169292294076,\n  0.9894535717683901,\n  0.990071750612854,\n  0.9906714424431913,\n  0.9912526246371813,\n  0.9918152752708436,\n  0.9923593731192655,\n  0.9928848976574018,\n  0.9933918290608507,\n  0.9938801482065998,\n  0.9943498366737487,\n  0.9948008767442034,\n  0.9952332514033447,\n  0.9956469443406706,\n  0.9960419399504106,\n  0.9964182233321149,\n  0.9967757802912172,\n  0.9971145973395684,\n  0.9974346616959475,\n  0.9977359612865423,\n  0.9980184847454051,\n  0.998282221414882,\n  0.9985271613460143,\n  0.9987532952989144,\n  0.9989606147431138,\n  0.9991491118578855,\n  0.999318779532538,\n  0.999469611366685,\n  0.9996016016704854,\n  0.999714745464859,\n  0.9998090384816739,\n  0.9998844771639073,\n  0.99994105866578,\n  0.9999787808528637,\n  0.9999976423021616,\n  0.9999976423021616,\n  0.9999787808528637,\n  0.99994105866578,\n  0.9998844771639073,\n  0.9998090384816739,\n  0.999714745464859,\n  0.9996016016704854,\n  0.999469611366685,\n  0.999318779532538,\n  0.9991491118578855,\n  0.9989606147431139,\n  0.9987532952989144,\n  0.9985271613460144,\n  0.998282221414882,\n  0.9980184847454051,\n  0.9977359612865423,\n  0.9974346616959475,\n  0.9971145973395684,\n  0.996775780291217,\n  0.9964182233321149,\n  0.9960419399504106,\n  0.9956469443406706,\n  0.9952332514033448,\n  0.9948008767442034,\n  0.9943498366737487,\n  0.9938801482065998,\n  0.9933918290608508,\n  0.9928848976574018,\n  0.9923593731192655,\n  0.9918152752708437,\n  0.9912526246371813,\n  0.9906714424431913,\n  0.990071750612854,\n  0.9894535717683901,\n  0.9888169292294076,\n  0.9881618470120215,\n  0.9874883498279484,\n  0.9867964630835742,\n  0.9860862128789953,\n  0.9853576260070347,\n  0.9846107299522304,\n  0.9838455528897998,\n  0.9830621236845754,\n  0.982260471889917,\n  0.9814406277465968,\n  0.9806026221816581,\n  0.9797464868072487,\n  0.978872253919429,\n  0.9779799564969529,\n  0.9770696282000244,\n  0.9761413033690276,\n  0.9751950170232309,\n  0.9742308048594666,\n  0.9732487032507837,\n  0.9722487492450764,\n  0.9712309805636864,\n  0.9701954355999791,\n  0.9691421534178966,\n  0.968071173750483,\n  0.9669825369983864,\n  0.9658762842283342,\n  0.9647524571715842,\n  0.9636110982223505,\n  0.962452250436204,\n  0.9612759575284482,\n  0.9600822638724705,\n  0.9588712144980681,\n  0.9576428550897489,\n  0.9563972319850091,\n  0.9551343921725843,\n  0.9538543832906772,\n  0.9525572536251605,\n  0.9512430521077564,\n  0.9499118283141887,\n  0.9485636324623146,\n  0.9471985154102293,\n  0.9458165286543476,\n  0.9444177243274617,\n  0.9430021551967742,\n  0.9415698746619079,\n  0.9401209367528907,\n  0.938655396128118,\n  0.937173308072291,\n  0.9356747284943311,\n  0.9341597139252698,\n  0.932628321516118,\n  0.9310806090357082,\n  0.9295166348685169,\n  0.9279364580124614,\n  0.9263401380766738,\n  0.9247277352792533,\n  0.9230993104449937,\n  0.92145492500309,\n  0.9197946409848194,\n  0.9181185210212034,\n  0.9164266283406433,\n  0.9147190267665362,\n  0.9129957807148665,\n  0.9112569551917774,\n  0.9095026157911167,\n  0.9077328286919637,\n  0.9059476606561327,\n  0.9041471790256541,\n  0.9023314517202341,\n  0.9005005472346923,\n  0.8986545346363792,\n  0.8967934835625688,\n  0.8949174642178331,\n  0.8930265473713939,\n  0.8911208043544512,\n  0.889200307057495,\n  0.8872651279275915,\n  0.8853153399656515,\n  0.8833510167236747,\n  0.8813722323019773,\n  0.8793790613463955,\n  0.8773715790454696,\n  0.8753498611276078,\n  0.8733139838582299,\n  0.8712640240368899,\n  0.8692000589943785,\n  0.8671221665898073,\n  0.8650304252076703,\n  0.8629249137548874,\n  0.8608057116578283,\n  0.858672898859316,\n  0.8565265558156102,\n  0.8543667634933743,\n  0.8521936033666189,\n  0.8500071574136296,\n  0.8478075081138745,\n  0.8455947384448924,\n  0.8433689318791626,\n  0.8411301723809563,\n  0.8388785444031694,\n  0.8366141328841366,\n  0.8343370232444263,\n  0.8320473013836195,\n  0.8297450536770697,\n  0.8274303669726426,\n  0.8251033285874423,\n  0.8227640263045148,\n  0.8204125483695403,\n  0.8180489834875,\n  0.8156734208193328,\n  0.8132859499785706,\n  0.8108866610279596,\n  0.8084756444760592,\n  0.8060529912738317,\n  0.8036187928112086,\n  0.8011731409136454,\n  0.7987161278386554,\n  0.7962478462723304,\n  0.7937683893258455,\n  0.7912778505319438,\n  0.7887763238414112,\n  0.7862639036195296,\n  0.7837406846425203,\n  0.7812067620939651,\n  0.7786622315612183,\n  0.7761071890317995,\n  0.7735417308897737,\n  0.7709659539121145,\n  0.7683799552650534,\n  0.7657838325004158,\n  0.763177683551939,\n  0.7605616067315796,\n  0.7579357007258022,\n  0.755300064591861,\n  0.7526547977540594,\n  0.7500000000000002,\n  0.747335771476822,\n  0.7446622126874216,\n  0.7419794244866621,\n  0.7392875080775665,\n  0.7365865650075045,\n  0.7338766971643579,\n  0.7311580067726784,\n  0.7284305963898313,\n  0.7256945689021281,\n  0.722950027520942,\n  0.7201970757788175,\n  0.7174358175255635,\n  0.714666356924337,\n  0.7118887984477117,\n  0.7091032468737379,\n  0.706309807281992,\n  0.7035085850496081,\n  0.700699685847307,\n  0.6978832156354079,\n  0.6950592806598327,\n  0.6922279874480959,\n  0.6893894428052881,\n  0.6865437538100458,\n  0.6836910278105126,\n  0.6808313724202896,\n  0.6779648955143752,\n  0.675091705225098,\n  0.6722119099380344,\n  0.6693256182879228,\n  0.6664329391545625,\n  0.6635339816587109,\n  0.6606288551579631,\n  0.6577176692426275,\n  0.6548005337315942,\n  0.6518775586681885,\n  0.6489488543160228,\n  0.646014531154834,\n  0.6430746998763205,\n  0.6401294713799619,\n  0.6371789567688381,\n  0.6342232673454369,\n  0.6312625146074577,\n  0.6282968102436013,\n  0.6253262661293603,\n  0.6223509943227981,\n  0.6193711070603203,\n  0.6163867167524419,\n  0.6133979359795464,\n  0.6104048774876407,\n  0.607407654184098,\n  0.6044063791334024,\n  0.601401165552882,\n  0.5983921268084391,\n  0.5953793764102722,\n  0.5923630280085943,\n  0.5893431953893483,\n  0.5863199924699097,\n  0.5832935332947938,\n  0.5802639320313512,\n  0.5772313029654628,\n  0.5741957604972264,\n  0.5711574191366431,\n  0.568116393499295,\n  0.5650727983020263,\n  0.5620267483586107,\n  0.5589783585754229,\n  0.5559277439471045,\n  0.5528750195522243,\n  0.5498203005489383,\n  0.5467637021706437,\n  0.5437053397216365,\n  0.5406453285727565,\n  0.5375837841570384,\n  0.5345208219653559,\n  0.5314565575420669,\n  0.5283911064806526,\n  0.5253245844193564,\n  0.5222571070368258,\n  0.5191887900477444,\n  0.5161197491984686,\n  0.5130501002626605,\n  0.5099799590369232,\n  0.5069094413364275,\n  0.5038386629905477,\n  0.50076773983849,\n  0.4976967877249241,\n  0.494625922495611,\n  0.4915552599930341,\n  0.48848491605203126,\n  0.4854150064954203,\n  0.4823456471296347,\n  0.4792769537403521,\n  0.4762090420881288,\n  0.4731420279040302,\n  0.4700760268852674,\n  0.46701115469083,\n  0.4639475269371274,\n  0.4608852591936232,\n  0.4578244669784774,\n  0.4547652657541895,\n  0.451707770923241,\n  0.44865209782374343,\n  0.4455983617250856,\n  0.44254667782358925,\n  0.43949716123815913,\n  0.43644992700594254,\n  0.433405090077989,\n  0.4303627653149158,\n  0.4273230674825725,\n  0.42428611124771165,\n  0.4212520111736669,\n  0.41822088171602684,\n  0.41519283721831984,\n  0.4121679919076997,\n  0.4091464598906386,\n  0.4061283551486186,\n  0.4031137915338362,\n  0.4001028827649047,\n  0.3970957424225666,\n  0.3940924839454068,\n  0.39109322062557395,\n  0.3880980656045089,\n  0.38510713186867235,\n  0.3821205322452867,\n  0.37913837939807754,\n  0.3761607858230257,\n  0.3731878638441208,\n  0.3702197256091265,\n  0.3672564830853471,\n  0.3642982480554083,\n  0.3613451321130358,\n  0.35839724665884787,\n  0.35545470289615366,\n  0.35251761182675617,\n  0.34958608424676685,\n  0.3466602307424236,\n  0.34374016168592303,\n  0.34082598723125324,\n  0.33791781731003984,\n  0.3350157616273989,\n  0.33211992965779963,\n  0.32923043064093294,\n  0.32634737357758986,\n  0.32347086722555385,\n  0.3206010200954935,\n  0.31773794044687165,\n  0.31488173628386035,\n  0.31203251535126897,\n  0.3091903851304753,\n  0.30635545283537513,\n  0.303527825408337,\n  0.30070760951616615,\n  0.2978949115460824,\n  0.295089837601706,\n  0.29229249349905695,\n  0.28950298476255976,\n  0.286721416621066,\n  0.2839478940038831,\n  0.28118252153681766,\n  0.2784254035382264,\n  0.2756766440150823,\n  0.2729363466590511,\n  0.27020461484257957,\n  0.26748155161499587,\n  0.26476725969862214,\n  0.26206184148490047,\n  0.2593653990305288,\n  0.25667803405361234,\n  0.25399984792982455,\n  0.25133094168858655,\n  0.24867141600925213,\n  0.2460213712173116,\n  0.24338090728060796,\n  0.24075012380556388,\n  0.23812912003342596,\n  0.2355179948365188,\n  0.23291684671451907,\n  0.23032577379073582,\n  0.22774487380841119,\n  0.22517424412703219,\n  0.22261398171865998,\n  0.22006418316426812,\n  0.21752494465010247,\n  0.2149963619640523,\n  0.21247853049203547,\n  0.20997154521440103,\n  0.207475500702346,\n  0.20499049111434942,\n  0.20251661019261702,\n  0.20005395125954833,\n  0.1976026072142143,\n  0.19516267052885444,\n  0.19273423324538663,\n  0.1903173869719359,\n  0.18791222287938003,\n  0.185518831697907,\n  0.1831373037135957,\n  0.18076772876500818,\n  0.17841019623980203,\n  0.17606479507135664,\n  0.17373161373542,\n  0.17141074024676917,\n  0.16910226215589308,\n  0.1668062665456871,\n  0.1645228400281688,\n  0.162252068741212,\n  0.15999403834529535,\n  0.15774883402027245,\n  0.15551654046215674,\n  0.15329724187992988,\n  0.15109102199236157,\n  0.14889796402485345,\n  0.14671815070629857,\n  0.1445516642659624,\n  0.14239858643037773,\n  0.1402589984202643,\n  0.13813298094746496,\n  0.13602061421189904,\n  0.1339219778985385,\n  0.1318371511744012,\n  0.12976621268556593,\n  0.1277092405542028,\n  0.12566631237562909,\n  0.12363750521538053,\n  0.12162289560630529,\n  0.11962255954567541,\n  0.11763657249232085,\n  0.11566500936378388,\n  0.11370794453349042,\n  0.11176545182794695,\n  0.10983760452395402,\n  0.1079244753458436,\n  0.10602613646273362,\n  0.10414265948580725,\n  0.10227411546560966,\n  0.10042057488937067,\n  0.09858210767834297,\n  0.0967587831851654,\n  0.09495067019124781,\n  0.09315783690417467,\n  0.09138035095513353,\n  0.08961827939636186,\n  0.08787168869862072,\n  0.08614064474868421,\n  0.08442521284685572,\n  0.08272545770450385,\n  0.0810414434416224,\n  0.07937323358440962,\n  0.0777208910628735,\n  0.0760844782084577,\n  0.07446405675168943,\n  0.07285968781985108,\n  0.07127143193467439,\n  0.0696993490100582,\n  0.06814349834980632,\n  0.06660393864539232,\n  0.06508072797374453,\n  0.063573923795056,\n  0.06208358295061578,\n  0.060609761660665284,\n  0.059152515522278404,\n  0.05771189950726202,\n  0.056287967960084506,\n  0.05488077459582419,\n  0.05349037249814442,\n  0.052116814117289745,\n  0.05076015126810807,\n  0.0494204351280953,\n  0.04809771623546638,\n  0.04679204448724711,\n  0.045503469137392505,\n  0.04423203879492932,\n  0.04297780142212154,\n  0.041740804332661585,\n  0.0405210941898847,\n  0.039318717005010495,\n  0.03813371813540528,\n  0.03696614228287198,\n  0.03581603349196366,\n  0.03468343514832262,\n  0.03356838997704237,\n  0.03247094004105716,\n  0.03139112673955513,\n  0.03032899080641599,\n  0.029284572308674595,\n  0.02825791064500982,\n  0.02724904454425847,\n  0.02625801206395323,\n  0.025284850588888075,\n  0.02432959682970809,\n  0.023392286821523778,\n  0.022472955922552162,\n  0.02157163881278301,\n  0.02068836949267089,\n  0.01982318128185162,\n  0.01897610681788625,\n  0.018147178055029578,\n  0.01733642626302484,\n  0.01654388202592383,\n  0.01576957524093342,\n  0.015013535117287646,\n  0.014275790175145908,\n  0.013556368244517114,\n  0.012855296464209631,\n  0.012172601280808104,\n  0.011508308447674975,\n  0.010862443023979707,\n  0.010235029373752758,\n  0.009626091164967598,\n  0.009035651368646702,\n  0.008463732257995571,\n  0.007910355407562741,\n  0.007375541692425325,\n  0.006859311287402137,\n  0.006361683666291973,\n  0.0058826776011399184,\n  0.005422311161528248,\n  0.004980601713895361,\n  0.004557565920880524,\n  0.004153219740695491,\n  0.0037675784265219225,\n  0.003400656525936685,\n  0.003052467880362675,\n  0.0027230256245468487,\n  0.0024123421860645644,\n  0.0021204292848509554,\n  0.0018472979327587291,\n  0.0015929584331427216,\n  0.0013574203804713747,\n  0.0011406926599646372,\n  0.0009427834472588992,\n  0.0007637002080985167,\n  0.0006034496980542037,\n  0.0004620379622682358,\n  0.00033947033522635506,\n  0.00023575144055643094,\n  0.00015088519085437735,\n  8.487478753615996e-5,\n  3.772272071722593e-5,\n  9.43076911874563e-6,\n  0.0,\n);\nexport const WRE = Float64Array.of(\n  1.0,\n  0.9999811752826011,\n  0.9999247018391445,\n  0.9998305817958234,\n  0.9996988186962042,\n  0.9995294175010931,\n  0.9993223845883495,\n  0.9990777277526454,\n  0.9987954562051724,\n  0.9984755805732948,\n  0.9981181129001492,\n  0.9977230666441916,\n  0.9972904566786902,\n  0.9968202992911657,\n  0.996312612182778,\n  0.9957674144676598,\n  0.9951847266721969,\n  0.9945645707342554,\n  0.9939069700023561,\n  0.9932119492347945,\n  0.99247953459871,\n  0.9917097536690995,\n  0.99090263542778,\n  0.9900582102622971,\n  0.989176509964781,\n  0.9882575677307495,\n  0.9873014181578584,\n  0.9863080972445987,\n  0.9852776423889412,\n  0.984210092386929,\n  0.9831054874312163,\n  0.9819638691095552,\n  0.9807852804032304,\n  0.9795697656854405,\n  0.9783173707196277,\n  0.9770281426577544,\n  0.9757021300385286,\n  0.9743393827855759,\n  0.9729399522055602,\n  0.9715038909862518,\n  0.970031253194544,\n  0.9685220942744174,\n  0.9669764710448521,\n  0.9653944416976894,\n  0.9637760657954398,\n  0.9621214042690416,\n  0.9604305194155658,\n  0.9587034748958716,\n  0.9569403357322088,\n  0.9551411683057708,\n  0.9533060403541939,\n  0.9514350209690083,\n  0.9495281805930367,\n  0.9475855910177411,\n  0.9456073253805213,\n  0.9435934581619604,\n  0.9415440651830208,\n  0.9394592236021899,\n  0.937339011912575,\n  0.9351835099389476,\n  0.932992798834739,\n  0.9307669610789837,\n  0.9285060804732156,\n  0.9262102421383114,\n  0.9238795325112867,\n  0.921514039342042,\n  0.9191138516900578,\n  0.9166790599210427,\n  0.9142097557035307,\n  0.9117060320054299,\n  0.9091679830905224,\n  0.9065957045149153,\n  0.9039892931234433,\n  0.901348847046022,\n  0.8986744656939538,\n  0.8959662497561852,\n  0.8932243011955153,\n  0.8904487232447579,\n  0.8876396204028539,\n  0.8847970984309378,\n  0.881921264348355,\n  0.8790122264286335,\n  0.8760700941954066,\n  0.8730949784182901,\n  0.8700869911087115,\n  0.8670462455156926,\n  0.8639728561215868,\n  0.8608669386377673,\n  0.8577286100002721,\n  0.8545579883654005,\n  0.8513551931052652,\n  0.8481203448032972,\n  0.8448535652497071,\n  0.8415549774368984,\n  0.8382247055548381,\n  0.83486287498638,\n  0.8314696123025452,\n  0.8280450452577558,\n  0.8245893027850253,\n  0.8211025149911046,\n  0.8175848131515837,\n  0.8140363297059484,\n  0.8104571982525948,\n  0.8068475535437993,\n  0.8032075314806449,\n  0.799537269107905,\n  0.7958369046088836,\n  0.7921065773002124,\n  0.7883464276266063,\n  0.7845565971555752,\n  0.7807372285720945,\n  0.7768884656732324,\n  0.773010453362737,\n  0.7691033376455797,\n  0.765167265622459,\n  0.7612023854842618,\n  0.7572088465064846,\n  0.7531867990436125,\n  0.7491363945234594,\n  0.7450577854414661,\n  0.7409511253549591,\n  0.7368165688773699,\n  0.7326542716724128,\n  0.7284643904482252,\n  0.724247082951467,\n  0.7200025079613817,\n  0.7157308252838186,\n  0.7114321957452164,\n  0.7071067811865476,\n  0.7027547444572253,\n  0.6983762494089729,\n  0.693971460889654,\n  0.6895405447370669,\n  0.6850836677727004,\n  0.6806009977954531,\n  0.676092703575316,\n  0.6715589548470183,\n  0.6669999223036375,\n  0.6624157775901718,\n  0.6578066932970786,\n  0.6531728429537768,\n  0.6485144010221126,\n  0.6438315428897915,\n  0.6391244448637757,\n  0.6343932841636455,\n  0.6296382389149271,\n  0.6248594881423865,\n  0.6200572117632892,\n  0.6152315905806268,\n  0.6103828062763095,\n  0.6055110414043255,\n  0.600616479383869,\n  0.5956993044924335,\n  0.5907597018588743,\n  0.5857978574564389,\n  0.5808139580957645,\n  0.5758081914178453,\n  0.5707807458869674,\n  0.5657318107836132,\n  0.560661576197336,\n  0.5555702330196023,\n  0.5504579729366048,\n  0.5453249884220465,\n  0.540171472729893,\n  0.5349976198870973,\n  0.5298036246862948,\n  0.5245896826784688,\n  0.5193559901655895,\n  0.5141027441932217,\n  0.508830142543107,\n  0.5035383837257176,\n  0.49822766697278187,\n  0.4928981922297841,\n  0.48755016014843605,\n  0.48218377207912283,\n  0.47679923006332225,\n  0.4713967368259978,\n  0.4659764957679661,\n  0.46053871095824,\n  0.45508358712634384,\n  0.4496113296546066,\n  0.44412214457042926,\n  0.4386162385385277,\n  0.433093818853152,\n  0.4275550934302822,\n  0.4220002707997998,\n  0.4164295600976373,\n  0.4108431710579039,\n  0.40524131400498986,\n  0.3996241998456468,\n  0.3939920400610481,\n  0.3883450466988263,\n  0.38268343236508984,\n  0.3770074102164183,\n  0.3713171939518376,\n  0.36561299780477396,\n  0.3598950365349883,\n  0.3541635254204905,\n  0.3484186802494345,\n  0.3426607173119944,\n  0.33688985339222005,\n  0.33110630575987643,\n  0.325310292162263,\n  0.31950203081601575,\n  0.3136817403988916,\n  0.307849640041535,\n  0.3020059493192282,\n  0.29615088824362396,\n  0.29028467725446233,\n  0.2844075372112718,\n  0.27851968938505306,\n  0.272621355449949,\n  0.2667127574748984,\n  0.26079411791527557,\n  0.2548656596045146,\n  0.24892760574572026,\n  0.24298017990326398,\n  0.23702360599436734,\n  0.23105810828067128,\n  0.22508391135979278,\n  0.21910124015686977,\n  0.21311031991609136,\n  0.20711137619221856,\n  0.20110463484209196,\n  0.19509032201612833,\n  0.18906866414980628,\n  0.18303988795514106,\n  0.17700422041214886,\n  0.17096188876030136,\n  0.1649131204899701,\n  0.1588581433338614,\n  0.1527971852584434,\n  0.14673047445536175,\n  0.14065823933284924,\n  0.13458070850712622,\n  0.12849811079379322,\n  0.12241067519921628,\n  0.11631863091190488,\n  0.11022220729388318,\n  0.10412163387205473,\n  0.09801714032956077,\n  0.0919089564971327,\n  0.08579731234443988,\n  0.07968243797143013,\n  0.07356456359966745,\n  0.0674439195636641,\n  0.06132073630220865,\n  0.05519524434969003,\n  0.049067674327418126,\n  0.04293825693494096,\n  0.03680722294135899,\n  0.03067480317663658,\n  0.024541228522912264,\n  0.01840672990580482,\n  0.012271538285719944,\n  0.006135884649154515,\n  6.123233995736766e-17,\n  -0.006135884649154393,\n  -0.012271538285719823,\n  -0.018406729905804695,\n  -0.024541228522912142,\n  -0.03067480317663646,\n  -0.036807222941358866,\n  -0.042938256934940834,\n  -0.04906767432741801,\n  -0.05519524434968991,\n  -0.06132073630220853,\n  -0.06744391956366398,\n  -0.07356456359966733,\n  -0.07968243797143001,\n  -0.08579731234443976,\n  -0.09190895649713257,\n  -0.09801714032956065,\n  -0.1041216338720546,\n  -0.11022220729388306,\n  -0.11631863091190475,\n  -0.12241067519921615,\n  -0.1284981107937931,\n  -0.1345807085071261,\n  -0.14065823933284913,\n  -0.14673047445536164,\n  -0.1527971852584433,\n  -0.15885814333386128,\n  -0.16491312048996995,\n  -0.17096188876030124,\n  -0.17700422041214875,\n  -0.18303988795514092,\n  -0.18906866414980616,\n  -0.1950903220161282,\n  -0.20110463484209182,\n  -0.20711137619221845,\n  -0.21311031991609125,\n  -0.21910124015686966,\n  -0.22508391135979267,\n  -0.23105810828067114,\n  -0.23702360599436723,\n  -0.24298017990326387,\n  -0.24892760574572012,\n  -0.2548656596045145,\n  -0.26079411791527546,\n  -0.2667127574748983,\n  -0.27262135544994887,\n  -0.27851968938505295,\n  -0.2844075372112717,\n  -0.29028467725446216,\n  -0.29615088824362384,\n  -0.3020059493192281,\n  -0.30784964004153487,\n  -0.3136817403988914,\n  -0.31950203081601564,\n  -0.32531029216226287,\n  -0.3311063057598763,\n  -0.33688985339221994,\n  -0.34266071731199427,\n  -0.3484186802494344,\n  -0.3541635254204904,\n  -0.35989503653498817,\n  -0.36561299780477385,\n  -0.3713171939518375,\n  -0.3770074102164182,\n  -0.3826834323650897,\n  -0.3883450466988262,\n  -0.393992040061048,\n  -0.3996241998456467,\n  -0.40524131400498975,\n  -0.4108431710579038,\n  -0.416429560097637,\n  -0.4220002707997997,\n  -0.42755509343028186,\n  -0.4330938188531519,\n  -0.4386162385385274,\n  -0.44412214457042914,\n  -0.4496113296546067,\n  -0.4550835871263437,\n  -0.46053871095824006,\n  -0.465976495767966,\n  -0.4713967368259977,\n  -0.4767992300633219,\n  -0.4821837720791227,\n  -0.4875501601484357,\n  -0.492898192229784,\n  -0.4982276669727816,\n  -0.5035383837257175,\n  -0.5088301425431071,\n  -0.5141027441932217,\n  -0.5193559901655896,\n  -0.5245896826784687,\n  -0.5298036246862947,\n  -0.534997619887097,\n  -0.5401714727298929,\n  -0.5453249884220462,\n  -0.5504579729366047,\n  -0.555570233019602,\n  -0.5606615761973359,\n  -0.5657318107836132,\n  -0.5707807458869671,\n  -0.5758081914178453,\n  -0.5808139580957644,\n  -0.5857978574564389,\n  -0.590759701858874,\n  -0.5956993044924334,\n  -0.6006164793838688,\n  -0.6055110414043254,\n  -0.6103828062763096,\n  -0.6152315905806267,\n  -0.6200572117632892,\n  -0.6248594881423862,\n  -0.6296382389149271,\n  -0.6343932841636454,\n  -0.6391244448637757,\n  -0.6438315428897913,\n  -0.6485144010221124,\n  -0.6531728429537765,\n  -0.6578066932970786,\n  -0.6624157775901719,\n  -0.6669999223036374,\n  -0.6715589548470184,\n  -0.6760927035753158,\n  -0.680600997795453,\n  -0.6850836677727002,\n  -0.6895405447370669,\n  -0.6939714608896538,\n  -0.6983762494089728,\n  -0.7027547444572251,\n  -0.7071067811865475,\n  -0.7114321957452165,\n  -0.7157308252838186,\n  -0.7200025079613817,\n  -0.7242470829514668,\n  -0.7284643904482252,\n  -0.7326542716724127,\n  -0.7368165688773699,\n  -0.7409511253549589,\n  -0.745057785441466,\n  -0.7491363945234591,\n  -0.7531867990436124,\n  -0.7572088465064846,\n  -0.7612023854842617,\n  -0.765167265622459,\n  -0.7691033376455795,\n  -0.773010453362737,\n  -0.7768884656732323,\n  -0.7807372285720945,\n  -0.784556597155575,\n  -0.7883464276266062,\n  -0.7921065773002122,\n  -0.7958369046088835,\n  -0.7995372691079051,\n  -0.8032075314806448,\n  -0.8068475535437993,\n  -0.8104571982525947,\n  -0.8140363297059484,\n  -0.8175848131515836,\n  -0.8211025149911046,\n  -0.8245893027850251,\n  -0.8280450452577557,\n  -0.8314696123025453,\n  -0.83486287498638,\n  -0.8382247055548381,\n  -0.8415549774368983,\n  -0.8448535652497071,\n  -0.8481203448032971,\n  -0.8513551931052652,\n  -0.8545579883654004,\n  -0.857728610000272,\n  -0.8608669386377671,\n  -0.8639728561215867,\n  -0.8670462455156928,\n  -0.8700869911087113,\n  -0.8730949784182901,\n  -0.8760700941954065,\n  -0.8790122264286335,\n  -0.8819212643483549,\n  -0.8847970984309378,\n  -0.8876396204028538,\n  -0.8904487232447579,\n  -0.8932243011955152,\n  -0.8959662497561851,\n  -0.8986744656939539,\n  -0.9013488470460219,\n  -0.9039892931234433,\n  -0.9065957045149153,\n  -0.9091679830905224,\n  -0.9117060320054298,\n  -0.9142097557035307,\n  -0.9166790599210426,\n  -0.9191138516900578,\n  -0.9215140393420418,\n  -0.9238795325112867,\n  -0.9262102421383114,\n  -0.9285060804732155,\n  -0.9307669610789837,\n  -0.9329927988347388,\n  -0.9351835099389476,\n  -0.9373390119125748,\n  -0.9394592236021899,\n  -0.9415440651830207,\n  -0.9435934581619604,\n  -0.9456073253805212,\n  -0.9475855910177411,\n  -0.9495281805930367,\n  -0.9514350209690083,\n  -0.9533060403541939,\n  -0.9551411683057707,\n  -0.9569403357322088,\n  -0.9587034748958715,\n  -0.9604305194155658,\n  -0.9621214042690415,\n  -0.9637760657954398,\n  -0.9653944416976893,\n  -0.9669764710448521,\n  -0.9685220942744174,\n  -0.970031253194544,\n  -0.9715038909862518,\n  -0.9729399522055601,\n  -0.9743393827855759,\n  -0.9757021300385285,\n  -0.9770281426577544,\n  -0.9783173707196275,\n  -0.9795697656854405,\n  -0.9807852804032304,\n  -0.9819638691095552,\n  -0.9831054874312163,\n  -0.984210092386929,\n  -0.9852776423889412,\n  -0.9863080972445986,\n  -0.9873014181578584,\n  -0.9882575677307495,\n  -0.989176509964781,\n  -0.990058210262297,\n  -0.99090263542778,\n  -0.9917097536690995,\n  -0.99247953459871,\n  -0.9932119492347945,\n  -0.9939069700023561,\n  -0.9945645707342554,\n  -0.9951847266721968,\n  -0.9957674144676598,\n  -0.996312612182778,\n  -0.9968202992911657,\n  -0.9972904566786902,\n  -0.9977230666441916,\n  -0.9981181129001492,\n  -0.9984755805732948,\n  -0.9987954562051724,\n  -0.9990777277526454,\n  -0.9993223845883495,\n  -0.9995294175010931,\n  -0.9996988186962042,\n  -0.9998305817958234,\n  -0.9999247018391445,\n  -0.9999811752826011,\n);\nexport const WIM = Float64Array.of(\n  -0.0,\n  -0.006135884649154475,\n  -0.012271538285719925,\n  -0.01840672990580482,\n  -0.024541228522912288,\n  -0.030674803176636626,\n  -0.03680722294135883,\n  -0.04293825693494082,\n  -0.049067674327418015,\n  -0.055195244349689934,\n  -0.06132073630220858,\n  -0.06744391956366405,\n  -0.07356456359966743,\n  -0.07968243797143013,\n  -0.0857973123444399,\n  -0.09190895649713272,\n  -0.0980171403295606,\n  -0.10412163387205459,\n  -0.11022220729388306,\n  -0.11631863091190475,\n  -0.1224106751992162,\n  -0.12849811079379317,\n  -0.13458070850712617,\n  -0.1406582393328492,\n  -0.14673047445536175,\n  -0.15279718525844344,\n  -0.15885814333386145,\n  -0.16491312048996992,\n  -0.17096188876030122,\n  -0.17700422041214875,\n  -0.18303988795514095,\n  -0.1890686641498062,\n  -0.19509032201612825,\n  -0.2011046348420919,\n  -0.20711137619221856,\n  -0.21311031991609136,\n  -0.2191012401568698,\n  -0.22508391135979283,\n  -0.2310581082806711,\n  -0.2370236059943672,\n  -0.24298017990326387,\n  -0.24892760574572015,\n  -0.25486565960451457,\n  -0.2607941179152755,\n  -0.26671275747489837,\n  -0.272621355449949,\n  -0.27851968938505306,\n  -0.2844075372112719,\n  -0.29028467725446233,\n  -0.2961508882436238,\n  -0.3020059493192281,\n  -0.30784964004153487,\n  -0.3136817403988915,\n  -0.3195020308160157,\n  -0.3253102921622629,\n  -0.33110630575987643,\n  -0.33688985339222005,\n  -0.3426607173119944,\n  -0.34841868024943456,\n  -0.35416352542049034,\n  -0.3598950365349881,\n  -0.36561299780477385,\n  -0.37131719395183754,\n  -0.37700741021641826,\n  -0.3826834323650898,\n  -0.38834504669882625,\n  -0.3939920400610481,\n  -0.3996241998456468,\n  -0.40524131400498986,\n  -0.4108431710579039,\n  -0.41642956009763715,\n  -0.4220002707997997,\n  -0.4275550934302821,\n  -0.43309381885315196,\n  -0.43861623853852766,\n  -0.4441221445704292,\n  -0.44961132965460654,\n  -0.45508358712634384,\n  -0.46053871095824,\n  -0.4659764957679662,\n  -0.47139673682599764,\n  -0.4767992300633221,\n  -0.4821837720791227,\n  -0.487550160148436,\n  -0.49289819222978404,\n  -0.49822766697278187,\n  -0.5035383837257176,\n  -0.508830142543107,\n  -0.5141027441932217,\n  -0.5193559901655896,\n  -0.524589682678469,\n  -0.5298036246862946,\n  -0.5349976198870972,\n  -0.5401714727298929,\n  -0.5453249884220465,\n  -0.5504579729366048,\n  -0.5555702330196022,\n  -0.560661576197336,\n  -0.5657318107836131,\n  -0.5707807458869673,\n  -0.5758081914178453,\n  -0.5808139580957645,\n  -0.5857978574564389,\n  -0.5907597018588742,\n  -0.5956993044924334,\n  -0.600616479383869,\n  -0.6055110414043255,\n  -0.6103828062763095,\n  -0.6152315905806268,\n  -0.6200572117632891,\n  -0.6248594881423863,\n  -0.629638238914927,\n  -0.6343932841636455,\n  -0.6391244448637757,\n  -0.6438315428897914,\n  -0.6485144010221124,\n  -0.6531728429537768,\n  -0.6578066932970786,\n  -0.6624157775901718,\n  -0.6669999223036375,\n  -0.6715589548470183,\n  -0.6760927035753159,\n  -0.680600997795453,\n  -0.6850836677727004,\n  -0.6895405447370668,\n  -0.693971460889654,\n  -0.6983762494089729,\n  -0.7027547444572253,\n  -0.7071067811865475,\n  -0.7114321957452164,\n  -0.7157308252838186,\n  -0.7200025079613817,\n  -0.7242470829514669,\n  -0.7284643904482252,\n  -0.7326542716724128,\n  -0.7368165688773698,\n  -0.7409511253549591,\n  -0.745057785441466,\n  -0.7491363945234593,\n  -0.7531867990436124,\n  -0.7572088465064845,\n  -0.7612023854842618,\n  -0.765167265622459,\n  -0.7691033376455796,\n  -0.773010453362737,\n  -0.7768884656732324,\n  -0.7807372285720944,\n  -0.7845565971555752,\n  -0.7883464276266062,\n  -0.7921065773002124,\n  -0.7958369046088835,\n  -0.799537269107905,\n  -0.8032075314806448,\n  -0.8068475535437992,\n  -0.8104571982525948,\n  -0.8140363297059483,\n  -0.8175848131515837,\n  -0.8211025149911046,\n  -0.8245893027850253,\n  -0.8280450452577558,\n  -0.8314696123025452,\n  -0.83486287498638,\n  -0.838224705554838,\n  -0.8415549774368983,\n  -0.844853565249707,\n  -0.8481203448032971,\n  -0.8513551931052652,\n  -0.8545579883654005,\n  -0.8577286100002721,\n  -0.8608669386377673,\n  -0.8639728561215867,\n  -0.8670462455156926,\n  -0.8700869911087113,\n  -0.8730949784182901,\n  -0.8760700941954066,\n  -0.8790122264286334,\n  -0.8819212643483549,\n  -0.8847970984309378,\n  -0.8876396204028539,\n  -0.8904487232447579,\n  -0.8932243011955153,\n  -0.8959662497561851,\n  -0.8986744656939538,\n  -0.901348847046022,\n  -0.9039892931234433,\n  -0.9065957045149153,\n  -0.9091679830905223,\n  -0.9117060320054299,\n  -0.9142097557035307,\n  -0.9166790599210427,\n  -0.9191138516900578,\n  -0.9215140393420419,\n  -0.9238795325112867,\n  -0.9262102421383113,\n  -0.9285060804732155,\n  -0.9307669610789837,\n  -0.9329927988347388,\n  -0.9351835099389475,\n  -0.937339011912575,\n  -0.9394592236021899,\n  -0.9415440651830208,\n  -0.9435934581619604,\n  -0.9456073253805213,\n  -0.9475855910177411,\n  -0.9495281805930367,\n  -0.9514350209690083,\n  -0.9533060403541938,\n  -0.9551411683057707,\n  -0.9569403357322089,\n  -0.9587034748958716,\n  -0.9604305194155658,\n  -0.9621214042690416,\n  -0.9637760657954398,\n  -0.9653944416976894,\n  -0.9669764710448521,\n  -0.9685220942744173,\n  -0.970031253194544,\n  -0.9715038909862518,\n  -0.9729399522055601,\n  -0.9743393827855759,\n  -0.9757021300385286,\n  -0.9770281426577544,\n  -0.9783173707196277,\n  -0.9795697656854405,\n  -0.9807852804032304,\n  -0.9819638691095552,\n  -0.9831054874312163,\n  -0.984210092386929,\n  -0.9852776423889412,\n  -0.9863080972445987,\n  -0.9873014181578584,\n  -0.9882575677307495,\n  -0.989176509964781,\n  -0.9900582102622971,\n  -0.99090263542778,\n  -0.9917097536690995,\n  -0.99247953459871,\n  -0.9932119492347945,\n  -0.9939069700023561,\n  -0.9945645707342554,\n  -0.9951847266721968,\n  -0.9957674144676598,\n  -0.996312612182778,\n  -0.9968202992911657,\n  -0.9972904566786902,\n  -0.9977230666441916,\n  -0.9981181129001492,\n  -0.9984755805732948,\n  -0.9987954562051724,\n  -0.9990777277526454,\n  -0.9993223845883495,\n  -0.9995294175010931,\n  -0.9996988186962042,\n  -0.9998305817958234,\n  -0.9999247018391445,\n  -0.9999811752826011,\n  -1.0,\n  -0.9999811752826011,\n  -0.9999247018391445,\n  -0.9998305817958234,\n  -0.9996988186962042,\n  -0.9995294175010931,\n  -0.9993223845883495,\n  -0.9990777277526454,\n  -0.9987954562051724,\n  -0.9984755805732948,\n  -0.9981181129001492,\n  -0.9977230666441916,\n  -0.9972904566786902,\n  -0.9968202992911658,\n  -0.996312612182778,\n  -0.9957674144676598,\n  -0.9951847266721969,\n  -0.9945645707342554,\n  -0.9939069700023561,\n  -0.9932119492347945,\n  -0.99247953459871,\n  -0.9917097536690995,\n  -0.99090263542778,\n  -0.9900582102622971,\n  -0.989176509964781,\n  -0.9882575677307495,\n  -0.9873014181578584,\n  -0.9863080972445987,\n  -0.9852776423889412,\n  -0.984210092386929,\n  -0.9831054874312163,\n  -0.9819638691095552,\n  -0.9807852804032304,\n  -0.9795697656854405,\n  -0.9783173707196277,\n  -0.9770281426577544,\n  -0.9757021300385286,\n  -0.9743393827855759,\n  -0.9729399522055602,\n  -0.9715038909862518,\n  -0.970031253194544,\n  -0.9685220942744174,\n  -0.9669764710448521,\n  -0.9653944416976894,\n  -0.9637760657954398,\n  -0.9621214042690416,\n  -0.9604305194155659,\n  -0.9587034748958716,\n  -0.9569403357322089,\n  -0.9551411683057707,\n  -0.9533060403541939,\n  -0.9514350209690083,\n  -0.9495281805930367,\n  -0.9475855910177412,\n  -0.9456073253805214,\n  -0.9435934581619604,\n  -0.9415440651830208,\n  -0.9394592236021899,\n  -0.937339011912575,\n  -0.9351835099389476,\n  -0.9329927988347388,\n  -0.9307669610789837,\n  -0.9285060804732156,\n  -0.9262102421383114,\n  -0.9238795325112867,\n  -0.921514039342042,\n  -0.9191138516900578,\n  -0.9166790599210427,\n  -0.9142097557035307,\n  -0.9117060320054299,\n  -0.9091679830905225,\n  -0.9065957045149153,\n  -0.9039892931234434,\n  -0.901348847046022,\n  -0.8986744656939539,\n  -0.8959662497561852,\n  -0.8932243011955152,\n  -0.890448723244758,\n  -0.8876396204028539,\n  -0.8847970984309379,\n  -0.881921264348355,\n  -0.8790122264286335,\n  -0.8760700941954066,\n  -0.8730949784182902,\n  -0.8700869911087115,\n  -0.8670462455156928,\n  -0.8639728561215868,\n  -0.8608669386377672,\n  -0.8577286100002721,\n  -0.8545579883654005,\n  -0.8513551931052652,\n  -0.8481203448032972,\n  -0.8448535652497072,\n  -0.8415549774368984,\n  -0.8382247055548382,\n  -0.8348628749863801,\n  -0.8314696123025455,\n  -0.8280450452577558,\n  -0.8245893027850252,\n  -0.8211025149911048,\n  -0.8175848131515837,\n  -0.8140363297059485,\n  -0.8104571982525948,\n  -0.8068475535437994,\n  -0.8032075314806449,\n  -0.7995372691079052,\n  -0.7958369046088836,\n  -0.7921065773002123,\n  -0.7883464276266063,\n  -0.7845565971555751,\n  -0.7807372285720946,\n  -0.7768884656732324,\n  -0.7730104533627371,\n  -0.7691033376455796,\n  -0.7651672656224591,\n  -0.7612023854842619,\n  -0.7572088465064847,\n  -0.7531867990436125,\n  -0.7491363945234593,\n  -0.7450577854414661,\n  -0.740951125354959,\n  -0.73681656887737,\n  -0.7326542716724128,\n  -0.7284643904482253,\n  -0.7242470829514669,\n  -0.7200025079613818,\n  -0.7157308252838187,\n  -0.7114321957452167,\n  -0.7071067811865476,\n  -0.7027547444572252,\n  -0.6983762494089729,\n  -0.693971460889654,\n  -0.689540544737067,\n  -0.6850836677727004,\n  -0.6806009977954532,\n  -0.6760927035753159,\n  -0.6715589548470186,\n  -0.6669999223036376,\n  -0.662415777590172,\n  -0.6578066932970787,\n  -0.6531728429537766,\n  -0.6485144010221126,\n  -0.6438315428897914,\n  -0.6391244448637758,\n  -0.6343932841636455,\n  -0.6296382389149272,\n  -0.6248594881423863,\n  -0.6200572117632894,\n  -0.6152315905806269,\n  -0.6103828062763097,\n  -0.6055110414043257,\n  -0.6006164793838689,\n  -0.5956993044924335,\n  -0.5907597018588742,\n  -0.585797857456439,\n  -0.5808139580957645,\n  -0.5758081914178454,\n  -0.5707807458869673,\n  -0.5657318107836135,\n  -0.5606615761973361,\n  -0.5555702330196022,\n  -0.5504579729366049,\n  -0.5453249884220464,\n  -0.540171472729893,\n  -0.5349976198870972,\n  -0.5298036246862948,\n  -0.524589682678469,\n  -0.5193559901655898,\n  -0.5141027441932218,\n  -0.5088301425431073,\n  -0.5035383837257177,\n  -0.49822766697278176,\n  -0.49289819222978415,\n  -0.4875501601484359,\n  -0.4821837720791229,\n  -0.4767992300633221,\n  -0.47139673682599786,\n  -0.4659764957679662,\n  -0.4605387109582402,\n  -0.4550835871263439,\n  -0.4496113296546069,\n  -0.4441221445704293,\n  -0.43861623853852755,\n  -0.43309381885315207,\n  -0.42755509343028203,\n  -0.42200027079979985,\n  -0.41642956009763715,\n  -0.41084317105790413,\n  -0.4052413140049899,\n  -0.39962419984564707,\n  -0.39399204006104815,\n  -0.3883450466988266,\n  -0.3826834323650899,\n  -0.37700741021641815,\n  -0.3713171939518377,\n  -0.3656129978047738,\n  -0.35989503653498833,\n  -0.3541635254204904,\n  -0.3484186802494348,\n  -0.34266071731199443,\n  -0.33688985339222033,\n  -0.3311063057598765,\n  -0.32531029216226326,\n  -0.3195020308160158,\n  -0.3136817403988914,\n  -0.30784964004153503,\n  -0.30200594931922803,\n  -0.296150888243624,\n  -0.2902846772544624,\n  -0.2844075372112721,\n  -0.27851968938505317,\n  -0.27262135544994925,\n  -0.2667127574748985,\n  -0.26079411791527585,\n  -0.2548656596045147,\n  -0.2489276057457201,\n  -0.24298017990326407,\n  -0.23702360599436717,\n  -0.23105810828067133,\n  -0.22508391135979283,\n  -0.21910124015687005,\n  -0.21311031991609142,\n  -0.20711137619221884,\n  -0.201104634842092,\n  -0.1950903220161286,\n  -0.18906866414980636,\n  -0.1830398879551409,\n  -0.17700422041214894,\n  -0.17096188876030122,\n  -0.16491312048997014,\n  -0.15885814333386147,\n  -0.15279718525844369,\n  -0.1467304744553618,\n  -0.14065823933284954,\n  -0.13458070850712628,\n  -0.12849811079379309,\n  -0.12241067519921635,\n  -0.11631863091190471,\n  -0.11022220729388324,\n  -0.10412163387205457,\n  -0.09801714032956083,\n  -0.09190895649713275,\n  -0.08579731234444016,\n  -0.0796824379714302,\n  -0.07356456359966773,\n  -0.06744391956366418,\n  -0.06132073630220849,\n  -0.055195244349690094,\n  -0.049067674327417966,\n  -0.04293825693494102,\n  -0.03680722294135883,\n  -0.030674803176636865,\n  -0.024541228522912326,\n  -0.0184067299058051,\n  -0.012271538285720007,\n  -0.006135884649154799,\n);\n",
+	"src/fused-resampler.mjs": "const AUDIO_MAX_BYTES = 57800000,\n  AUDIO_MAX_SECONDS = 300;\nfunction inspectWav(buf) {\n  const dv =\n    buf instanceof DataView\n      ? buf\n      : new DataView(buf.buffer || buf, buf.byteOffset || 0, buf.byteLength);\n  if (\n    dv.byteLength > AUDIO_MAX_BYTES ||\n    dv.byteLength < 44 ||\n    dv.getUint32(4, true) + 8 !== dv.byteLength\n  )\n    throw Error('Invalid WAV length');\n  if (dv.getUint32(0) !== 1380533830 || dv.getUint32(8) !== 1463899717)\n    throw new Error('not RIFF/WAVE');\n  let pos = 12,\n    fmt = null,\n    dataOff = -1,\n    dataLen = 0;\n  while (pos + 8 <= dv.byteLength) {\n    const id = dv.getUint32(pos),\n      sz = dv.getUint32(pos + 4, true);\n    if (pos + 8 + sz + (sz & 1) > dv.byteLength)\n      throw Error('Truncated WAV chunk');\n    if (id === 1718449184) {\n      if (fmt || sz < 16) throw Error('Invalid fmt chunk');\n      fmt = {\n        format: dv.getUint16(pos + 8, true),\n        channels: dv.getUint16(pos + 10, true),\n        sampleRate: dv.getUint32(pos + 12, true),\n        bits: dv.getUint16(pos + 22, true),\n      };\n    } else if (id === 1684108385) {\n      if (dataOff >= 0) throw Error('Duplicate data chunk');\n      dataOff = pos + 8;\n      dataLen = sz;\n    }\n    pos += 8 + sz + (sz & 1);\n  }\n  if (!fmt || dataOff < 0) throw new Error('missing fmt or data chunk');\n  if (\n    fmt.format !== 1 ||\n    fmt.bits !== 16 ||\n    fmt.channels !== 2 ||\n    ![44100, 48e3].includes(fmt.sampleRate)\n  )\n    throw Error('Unsupported canonical format');\n  if (\n    dataLen === 0 ||\n    dataLen % 4 ||\n    dataLen > fmt.sampleRate * 4 * AUDIO_MAX_SECONDS\n  )\n    throw Error('Invalid canonical PCM length');\n  return {\n    sampleRate: fmt.sampleRate,\n    channels: fmt.channels,\n    bitsPerSample: fmt.bits,\n    frames: dataLen / 4,\n    view: dv,\n    dataOffset: dataOff,\n  };\n}\n\n// Equivalent to old PCM16 stereo Float32 mono buffer then resampleLinear22050.\n// Source mono rounding remains explicit, even though S16 sums fit exactly.\nexport function parseWavAnalysis(bytes) {\n  const p = inspectWav(bytes),\n    ratio = p.sampleRate / 22050,\n    length = Math.floor(p.frames / ratio),\n    samples = new Float32Array(length),\n    dv = p.view;\n  const mono = (i) => {\n    const o = p.dataOffset + i * 4;\n    return Math.fround(\n      (dv.getInt16(o, true) / 32768 + dv.getInt16(o + 2, true) / 32768) / 2,\n    );\n  };\n  for (let i = 0; i < length; i++) {\n    const x = i * ratio,\n      j = Math.floor(x),\n      f = x - j,\n      a = mono(j),\n      b = j + 1 < p.frames ? mono(j + 1) : a;\n    samples[i] = a + (b - a) * f;\n  }\n  return {\n    sampleRate: p.sampleRate,\n    frames: p.frames,\n    samples,\n    dataOffset: p.dataOffset,\n  };\n}\n"
+});
+// src/opus/opus468-adaptive-owned-worker.mjs
+let used = false;
+self.onmessage = async ({ data }) => {
+	if (used) return;
+	used = true;
+	try {
+		const { audioBytes, descriptorBytes, decoderWasmBytes, record, baseRecordRaw } = data;
+		for (const value of [
+			audioBytes,
+			descriptorBytes,
+			decoderWasmBytes
+		]) if (!(value instanceof ArrayBuffer)) throw Error("owned_buffer_required");
+		const verdict = await verifyOpus468AdaptiveProvenance({
+			audioBytes: new Uint8Array(audioBytes),
+			descriptorBytes: new Uint8Array(descriptorBytes),
+			decoderWasmBytes: new Uint8Array(decoderWasmBytes),
+			record,
+			baseRecordRaw,
+			loadFile: (path) => {
+				if (!Object.hasOwn(recipeSources, path)) throw Error("source_absent");
+				return recipeSources[path];
+			}
+		});
+		self.postMessage({
+			ok: true,
+			verdict
+		});
+	} catch {
+		self.postMessage({
+			ok: false,
+			error: "candidate_worker_failed"
+		});
+	}
+};

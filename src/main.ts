@@ -1,9 +1,25 @@
+import { waitAcquired } from './opus/opus-acquired-v2-artifacts.mjs';
+import { recoverPublic468Source } from './opus/opus468-share-recovery';
+import { createOpus468ShareRouteOwner } from './opus/opus468-share-route-owner';
+import { validateRecoveredV7 } from './opus/public468-v7.mjs';
+import { createPrivateOpusV2ProjectionTransport } from './opus/opus-projection-v2-transport-private.mjs';
+import { createOpus468AppCoordinator } from './opus/opus468-app-coordinator';
+import { prepareCurrentOpusInstall } from './opus/opus468-current-install';
+import { createOpus468LibraryPairs } from './opus/opus468-library-pairs';
+import { privateOpus468ResultUrl } from './opus/opus468-result-url';
+import { opus468PlayerLabels } from './opus/opus468-player-labels';
+import { createCurrentOpus468Bridge } from './opus/opus468-current-entry-bridge';
+import type { createOpus468Frontend } from './opus/opus468-frontend';
 import { disableUnreadySongRow } from './unready-song-row';
 import { visibleLibrarySelection } from './library-visible-selection';
-import { chartDisplay } from './chart-display';
+import { chartDisplay as legacyChartDisplay } from './chart-display';
 import { installDoubleTapGuard } from './touch-gestures';
 import { isOpusRecord, type PlayableSourceRecord } from './playable-source';
-import { listOpus35Metadata } from './opus/opus35-store';
+import {
+  listOpus35Metadata,
+  saveOpus35Metadata,
+  readOpus35Metadata,
+} from './opus/opus35-store';
 import { readVerifiedOpusByRoots } from './opus/opus-cache.mjs';
 import { encodeOpus35Share, decodeOpus35Share } from './opus/opus35-share';
 import {
@@ -90,7 +106,12 @@ import { difficultyForChart, difficultyText } from './chart-difficulty';
 import { CURRENT_FEVER } from './fever';
 import { renderFeverHud } from './fever-hud';
 import { StartupAttempt } from './startup';
-import { songArt, ART_FALLBACK } from './song-art';
+import {
+  songArt,
+  songVideoId,
+  attachOpus468Artwork,
+  ART_FALLBACK,
+} from './song-art';
 import { AudioJobError } from './external-audio-api';
 import { externalError } from './external-errors';
 import {
@@ -100,7 +121,12 @@ import {
   readLocalSession,
   saveLocalSession,
 } from './external-local';
-import { initReplayPage, setReplayNavLabel, showReplays } from './replay-page';
+import {
+  initReplayPage,
+  setReplayNavLabel,
+  showReplays,
+  installPrivateReplayList,
+} from './replay-page';
 import { externalLabels } from './external-labels';
 import { importYoutube } from './external-import';
 import { pinSource, allPinnedSources } from './external-source-store';
@@ -159,8 +185,8 @@ import './result-screen.css';
 import { ResultMotion } from './result-motion';
 import {
   SONGS,
-  makeChart,
-  duration,
+  makeChart as legacyMakeChart,
+  duration as legacyDuration,
   type Difficulty,
   type Lanes,
   type Note,
@@ -168,6 +194,353 @@ import {
 import { Engine, type JudgmentEvent } from './engine';
 import { AudioClock, renderSong, type Soundtrack } from './audio';
 import { Playfield } from './renderer';
+// PRIVATE scratch integration. No public composition calls this service.
+const private468Bridge = createCurrentOpus468Bridge();
+const extensionLibraryPairs = createOpus468LibraryPairs();
+const shared468Route = createOpus468ShareRouteOwner();
+const transient468Ids = new Set<string>();
+let shared468:
+  | {
+      fragment: string;
+      url: string;
+      service: any;
+      view: any;
+      candidate: any;
+      added: boolean;
+    }
+  | undefined;
+let general468ReadyResolve: () => void;
+const general468Ready = new Promise<void>(
+  (resolve) => (general468ReadyResolve = resolve),
+);
+const transient468Owns = (id: string) => shared468?.view.song.id === id;
+const ownsOpus468 = (id: string) =>
+  private468Bridge.owns(id) || transient468Owns(id);
+
+let general468Runtime: any;
+let general468Coordinator:
+  ReturnType<typeof createOpus468AppCoordinator> | undefined;
+let extensionWork: Promise<unknown> = Promise.resolve();
+const extensionPending = new Set<string>(),
+  extensionFailed = new Set<string>();
+const extensionDeferred = new Map<string, string>();
+let extensionFlushQueued = false;
+export async function enableGeneral468Candidate(runtime: any) {
+  if (general468Runtime && general468Runtime !== runtime)
+    throw Error('extension_frontend_conflict');
+  general468Runtime = runtime;
+  general468ReadyResolve();
+  general468Coordinator ??= createOpus468AppCoordinator(runtime);
+  const local = new URLSearchParams(location.search).get('local');
+  if (local?.startsWith('yt-opus-')) {
+    const c = new AbortController(),
+      timer = setTimeout(
+        () => c.abort(Error('extension_operation_timeout')),
+        95000,
+      );
+    try {
+      const loaded = await runtime.frontend.restoreSession(local, {
+        signal: c.signal,
+      });
+      if (!loaded) throw Error('extension_session_missing');
+      await installPrivateOpus468Frontend(runtime.frontend, {
+        song: loaded.session.song,
+        signal: c.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  if (
+    !location.hash.startsWith('#v=7&d=') &&
+    !new URLSearchParams(location.search).has('s')
+  )
+    syncSettings();
+}
+const canInstallExtension = () => !active && !preparing && screen === 'select';
+function extendGeneralSource(
+  record: import('./opus/opus-record').OpusRecord,
+  selection: { lanes: 4 | 6 | 8; difficulty: Difficulty },
+) {
+  const id = sourceId(record);
+  if (
+    !general468Coordinator ||
+    extensionPending.has(id) ||
+    extensionLibraryPairs.extension(id)
+  )
+    return Promise.resolve();
+  extensionPending.add(id);
+  extensionFailed.delete(id);
+  if (canInstallExtension()) songCards();
+  const run = async () => {
+    const operation = new AbortController(),
+      timer = setTimeout(
+        () => operation.abort(Error('extension_operation_timeout')),
+        95000,
+      );
+    try {
+      if (canInstallExtension()) {
+        const restored = await installPrivateOpus468Frontend(
+          general468Runtime.frontend,
+          { base: record, signal: operation.signal },
+        );
+        if (restored === true) return;
+      }
+      const pin = await general468Coordinator!.extend(record, selection, {
+        signal: operation.signal,
+      });
+      extensionDeferred.set(id, pin.song.id);
+      if (canInstallExtension()) {
+        await installPrivateOpus468Frontend(general468Runtime.frontend, {
+          song: pin.song.id,
+          signal: operation.signal,
+        });
+        extensionDeferred.delete(id);
+      }
+    } catch (error) {
+      if (!extensionDeferred.has(id)) {
+        extensionFailed.add(id);
+        throw error;
+      }
+      // A route change may defer visible install after an already durable pin.
+    } finally {
+      clearTimeout(timer);
+      extensionPending.delete(id);
+      if (canInstallExtension()) {
+        songCards();
+        syncSettings();
+      }
+    }
+  };
+  const result = extensionWork.then(run, run);
+  extensionWork = result.catch(() => undefined);
+  return result;
+}
+function refreshGeneralSelection() {
+  if (!general468Coordinator || !canInstallExtension()) return;
+  if (extensionDeferred.size && !extensionFlushQueued) {
+    extensionFlushQueued = true;
+    const flush = async () => {
+      const arrival = location.href,
+        navigation = navigationVersion;
+      try {
+        for (const [base, song] of extensionDeferred) {
+          if (!canInstallExtension()) break;
+          const operation = new AbortController(),
+            timer = setTimeout(
+              () => operation.abort(Error('extension_operation_timeout')),
+              95000,
+            );
+          try {
+            await installPrivateOpus468Frontend(general468Runtime.frontend, {
+              song,
+              signal: operation.signal,
+            });
+          } finally {
+            clearTimeout(timer);
+          }
+          extensionDeferred.delete(base);
+        }
+      } finally {
+        extensionFlushQueued = false;
+        // A route/lane change can invalidate the staged install while its refresh
+        // was coalesced by this flush. Retry only that new navigation, not a
+        // stationary validation/storage failure. The durable pin stays unchanged.
+        if (
+          extensionDeferred.size &&
+          canInstallExtension() &&
+          (location.href !== arrival || navigationVersion !== navigation)
+        )
+          queueMicrotask(refreshGeneralSelection);
+      }
+    };
+    extensionWork = extensionWork.then(flush, flush).catch(() => undefined);
+  }
+  if (![4, 6, 8].includes(settings.lanes)) return;
+  const source = externalSource(SONGS[songIndex].id);
+  if (
+    !source ||
+    !isOpusRecord(source.record) ||
+    extensionPending.has(source.song.id) ||
+    extensionDeferred.has(source.song.id) ||
+    extensionFailed.has(source.song.id) ||
+    extensionLibraryPairs.extension(source.song.id)
+  )
+    return;
+  void extendGeneralSource(source.record, {
+    lanes: settings.lanes as 4 | 6 | 8,
+    difficulty: settings.difficulty,
+  }).catch(() => toast(opus468PlayerLabels(settings.language).unavailable));
+}
+
+function makeChart(
+  song: (typeof SONGS)[number],
+  diff: Difficulty,
+  lanes: Lanes,
+): Note[] {
+  return (
+    (transient468Owns(song.id)
+      ? structuredClone(
+          shared468!.view.extension.charts[`${lanes}:${diff}`]?.notes ?? [],
+        )
+      : undefined) ??
+    private468Bridge.chart(song.id, lanes, diff) ??
+    legacyMakeChart(song, diff, lanes)
+  );
+}
+function duration(song: (typeof SONGS)[number]) {
+  return (
+    (transient468Owns(song.id)
+      ? shared468!.view.baseRecord.frames / 48000
+      : undefined) ??
+    private468Bridge.seconds(song.id) ??
+    legacyDuration(song)
+  );
+}
+function chartDisplay(
+  song: (typeof SONGS)[number],
+  diff: Difficulty,
+  lanes: Lanes,
+) {
+  if (transient468Owns(song.id)) {
+    const notes = makeChart(song, diff, lanes);
+    return {
+      count: notes.length,
+      metadata: notes.length
+        ? difficultyForChart(notes, duration(song), `${lanes}:${diff}`)
+        : undefined,
+    };
+  }
+  return (
+    private468Bridge.display(song.id, lanes, diff) ??
+    legacyChartDisplay(song, diff, lanes)
+  );
+}
+export async function installPrivateOpus468Frontend(
+  frontend: ReturnType<typeof createOpus468Frontend>,
+  options: {
+    signal?: AbortSignal;
+    song?: string;
+    base?: import('./opus/opus-record').OpusRecord;
+  } = {},
+) {
+  const href = location.href,
+    navigation = navigationVersion;
+  try {
+    return await installPrivateOpus468FrontendInner(frontend, options);
+  } catch (error) {
+    if (location.href === href && navigationVersion === navigation) {
+      document.documentElement.removeAttribute('data-result-pending');
+      if (
+        new URLSearchParams(location.search)
+          .get('local')
+          ?.startsWith('yt-opus-')
+      ) {
+        history.replaceState(null, '', '/select/');
+        exit();
+        readRoute();
+      }
+      if (!options.signal?.aborted)
+        toast(opus468PlayerLabels(settings.language).unavailable);
+    }
+    throw error;
+  }
+}
+async function installPrivateOpus468FrontendInner(
+  frontend: ReturnType<typeof createOpus468Frontend>,
+  {
+    signal,
+    song: requestedSong,
+    base,
+  }: {
+    signal?: AbortSignal;
+    song?: string;
+    base?: import('./opus/opus-record').OpusRecord;
+  } = {},
+) {
+  // Gate is the reviewed frontend service's fresh admission, not presence in a UI map.
+  const arrival = location.href,
+    navigation = navigationVersion;
+  const songs = base
+    ? await private468Bridge.attachSource(frontend, base, { signal })
+    : requestedSong
+      ? await private468Bridge.attachSong(frontend, requestedSong, { signal })
+      : await private468Bridge.attach(frontend, { signal });
+  if (songs === null) return false;
+  const staged = await prepareCurrentOpusInstall(
+    songs,
+    async (song) => {
+      const base = private468Bridge.baseRecord(song.id);
+      if (!base) throw Error('extension_presentation_source');
+      await attachOpus468Artwork(song.id, base, { signal });
+      return { song, base };
+    },
+    () => location.href === arrival && navigationVersion === navigation,
+    signal,
+  ).catch((error) => {
+    private468Bridge.cancel();
+    throw error;
+  });
+  // No awaited work after this guard until all catalog/pair mutations commit.
+  for (const { song, base } of staged) {
+    const old = externalSource(sourceId(base));
+    const item = installExternalSource(
+      base,
+      old?.song.title ?? song.title,
+      undefined,
+      old?.jobId,
+      old?.song.subtitle ?? song.subtitle,
+    );
+    if (!SONGS.some((s) => s.id === item.song.id)) SONGS.push(item.song);
+    if (!canonicalPreferred.has(base.videoId))
+      canonicalPreferred.set(base.videoId, item.song.id);
+    extensionLibraryPairs.attach(item.song.id, song.id);
+  }
+  installPrivateReplayList(async () => {
+    const { rows, songs } = await private468Bridge.listSessions();
+    for (const song of songs)
+      if (!SONGS.some((s) => s.id === song.id)) SONGS.push(song);
+    return rows;
+  });
+  signal?.throwIfAborted();
+  for (const song of songs)
+    if (!SONGS.some((existing) => existing.id === song.id)) SONGS.push(song);
+  const requested = new URLSearchParams(location.search).get('song');
+  const requestedIndex = SONGS.findIndex((song) => song.id === requested);
+  if (requestedIndex >= 0) songIndex = requestedIndex;
+  songCards();
+  syncSettings();
+  selectedSong();
+  if (location.pathname === '/replays/') await showReplays();
+  const local = new URLSearchParams(location.search).get('local');
+  if (local?.startsWith('yt-opus-')) await openLocalSession(local);
+  return true;
+}
+function entryReplayMatches(
+  replay: Parameters<typeof replayMatches>[0],
+  result: Parameters<typeof replayMatches>[1],
+  notes?: Note[],
+) {
+  const song = SONGS.find((s) => s.id === replay.song);
+  return replayMatches(
+    replay,
+    result,
+    notes ??
+      (song && ownsOpus468(song.id)
+        ? makeChart(song, replay.difficulty, replay.lanes)
+        : undefined),
+  );
+}
+async function readEntrySession(id: string) {
+  if (id.startsWith('yt-opus-')) {
+    const loaded = await private468Bridge.readSession(id);
+    if (!SONGS.some((s) => s.id === loaded.song.id)) SONGS.push(loaded.song);
+    return loaded.session;
+  }
+  return id.startsWith('builtin:')
+    ? readBuiltinSession(id)
+    : readLocalSession(id);
+}
 const $ = <T extends HTMLElement = HTMLElement>(s: string) =>
   document.querySelector<T>(s)!;
 const defaults = Object.fromEntries(
@@ -344,6 +717,8 @@ let armedWallpaperAt = 0;
 // activated AudioContext, so the gate hydrates through a throwaway context.
 let preloadContext: OfflineAudioContext | undefined;
 async function preloadTrack(id: string): Promise<Soundtrack | undefined> {
+  // Private extensions are freshly prepared by their owned frontend, never procedural preload.
+  if (ownsOpus468(id)) return undefined;
   try {
     preloadContext ??= new OfflineAudioContext(1, 1, 44100);
     if (externalSource(id)) {
@@ -379,7 +754,7 @@ function persist() {
 const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.53</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.3.0</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
 <section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><p class="mobile-playback-note"></p><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status"></span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
 <section class="library" aria-label="Track selection"><p class="mobile-playback-note"></p><div class="section-title"><strong>${label('select')}</strong></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">NM</button><button data-diff="mid">HD</button><button data-diff="high">MX</button><button data-diff="sc">SC</button></div><div class="segmented compact" id="lanes">${KEY_MODES.map((mode) => `<button data-lanes="${mode}">${mode} KEY</button>`).join('')}</div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div></section>
 <section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
@@ -408,7 +783,7 @@ $('#app .library .section-title').append(libraryActions);
 libraryActions.append(addYoutube);
 let sharingSong = false;
 async function shareLibrarySong(id: string) {
-  const item = externalSource(id);
+  const item = externalSource(extensionLibraryPairs.base(id) ?? id);
   if (!item || sharingSong) return;
   sharingSong = true;
   try {
@@ -435,8 +810,8 @@ async function shareLibrarySong(id: string) {
 }
 const hiddenSongs = hiddenLibraryIds();
 const libraryVideoKey = (id: string) => {
-  const source = externalSource(id);
-  return source ? 'yt:' + source.record.videoId : id;
+  const video = songVideoId(id);
+  return video ? 'yt:' + video : id;
 };
 const isHiddenSong = (id: string) =>
   hiddenSongs.has(id) || hiddenSongs.has(libraryVideoKey(id));
@@ -525,17 +900,26 @@ const libraryAddOrder = new LibraryAddOrder(localStorage);
 const visibleSongIndices = () => {
   const seen = new Set<string>();
   return SONGS.flatMap((song, i) => {
+    if (transient468Ids.has(song.id) && !private468Bridge.owns(song.id))
+      return [];
     const source = externalSource(song.id);
     if (source && canonicalPreferred.get(source.record.videoId) !== song.id)
       return [];
+    const paired = extensionLibraryPairs.resolve(song.id, settings.lanes);
+    if (paired !== song.id && SONGS.some((s) => s.id === paired)) return [];
+    if (ownsOpus468(song.id)) {
+      const base = extensionLibraryPairs.base(song.id),
+        video = songVideoId(song.id);
+      if (video && canonicalPreferred.get(video) !== base) return [];
+    }
     const key = libraryVideoKey(song.id);
     if (isHiddenSong(song.id) || seen.has(key)) return [];
     seen.add(key);
     return [i];
   }).sort(
     (a, b) =>
-      libraryAddOrder.rank(externalSource(SONGS[a].id)?.record.videoId) -
-      libraryAddOrder.rank(externalSource(SONGS[b].id)?.record.videoId),
+      libraryAddOrder.rank(songVideoId(SONGS[a].id)) -
+      libraryAddOrder.rank(songVideoId(SONGS[b].id)),
   );
 };
 app.insertAdjacentHTML(
@@ -573,7 +957,7 @@ libraryContextMenu($('#songs'), (row) => {
     row.dataset.canonicalVideo ??
     row.dataset.importVideo ??
     row.dataset.pendingVideo ??
-    (song ? externalSource(song.id)?.record.videoId : undefined);
+    (song ? songVideoId(song.id) : undefined);
   if (!videoId) return null;
   const title =
     song?.title ??
@@ -693,10 +1077,15 @@ async function openVideoHistory(videoId: string) {
   dialog.showModal();
 }
 async function openLocalSession(id: string) {
+  const href = location.href,
+    navigation = navigationVersion;
   try {
-    const session = id.startsWith('builtin:')
-      ? await readBuiltinSession(id)
-      : await readLocalSession(id);
+    const session = await readEntrySession(id);
+    if (
+      id.startsWith('yt-opus-') &&
+      (location.href !== href || navigationVersion !== navigation)
+    )
+      return;
     localBuiltinNotes =
       session && 'kind' in session && session.kind === 'builtin'
         ? session.chart
@@ -708,9 +1097,24 @@ async function openLocalSession(id: string) {
     lastResult = session.result;
     localSessionKey = session.key;
     localSessionOpened = true;
+    if (id.startsWith('yt-opus-')) {
+      songIndex = SONGS.findIndex((s) => s.id === session.replay.song);
+      settings.lanes = session.replay.lanes;
+      settings.difficulty = session.replay.difficulty;
+    }
     ownResults.add(session.result);
     showResult(session.result);
   } catch {
+    if (
+      id.startsWith('yt-opus-') &&
+      location.href === href &&
+      navigationVersion === navigation
+    ) {
+      document.documentElement.removeAttribute('data-result-pending');
+      history.replaceState(null, '', '/select/');
+      exit();
+      readRoute();
+    }
     toast(REPLAY_READ_ERROR[settings.language]);
   }
 }
@@ -722,46 +1126,59 @@ let submittedYoutubeInput:
 $('#youtube-url').addEventListener('input', () => {
   youtubeInputRevision++;
 });
-const backgroundImports = new BackgroundImports(
-  () => songCards(),
-  async (r) => {
-    const title = r.title?.trim() || 'YouTube · ' + r.prepared.record.videoId;
-    await audioAtStage('storage', () =>
-      saveLocalAudio(
-        r.prepared.record,
-        title,
-        r.jobId,
-        r.prepared.bytes,
-        r.author,
-      ),
-    );
-    const item = installExternalSource(
+export async function completePreparedYoutubeImport(
+  r: Awaited<ReturnType<typeof import('./external-import').importYoutube>>,
+) {
+  const title = r.title?.trim() || 'YouTube · ' + r.prepared.record.videoId;
+  await audioAtStage('storage', () =>
+    saveLocalAudio(
       r.prepared.record,
       title,
-      r.prepared.bytes,
       r.jobId,
+      r.prepared.bytes,
       r.author,
-    );
-    if (!SONGS.some((s) => s.id === item.song.id)) SONGS.push(item.song);
-    canonicalPreferred.set(r.prepared.record.videoId, item.song.id);
-    canonicalPending.delete(r.prepared.record.videoId);
-    recoverDisplayMetadata(r.prepared.record);
-    if (!active && !preparing) {
-      songCards();
-      selectedSong();
-    }
-    const submitted = submittedYoutubeInput;
-    const input = $<HTMLInputElement>('#youtube-url');
-    if (
-      submitted?.videoId === r.prepared.record.videoId &&
-      submitted.revision === youtubeInputRevision &&
-      input.value === submitted.value
-    ) {
-      input.value = '';
-      submittedYoutubeInput = undefined;
-    }
-    toast(externalLabels(settings.language).saved);
-  },
+    ),
+  );
+  const item = installExternalSource(
+    r.prepared.record,
+    title,
+    r.prepared.bytes,
+    r.jobId,
+    r.author,
+  );
+  if (!SONGS.some((s) => s.id === item.song.id)) SONGS.push(item.song);
+  canonicalPreferred.set(r.prepared.record.videoId, item.song.id);
+  canonicalPending.delete(r.prepared.record.videoId);
+  recoverDisplayMetadata(r.prepared.record);
+  if (general468Coordinator && isOpusRecord(r.prepared.record))
+    await extendGeneralSource(r.prepared.record, {
+      lanes: [4, 6, 8].includes(settings.lanes)
+        ? (settings.lanes as 4 | 6 | 8)
+        : 4,
+      difficulty: settings.difficulty,
+    }).catch(() => {
+      // Base import already committed. Keep extension retry separate.
+      toast(opus468PlayerLabels(settings.language).unavailable);
+    });
+  if (!active && !preparing) {
+    songCards();
+    selectedSong();
+  }
+  const submitted = submittedYoutubeInput;
+  const input = $<HTMLInputElement>('#youtube-url');
+  if (
+    submitted?.videoId === r.prepared.record.videoId &&
+    submitted.revision === youtubeInputRevision &&
+    input.value === submitted.value
+  ) {
+    input.value = '';
+    submittedYoutubeInput = undefined;
+  }
+  toast(externalLabels(settings.language).saved);
+}
+const backgroundImports = new BackgroundImports(
+  () => songCards(),
+  completePreparedYoutubeImport,
 );
 addYoutube.onclick = () => {
   $('#youtube-status').textContent = '';
@@ -884,7 +1301,7 @@ function selectedSong() {
   $('#selected-art').className =
     'selected-art cover-' +
     songIndex +
-    (externalSource(song.id) ? ' youtube-art' : '');
+    (songVideoId(song.id) ? ' youtube-art' : '');
   $('#selected-art').style.backgroundImage =
     `url("${songArt(song.id)}"), url("${ART_FALLBACK}")`;
   $('#selected-art .art-index').textContent = '0' + (songIndex + 1);
@@ -894,12 +1311,14 @@ function selectedSong() {
     '#selected-art .art-mark',
   );
   if (originLabel)
-    originLabel.textContent = externalSource(song.id)
-      ? 'YOUTUBE'
-      : 'ORVIO / ORIGINALS';
-  $('#selected-subtitle').textContent = externalSource(song.id)
-    ? song.subtitle
-    : t(('subtitle' + songIndex) as Word);
+    originLabel.textContent =
+      externalSource(song.id) || ownsOpus468(song.id)
+        ? 'YOUTUBE'
+        : 'ORVIO / ORIGINALS';
+  $('#selected-subtitle').textContent =
+    externalSource(song.id) || ownsOpus468(song.id)
+      ? song.subtitle
+      : t(('subtitle' + songIndex) as Word);
   $('#selected-genre').textContent = song.genre;
   $('#selected-bpm').textContent = song.bpm + ' BPM';
   if (libraryHydrated && screen === 'select') {
@@ -965,7 +1384,7 @@ function songCards() {
   $('#songs').innerHTML = visible
     .map((i) => {
       const s = SONGS[i];
-      return `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${externalSource(s.id) ? `<img class="youtube-cover" data-song-art="${s.id}" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle) : t(('subtitle' + i) as Word)}</span><span class="song-note-count" data-chart-song="${i}">${chartDisplay(s, settings.difficulty, settings.lanes).count || '--'} ${t('notes')}</span></span><span class="song-time"><em class="song-level">${chartLevel(s, settings.difficulty, settings.lanes)}</em>${Math.floor(duration(s) / 60)}:${Math.floor(
+      return `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${songVideoId(s.id) ? `<img class="youtube-cover" data-song-art="${s.id}" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) || ownsOpus468(s.id) ? escapeText(s.subtitle) : t(('subtitle' + i) as Word)}</span><span class="song-note-count" data-chart-song="${i}">${chartDisplay(s, settings.difficulty, settings.lanes).count || '--'} ${t('notes')}</span></span><span class="song-time"><em class="song-level">${chartLevel(s, settings.difficulty, settings.lanes)}</em>${Math.floor(duration(s) / 60)}:${Math.floor(
         duration(s) % 60,
       )
         .toString()
@@ -1194,8 +1613,7 @@ function songCards() {
         element.dataset.canonicalVideo ??
         element.dataset.importVideo ??
         (element.dataset.song !== undefined
-          ? externalSource(SONGS[Number(element.dataset.song)].id)?.record
-              .videoId
+          ? songVideoId(SONGS[Number(element.dataset.song)].id)
           : undefined)
       );
     };
@@ -1211,7 +1629,7 @@ function songCards() {
     const video =
       el.dataset.canonicalVideo ??
       el.dataset.importVideo ??
-      (song ? externalSource(song.id)?.record.videoId : undefined);
+      (song ? songVideoId(song.id) : undefined);
     el.dataset.libraryFocusKey = video ? 'yt:' + video : song?.id;
   }
   $('#songs').scrollTop = listScroll;
@@ -1232,9 +1650,31 @@ function songCards() {
   document.querySelectorAll<HTMLButtonElement>('[data-song]').forEach(
     (b) =>
       (b.onclick = () => {
+        if (
+          extensionPending.has(SONGS[Number(b.dataset.song)].id) &&
+          [4, 6, 8].includes(settings.lanes)
+        )
+          return;
+        extensionFailed.delete(SONGS[Number(b.dataset.song)].id);
         selectSong(Number(b.dataset.song));
       }),
   );
+  if ([4, 6, 8].includes(settings.lanes))
+    for (const row of document.querySelectorAll<HTMLElement>(
+      '#songs [data-song]',
+    )) {
+      const id = SONGS[Number(row.dataset.song)].id;
+      if (extensionPending.has(id)) {
+        disableUnreadySongRow(row);
+        const label = row.querySelector('.song-note-count');
+        if (label)
+          label.textContent = externalLabels(settings.language).preparing;
+      } else if (extensionFailed.has(id)) {
+        const label = row.querySelector('.song-note-count');
+        if (label)
+          label.textContent = opus468PlayerLabels(settings.language).retry;
+      }
+    }
 }
 function updateOptionReadout() {
   const shuffle = optionsDuringPlay ? originalShuffle : settings.shuffle;
@@ -1248,6 +1688,25 @@ function updateOptionReadout() {
 }
 
 function syncSettings(updateLibrary = true) {
+  queueMicrotask(refreshGeneralSelection);
+  if (!active && !preparing && !playReplay) {
+    const paired = extensionLibraryPairs.resolve(
+      SONGS[songIndex].id,
+      settings.lanes,
+    );
+    const index = SONGS.findIndex((s) => s.id === paired);
+    if (index >= 0 && index !== songIndex) {
+      songIndex = index;
+      selectedSong();
+    }
+  }
+  if (updateLibrary && !active && !preparing && screen === 'select') {
+    const shown = [
+      ...document.querySelectorAll<HTMLElement>('#songs [data-song]'),
+    ].map((row) => Number(row.dataset.song));
+    const next = visibleSongIndices();
+    if (JSON.stringify(shown) !== JSON.stringify(next)) songCards();
+  }
   const priorDifficulty = settings.difficulty;
   resolveBindings();
   const selected = SONGS[songIndex];
@@ -1282,6 +1741,17 @@ function syncSettings(updateLibrary = true) {
         if (count)
           count.textContent = `${chartDisplay(song, settings.difficulty, settings.lanes).count || '--'} ${t('notes')}`;
       });
+  if ([4, 6, 8].includes(settings.lanes))
+    for (const row of document.querySelectorAll<HTMLElement>(
+      '#songs [data-song]',
+    )) {
+      const id = SONGS[Number(row.dataset.song)].id,
+        label = row.querySelector('.song-note-count');
+      if (label && extensionPending.has(id))
+        label.textContent = externalLabels(settings.language).preparing;
+      else if (label && extensionFailed.has(id))
+        label.textContent = opus468PlayerLabels(settings.language).retry;
+    }
   queueMicrotask(() => document.dispatchEvent(new Event('orvio:select-sync')));
   updateOptionReadout();
   clock?.setVolume(settings.volume);
@@ -1381,6 +1851,7 @@ function syncSettings(updateLibrary = true) {
 }
 
 function stopPreview() {
+  // Preview owns previewAbort. A dialog-close event must not cancel a new play.
   previewRequest++;
   previewAbort?.abort();
   previewAbort = undefined;
@@ -1405,6 +1876,46 @@ async function prepare(attempt: StartupAttempt, joinGatePreload = false) {
   const audio = clock;
   await attempt.wait(audio.activate());
   const song = SONGS[songIndex];
+  if (transient468Owns(song.id) && playReplay) {
+    const current = shared468!;
+    const prepared: any = await attempt.wait(
+      current.service.prepareReplay(audio.context, { signal: attempt.signal }),
+    );
+    attempt.check();
+    if (current !== shared468 || prepared.identity.song !== song.id)
+      throw Error('share468_replay_stale');
+    return {
+      buffer: prepared.audio,
+      peak: 1,
+      warm: false,
+      extensionEngine: prepared.engine as Engine,
+    };
+  }
+  if (ownsOpus468(song.id)) {
+    const prepared = await attempt.wait(
+      private468Bridge.prepare(
+        {
+          song: song.id,
+          lanes: settings.lanes,
+          difficulty: settings.difficulty,
+          shuffle: settings.shuffle,
+          seed: shuffleSeed,
+          context: audio.context,
+          present: () => {},
+        },
+        {
+          signal: attempt.signal,
+          replaySession: playReplay ? localSessionKey : undefined,
+        },
+      ),
+    );
+    return {
+      buffer: prepared.buffer,
+      peak: 1,
+      warm: false,
+      extensionEngine: prepared.engine,
+    };
+  }
   const external = externalSource(song.id);
   if (
     external &&
@@ -1466,6 +1977,14 @@ $('#song-loading').addEventListener('click', (e) => {
 async function start() {
   if (
     !playReplay &&
+    transient468Owns(SONGS[songIndex].id) &&
+    !shared468!.added
+  ) {
+    showShared468Add();
+    return;
+  }
+  if (
+    !playReplay &&
     !makeChart(SONGS[songIndex], settings.difficulty, settings.lanes).length
   )
     return;
@@ -1523,18 +2042,21 @@ async function start() {
     wallpaper.src = songArt(loadingSong.id);
   }
   $('#loading-title').textContent = loadingSong.title;
-  $('#loading-title').previousElementSibling!.textContent = externalSource(
-    loadingSong.id,
-  )
-    ? 'YOUTUBE'
-    : 'ORVIO ORIGINALS';
+  $('#loading-title').previousElementSibling!.textContent =
+    externalSource(loadingSong.id) || ownsOpus468(loadingSong.id)
+      ? 'YOUTUBE'
+      : 'ORVIO ORIGINALS';
   $('#loading-detail').textContent =
     `${loadingSong.genre} · ${loadingSong.bpm} BPM · ${settings.lanes} KEY`;
   $('#loading-status').textContent = t('preparing');
   $('#cancel-startup').textContent =
     externalLabels(settings.language).cancel + ' · ESC';
   $('#song-loading').classList.remove('hidden');
-  if (location.pathname !== playPath()) history.pushState(null, '', playPath());
+  if (
+    !(playReplay && transient468Owns(SONGS[songIndex].id)) &&
+    location.pathname !== playPath()
+  )
+    history.pushState(null, '', playPath());
   screen = 'play';
   $('#home-screen').classList.add('hidden');
   $('#ready-screen').classList.add('hidden');
@@ -1582,17 +2104,19 @@ async function start() {
     field = new Playfield();
     await attempt.wait(field.init($('#highway'), attempt.signal));
     const song = SONGS[songIndex];
-    engine = new Engine(
-      transformChart(
-        playReplay && localBuiltinNotes
-          ? structuredClone(localBuiltinNotes)
-          : makeChart(song, settings.difficulty, settings.lanes),
-        settings.lanes,
-        settings.shuffle,
-        shuffleSeed,
-      ),
-      playReplay ? playReplay.fever : { ...CURRENT_FEVER, auto: true },
-    );
+    engine =
+      ('extensionEngine' in track ? track.extensionEngine : undefined) ??
+      new Engine(
+        transformChart(
+          playReplay && localBuiltinNotes
+            ? structuredClone(localBuiltinNotes)
+            : makeChart(song, settings.difficulty, settings.lanes),
+          settings.lanes,
+          settings.shuffle,
+          shuffleSeed,
+        ),
+        playReplay ? playReplay.fever : { ...CURRENT_FEVER, auto: true },
+      );
     seenEvents = 0;
     sequence = 0;
     lastFeverActivations = 0;
@@ -1650,11 +2174,10 @@ async function start() {
     $('#arena').dataset.position = settings.position;
     $('#now-title').textContent = song.title;
     $('#side-title').textContent = song.title;
-    $('#side-title').previousElementSibling!.textContent = externalSource(
-      song.id,
-    )
-      ? 'YOUTUBE'
-      : 'ORVIO ORIGINALS';
+    $('#side-title').previousElementSibling!.textContent =
+      externalSource(song.id) || ownsOpus468(song.id)
+        ? 'YOUTUBE'
+        : 'ORVIO ORIGINALS';
     $('#now-detail').textContent =
       `${playReplay ? REPLAY_LABELS[settings.language][1] + ' · ' : ''}${song.genre} · ${song.bpm} BPM`;
     $('#lane-detail').textContent =
@@ -2036,10 +2559,24 @@ function finish() {
   ownResults.add(completed);
   replayExpected = true;
   replayEncoding = (async () => {
-    if (externalSource(completed.song)) {
+    if (ownsOpus468(completed.song)) {
       replayText = '';
       replayExpected = false;
-      if (!savedReplay || !replayMatches(savedReplay, completed))
+      if (savedReplay)
+        try {
+          localSessionKey = await private468Bridge.saveSession(
+            savedReplay,
+            completed,
+          );
+        } catch {
+          savedReplay = undefined;
+          localSessionKey = undefined;
+          toast(REPLAY_SAVE_ERROR[settings.language]);
+        }
+    } else if (externalSource(completed.song)) {
+      replayText = '';
+      replayExpected = false;
+      if (!savedReplay || !entryReplayMatches(savedReplay, completed))
         savedReplay = undefined;
       if (savedReplay) {
         try {
@@ -2051,7 +2588,7 @@ function finish() {
     } else if (
       !externalSource(completed.song) &&
       savedReplay &&
-      replayMatches(savedReplay, completed)
+      entryReplayMatches(savedReplay, completed)
     ) {
       try {
         replayText = await encodeReplay(savedReplay as ReplayData);
@@ -2091,8 +2628,18 @@ function finish() {
   });
 }
 function resultLink(result: UiResult) {
+  if (shared468?.view.result === result) return shared468.url;
   if (receivedShare?.data.result === result)
     return new URL('/result/#' + receivedShare.fragment, location.origin).href;
+  if (ownsOpus468(result.song)) {
+    // Failed local save leaves a usable in-memory result, never a fabricated session URL.
+    return privateOpus468ResultUrl(
+      result.song,
+      localSessionKey,
+      location.origin,
+      selectionPath(),
+    );
+  }
   if (
     externalSource(result.song) ||
     (localSessionOpened && localSessionKey?.startsWith('builtin:'))
@@ -2106,11 +2653,13 @@ function resultLink(result: UiResult) {
     p.set('rp', '1');
     p.set('rn', String(replayExpectedLength));
   }
-  if (replayText && savedReplay && replayMatches(savedReplay, result))
+  if (replayText && savedReplay && entryReplayMatches(savedReplay, result))
     p.set('r', replayText);
   return new URL('/result/#' + p, location.origin).href;
 }
 function showResult(result: UiResult) {
+  $('#share-result').hidden = false;
+  $('#share-result').style.display = '';
   const arrivalKey = initialArrivalKey ?? resultIdentityKey(location.href);
   const arrivalFragment = initialArrivalFragment;
   initialArrivalKey = null;
@@ -2137,6 +2686,15 @@ function showResult(result: UiResult) {
   $('#result-song').textContent =
     SONGS.find((s) => s.id === result.song)?.title ?? result.song;
   $<HTMLButtonElement>('#share-result').hidden = false;
+  document.getElementById('shared468-add')?.remove();
+  if (transient468Owns(result.song) && !shared468!.added) {
+    const add = document.createElement('button');
+    add.id = 'shared468-add';
+    add.className = 'quiet';
+    add.textContent = externalLabels(settings.language).submit;
+    add.onclick = showShared468Add;
+    document.querySelector('.result-tools')!.append(add);
+  }
   const resultBadgeList = resultOptions(result);
   $('#result-rank').textContent =
     result.accuracy >= 97
@@ -2162,9 +2720,16 @@ function showResult(result: UiResult) {
   if (
     savedReplay?.fever?.auto &&
     savedReplay.fever.rulesId === 'orvio-auto-v1' &&
-    replayMatches(savedReplay, result, localBuiltinNotes)
+    entryReplayMatches(savedReplay, result, localBuiltinNotes)
   ) {
-    const verified = replayEngine(savedReplay, localBuiltinNotes);
+    const extensionSong = SONGS.find((s) => s.id === savedReplay!.song);
+    const verified = replayEngine(
+      savedReplay,
+      localBuiltinNotes ??
+        (extensionSong && ownsOpus468(extensionSong.id)
+          ? makeChart(extensionSong, savedReplay.difficulty, savedReplay.lanes)
+          : undefined),
+    );
     savedReplay.ops.forEach((op, i) => applyReplayOp(verified, op, i));
     verified.update(9999);
     resultFever.textContent = `FEVER MAX ${verified.fever.maxDisplayCombo}`;
@@ -2189,7 +2754,10 @@ function showResult(result: UiResult) {
   // A result that arrived through a share carries the share's verified
   // expiry onto every identity the projection is written under, so an
   // expired share can never paint before the app rejects it.
-  const shared = shortCache.get(sharedURL.slice(sharedURL.indexOf('#') + 1));
+  const shared =
+    shared468?.view.result === result
+      ? shortCache.get(shared468.fragment)
+      : shortCache.get(sharedURL.slice(sharedURL.indexOf('#') + 1));
   rememberResultFirstPaint([arrivalKey, canonicalKey], result, {
     ...(shared ? { expiresAt: Date.parse(shared.expiresAt) } : {}),
     badges: resultBadgeList,
@@ -2217,7 +2785,7 @@ function resultOptions(result: UiResult) {
     resultArt.src = ART_FALLBACK;
   };
   resultArt.dataset.songArt = song.id;
-  resultArt.toggleAttribute('data-external', !!externalSource(song.id));
+  resultArt.toggleAttribute('data-external', !!songVideoId(song.id));
   resultArt.src = songArt(song.id);
   const count = makeChart(song, result.difficulty, result.lanes).length;
   $('#result-metadata').textContent =
@@ -2236,6 +2804,7 @@ function resultOptions(result: UiResult) {
   return resultBadgeData(result, badgeLabels);
 }
 function exit() {
+  private468Bridge.cancel();
   playReplay = undefined;
   sessionReplay = undefined;
   document.body.classList.remove('replay-view');
@@ -2667,10 +3236,18 @@ for (const id of ['fader', 'shuffle'] as const)
     syncSettings();
   };
 let shareBusy = false;
+let shareController: AbortController | undefined;
 const shortCache = new Map<string, { id: string; expiresAt: string }>();
 $('#share-result').onclick = async () => {
   if (!lastResult || shareBusy) return;
-  const sharedResult = lastResult;
+  const sharedResult = lastResult,
+    shareNavigation = navigationVersion;
+  const controller = new AbortController(),
+    timer = setTimeout(
+      () => controller.abort(Error('share468_timeout')),
+      95000,
+    );
+  shareController = controller;
   shareBusy = true;
   const button = $<HTMLButtonElement>('#share-result');
   button.disabled = true;
@@ -2685,32 +3262,58 @@ $('#share-result').onclick = async () => {
     if (lastResult !== sharedResult) throw new ShareError(400);
     if (replayExpected && (!savedReplay || !replayText || replayIssue))
       throw new ShareError(400);
+    if (
+      shared468?.view.result === sharedResult &&
+      new URL(shared468.url).searchParams.has('s')
+    )
+      return shared468.url;
     const item = externalSource(lastResult!.song);
-    const fragment = item
-      ? await encodeCodecShare({
-          record: item.record,
-          replay: savedReplay!,
-          result: lastResult!,
-          title: item.song.title,
-          ...(item.jobId ? { jobId: item.jobId } : {}),
-        })
-      : savedReplay
-        ? await builtinShareFragment(
-            savedReplay,
-            lastResult! as SharedResult,
-            localBuiltinNotes,
-          )
-        : builtinScoreShareFragment(lastResult! as SharedResult, {
-            replayExpected,
-            replayIssue,
-            frozen: localBuiltinNotes,
-          });
+    const transient =
+      shared468?.view.result === sharedResult ? shared468 : undefined;
+    if (transient)
+      await validateRecoveredV7(
+        transient.candidate,
+        general468Runtime.makeCodec(),
+        { signal: controller.signal },
+      );
+    const fragment = transient
+      ? transient.fragment
+      : private468Bridge.owns(sharedResult.song)
+        ? await general468Runtime.exportSharedV7(localSessionKey, {
+            signal: controller.signal,
+          })
+        : item
+          ? await encodeCodecShare({
+              record: item.record,
+              replay: savedReplay!,
+              result: lastResult!,
+              title: item.song.title,
+              ...(item.jobId ? { jobId: item.jobId } : {}),
+            })
+          : savedReplay
+            ? await builtinShareFragment(
+                savedReplay,
+                lastResult! as SharedResult,
+                localBuiltinNotes,
+              )
+            : builtinScoreShareFragment(lastResult! as SharedResult, {
+                replayExpected,
+                replayIssue,
+                frozen: localBuiltinNotes,
+              });
+    controller.signal.throwIfAborted();
+    if (lastResult !== sharedResult || navigationVersion !== shareNavigation)
+      throw new ShareError(400);
     let shared = shortCache.get(fragment);
     if (!shared || Date.parse(shared.expiresAt) <= Date.now())
-      shared = await saveSharedReplay(fragment);
+      shared = await saveSharedReplay(fragment, { signal: controller.signal });
     shortCache.set(fragment, shared);
     const url = new URL('/result/', location.origin);
     url.searchParams.set('s', shared.id);
+    if (lastResult === sharedResult && fragment.startsWith('v=7&d=')) {
+      history.replaceState(null, '', url.href);
+      if (shared468?.view.result === sharedResult) shared468.url = url.href;
+    }
     return url.href;
   })();
   try {
@@ -2739,6 +3342,8 @@ $('#share-result').onclick = async () => {
     ];
     status.classList.remove('hidden');
   } finally {
+    clearTimeout(timer);
+    if (shareController === controller) shareController = undefined;
     shareBusy = false;
     button.disabled = false;
   }
@@ -2748,7 +3353,7 @@ async function watchReplay() {
   if (
     !savedReplay ||
     !lastResult ||
-    !replayMatches(savedReplay, lastResult, localBuiltinNotes)
+    !entryReplayMatches(savedReplay, lastResult, localBuiltinNotes)
   ) {
     toast(REPLAY_LABELS[settings.language][2]);
     return;
@@ -2868,6 +3473,38 @@ async function previewSong() {
   try {
     // resume is called during the selection key/click gesture, before rendering.
     await clock.activate();
+    if (ownsOpus468(song.id)) {
+      const prepared = transient468Owns(song.id)
+        ? await shared468!.service.prepareReplay(clock.context, {
+            signal: controller.signal,
+          })
+        : await private468Bridge.preview(
+            song.id,
+            settings.lanes,
+            settings.difficulty,
+            clock.context,
+            controller.signal,
+          );
+      controller.signal.throwIfAborted();
+      if (
+        request !== previewRequest ||
+        active ||
+        preparing ||
+        SONGS[songIndex] !== song
+      )
+        return;
+      preview = clock.context.createBufferSource();
+      preview.buffer = prepared.audio;
+      const gain = clock.context.createGain();
+      previewGain = gain;
+      gain.gain.value = settings.volume * 0.5;
+      preview.connect(gain);
+      gain.connect(clock.context.destination);
+      preview.start();
+      document.body.classList.add('previewing');
+      syncResultPreview();
+      return;
+    }
     await ensureExternalBytes(song.id, controller.signal);
     let track = cache.get(song.id);
     if (!track) {
@@ -3024,7 +3661,8 @@ $('#reset').onclick = () => {
   syncSettings();
 };
 function playPath() {
-  if (externalSource(SONGS[songIndex].id)) return selectionPath();
+  if (externalSource(SONGS[songIndex].id) || ownsOpus468(SONGS[songIndex].id))
+    return selectionPath();
   return `/play/${SONGS[songIndex].id}/${settings.lanes}/${settings.difficulty}/?speed=${settings.speed.toFixed(1)}&fader=${settings.fader}&shuffle=${settings.shuffle}&seed=${shuffleSeed}${perfOverlay ? '&perf=1' : ''}`;
 }
 function selectionPath() {
@@ -3095,7 +3733,166 @@ function showAudioRecovery(
   document.body.append(dialog);
   dialog.showModal();
 }
+async function openPublic468Share(fragment: string, url: string) {
+  const navigation = navigationVersion,
+    operation = shared468Route.begin(
+      url,
+      () => location.href === url && navigationVersion === navigation,
+    );
+  let service: any;
+  try {
+    await waitAcquired(general468Ready, operation.signal);
+    operation.check();
+    const bootstrap = await general468Runtime.parseSharedV7(fragment, {
+      signal: operation.signal,
+    });
+    operation.check();
+    if (
+      bootstrap.admitted !== false ||
+      bootstrap.kind !== 'untrusted-share468-bootstrap-candidate'
+    )
+      throw Error('share468_bootstrap');
+    const candidate = bootstrap.candidate;
+    await recoverPublic468Source(candidate, {
+      exchangeProjection: createPrivateOpusV2ProjectionTransport().exchange,
+      signal: operation.signal,
+    });
+    operation.check();
+    service = await general468Runtime.makeTransientSharedView(candidate, {
+      signal: operation.signal,
+    });
+    operation.check();
+    const view = await service.verifiedResult({ signal: operation.signal });
+    operation.check();
+    await attachOpus468Artwork(view.song.id, view.baseRecord, {
+      signal: operation.signal,
+    });
+    operation.check();
+    if (
+      view.persistentLibraryAdded !== false ||
+      view.persistentSessionSaved !== false
+    )
+      throw Error('share468_transient_contract');
+    transient468Ids.add(view.song.id);
+    shared468 = { fragment, url, service, view, candidate, added: false };
+    operation.finish(service);
+    if (!SONGS.some((song) => song.id === view.song.id)) SONGS.push(view.song);
+    songIndex = SONGS.findIndex((song) => song.id === view.song.id);
+    savedReplay = view.replay;
+    localBuiltinNotes = structuredClone(view.frozenNotes);
+    lastResult = view.result;
+    replayExpected = false;
+    replayIssue = false;
+    replayText = '';
+    localSessionKey = undefined;
+    settings.lanes = view.replay.lanes;
+    settings.difficulty = view.replay.difficulty;
+    showResult(view.result);
+  } catch (error) {
+    service?.revoke();
+    operation.dispose();
+    throw error;
+  }
+}
+let shared468AddBusy = false;
+function showShared468Add() {
+  const shared = shared468;
+  if (!shared || shared.added || shared468AddBusy) return;
+  const dialog = document.createElement('dialog'),
+    name = document.createElement('h2'),
+    status = document.createElement('p'),
+    add = document.createElement('button'),
+    cancel = document.createElement('button');
+  dialog.id = 'shared468-add-dialog';
+  name.textContent = shared.view.song.title;
+  add.id = 'shared468-add-confirm';
+  add.textContent = externalLabels(settings.language).submit;
+  add.className = 'primary';
+  cancel.textContent = externalLabels(settings.language).cancel;
+  cancel.className = 'quiet';
+  const controller = new AbortController();
+  cancel.onclick = () => dialog.close();
+  dialog.addEventListener('close', () => {
+    controller.abort(Error('share468_add_closed'));
+    dialog.remove();
+  });
+  add.onclick = async () => {
+    if (shared468AddBusy) return;
+    shared468AddBusy = true;
+    add.disabled = true;
+    status.textContent = externalLabels(settings.language).preparing;
+    const href = location.href,
+      navigation = navigationVersion,
+      timer = setTimeout(
+        () => controller.abort(Error('share468_add_timeout')),
+        95000,
+      ),
+      check = () => {
+        controller.signal.throwIfAborted();
+        if (
+          shared !== shared468 ||
+          href !== location.href ||
+          navigation !== navigationVersion
+        )
+          throw Error('share468_add_stale');
+      };
+    try {
+      const wire = await validateRecoveredV7(
+        shared.candidate,
+        general468Runtime.makeCodec(),
+        { signal: controller.signal },
+      );
+      check();
+      const installed = await general468Runtime.installSharedReplay(wire, {
+        signal: controller.signal,
+      });
+      check();
+      const existing = await readOpus35Metadata(shared.view.baseRecord);
+      check();
+      if (!existing)
+        await saveOpus35Metadata(
+          shared.view.baseRecord,
+          shared.view.song.title,
+          undefined,
+          shared.view.song.subtitle,
+        );
+      check();
+      await installPrivateOpus468Frontend(general468Runtime.frontend, {
+        song: installed.song,
+        signal: controller.signal,
+      });
+      check();
+      shared.added = true;
+      libraryAddOrder.added(shared.view.baseRecord.videoId);
+      restoreLibraryVideo(shared.view.baseRecord.videoId);
+      songCards();
+      dialog.close();
+      toast(externalLabels(settings.language).saved);
+    } catch (error) {
+      if (
+        !controller.signal.aborted &&
+        shared === shared468 &&
+        href === location.href &&
+        navigation === navigationVersion
+      )
+        status.textContent = externalLabels(settings.language).failed;
+    } finally {
+      clearTimeout(timer);
+      shared468AddBusy = false;
+      add.disabled = false;
+    }
+  };
+  dialog.append(name, status, add, cancel);
+  document.body.append(dialog);
+  dialog.showModal();
+  cancel.focus();
+}
 async function openExternalShare(fragment: string) {
+  if (fragment.startsWith('v=7&d=')) {
+    await openPublic468Share(fragment, location.href);
+    return;
+  }
+
   const request = ++shareRouteRequest;
   const href = location.href;
   const navigation = navigationVersion;
@@ -3132,13 +3929,25 @@ async function openExternalShare(fragment: string) {
 }
 
 function readRoute(initial = false) {
+  if (shared468 && location.href === shared468.url) {
+    songIndex = SONGS.findIndex((s) => s.id === shared468!.view.song.id);
+    savedReplay = shared468.view.replay;
+    localBuiltinNotes = structuredClone(shared468.view.frozenNotes);
+    settings.lanes = savedReplay!.lanes;
+    settings.difficulty = savedReplay!.difficulty;
+    showResult(shared468.view.result);
+    return;
+  }
+
   localBuiltinNotes = undefined;
   if (location.pathname !== '/result/')
     document.documentElement.removeAttribute('data-result-pending');
   const fragment = location.hash.slice(1);
   if (
     location.pathname === '/result/' &&
-    (fragment.startsWith('v=5&d=') || fragment.startsWith('v=6&d=')) &&
+    (fragment.startsWith('v=5&d=') ||
+      fragment.startsWith('v=6&d=') ||
+      fragment.startsWith('v=7&d=')) &&
     receivedShare?.fragment !== fragment
   ) {
     const routeHref = location.href,
@@ -3208,7 +4017,7 @@ function readRoute(initial = false) {
             !Number.isInteger(replayExpectedLength))
             ? null
             : await decodeReplay(encoded);
-        if (lastResult === shared && r && replayMatches(r, shared)) {
+        if (lastResult === shared && r && entryReplayMatches(r, shared)) {
           savedReplay = r;
           replayText = encoded;
           history.replaceState(null, '', resultLink(shared));
@@ -3307,11 +4116,10 @@ function readRoute(initial = false) {
           .finally(() => preloading.delete(loadingSong.id)),
       );
     $('#loading-title').textContent = loadingSong.title;
-    $('#loading-title').previousElementSibling!.textContent = externalSource(
-      loadingSong.id,
-    )
-      ? 'YOUTUBE'
-      : 'ORVIO ORIGINALS';
+    $('#loading-title').previousElementSibling!.textContent =
+      externalSource(loadingSong.id) || ownsOpus468(loadingSong.id)
+        ? 'YOUTUBE'
+        : 'ORVIO ORIGINALS';
     $('#loading-detail').textContent =
       `${loadingSong.genre} · ${loadingSong.bpm} BPM · ${settings.lanes} KEY`;
     $('#loading-status').textContent = `${t('start')} · ENTER ↵`;
@@ -3360,11 +4168,19 @@ $('#ready-start').onclick = () => {
 };
 window.addEventListener('popstate', () => {
   navigationVersion++;
+  shareController?.abort(Error('share_route_changed'));
+  shared468Route.close();
+  shared468 = undefined;
   if (startup) {
     startup.cancel();
     return;
   }
-  readRoute();
+  if (
+    location.pathname === '/result/' &&
+    new URLSearchParams(location.search).has('s')
+  )
+    void readInitialRoute();
+  else readRoute();
 });
 /** Warm-cache-first shared replay load: identical identity (replay id),
  * expiry enforced locally exactly as the network path does. */
@@ -3400,7 +4216,8 @@ async function readInitialRoute() {
   if (!id) {
     if (
       location.hash.startsWith('#v=5&d=') ||
-      location.hash.startsWith('#v=6&d=')
+      location.hash.startsWith('#v=6&d=') ||
+      location.hash.startsWith('#v=7&d=')
     ) {
       try {
         await openExternalShare(location.hash.slice(1));
@@ -3438,6 +4255,11 @@ async function readInitialRoute() {
     const loaded = await resolveSharedReplay(id);
     if (!stillInitial()) return;
     const params = new URLSearchParams(loaded.fragment);
+    if (params.get('v') === '7') {
+      shortCache.set(loaded.fragment, { id, expiresAt: loaded.expiresAt });
+      await openPublic468Share(loaded.fragment, location.href);
+      return;
+    }
     if (['5', '6'].includes(params.get('v') || '')) {
       shortCache.set(loaded.fragment, { id, expiresAt: loaded.expiresAt });
       history.replaceState(null, '', '/result/#' + loaded.fragment);
@@ -3456,7 +4278,7 @@ async function readInitialRoute() {
     if (encoded) {
       const replay = await decodeReplay(encoded);
       if (!stillInitial()) return;
-      if (!replay || !replayMatches(replay, readResult(params)!))
+      if (!replay || !entryReplayMatches(replay, readResult(params)!))
         throw new ShareError(400);
     }
     if (params.get('rp') === '1' && !encoded) throw new ShareError(400);
@@ -3501,6 +4323,7 @@ const deferredLibraryRoute =
   initialQuery.has('s') ||
   location.hash.startsWith('#v=5&d=') ||
   location.hash.startsWith('#v=6&d=') ||
+  location.hash.startsWith('#v=7&d=') ||
   location.hash.startsWith('#v=4&');
 // A37: until the library hydrate finishes and the initial route is read, no
 // screen owns this route; the default markup would paint the home screen's
@@ -3739,11 +4562,9 @@ async function initializeLibrary() {
   } else if (screen === 'replays') void showReplays();
   finishLibraryFirstPaint();
   const local = new URLSearchParams(location.search).get('local');
-  if (local) {
+  if (local && !local.startsWith('yt-opus-')) {
     try {
-      const session = local.startsWith('builtin:')
-        ? await readBuiltinSession(local)
-        : await readLocalSession(local);
+      const session = await readEntrySession(local);
       localBuiltinNotes =
         session && 'kind' in session && session.kind === 'builtin'
           ? session.chart
@@ -3772,7 +4593,7 @@ void initializeLibrary();
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.2.53',
+    version: '0.3.0',
     active,
     paused,
     fever: engine
@@ -3842,7 +4663,7 @@ enhanceSelects();
 // One verified thumbnail choice is used by every view, including later image loads.
 document.addEventListener('orvio:art-ready', (event) => {
   const id = (event as CustomEvent<string>).detail;
-  if (!externalSource(id)) return;
+  if (!songVideoId(id)) return;
   const url = songArt(id);
   document
     .querySelectorAll<HTMLImageElement>('[data-song-art]')
