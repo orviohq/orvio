@@ -420,3 +420,23 @@
     margin: 16px 0;
   }
 }
+
+/* Keep the intro content on the same paint path as its settled report.
+   The hint applies only while the report is visible, never during gameplay. */
+:is(#results[open], #rpaint)
+  :is(
+    #result-rank,
+    #rp-rank,
+    .result-stats > div,
+    #result-fever,
+    #rp-fever,
+    #judgment-list > div,
+    #rp-judgment-list > div
+  ) {
+  will-change: transform, opacity;
+}
+
+/* A straight-edged rank stamp avoids animated rounded-clip edge residue. */
+:is(#results, #rpaint) .result-rank-block {
+  border-radius: 0;
+}

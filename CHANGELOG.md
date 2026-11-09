@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.52] - 2026-11-09
+
+- Keep finished and reopened result reports on the same settled paint path; use straight rank-panel corners and release completed intro effects.
+- Preserve intro motion, reduced-motion behavior, score/chart/replay data and the existing strict raw-pixel comparison gate.
+- Keep compositing hints scoped to visible result content, not gameplay-hidden reports.
+
 ## [0.2.51] - 2026-11-09
 
 - Reduce repeated frequency-band lookup work while preparing charts on the device. Preserve exact chart outputs, timing, judgments and existing replay identities.

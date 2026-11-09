@@ -48,13 +48,27 @@ export class ResultMotion {
     };
     el.textContent = '0';
     this.frame = requestAnimationFrame(tick);
+    const hold = (animation: Animation) => {
+      this.animations.push(animation);
+      // Intro animations hold their final keyframe (fill: 'both'); release
+      // each one when it finishes so the element returns to its natural
+      // style and is re-rendered by the normal style system while sibling
+      // intro animations are still running, instead of retaining
+      // animation-era raster. Aborted/restarted intros bump the generation;
+      // finish() cancels the same animations on close.
+      void animation.finished
+        .catch(() => {})
+        .then(() => {
+          if (generation === this.generation) animation.cancel();
+        });
+    };
     const animate = (
       selector: string,
       frames: Keyframe[],
       options: KeyframeAnimationOptions,
     ) => {
       this.dialog.querySelectorAll<HTMLElement>(selector).forEach((target) => {
-        this.animations.push(target.animate(frames, options));
+        hold(target.animate(frames, options));
       });
     };
     animate(
@@ -69,7 +83,7 @@ export class ResultMotion {
         duration: 480,
         delay: 160,
         easing: 'cubic-bezier(.16,1,.3,1)',
-        fill: 'backwards',
+        fill: 'both',
       },
     );
     animate(
@@ -78,13 +92,13 @@ export class ResultMotion {
         { borderColor: '#9efaff', background: '#25485b' },
         { borderColor: '#39566a', background: '#142637' },
       ],
-      { duration: 650, delay: 340, easing: 'ease-out', fill: 'backwards' },
+      { duration: 650, delay: 340, easing: 'ease-out', fill: 'both' },
     );
     const rows = this.dialog.querySelectorAll<HTMLElement>(
       '.result-stats > div, #result-fever:not(.hidden), #judgment-list > div',
     );
     rows.forEach((target, i) => {
-      this.animations.push(
+      hold(
         target.animate(
           [
             { opacity: 0, transform: 'translateY(12px)' },
@@ -94,7 +108,7 @@ export class ResultMotion {
             duration: 320,
             delay: 300 + i * 48,
             easing: 'ease-out',
-            fill: 'backwards',
+            fill: 'both',
           },
         ),
       );
