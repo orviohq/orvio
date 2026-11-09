@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 test('all builtin modes play with exact contiguous physical keycaps and no page errors', async ({
   page,
-}) => {
+}, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   for (const [mode, keys] of [
@@ -18,7 +18,10 @@ test('all builtin modes play with exact contiguous physical keycaps and no page 
     );
     expect(await page.locator('#keycaps span').allTextContents()).toEqual(keys);
     await page.waitForTimeout(1500);
-    if (mode === 8) await page.screenshot({path:'/downloads/a29-current49-builtin8-active.png'});
+    if (mode === 8)
+      await page.screenshot({
+        path: testInfo.outputPath('a29-builtin8-active.png'),
+      });
     await page.keyboard.press(keys[0]);
     await page.keyboard.press('Escape');
     await expect(page.locator('#pause')).toBeVisible();
