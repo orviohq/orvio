@@ -5095,3 +5095,24 @@ body * {
 #cached-songs {
   touch-action: pan-y pinch-zoom;
 }
+
+/* Unready song content is visibly unavailable; recovery controls are not disabled. */
+#songs > .song-unready {
+  cursor: not-allowed;
+  border-style: dashed;
+  background: #0c1520;
+}
+#songs > .song-unready:hover {
+  background: #0c1520;
+  border-color: #ffffff12;
+  transform: none;
+}
+#songs > .song-unready > .cover,
+#songs > .song-unready > .song-copy > strong,
+#songs > .song-unready > .song-copy > small {
+  opacity: 0.5;
+  filter: saturate(0.25);
+}
+#songs > .song-unready .import-actions button {
+  cursor: pointer;
+}

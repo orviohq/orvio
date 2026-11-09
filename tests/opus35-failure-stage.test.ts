@@ -71,3 +71,27 @@ it('durable source rejection preserves the too-long fact and cannot retry POST',
   expect(api.create).not.toHaveBeenCalled();
   expect(api.prepare).not.toHaveBeenCalled();
 });
+it('ready same-job reads trace the existing handle and pass accurate later stages without POST', async () => {
+  const { beginTrace, endTrace } = await import('../src/import-trace');
+  const trace = beginTrace();
+  const stages: string[] = [];
+  api.read.mockResolvedValue({ ...base, status: 'verified' });
+  api.prepare.mockImplementation(async (_job, _signal, options) => {
+    options.onStage('charting');
+    options.onStage('saving');
+    return { record: {} };
+  });
+  await importOpus35(base.videoId, AbortSignal.timeout(1000), {
+    jobId: base.jobId,
+    trace,
+    onStage: (stage) => stages.push(stage),
+  });
+  endTrace(trace, 'ok');
+  expect(api.create).not.toHaveBeenCalled();
+  expect(stages).toEqual(['downloading', 'charting', 'saving']);
+  expect(trace?.events.map((e) => e.stage)).toEqual([
+    'opus-job-read:begin',
+    'opus-job-read:end',
+  ]);
+  expect(api.prepare.mock.calls[0][2].trace).toBe(trace);
+});

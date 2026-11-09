@@ -185,3 +185,194 @@ it('stage transitions reach saving before completion and remove row only after c
   finish();
   await vi.waitFor(() => expect(pending.rows.size).toBe(0));
 });
+
+it('admits one import at a time and starts no timeout while the next waits', async () => {
+  raf();
+  let release!: (value: unknown) => void;
+  api.import.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+  );
+  const timeout = vi.spyOn(AbortSignal, 'timeout');
+  const pending = new BackgroundImports(
+    () => {},
+    async () => {},
+    store(),
+  );
+  pending.enqueue('AAAAAAAAAAA');
+  pending.enqueue('BBBBBBBBBBB');
+  pending.enqueue('BBBBBBBBBBB');
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(1));
+  expect(timeout).toHaveBeenCalledTimes(1);
+  expect(pending.isWaiting('BBBBBBBBBBB')).toBe(true);
+  expect(pending.rows.get('BBBBBBBBBBB')).toMatchObject({
+    stage: 'queued',
+    waitingForTurn: true,
+  });
+  release({ prepared: { record: { videoId: 'AAAAAAAAAAA' } } });
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(2));
+  expect(timeout).toHaveBeenCalledTimes(2);
+  expect(pending.rows.get('BBBBBBBBBBB')?.waitingForTurn).toBeUndefined();
+  timeout.mockRestore();
+});
+it('cancelled never-started queued work does not issue any request', async () => {
+  raf();
+  api.import.mockImplementation(() => new Promise(() => {}));
+  const pending = new BackgroundImports(
+    () => {},
+    async () => {},
+    store(),
+  );
+  pending.enqueue('AAAAAAAAAAA');
+  pending.enqueue('BBBBBBBBBBB');
+  pending.dismiss('BBBBBBBBBBB');
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(1));
+  expect(pending.rows.has('BBBBBBBBBBB')).toBe(false);
+  expect(pending.isWaiting('BBBBBBBBBBB')).toBe(false);
+});
+it('reload resumes proven never-started work but not ambiguous interrupted pre-job work', async () => {
+  raf();
+  api.import.mockImplementation(() => new Promise(() => {}));
+  const pending = new BackgroundImports(
+    () => {},
+    async () => {},
+    store(
+      JSON.stringify([
+        { videoId: 'AAAAAAAAAAA', state: 'loading', waitingForTurn: true },
+        { videoId: 'BBBBBBBBBBB', state: 'loading' },
+        {
+          videoId: 'CCCCCCCCCCC',
+          state: 'loading',
+          jobId: 'known-existing',
+          transportVersion: 2,
+          audioFormat: 'orvio-opus-v1',
+        },
+      ]),
+    ),
+  );
+  pending.resume();
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(1));
+  expect(api.import.mock.calls[0][0]).toBe('AAAAAAAAAAA');
+  expect(pending.rows.get('BBBBBBBBBBB')?.state).toBe('error');
+  expect(pending.rows.get('CCCCCCCCCCC')?.jobId).toBe('known-existing');
+  expect(pending.isWaiting('CCCCCCCCCCC')).toBe(true);
+});
+it('failure to durably clear the never-started marker blocks external effects', async () => {
+  raf();
+  api.import.mockImplementation(() => new Promise(() => {}));
+  let text = '[]';
+  const pending = new BackgroundImports(
+    () => {},
+    async () => {},
+    {
+      getItem: () => text,
+      setItem: (_k, v) => {
+        if (!v.includes('waitingForTurn')) throw Error('Storage unavailable');
+        text = v;
+      },
+    },
+  );
+  pending.enqueue('AAAAAAAAAAA');
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(api.import).not.toHaveBeenCalled();
+  expect(pending.rows.get('AAAAAAAAAAA')).toMatchObject({
+    state: 'error',
+    failure: { stage: 'storage' },
+  });
+});
+it('a failed active import hands off the queue without retrying the failed job', async () => {
+  raf();
+  api.import
+    .mockRejectedValueOnce(new Error('failed'))
+    .mockImplementation(() => new Promise(() => {}));
+  const pending = new BackgroundImports(
+    () => {},
+    async () => {},
+    store(),
+  );
+  pending.enqueue('AAAAAAAAAAA');
+  pending.enqueue('BBBBBBBBBBB');
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(2));
+  expect(pending.rows.get('AAAAAAAAAAA')?.state).toBe('error');
+  expect(api.import.mock.calls.map((c) => c[0])).toEqual([
+    'AAAAAAAAAAA',
+    'BBBBBBBBBBB',
+  ]);
+});
+it('queued explicit retry intent survives reload behind an active job and is consumed at admission', async () => {
+  raf();
+  const storage = store(
+    JSON.stringify([
+      { videoId: 'AAAAAAAAAAA', state: 'loading', jobId: 'active-existing' },
+      {
+        videoId: 'BBBBBBBBBBB',
+        state: 'error',
+        jobId: 'terminal-existing',
+        error: 'unavailable',
+        transportVersion: 2,
+        audioFormat: 'orvio-opus-v1',
+      },
+    ]),
+  );
+  let release!: (value: unknown) => void;
+  api.import
+    .mockImplementationOnce(() => new Promise(() => {}))
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    )
+    .mockImplementation(() => new Promise(() => {}));
+  const first = new BackgroundImports(
+    () => {},
+    async () => {},
+    storage,
+  );
+  first.resume();
+  first.enqueue('BBBBBBBBBBB');
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(1));
+  expect(
+    JSON.parse(storage.getItem('orvio.pending-imports.v1')!).find(
+      (r: any) => r.videoId === 'BBBBBBBBBBB',
+    ),
+  ).toMatchObject({
+    waitingForTurn: true,
+    retryWhenAdmitted: true,
+    jobId: 'terminal-existing',
+  });
+  const reloaded = new BackgroundImports(
+    () => {},
+    async () => {},
+    storage,
+  );
+  reloaded.resume();
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(2));
+  expect(reloaded.isWaiting('BBBBBBBBBBB')).toBe(true);
+  release({ prepared: { record: { videoId: 'AAAAAAAAAAA' } } });
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(3));
+  expect(api.import.mock.calls[2][2]).toMatchObject({
+    jobId: 'terminal-existing',
+    retryFailed: true,
+    transportVersion: 2,
+  });
+  const saved = JSON.parse(storage.getItem('orvio.pending-imports.v1')!).find(
+    (r: any) => r.videoId === 'BBBBBBBBBBB',
+  );
+  expect(saved.waitingForTurn).toBeUndefined();
+  expect(saved.retryWhenAdmitted).toBeUndefined();
+  // An interrupted admitted request has uncertain effects and must not replay retry authority.
+  const interrupted = new BackgroundImports(
+    () => {},
+    async () => {},
+    storage,
+  );
+  interrupted.resume();
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(4));
+  expect(api.import.mock.calls[3][2]).toMatchObject({
+    jobId: 'terminal-existing',
+    retryFailed: false,
+  });
+});

@@ -3143,9 +3143,9 @@ function analyzeFluxV2(samples, sampleRate, opts = {}) {
   const re = new Float64Array(window),
     im = new Float64Array(window);
   let prev = null;
-  const flux = { low: [], mid: [], high: [] };
-  const times = [];
-  for (let i = 0; i + window < samples.length; i += hop) {
+  const flux = opts.sharedFlux?.flux ?? { low: [], mid: [], high: [] };
+  const times = opts.sharedFlux?.times ?? [];
+  for (let i = 0; !opts.sharedFlux && i + window < samples.length; i += hop) {
     for (let j = 0; j < window; j++) {
       re[j] = samples[i + j] * HANN[j];
       im[j] = 0;
@@ -3232,8 +3232,8 @@ function analyzeFluxV2(samples, sampleRate, opts = {}) {
 }
 
 // src/flux-chart-research.mjs
-function analyzePcm2(samples, rate) {
-  const r = analyzeFluxV2(samples, rate);
+function analyzePcm2(samples, rate, sharedFlux) {
+  const r = analyzeFluxV2(samples, rate, { sharedFlux });
   return {
     ...r,
     peaks: r.combined,
@@ -3536,7 +3536,8 @@ function generateC3RuntimeState11(samples, rate) {
       Math.min(globalFloor, win[Math.floor(win.length * 0.15)] || 0)
     );
   });
-  const a2 = analyzePcm2(samples, rate);
+  // Both selectors use the same table-STFT flux; only peak thresholds differ.
+  const a2 = analyzePcm2(samples, rate, analysis);
   const repairLog = {};
   for (const lanes of [5, 7]) {
     const v2tierTimes = {};

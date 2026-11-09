@@ -1,3 +1,6 @@
+import { traceOpusServerTiming } from './opus-server-timing';
+import type { ImportTrace } from '../import-trace';
+import type { ImportStage } from '../import-progress';
 import {
   AUDIO_BASE,
   AudioJobError,
@@ -134,6 +137,7 @@ async function requestState(
   videoId: string,
   init: RequestInit,
   jobId?: string,
+  trace?: ImportTrace | null,
 ) {
   let response: Response;
   try {
@@ -142,6 +146,7 @@ async function requestState(
     if (init.signal?.aborted) throw error;
     throw new AudioJobError('network_error');
   }
+  traceOpusServerTiming(trace, response.headers.get('Server-Timing'));
   // HTTP status remains a known service fact even when its optional error
   // body is empty or malformed. Successful responses require valid JSON.
   const j = response.ok
@@ -169,6 +174,7 @@ export async function createOpus35Job(
   signal: AbortSignal,
   handle?: Opus35Handle,
   retry = false,
+  trace?: ImportTrace | null,
 ) {
   if (!VIDEO.test(videoId)) throw Error('opus35_video');
   if (handle) {
@@ -190,23 +196,36 @@ export async function createOpus35Job(
       }),
     },
     handle?.jobId,
+    trace,
   );
 }
-export async function readOpus35Job(handle: Opus35Handle, signal: AbortSignal) {
+export async function readOpus35Job(
+  handle: Opus35Handle,
+  signal: AbortSignal,
+  trace?: ImportTrace | null,
+) {
   validateOpus35Handle(handle);
   return requestState(
     `${AUDIO_BASE}/v2/audio-jobs/${handle.jobId}`,
     handle.videoId,
     { signal },
     handle.jobId,
+    trace,
   );
 }
 const prepare = createAcquiredOpusV2Preparer({
   readArtifact: readOpus35Artifact,
 });
-export async function prepareOpus35Job(j: any, signal: AbortSignal) {
+export async function prepareOpus35Job(
+  j: any,
+  signal: AbortSignal,
+  options?: {
+    trace?: ImportTrace | null;
+    onStage?: (stage: ImportStage) => void;
+  },
+) {
   captureAcquiredOpusV2(j);
-  return prepare(j, signal);
+  return prepare(j, signal, options);
 }
 export async function restoreOpus35Record(
   record: OpusRecord,

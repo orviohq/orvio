@@ -1,3 +1,4 @@
+import { disableUnreadySongRow } from './unready-song-row';
 import { visibleLibrarySelection } from './library-visible-selection';
 import { chartDisplay } from './chart-display';
 import { installDoubleTapGuard } from './touch-gestures';
@@ -1068,6 +1069,7 @@ function songCards() {
     remove.textContent = removalLabels(settings.language).button;
     remove.onclick = () => openSongRemoval('yt:' + row.videoId, row.title);
     actions.append(remove);
+    disableUnreadySongRow(element);
     $('#songs').append(element);
     void localVideoSessions(row.videoId)
       .then((sessions) => {
@@ -1133,6 +1135,24 @@ function songCards() {
       spinner.className = 'youtube-spinner';
       spinner.setAttribute('aria-hidden', 'true');
       row.append(spinner);
+      if (backgroundImports.isWaiting(pending.videoId)) {
+        const cancel = document.createElement('button');
+        cancel.className = 'quiet';
+        cancel.dataset.libraryFocusAction = 'dismiss';
+        cancel.textContent = '×';
+        cancel.setAttribute('aria-label', t('close'));
+        cancel.onclick = () => {
+          try {
+            backgroundImports.dismiss(pending.videoId);
+          } catch (error) {
+            toast(externalError(error, settings.language));
+          }
+        };
+        const actions = document.createElement('span');
+        actions.className = 'import-actions';
+        actions.append(cancel);
+        row.append(actions);
+      }
     } else {
       const retry = document.createElement('button');
       retry.className = 'quiet';
@@ -1162,6 +1182,7 @@ function songCards() {
       actions.append(retry, dismiss);
       row.append(actions);
     }
+    disableUnreadySongRow(row);
     $('#songs').append(row);
   }
   // Order DOM rows together, including loading/error transitions, without changing song IDs or selection indices.

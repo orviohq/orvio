@@ -112,7 +112,7 @@ async function importYoutubeTraced(
   if (options.transportVersion === 2) {
     if (options.audioFormat !== 'orvio-opus-v1' || !options.jobId)
       throw Error('opus35_pending_identity');
-    return importOpus35(id, signal, options);
+    return importOpus35(id, signal, { ...options, trace });
   }
   if (typeof indexedDB !== 'undefined') {
     const saved = (await listOpus35Metadata())
@@ -207,7 +207,7 @@ async function importYoutubeTraced(
   if (lookup.state !== 'missing')
     throw new AudioJobError('request_timeout', lookup.retryAfterSec);
   if (OPUS35_CREATE_ENABLED && !options.jobId)
-    return importOpus35(id, signal, options);
+    return importOpus35(id, signal, { ...options, trace });
   let job = options.jobId
     ? await traceSpan(trace, 'job-read', () =>
         readAudioJob(options.jobId!, signal),

@@ -1,3 +1,4 @@
+import { traceSpan, type ImportTrace } from '../import-trace';
 import {
   createOpus35Job,
   readOpus35Job,
@@ -30,6 +31,7 @@ export async function importOpus35(
   videoId: string,
   signal: AbortSignal,
   options: {
+    trace?: ImportTrace | null;
     jobId?: string;
     retryFailed?: boolean;
     onStage?: (stage: ImportStage) => void;
@@ -47,15 +49,21 @@ export async function importOpus35(
   // Reload reads an existing handle. Never retry a terminal/unknown job through
   // a POST unless a fresh explicit Add requested a proven retryable ERROR.
   let j = handle
-    ? await readOpus35Job(handle, signal)
-    : await createOpus35Job(videoId, signal);
+    ? await traceSpan(options.trace, 'opus-job-read', () =>
+        readOpus35Job(handle!, signal, options.trace),
+      )
+    : await traceSpan(options.trace, 'opus-job-create', () =>
+        createOpus35Job(videoId, signal, undefined, false, options.trace),
+      );
   if (
     handle &&
     j.status === 'error' &&
     j.canRetry === true &&
     options.retryFailed
   )
-    j = await createOpus35Job(videoId, signal, handle, true);
+    j = await traceSpan(options.trace, 'opus-job-retry-create', () =>
+      createOpus35Job(videoId, signal, handle, true, options.trace),
+    );
   const end = performance.now() + 90000;
   for (;;) {
     signal.throwIfAborted();
@@ -96,11 +104,16 @@ export async function importOpus35(
     if (j.status === 'unknown') throw new AudioJobError('unavailable');
     if (performance.now() >= end) throw new AudioJobError('request_timeout');
     options.onStage?.('queued');
-    await pause(5000, signal);
-    j = await readOpus35Job(handle, signal);
+    await traceSpan(options.trace, 'opus-poll-wait', () => pause(5000, signal));
+    j = await traceSpan(options.trace, 'opus-poll-read', () =>
+      readOpus35Job(handle!, signal, options.trace),
+    );
   }
   options.onStage?.('downloading');
-  const prepared = await prepareOpus35Job(j, signal);
+  const prepared = await prepareOpus35Job(j, signal, {
+    trace: options.trace,
+    onStage: options.onStage,
+  });
   signal.throwIfAborted();
   return { prepared, jobId: handle.jobId };
 }

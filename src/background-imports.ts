@@ -16,6 +16,8 @@ export interface PendingImport {
   title?: string;
   thumbnailUrl?: string;
   state: 'loading' | 'error';
+  waitingForTurn?: true;
+  retryWhenAdmitted?: true;
   stage?: ImportStage;
   error?: AudioErrorCode;
   failure?: AudioJobError;
@@ -24,6 +26,10 @@ const KEY = 'orvio.pending-imports.v1';
 export class BackgroundImports {
   readonly rows = new Map<string, PendingImport>();
   private active = new Set<string>();
+  private queue: { row: PendingImport; retryFailed: boolean }[] = [];
+  isWaiting(videoId: string) {
+    return this.queue.some((item) => item.row.videoId === videoId);
+  }
   constructor(
     private changed: () => void,
     private complete: (
@@ -58,6 +64,15 @@ export class BackgroundImports {
               ? { title: row.title }
               : {}),
             state: row.state,
+            ...(row.waitingForTurn === true && row.state === 'loading'
+              ? { waitingForTurn: true as const }
+              : {}),
+            ...(row.waitingForTurn === true &&
+            row.state === 'loading' &&
+            row.jobId &&
+            row.retryWhenAdmitted === true
+              ? { retryWhenAdmitted: true as const }
+              : {}),
             ...(IMPORT_STAGES.includes(row.stage)
               ? { stage: row.stage as ImportStage }
               : {}),
@@ -104,14 +119,18 @@ export class BackgroundImports {
   enqueue(input: string) {
     const videoId = youtubeId(input);
     if (!videoId) throw new AudioJobError('invalid_url');
-    if (this.active.has(videoId)) return videoId;
+    if (this.active.has(videoId) || this.isWaiting(videoId)) return videoId;
     const previous = this.rows.get(videoId);
     if (!previous && this.rows.size >= 8)
       throw new AudioJobError('unavailable');
     const row: PendingImport = {
       videoId,
       state: 'loading',
-      stage: 'checking',
+      stage: this.active.size ? 'queued' : 'checking',
+      waitingForTurn: true,
+      ...(previous?.state === 'error' && previous.jobId
+        ? { retryWhenAdmitted: true as const }
+        : {}),
       ...(previous?.title ? { title: previous.title } : {}),
       ...(previous?.jobId ? { jobId: previous.jobId } : {}),
       ...(previous?.transportVersion === 2
@@ -146,7 +165,7 @@ export class BackgroundImports {
   resume() {
     for (const row of this.rows.values())
       if (row.state === 'loading') {
-        if (row.jobId) void this.run(row);
+        if (row.jobId || row.waitingForTurn) void this.run(row);
         else {
           row.state = 'error';
           row.error = 'request_timeout';
@@ -167,12 +186,41 @@ export class BackgroundImports {
       if (previous) this.rows.set(videoId, previous);
       throw error;
     }
+    this.queue = this.queue.filter((item) => item.row.videoId !== videoId);
     this.changed();
   }
-  private async run(row: PendingImport, retryFailed = false) {
-    if (this.active.has(row.videoId)) return;
-    this.active.add(row.videoId);
+  private run(
+    row: PendingImport,
+    retryFailed = row.retryWhenAdmitted === true,
+  ) {
+    if (this.active.has(row.videoId) || this.isWaiting(row.videoId)) return;
+    this.queue.push({ row, retryFailed });
+    if (this.active.size) {
+      row.stage = 'queued';
+      this.changed();
+    }
+    this.drain();
+  }
+  private drain() {
+    if (this.active.size) return;
+    const next = this.queue.shift();
+    if (!next) return;
+    if (this.rows.get(next.row.videoId) !== next.row) {
+      this.drain();
+      return;
+    }
+    this.active.add(next.row.videoId);
+    void this.perform(next.row, next.retryFailed);
+  }
+  private async perform(row: PendingImport, retryFailed: boolean) {
     try {
+      // Clear the durable never-started marker BEFORE any external effect.
+      // If this write fails, do not start or resume a request.
+      delete row.waitingForTurn;
+      delete row.retryWhenAdmitted;
+      row.stage = 'checking';
+      this.persist();
+      this.changed();
       // Let the immediate pending row paint before cached audio/chart work starts.
       await new Promise<void>((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
@@ -241,6 +289,7 @@ export class BackgroundImports {
       this.changed();
     } finally {
       this.active.delete(row.videoId);
+      this.drain();
     }
   }
 }

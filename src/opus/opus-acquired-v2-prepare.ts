@@ -1,3 +1,5 @@
+import { traceSpan, traceMark, type ImportTrace } from '../import-trace';
+import type { ImportStage } from '../import-progress';
 import { audioAtStage } from '../audio-error-stage';
 // Private actual Response-artifact preparation. No legacy source route used.
 import ChartWorkerUrl from './opus-chart.worker.mjs?worker&url';
@@ -22,16 +24,28 @@ export function createAcquiredOpusV2Preparer({
   readArtifact: AcquiredArtifactCapability;
 }) {
   const artifacts = createAcquiredOpusV2Artifacts({ readArtifact });
-  return async function prepare(input: unknown, signal: AbortSignal) {
+  return async function prepare(
+    input: unknown,
+    signal: AbortSignal,
+    options?: {
+      trace?: ImportTrace | null;
+      onStage?: (stage: ImportStage) => void;
+    },
+  ) {
     signal.throwIfAborted();
     const job = captureAcquiredOpusV2(input),
       artifact = await audioAtStage<any>('response', () =>
-        artifacts.load(job, { signal }),
+        traceSpan(options?.trace, 'opus-artifact-download-verify', () =>
+          artifacts.load(job, { signal }),
+        ),
       );
-    const r = await waitAcquired(
-      fetch(DecoderUrl, { signal }),
-      signal,
-      (r: Response) => detachCancel(r.body),
+    const r = await traceSpan<Response>(
+      options?.trace,
+      'opus-decoder-fetch',
+      () =>
+        waitAcquired(fetch(DecoderUrl, { signal }), signal, (r: Response) =>
+          detachCancel(r.body),
+        ),
     );
     if (signal.aborted) {
       detachCancel(r.body);
@@ -45,16 +59,30 @@ export function createAcquiredOpusV2Preparer({
     signal.throwIfAborted();
     if ((await sha256(new Uint8Array(wasmBytes))) !== DECODER)
       throw Error('opus_decoder_identity');
+    options?.onStage?.('charting');
     const result = await audioAtStage<any>('analysis', () =>
-      prepareOpusOwned({
-        workerUrl: ChartWorkerUrl,
-        bytes: artifact.bytes.slice().buffer,
-        wasmBytes,
-        descriptorBytes: artifact.descriptorBytes.slice().buffer,
-        descriptorSha256: artifact.descriptorSha256,
-        signal,
-      }),
+      traceSpan(options?.trace, 'opus-decode-chart-verify', () =>
+        prepareOpusOwned({
+          workerUrl: ChartWorkerUrl,
+          bytes: artifact.bytes.slice().buffer,
+          wasmBytes,
+          descriptorBytes: artifact.descriptorBytes.slice().buffer,
+          descriptorSha256: artifact.descriptorSha256,
+          signal,
+        }),
+      ),
     );
+    for (const key of [
+      'encodedVerifyMs',
+      'decodeVerifyMs',
+      'analysisResampleMs',
+      'chartGenerationMs',
+      'chartVerifyMs',
+    ]) {
+      const ms = result.timings?.[key];
+      if (Number.isFinite(ms) && ms >= 0)
+        traceMark(options?.trace, 'opus-worker-' + key, { ms });
+    }
     signal.throwIfAborted();
     if (
       !(await verifyOpusRecord(
@@ -65,8 +93,11 @@ export function createAcquiredOpusV2Preparer({
     )
       throw Error('acquired_v2_prepared_record');
     signal.throwIfAborted();
+    options?.onStage?.('saving');
     await audioAtStage('storage', () =>
-      saveVerifiedOpus({ ...artifact, record: result.record }, signal),
+      traceSpan(options?.trace, 'opus-cache-save', () =>
+        saveVerifiedOpus({ ...artifact, record: result.record }, signal),
+      ),
     );
     signal.throwIfAborted();
     return {
