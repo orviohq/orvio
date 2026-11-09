@@ -1,12 +1,13 @@
 import fs from 'node:fs';
+import { externalResultFixtureFragment } from './external-result-fixture';
 import { test, expect } from '@playwright/test';
-test('A39 mobile fullscreen result and actual replay, no direct gameplay on any entry', async ({
+test('A39 mobile compact result and actual replay, no direct gameplay on any entry', async ({
   browser,
   baseURL,
 }) => {
   test.setTimeout(90000);
   const fragment = JSON.parse(
-    fs.readFileSync('/downloads/v027-public-proof.json', 'utf8'),
+    fs.readFileSync('e2e/fixtures/v027-public-proof.json', 'utf8'),
   )[0].shareCaptures[0].fragment;
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -25,13 +26,52 @@ test('A39 mobile fullscreen result and actual replay, no direct gameplay on any 
     await p.setViewportSize({ width, height });
     await p.goto(baseURL + '/result/#' + fragment);
     await expect(p.locator('#results')).toBeVisible();
+    await p.waitForFunction(
+      () => {
+        const e = document.querySelector('#results')!;
+        return (
+          !(e as HTMLElement).dataset.resultAnimating &&
+          !e
+            .getAnimations({ subtree: true })
+            .some((a) => a.pending || a.playState === 'running')
+        );
+      },
+      undefined,
+      { timeout: 4000 },
+    );
     const r = await p
       .locator('#results')
       .evaluate((e) => e.getBoundingClientRect().toJSON());
-    expect(r.x).toBe(0);
-    expect(r.y).toBe(0);
-    expect(r.width).toBe(width);
-    expect(r.height).toBe(height);
+    // ORV-57 redesign and ORV-60 excess-gap correction supersede the old
+    // viewport-filling panel. Preserve the compact 12px-inset card contract.
+    expect(r.x).toBe(12);
+    expect(r.y).toBeGreaterThanOrEqual(12);
+    expect(r.width).toBe(width - 24);
+    expect(r.height).toBeLessThanOrEqual(height - 24);
+    expect(r.y + r.height).toBeLessThanOrEqual(height - 12);
+    const fit = await p.locator('#results').evaluate((e) => {
+      const style = getComputedStyle(e);
+      return {
+        height: e.clientHeight,
+        scroll: e.scrollHeight,
+        top: parseFloat(style.paddingTop),
+        bottom: parseFloat(style.paddingBottom),
+        radius: parseFloat(style.borderRadius),
+      };
+    });
+    expect(fit.radius).toBe(12);
+    expect(fit.top).toBeGreaterThanOrEqual(24);
+    expect(fit.bottom).toBeGreaterThanOrEqual(24);
+    // When content fits, the card must shrink to it rather than add a large
+    // blank lower region. Overflow remains within the bounded card otherwise.
+    if (fit.scroll === fit.height) {
+      const gap = await p.locator('#results').evaluate((e) => {
+        const parent = e.getBoundingClientRect(),
+          back = e.querySelector('#back')!.getBoundingClientRect();
+        return parent.bottom - back.bottom;
+      });
+      expect(gap).toBeLessThanOrEqual(fit.bottom + 2);
+    }
     expect(
       await p
         .locator('#results')
@@ -43,10 +83,14 @@ test('A39 mobile fullscreen result and actual replay, no direct gameplay on any 
     await p.keyboard.press('Enter');
     await expect(p.locator('#results')).toBeVisible();
     await expect(p.locator('#result-song')).toBeInViewport();
-    await p.screenshot({ path: `/downloads/a39-result-${width}-top.png` });
+    await p.screenshot({
+      path: test.info().outputPath(`a39-result-${width}-top.png`),
+    });
     await p.locator('#watch-replay').scrollIntoViewIfNeeded();
     await expect(p.locator('#watch-replay')).toBeInViewport();
-    await p.screenshot({ path: `/downloads/a39-result-${width}-bottom.png` });
+    await p.screenshot({
+      path: test.info().outputPath(`a39-result-${width}-bottom.png`),
+    });
     await p.click('#watch-replay');
     await p.waitForFunction(() =>
       Boolean(
@@ -57,7 +101,9 @@ test('A39 mobile fullscreen result and actual replay, no direct gameplay on any 
     await p.waitForFunction(() => (window as any).orvioAudioTime > 1);
     await expect(p.locator('#game')).toBeVisible();
     await expect(p.locator('#replay-playing')).toBeInViewport();
-    await p.screenshot({ path: `/downloads/a39-replay-${width}.png` });
+    await p.screenshot({
+      path: test.info().outputPath(`a39-replay-${width}.png`),
+    });
     await expect(p.locator('#exit')).not.toContainText('ESC');
     expect(
       await p
@@ -120,10 +166,10 @@ test('A39 long external result title and all locales wrap in narrow fullscreen w
   baseURL,
 }) => {
   await page.goto('/select/');
-  const original = fs.readFileSync(
-    '/downloads/a38-result-fragment.txt',
-    'utf8',
+  const f = JSON.parse(
+    fs.readFileSync('e2e/fixtures/v027-synthetic-fixture.json', 'utf8'),
   );
+  const original = await externalResultFixtureFragment(page, f.records[0].raw);
   const longFragment = await page.evaluate(async (fragment) => {
     const { decodeExternalShare, encodeExternalShare } = await import(
       /* @vite-ignore */ String('/src/external-share.ts')
@@ -188,10 +234,12 @@ test('A39 long external result title and all locales wrap in narrow fullscreen w
     await expect(p.locator('#back')).toBeInViewport();
     if (language === 'de') {
       await p.screenshot({
-        path: '/downloads/a39-longtitle-de-320-bottom.png',
+        path: test.info().outputPath('a39-longtitle-de-320-bottom.png'),
       });
       await p.locator('#results').evaluate((e) => (e.scrollTop = 0));
-      await p.screenshot({ path: '/downloads/a39-longtitle-de-320-top.png' });
+      await p.screenshot({
+        path: test.info().outputPath('a39-longtitle-de-320-top.png'),
+      });
     }
   }
   await c.close();

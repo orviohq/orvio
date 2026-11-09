@@ -66,7 +66,8 @@ test('finished and reopened result are the same view, copy works without a link 
   await expect(page.locator('#results')).toBeVisible({ timeout: 50000 });
   await expect(page.locator('#result-fever')).toContainText('FEVER MAX 0');
   const url = page.url();
-  expect(url).toContain('/result/?local=builtin');
+  expect(url).toContain('/result/#v=4&');
+  expect(new URL(url).searchParams.has('local')).toBe(false);
   await expect(page.locator('#result-url,#share-privacy')).toHaveCount(0);
   await readyResult();
   const originalState = await layoutState();

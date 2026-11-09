@@ -27,6 +27,8 @@ test('all public patch-note locales show normal copy without private request IDs
       .evaluateAll((es) => es.map((e) => e.querySelectorAll('li').length));
     expect(groups.every((n) => n > 0)).toBe(true);
     await expect(body.locator('[data-patch-group=fixes]')).not.toHaveCount(0);
-    await page.screenshot({ path: `/downloads/notes-clean-${language}.png` });
+    await page.screenshot({
+      path: test.info().outputPath(`notes-clean-${language}.png`),
+    });
   }
 });

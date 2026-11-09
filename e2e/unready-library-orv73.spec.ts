@@ -36,5 +36,7 @@ for (const width of [1440, 390])
       true,
     );
     await row.scrollIntoViewIfNeeded();
-    await page.screenshot({ path: `/downloads/orv73-unready-${width}.png` });
+    await page.screenshot({
+      path: test.info().outputPath(`orv73-unready-${width}.png`),
+    });
   });

@@ -1,3 +1,4 @@
+import { heldBindingCodes } from './hold-input';
 import { atKey } from './input';
 import { judge } from '../src/engine';
 import { test, expect } from '@playwright/test';
@@ -75,7 +76,9 @@ test('page-timed DOM input gives its measured grade and BREAK feedback with lane
     (window as any).orvioDiagnostics.notes.map((s: any) => s.note),
   );
   const n = notes[0];
-  const keys = ['d', 'f', 'Space', 'j', 'k'];
+  const keys = (await heldBindingCodes(page)).map((code) =>
+    code === 'Space' ? code : code.slice(3).toLowerCase(),
+  );
   await atKey(page, n.time, keys[n.lane], true);
   const hit = await page.evaluate(
     (id) =>
@@ -132,7 +135,9 @@ test('pause settings resume and page-timed graded key hits remain distinct', asy
   const notes = await page.evaluate(() =>
     (window as any).orvioDiagnostics.notes.map((s: any) => s.note),
   );
-  const keys = ['d', 'f', 'Space', 'j', 'k'];
+  const keys = (await heldBindingCodes(page)).map((code) =>
+    code === 'Space' ? code : code.slice(3).toLowerCase(),
+  );
   const colors = new Set<string>();
   for (const [index, delay] of [0, 0.055, 0.085, 0.12].entries()) {
     const n = notes.filter((n: any) => !n.end)[index + 2];

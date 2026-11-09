@@ -40,7 +40,7 @@ for (const viewport of [
     await expect.poll(async () => (await visible()).visible).toBe(true);
     expect((await visible()).selected).toBe('2');
     await p.screenshot({
-      path: `/downloads/orv71-return-${viewport.width}.png`,
+      path: test.info().outputPath(`orv71-return-${viewport.width}.png`),
     });
     await p.reload();
     await expect.poll(async () => (await visible()).visible).toBe(true);

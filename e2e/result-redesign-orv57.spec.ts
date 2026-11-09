@@ -53,7 +53,7 @@ test('redesigned report keeps rank with score and translated actions on same row
     await expect(page.locator('#share-result')).toContainText('결과 공유');
     await expect(page.locator('#watch-replay')).toContainText('리플레이');
     await page.screenshot({
-      path: `/downloads/orv57-result-${width}x${height}.png`,
+      path: test.info().outputPath(`orv57-result-${width}x${height}.png`),
     });
   }
   for (const lang of Object.keys(LANGUAGES)) {
@@ -108,7 +108,9 @@ test('natural completion and real shared replay retain labeled tools and respons
   await expect(page.locator('#results')).toBeVisible({ timeout: 50000 });
   await expect(page.locator('#watch-replay')).toBeVisible();
   await expect(page.locator('#share-result')).toContainText('결과 공유');
-  await page.screenshot({ path: '/downloads/orv57-natural-desktop.png' });
+  await page.screenshot({
+    path: test.info().outputPath('orv57-natural-desktop.png'),
+  });
   expect(
     await page
       .locator('#results')
@@ -133,7 +135,9 @@ test('natural completion and real shared replay retain labeled tools and respons
   await expect(p.locator('#results')).toBeVisible();
   await expect(p.locator('#watch-replay')).toBeVisible();
   await expect(p.locator('#retry')).toBeHidden();
-  await p.screenshot({ path: '/downloads/orv57-natural-mobile.png' });
+  await p.screenshot({
+    path: test.info().outputPath('orv57-natural-mobile.png'),
+  });
   const rows = await p
     .locator('#watch-replay,#share-result')
     .evaluateAll((es) => es.map((e) => e.getBoundingClientRect().top));

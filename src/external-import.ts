@@ -1,3 +1,7 @@
+import { listOpus35Metadata } from './opus/opus35-store';
+import { restoreOpus35Record } from './opus/opus35-api';
+import { OPUS35_CREATE_ENABLED } from './opus/opus35-api';
+import { importOpus35, type Opus35JobNotice } from './opus/opus35-import';
 import { prepareClientJob } from './prepare-local-job';
 import { savedLocalGenerated } from './local-generated-library';
 import { jobImportStage, type ImportStage } from './import-progress';
@@ -7,6 +11,7 @@ import {
   createAudioJob,
   readAudioJob,
   AudioJobError,
+  validAudioErrorCode,
 } from './external-audio-api';
 import { refreshCanonical } from './canonical-library';
 import { localAudio, saveLocalAudio, localMetadata } from './external-local';
@@ -14,6 +19,28 @@ import {
   prepareExternalJob,
   type PreparedSource,
 } from './external-source-flow';
+import {
+  beginTrace,
+  endTrace,
+  traceErrorName,
+  traceSpan,
+  type ImportTrace,
+} from './import-trace';
+/** Trace outcome names are readout data: only fixed allowlisted error codes
+ * and platform error names may appear, never server- or caller-controlled
+ * strings (custom DOMException names, arbitrary abort reasons). */
+export function traceOutcome(error: unknown): string {
+  // Reading .code can itself throw (throwing getter, proxy). Inspection
+  // failures fall back to the fixed name path; the thrown object is never
+  // replaced by instrumentation.
+  try {
+    const code = (error as { code?: unknown } | null | undefined)?.code;
+    if (validAudioErrorCode(code)) return 'error:' + code;
+  } catch {
+    // fall through to the name path
+  }
+  return 'error:' + traceErrorName(error);
+}
 export interface ImportResult {
   prepared: PreparedSource;
   jobId?: string;
@@ -47,18 +74,73 @@ export async function importYoutube(
     /** Only the current explicit re-add may replace a confirmed terminal failure. */
     retryFailed?: boolean;
     jobId?: string;
+    transportVersion?: 2;
+    audioFormat?: 'orvio-opus-v1';
     onStage?: (stage: ImportStage) => void;
-    onJob?: (job: import('./external-audio-api').AudioJob) => void;
+    onJob?: (
+      job: import('./external-audio-api').AudioJob | Opus35JobNotice,
+    ) => void;
   } = {},
+): Promise<ImportResult> {
+  const trace = beginTrace();
+  try {
+    const result = await importYoutubeTraced(input, signal, options, trace);
+    endTrace(trace, 'ok');
+    return result;
+  } catch (error) {
+    endTrace(trace, traceOutcome(error));
+    throw error;
+  }
+}
+async function importYoutubeTraced(
+  input: string,
+  signal: AbortSignal,
+  options: {
+    retryFailed?: boolean;
+    jobId?: string;
+    transportVersion?: 2;
+    audioFormat?: 'orvio-opus-v1';
+    onStage?: (stage: ImportStage) => void;
+    onJob?: (
+      job: import('./external-audio-api').AudioJob | Opus35JobNotice,
+    ) => void;
+  },
+  trace: ImportTrace | null,
 ): Promise<ImportResult> {
   const id = youtubeId(input);
   if (!id) throw new AudioJobError('invalid_url');
+  if (options.transportVersion === 2) {
+    if (options.audioFormat !== 'orvio-opus-v1' || !options.jobId)
+      throw Error('opus35_pending_identity');
+    return importOpus35(id, signal, options);
+  }
+  if (typeof indexedDB !== 'undefined') {
+    const saved = (await listOpus35Metadata())
+      .filter((r) => r.record.videoId === id)
+      .at(-1);
+    if (saved) {
+      const audio = await localAudio(saved.record, signal);
+      const bytes =
+        audio?.bytes ?? (await restoreOpus35Record(saved.record, signal));
+      signal.throwIfAborted();
+      return {
+        prepared: { record: saved.record, bytes, restored: true },
+        jobId: saved.jobId,
+        title: saved.title,
+        author: saved.author,
+      };
+    }
+  }
   options.onStage?.('checking');
-  const lookup = await refreshCanonical(id, signal);
+  const lookup = await traceSpan(trace, 'canonical-lookup', () =>
+    refreshCanonical(id, signal),
+  );
   if (lookup.state === 'ready') {
     const first = lookup.record;
     options.onStage?.('downloading');
-    const cached = await audioAtStage('storage', () => localAudio(first));
+    const cached = await traceSpan(trace, 'local-audio-lookup', () =>
+      audioAtStage('storage', () => localAudio(first)),
+    );
     if (cached)
       return {
         prepared: { record: first, bytes: cached.bytes, restored: true },
@@ -67,7 +149,9 @@ export async function importYoutube(
         author: cached.author,
       };
     // A published identity is never silently re-extracted because a job handle expired.
-    const bytes = await loadCanonicalAudio(first, signal);
+    const bytes = await traceSpan(trace, 'canonical-audio-download', () =>
+      loadCanonicalAudio(first, signal),
+    );
     return {
       prepared: { record: first, bytes, restored: true },
       jobId: undefined,
@@ -76,9 +160,15 @@ export async function importYoutube(
     };
   }
   const localGenerated =
-    lookup.state === 'missing' ? await savedLocalGenerated(id) : null;
+    lookup.state === 'missing'
+      ? await traceSpan(trace, 'local-generated-lookup', () =>
+          savedLocalGenerated(id),
+        )
+      : null;
   if (localGenerated) {
-    const audio = await localAudio(localGenerated);
+    const audio = await traceSpan(trace, 'local-audio-lookup', () =>
+      localAudio(localGenerated),
+    );
     if (audio)
       return {
         prepared: {
@@ -91,15 +181,21 @@ export async function importYoutube(
         author: audio.author,
       };
     options.onStage?.('downloading');
-    const metadata = await localMetadata(localGenerated);
-    const bytes = await loadRetainedAudio(localGenerated, signal);
+    const metadata = await traceSpan(trace, 'local-metadata-lookup', () =>
+      localMetadata(localGenerated),
+    );
+    const bytes = await traceSpan(trace, 'retained-audio-download', () =>
+      loadRetainedAudio(localGenerated, signal),
+    );
     const title = metadata?.title ?? 'YouTube · ' + id;
-    await saveLocalAudio(
-      localGenerated,
-      title,
-      metadata?.jobId,
-      bytes,
-      metadata?.author,
+    await traceSpan(trace, 'idb-save', () =>
+      saveLocalAudio(
+        localGenerated,
+        title,
+        metadata?.jobId,
+        bytes,
+        metadata?.author,
+      ),
     );
     return {
       prepared: { record: localGenerated, bytes, restored: true },
@@ -110,12 +206,18 @@ export async function importYoutube(
   }
   if (lookup.state !== 'missing')
     throw new AudioJobError('request_timeout', lookup.retryAfterSec);
+  if (OPUS35_CREATE_ENABLED && !options.jobId)
+    return importOpus35(id, signal, options);
   let job = options.jobId
-    ? await readAudioJob(options.jobId, signal)
-    : await createAudioJob(
-        'https://www.youtube.com/watch?v=' + id,
-        signal,
-        'client',
+    ? await traceSpan(trace, 'job-read', () =>
+        readAudioJob(options.jobId!, signal),
+      )
+    : await traceSpan(trace, 'job-create', () =>
+        createAudioJob(
+          'https://www.youtube.com/watch?v=' + id,
+          signal,
+          'client',
+        ),
       );
   // A timeout/network failure can still own a live job. Read it first, never
   // discard an uncertain handle or create a duplicate while it is running.
@@ -127,33 +229,41 @@ export async function importYoutube(
     job.status === 'error' &&
     job.error?.code === 'unavailable'
   )
-    job = await createAudioJob(
-      'https://www.youtube.com/watch?v=' + id,
-      signal,
-      'client',
+    job = await traceSpan(trace, 'job-create', () =>
+      createAudioJob('https://www.youtube.com/watch?v=' + id, signal, 'client'),
     );
   options.onJob?.(job);
   const stage = jobImportStage(job);
   if (stage) options.onStage?.(stage);
   const deadline = performance.now() + 90000;
+  let poll = 0;
   while (job.status === 'queued' || job.status === 'running') {
     if (performance.now() > deadline)
       throw new AudioJobError('request_timeout');
-    await new Promise<void>((resolve, reject) => {
-      const t = setTimeout(
-        resolve,
-        Math.max(3, Math.min(30, job.retryAfterSec ?? 3)) * 1000,
-      );
-      signal.addEventListener(
-        'abort',
-        () => {
-          clearTimeout(t);
-          reject(new DOMException('Aborted', 'AbortError'));
-        },
-        { once: true },
-      );
-    });
-    job = await readAudioJob(job.jobId, signal);
+    const waitSec = Math.max(3, Math.min(30, job.retryAfterSec ?? 3));
+    await traceSpan(
+      trace,
+      'job-poll-wait',
+      () =>
+        new Promise<void>((resolve, reject) => {
+          const t = setTimeout(resolve, waitSec * 1000);
+          signal.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(t);
+              reject(new DOMException('Aborted', 'AbortError'));
+            },
+            { once: true },
+          );
+        }),
+      { poll: ++poll, waitSec },
+    );
+    job = await traceSpan(
+      trace,
+      'job-poll-get',
+      () => readAudioJob(job.jobId, signal),
+      { poll },
+    );
     options.onJob?.(job);
     const stage = jobImportStage(job);
     if (stage) options.onStage?.(stage);
@@ -168,8 +278,12 @@ export async function importYoutube(
     );
   return {
     prepared:
-      (await prepareClientJob(id, job.jobId, signal, options.onStage)) ??
-      (await prepareExternalJob(id, job.jobId, signal, options.onStage)),
+      (await traceSpan(trace, 'prepare-client', () =>
+        prepareClientJob(id, job.jobId, signal, options.onStage, trace),
+      )) ??
+      (await traceSpan(trace, 'prepare-external', () =>
+        prepareExternalJob(id, job.jobId, signal, options.onStage, trace),
+      )),
     jobId: job.jobId,
     title: job.title,
     author: job.author,

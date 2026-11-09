@@ -167,7 +167,9 @@ test('fresh-browser local-generated shared replay uses only exact stable retaine
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
   await page.waitForTimeout(500);
   expect(calls.filter((c) => c.endsWith('/audio'))).toHaveLength(downloads);
-  await page.screenshot({ path: '/downloads/orv69-actual-local-play.png' });
+  await page.screenshot({
+    path: test.info().outputPath('orv69-actual-local-play.png'),
+  });
   expect(calls.filter((c) => c.startsWith('POST '))).toEqual([
     'POST /v1/audio-jobs',
   ]);
@@ -270,7 +272,9 @@ test('fresh-browser local-generated shared replay uses only exact stable retaine
       `/v1/audio-sources/${f.record.videoId}/${sha}/audio`,
     ]);
     expect(posts).toEqual([]);
-    await p.screenshot({ path: `/downloads/orv69-fresh-share-${mode}.png` });
+    await p.screenshot({
+      path: test.info().outputPath(`orv69-fresh-share-${mode}.png`),
+    });
     await c.close();
   }
 });

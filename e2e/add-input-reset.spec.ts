@@ -140,7 +140,9 @@ test('input clears only after ready success; delayed completion protects edited/
   await expect(input).toHaveValue('');
   await page.click('#add-youtube');
   await expect(input).toHaveValue('');
-  await page.screenshot({ path: '/downloads/a28-success-reopened-empty.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a28-success-reopened-empty.png'),
+  });
   await page.click('#youtube-cancel');
   await add('BBBBBBBBBBB');
   await page.click('#add-youtube');
@@ -174,6 +176,8 @@ test('input clears only after ready success; delayed completion protects edited/
   await expect(input).toHaveValue(
     'https://www.youtube.com/watch?v=AAAAAAAAAAA',
   );
-  await page.screenshot({ path: '/downloads/a28-failure-input-retained.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a28-failure-input-retained.png'),
+  });
   expect(posts).toEqual([]);
 });

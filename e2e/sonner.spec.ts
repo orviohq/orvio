@@ -40,7 +40,9 @@ test('actual Sonner preserves latest text, safe literal text, lifetime and modal
       parent: e.parentElement?.outerHTML.slice(0, 1500),
     })),
   );
-  await page.screenshot({ path: '/downloads/a53-selection-sonner.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a53-selection-sonner.png'),
+  });
   await expect(toast).toHaveCount(0, { timeout: 5000 });
 
   await page.locator('#open-settings').click();
@@ -67,7 +69,9 @@ test('actual Sonner preserves latest text, safe literal text, lifetime and modal
       parent: e.parentElement?.outerHTML.slice(0, 1500),
     })),
   );
-  await page.screenshot({ path: '/downloads/a53-settings-sonner.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a53-settings-sonner.png'),
+  });
   await page.locator('#settings .close').click();
   await expect(page.locator('body > #toast-root')).toHaveCount(1);
   await expect(toast).toBeVisible();
@@ -112,7 +116,9 @@ test('all languages and mobile long feedback fit, modal close does not strand fe
       parent: e.parentElement?.outerHTML.slice(0, 1500),
     })),
   );
-  await page.screenshot({ path: '/downloads/a53-mobile-sonner.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a53-mobile-sonner.png'),
+  });
 });
 
 test('real playback notifications avoid all three highway positions and score HUD', async ({
@@ -151,7 +157,7 @@ test('real playback notifications avoid all three highway positions and score HU
     expect(overlaps(rects.toast, rects.score)).toBe(false);
     console.log('PLAYBACK', position, rects);
     await page.screenshot({
-      path: `/downloads/a53-game-${position}-sonner.png`,
+      path: test.info().outputPath(`a53-game-${position}-sonner.png`),
     });
     await page.keyboard.press('Escape');
     await page.locator('#pause-exit').click();
@@ -193,7 +199,7 @@ test('real shared result copy feedback does not cover result title, stats or act
     ).toBe(true);
     expect(rects.toast.right).toBeLessThanOrEqual(width);
     await page.screenshot({
-      path: `/downloads/a53-result-${width}x${height}-sonner.png`,
+      path: test.info().outputPath(`a53-result-${width}x${height}-sonner.png`),
     });
     await page.locator('#back').scrollIntoViewIfNeeded();
     await expect(page.locator('#back')).toBeInViewport();

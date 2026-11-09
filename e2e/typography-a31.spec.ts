@@ -59,7 +59,7 @@ test('A31 actions and settings remain readable and reachable across narrow and l
       await expect(page.locator('#reset')).toBeInViewport();
       if (['ko', 'de'].includes(lang))
         await page.screenshot({
-          path: `/downloads/a31-settings-${lang}-${width}.png`,
+          path: test.info().outputPath(`a31-settings-${lang}-${width}.png`),
         });
     }
     await page.keyboard.press('Escape');
@@ -80,7 +80,7 @@ test('A31 actions and settings remain readable and reachable across narrow and l
   }
   await page.setViewportSize({ width: 1280, height: 720 });
   const fragment = JSON.parse(
-    fs.readFileSync('/downloads/v027-public-proof.json', 'utf8'),
+    fs.readFileSync('e2e/fixtures/v027-public-proof.json', 'utf8'),
   )[0].shareCaptures[0].fragment;
   await page.goto('/result/#' + fragment);
   await expect(page.locator('#results')).toBeVisible();
@@ -117,7 +117,7 @@ test('A31 actions and settings remain readable and reachable across narrow and l
           .evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
       ).toBe(true);
       await page.screenshot({
-        path: `/downloads/a31-result-${lang}-${width}.png`,
+        path: test.info().outputPath(`a31-result-${lang}-${width}.png`),
       });
     }
   }

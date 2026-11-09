@@ -126,7 +126,20 @@ export async function saveBuiltinSession(
   return raw.key;
 }
 export async function readBuiltinSession(key: string) {
-  const raw = (await readAll()).find((r) => r.key === key);
+  const db = await open();
+  let raw: any;
+  try {
+    raw = await new Promise((resolve, reject) => {
+      const q = db
+        .transaction('sessions', 'readonly')
+        .objectStore('sessions')
+        .get(key);
+      q.onsuccess = () => resolve(q.result);
+      q.onerror = () => reject(q.error);
+    });
+  } finally {
+    db.close();
+  }
   return raw ? validate(raw) : null;
 }
 export async function listBuiltinSessions() {

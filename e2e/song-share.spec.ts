@@ -178,9 +178,10 @@ for (const viewport of [
     expect(
       await page.evaluate(() => document.fonts.check('24px OrvioKR', '꿈')),
     ).toBe(true);
-    mkdirSync('/downloads/a40-proof', { recursive: true });
     await page.screenshot({
-      path: `/downloads/a40-proof/invitation-${viewport.width}.png`,
+      path: test
+        .info()
+        .outputPath(`a40-proof/invitation-${viewport.width}.png`),
       fullPage: true,
     });
     await page.locator('#song-add').click();
@@ -209,7 +210,7 @@ for (const viewport of [
     expect(refs).toHaveLength(1);
     expect(refs[0].audioSha256).toBe(record.audioSha256);
     await page.screenshot({
-      path: `/downloads/a40-proof/saved-${viewport.width}.png`,
+      path: test.info().outputPath(`a40-proof/saved-${viewport.width}.png`),
       fullPage: true,
     });
     await page.locator('#song-add').click();
@@ -235,7 +236,7 @@ for (const viewport of [
     ).toBeFocused();
     await page.keyboard.press('ArrowUp');
     await page.screenshot({
-      path: `/downloads/orv56-menu-${viewport.width}.png`,
+      path: test.info().outputPath(`orv56-menu-${viewport.width}.png`),
     });
     await page.locator('.library-context-menu [data-action=share]').click();
     await expect(page.locator('.song-link-dialog')).toHaveCount(0);
@@ -246,7 +247,7 @@ for (const viewport of [
     expect(link).toContain('/song/#');
     expect(link).not.toMatch(/replay|jobId|score|title/);
     await page.screenshot({
-      path: `/downloads/a40-proof/share-${viewport.width}.png`,
+      path: test.info().outputPath(`a40-proof/share-${viewport.width}.png`),
       fullPage: true,
     });
 

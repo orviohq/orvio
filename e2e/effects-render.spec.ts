@@ -1,3 +1,4 @@
+import { heldBindingCodes } from './hold-input';
 import { test, expect } from '@playwright/test';
 test('real renderer blink, gear blink, fog, blind and pixel retain original chart and scoring', async ({
   page,
@@ -61,7 +62,9 @@ test('real renderer blink, gear blink, fog, blind and pixel retain original char
         .poll(async () => (await fx()).fog, { intervals: [25], timeout: 2000 })
         .toBe(true);
     if (fader === 'pixel' || fader === 'pixel2') {
-      const keys = ['d', 'f', 'Space', 'j', 'k'];
+      const keys = (await heldBindingCodes(page)).map((code) =>
+        code === 'Space' ? code : code.slice(3).toLowerCase(),
+      );
       const n = await page.evaluate(() =>
         (window as any).orvioDiagnostics.notes
           .filter(

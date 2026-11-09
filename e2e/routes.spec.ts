@@ -25,7 +25,8 @@ test('home, direct play, refresh and history are safe keyboard routes', async ({
     await page.evaluate(() => (window as any).orvioDiagnostics.audioActive),
   ).toBe(false);
   await page.reload();
-  await expect(page.locator('#ready-screen')).toBeVisible();
+  await expect(page.locator('#song-loading')).toBeVisible();
+  await expect(page.locator('#ready-screen')).toBeHidden();
   await page.screenshot({ path: 'test-results/ready.png' });
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);

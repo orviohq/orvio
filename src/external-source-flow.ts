@@ -1,7 +1,8 @@
 import type { ImportStage } from './import-progress';
 import { readAudioJob, loadAudio, AudioJobError } from './external-audio-api';
 import { canonicalForJob } from './canonical-job';
-import type { SourceRecord } from './external-source';
+import type { PlayableSourceRecord as SourceRecord } from './playable-source';
+import { traceSpan, type ImportTrace } from './import-trace';
 export interface PreparedSource {
   record: SourceRecord;
   bytes: ArrayBuffer;
@@ -13,8 +14,11 @@ export async function prepareExternalJob(
   jobId: string,
   signal?: AbortSignal,
   onStage?: (stage: ImportStage) => void,
+  trace?: ImportTrace | null,
 ): Promise<PreparedSource> {
-  const job = await readAudioJob(jobId, signal);
+  const job = await traceSpan(trace, 'job-read', () =>
+    readAudioJob(jobId, signal),
+  );
   if (job.status !== 'done')
     throw new AudioJobError(
       job.status === 'error'
@@ -25,8 +29,10 @@ export async function prepareExternalJob(
       undefined,
       job.status === 'error' ? 'service' : 'response',
     );
-  const record = await canonicalForJob(videoId, job, signal, onStage);
+  const record = await canonicalForJob(videoId, job, signal, onStage, trace);
   onStage?.('downloading');
-  const bytes = await loadAudio(job, videoId, record.audioSha256, signal);
+  const bytes = await traceSpan(trace, 'audio-download', () =>
+    loadAudio(job, videoId, record.audioSha256, signal, trace),
+  );
   return { record, bytes, restored: false };
 }

@@ -8,6 +8,22 @@ test('finished and reopened result are the same view, copy works without a link 
   test.setTimeout(85000);
   async function readyResult() {
     await page.evaluate(async () => {
+      const report = document.querySelector('#results')!;
+      const deadline = performance.now() + 4000;
+      while (true) {
+        if (performance.now() > deadline)
+          throw Error('Result intro did not settle within 4 seconds');
+        const active = report
+          .getAnimations({ subtree: true })
+          .filter((a) => a.pending || a.playState === 'running');
+        if (!active.length) break;
+        await Promise.race([
+          Promise.all(active.map((a) => a.finished)),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(Error('Result intro stuck')), 4000),
+          ),
+        ]);
+      }
       await document.fonts.ready;
       await Promise.all(
         Array.from(
@@ -49,8 +65,61 @@ test('finished and reopened result are the same view, copy works without a link 
   await page.keyboard.press('Enter');
   await expect(page.locator('#results')).toBeVisible({ timeout: 50000 });
   await expect(page.locator('#result-fever')).toContainText('FEVER MAX 0');
+  // A fresh result address is cross-device shareable; archiving must not
+  // silently replace it with a device-local pointer (Nov 7 address-bar copy).
+  await page.waitForURL(
+    (url) =>
+      url.pathname === '/result/' &&
+      new URLSearchParams(url.hash.slice(1)).has('r'),
+  );
   const url = page.url();
   expect(url).toContain('/result/#v=4&');
+  expect(new URL(url).searchParams.has('local')).toBe(false);
+  const saved = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const q = indexedDB.open('orvio.builtin-replays.v1', 1);
+      q.onsuccess = () => resolve(q.result);
+      q.onerror = () => reject(q.error);
+    });
+    try {
+      const rows = await new Promise<any[]>((resolve, reject) => {
+        const q = db
+          .transaction('sessions', 'readonly')
+          .objectStore('sessions')
+          .getAll();
+        q.onsuccess = () => resolve(q.result);
+        q.onerror = () => reject(q.error);
+      });
+      const saved = rows.find(
+        (row) =>
+          row.replay.song === 'first-light' &&
+          row.replay.lanes === 5 &&
+          row.replay.difficulty === 'low',
+      );
+      if (!saved) throw Error('Builtin replay was not archived');
+      const { builtinShareFragment } = await import(
+        /* @vite-ignore */ String('/src/builtin-share-fragment.ts')
+      );
+      if (
+        (await builtinShareFragment(
+          saved.replay,
+          saved.result,
+          saved.chart,
+        )) !== location.hash.slice(1)
+      )
+        throw Error(
+          'Fresh result address differs from exact archived result/replay',
+        );
+      return saved;
+    } finally {
+      db.close();
+    }
+  });
+  expect(saved?.key).toMatch(/^builtin:[0-9a-f-]{36}$/);
+  expect(saved?.kind).toBe('builtin');
+  expect(saved?.replay?.song).toBe('first-light');
+  expect(saved?.replay?.lanes).toBe(5);
+  expect(saved?.replay?.difficulty).toBe('low');
   await expect(page.locator('#result-url,#share-privacy')).toHaveCount(0);
   await readyResult();
   const originalState = await layoutState();

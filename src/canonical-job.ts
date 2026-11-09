@@ -7,6 +7,7 @@ import {
   AudioJobError,
   type AudioJob,
 } from './external-audio-api';
+import { traceSpan, type ImportTrace } from './import-trace';
 function wait(ms: number, signal?: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
     signal?.throwIfAborted();
@@ -27,24 +28,38 @@ export async function canonicalForJob(
   job: AudioJob,
   signal?: AbortSignal,
   onStage?: (stage: ImportStage) => void,
+  trace?: ImportTrace | null,
 ) {
   const deadline = performance.now() + 90000;
+  let poll = 0;
   for (;;) {
     const stage = jobImportStage(job);
     if (stage) onStage?.(stage);
     signal?.throwIfAborted();
-    const lookup = await readCanonicalSource(videoId, signal);
+    const lookup = await traceSpan(
+      trace,
+      'canonical-get',
+      () => readCanonicalSource(videoId, signal),
+      { poll },
+    );
     if (lookup.state === 'ready') {
       if (lookup.record.audioSha256 !== job.audio?.sha256)
         throw new AudioJobError('source_changed');
-      await audioAtStage('storage', () =>
-        rememberCanonical(lookup.record, lookup.recordSha256),
+      await traceSpan(trace, 'canonical-idb', () =>
+        audioAtStage('storage', () =>
+          rememberCanonical(lookup.record, lookup.recordSha256),
+        ),
       );
       return lookup.record;
     }
     if (performance.now() >= deadline)
       throw new AudioJobError('request_timeout');
-    job = await readAudioJob(job.jobId, signal);
+    job = await traceSpan(
+      trace,
+      'canonical-job-get',
+      () => readAudioJob(job.jobId, signal),
+      { poll },
+    );
     if (job.status === 'error')
       throw new AudioJobError(
         job.error?.code ?? 'unavailable',
@@ -68,13 +83,14 @@ export async function canonicalForJob(
       lookup.state === 'missing'
         ? (job.canonical?.retryAfterSec ?? 3)
         : lookup.retryAfterSec;
-    await wait(
-      Math.min(
-        30000,
-        Math.max(1000, seconds * 1000),
-        Math.max(1, deadline - performance.now()),
-      ),
-      signal,
+    const waitMs = Math.min(
+      30000,
+      Math.max(1000, seconds * 1000),
+      Math.max(1, deadline - performance.now()),
     );
+    await traceSpan(trace, 'canonical-wait', () => wait(waitMs, signal), {
+      poll: ++poll,
+      waitMs: Math.round(waitMs),
+    });
   }
 }

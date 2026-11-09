@@ -1,51 +1,15 @@
 import fs from 'node:fs';
+import { externalResultFixtureFragment } from './external-result-fixture';
 import { test, expect } from '@playwright/test';
 test('new A38 external result title survives reload and matching display metadata recovery', async ({
   page,
   context,
 }) => {
   const f = JSON.parse(
-    fs.readFileSync('/downloads/v027-synthetic-fixture.json', 'utf8'),
+    fs.readFileSync('e2e/fixtures/v027-synthetic-fixture.json', 'utf8'),
   );
   await page.goto('/select/');
-  const fragment = await page.evaluate(async (raw) => {
-    const record = JSON.parse(raw);
-    const { sourceId } = await import(
-      /* @vite-ignore */ String('/src/external-catalog.ts')
-    );
-    const { encodeExternalShare, externalReplayEngine } = await import(
-      /* @vite-ignore */ String('/src/external-share.ts')
-    );
-    const replay: any = {
-      version: 1,
-      song: sourceId(record),
-      lanes: 5,
-      difficulty: 'low',
-      options: { speed: 1.5, fader: 'off', shuffle: 'off', seed: 1 },
-      ops: [[1, 3000, 9999]],
-      end: 3000,
-    };
-    const engine = externalReplayEngine(replay, record);
-    engine.update(9999);
-    return encodeExternalShare({
-      record,
-      replay,
-      title: 'A38 Verified Result Title',
-      result: {
-        song: replay.song,
-        lanes: 5,
-        difficulty: 'low',
-        options: replay.options,
-        score: engine.score,
-        accuracy: engine.sum / engine.total,
-        combo: engine.maxCombo,
-        judgments: [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 1, 0].map(
-          (v) => engine.events.filter((e: any) => e.value === v).length,
-        ),
-      },
-    });
-  }, f.records[0].raw);
-  fs.writeFileSync('/downloads/a38-result-fragment.txt', fragment);
+  const fragment = await externalResultFixtureFragment(page, f.records[0].raw);
   const origins = process.env.A38_PUBLIC
     ? ['https://orvio-play.pages.dev', 'https://orvio-4n8.pages.dev']
     : ['http://127.0.0.1:4207'];
@@ -109,7 +73,9 @@ test('new A38 external result title survives reload and matching display metadat
     if (!process.env.A38_PUBLIC)
       expect(await snapshot()).toBe(snapshots.at(-1));
     await p.screenshot({
-      path: `/downloads/a38-result-fixed-${origins.indexOf(origin)}.png`,
+      path: test
+        .info()
+        .outputPath(`a38-result-fixed-${origins.indexOf(origin)}.png`),
     });
     if (!process.env.A38_PUBLIC) {
       const resultBefore = await p
@@ -147,7 +113,7 @@ test('new A38 external result title survives reload and matching display metadat
     await c.close();
   }
   fs.writeFileSync(
-    '/downloads/a38-shared-result-fixed.json',
+    test.info().outputPath('a38-shared-result-fixed.json'),
     JSON.stringify(all, null, 2),
   );
   console.log(JSON.stringify(all));

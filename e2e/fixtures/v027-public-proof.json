@@ -1,0 +1,52 @@
+[
+  {
+    "storageReadFailure": true,
+    "origin": "https://orvio-play.pages.dev",
+    "version": "0.2.27",
+    "sw": "67b79dfe935a9bb2",
+    "assets": [
+      "/_astro/Game.BulqQ9ig.css",
+      "/_astro/Game.astro_astro_type_script_index_0_lang.D3i8N12o.js",
+      "/_astro/Game.astro_astro_type_script_index_1_lang.BzYAMTok.js"
+    ],
+    "actualPlay": true,
+    "actualCompletion": true,
+    "collectionReload": true,
+    "watchLocalSnapshot": true,
+    "shareCaptures": [
+      {
+        "fragment": "v=4&song=first-light&keys=5&diff=low&score=0&acc=0.00&combo=0&j=0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C56&speed=1.5&fade=off&shuffle=off&seed=2274932494&rp=1&rn=1052&r=eJxNkG1IU1EYx3u65RJ6L5AgME4QBHeim7Pmh-xDEn3tW1QfCndrIC02tQ8SnF58aWlOWdqSfMtq3lxqU7KcNhyJLzfd5q6kLJ1m1yg1Q6bLJifWuVHP-XL-53me3_M_z2lVG5xFnN5oylFm6y9dzkGshkXZhmuIzUemqzpdFkpPSdKwiLuQpTOidGTgOMQi0-VcjsvW_dN_ClWqI6latSpVm3qdVWvTNMlJqmQaKu1RVpPGqpLStJrU_46azUd5OqNJb7iC0lNYZMzN1plOZcW4xjy9QXkhN8egzEtBLIrdUHqOMVd3_fwGjB86JWF-6HhXW1XBi4WRAgxAH0ugquynyx9WbADstjkloWa313Er2LQXMCaEjJQxheGG4ubtgN2SYPOsxZmf8j0_tgOORWspROYWJ32baW-wlimqso5Px4oDvDhoBrdn_kmQodJfmvH2xgKxK-TiYig21_dsoaS6_OXm2rGWfTQX6GX8lq7ou0TAdSIvzmT2uzunPRsB1_Ei_2QIhgqLO2MyFqFzLZ6KRyz199yjmC1YqD0KOCTYnJP3gJGLXMzoXeHXAcrjM79Xkhv2jfSLc-_ho23imw9kJycnat6M7wBsIYS09O24M-APq2lqCfkt3216wF6bUwplRtbtc_F00gSB4Nc1spoB2E0IWT5YPrrSraRilBvuMC8dkzeGVsfMrQmAW0VeHFtkSEnv7K6_9OVPDU9fyjaiJyrvV_pipkKEkNVJuP2sfHAYAHt5kffpQlLzq8OU70RTzo6XJQraF5xWlJKKjh4AXOeUhB_KaKS68LkM9XL15a41hew5CCP1_e1xMhK9rvbMx1PRxtnLy6wDm2WbKNxln-mVV7m0yLyfn_ocR7cQOFhTIEk7qWjn-h1r47tpFx-FdkvAO_N39MWmSNi1VeYfEn1WRyMA_sCLfLeU2NJX7WhkAH8RbE57wrArMppF2x6krPdZfm4C3CoJNseeSmtfY6IMNKwGbjZvo5nHatfHen6_nNnZYJ0aMlARWYF3M2_JGeoQny1qEh4E-6PHfwPDIfdJ"
+      },
+      {
+        "fragment": "v=4&song=first-light&keys=5&diff=low&score=0&acc=0.00&combo=0&j=0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C56&speed=1.5&fade=off&shuffle=off&seed=2274932494&rp=1&rn=1052&r=eJxNkG1IU1EYx3u65RJ6L5AgME4QBHeim7Pmh-xDEn3tW1QfCndrIC02tQ8SnF58aWlOWdqSfMtq3lxqU7KcNhyJLzfd5q6kLJ1m1yg1Q6bLJifWuVHP-XL-53me3_M_z2lVG5xFnN5oylFm6y9dzkGshkXZhmuIzUemqzpdFkpPSdKwiLuQpTOidGTgOMQi0-VcjsvW_dN_ClWqI6latSpVm3qdVWvTNMlJqmQaKu1RVpPGqpLStJrU_46azUd5OqNJb7iC0lNYZMzN1plOZcW4xjy9QXkhN8egzEtBLIrdUHqOMVd3_fwGjB86JWF-6HhXW1XBi4WRAgxAH0ugquynyx9WbADstjkloWa313Er2LQXMCaEjJQxheGG4ubtgN2SYPOsxZmf8j0_tgOORWspROYWJ32baW-wlimqso5Px4oDvDhoBrdn_kmQodJfmvH2xgKxK-TiYig21_dsoaS6_OXm2rGWfTQX6GX8lq7ou0TAdSIvzmT2uzunPRsB1_Ei_2QIhgqLO2MyFqFzLZ6KRyz199yjmC1YqD0KOCTYnJP3gJGLXMzoXeHXAcrjM79Xkhv2jfSLc-_ho23imw9kJycnat6M7wBsIYS09O24M-APq2lqCfkt3216wF6bUwplRtbtc_F00gSB4Nc1spoB2E0IWT5YPrrSraRilBvuMC8dkzeGVsfMrQmAW0VeHFtkSEnv7K6_9OVPDU9fyjaiJyrvV_pipkKEkNVJuP2sfHAYAHt5kffpQlLzq8OU70RTzo6XJQraF5xWlJKKjh4AXOeUhB_KaKS68LkM9XL15a41hew5CCP1_e1xMhK9rvbMx1PRxtnLy6wDm2WbKNxln-mVV7m0yLyfn_ocR7cQOFhTIEk7qWjn-h1r47tpFx-FdkvAO_N39MWmSNi1VeYfEn1WRyMA_sCLfLeU2NJX7WhkAH8RbE57wrArMppF2x6krPdZfm4C3CoJNseeSmtfY6IMNKwGbjZvo5nHatfHen6_nNnZYJ0aMlARWYF3M2_JGeoQny1qEh4E-6PHfwPDIfdJ"
+      }
+    ],
+    "errors": [],
+    "externalCalls": "all intercepted; zero real share writes"
+  },
+  {
+    "storageReadFailure": true,
+    "origin": "https://orvio-4n8.pages.dev",
+    "version": "0.2.27",
+    "sw": "67b79dfe935a9bb2",
+    "assets": [
+      "/_astro/Game.BulqQ9ig.css",
+      "/_astro/Game.astro_astro_type_script_index_0_lang.D3i8N12o.js",
+      "/_astro/Game.astro_astro_type_script_index_1_lang.BzYAMTok.js"
+    ],
+    "actualPlay": true,
+    "actualCompletion": true,
+    "collectionReload": true,
+    "watchLocalSnapshot": true,
+    "shareCaptures": [
+      {
+        "fragment": "v=4&song=first-light&keys=5&diff=low&score=0&acc=0.00&combo=0&j=0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C56&speed=1.5&fade=off&shuffle=off&seed=706718973&rp=1&rn=1071&r=eJxNkklME1EYx_mYSKMxYsTExIPGZ6IeBkItLcIFDnDw6tHlQGwLGLSmLXggJI_FACKbCLVF0-IGmQapDIsFIotKQFtZRyUVKBCmQNlUAi1Lx9Q3Rt9c5vf-3_d__-_NXDpvgytIna7V6SMz0lPT9IiW0yhDcwfR2Uh3W6VSonhplJxG6hSlSovikUatRjTSpWWq1Rmqf_ynMDZaESu9EBcry6FlcQqZIkoeR1ZMdAwtV9DnoxRx8pj_HhmdjbJUWl265haKl9JIm5mh0l1UBm21WemayJRMvSYyS4poFHxD8XptpirnWgjGDiPLr35KXGov__BpdPAuBhA3T2DuNTNkOBACGPMO41z-kafjP52-k4B7BEFYu0f1-g2lfj3gHoZjPuyEjQ56Wf9-EcvgaZu7vuAAYMwx3EcjNTjDbc6GEbW1HDpe1FrOEGNvUcJu867VHQ7Y7TCyn4vB4fr8ZIMCbOEYbjvZNLLR2bAfcHBZ9qiJ7o9lVwm5k0rrHkwuHwTsFgShyQns6KIlLxSwJZg32W42534LFRtdkrZAiT0Y3sjyLeWQu1A48zWUdNZ3Ut7eJ_mNhwh6kqq6xyZ9ElF0QmfzWuWS5G-exZppky8BMGZ5x8r78PYKb4kfyCk29N1btnN_H5mkI-nljsEyFS5qAWiwDpmKJASHT9e7nT_qEgCvC4KwlbqxNV9WSwEeZjhm5HRBeV5g5K_pKhUQalzZpHIa1T3zGBkJqXyR9K6mveAOkdgpmH08b2IEivCYqqqv6m0MCbN6il8ZGrxJ5rfNSh6W8J7DhIYjx7_UrMvIaRspE_mernOAK4LjuWDR3NhsBWJoRW8C3Kta8cvkqZmix3cLgZiMI4OhY9q2jzTaV6kWT6-vaJciXIfY7onnN0gUk3p5eTq37xAxnduDahs7kEMK967_qu7rihDv6OzWvH1bhCn-ZPt6ffGieCsNx4Q5e_5xwDbeYWyV3vN_mTpKlEcRTX3mZ0rAPkEQRjQdDvbrdwA8YGT5pWhrtTP4LwXhUUTD2FpVDoGFTTD39DNKkrD_cuvsduWysJv4GzdEDZ4"
+      },
+      {
+        "fragment": "v=4&song=first-light&keys=5&diff=low&score=0&acc=0.00&combo=0&j=0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C0%2C56&speed=1.5&fade=off&shuffle=off&seed=706718973&rp=1&rn=1071&r=eJxNkklME1EYx_mYSKMxYsTExIPGZ6IeBkItLcIFDnDw6tHlQGwLGLSmLXggJI_FACKbCLVF0-IGmQapDIsFIotKQFtZRyUVKBCmQNlUAi1Lx9Q3Rt9c5vf-3_d__-_NXDpvgytIna7V6SMz0lPT9IiW0yhDcwfR2Uh3W6VSonhplJxG6hSlSovikUatRjTSpWWq1Rmqf_ynMDZaESu9EBcry6FlcQqZIkoeR1ZMdAwtV9DnoxRx8pj_HhmdjbJUWl265haKl9JIm5mh0l1UBm21WemayJRMvSYyS4poFHxD8XptpirnWgjGDiPLr35KXGov__BpdPAuBhA3T2DuNTNkOBACGPMO41z-kafjP52-k4B7BEFYu0f1-g2lfj3gHoZjPuyEjQ56Wf9-EcvgaZu7vuAAYMwx3EcjNTjDbc6GEbW1HDpe1FrOEGNvUcJu867VHQ7Y7TCyn4vB4fr8ZIMCbOEYbjvZNLLR2bAfcHBZ9qiJ7o9lVwm5k0rrHkwuHwTsFgShyQns6KIlLxSwJZg32W42534LFRtdkrZAiT0Y3sjyLeWQu1A48zWUdNZ3Ut7eJ_mNhwh6kqq6xyZ9ElF0QmfzWuWS5G-exZppky8BMGZ5x8r78PYKb4kfyCk29N1btnN_H5mkI-nljsEyFS5qAWiwDpmKJASHT9e7nT_qEgCvC4KwlbqxNV9WSwEeZjhm5HRBeV5g5K_pKhUQalzZpHIa1T3zGBkJqXyR9K6mveAOkdgpmH08b2IEivCYqqqv6m0MCbN6il8ZGrxJ5rfNSh6W8J7DhIYjx7_UrMvIaRspE_mernOAK4LjuWDR3NhsBWJoRW8C3Kta8cvkqZmix3cLgZiMI4OhY9q2jzTaV6kWT6-vaJciXIfY7onnN0gUk3p5eTq37xAxnduDahs7kEMK967_qu7rihDv6OzWvH1bhCn-ZPt6ffGieCsNx4Q5e_5xwDbeYWyV3vN_mTpKlEcRTX3mZ0rAPkEQRjQdDvbrdwA8YGT5pWhrtTP4LwXhUUTD2FpVDoGFTTD39DNKkrD_cuvsduWysJv4GzdEDZ4"
+      }
+    ],
+    "errors": [],
+    "externalCalls": "all intercepted; zero real share writes"
+  }
+]

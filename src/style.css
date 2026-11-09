@@ -1046,7 +1046,7 @@ dialog .segmented button {
   }
   header nav {
     gap: 12px;
-    flex-shrink: 0;
+    min-width: 0;
   }
   header nav a,
   header nav button {

@@ -191,7 +191,9 @@ test('maximum 300 second client import remains responsive and saves a verified l
   expect(generationHeartbeat.max).toBeLessThan(2000);
   expect(heartbeat.count).toBeGreaterThan(5);
   expect(heartbeat.max).toBeLessThan(2000);
-  await page.screenshot({ path: '/downloads/orv69-max300-selection.png' });
+  await page.screenshot({
+    path: test.info().outputPath('orv69-max300-selection.png'),
+  });
   expect(calls.filter((c) => c.endsWith('/audio'))).toHaveLength(downloads);
   expect(errors).toEqual([]);
 });

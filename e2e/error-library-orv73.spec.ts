@@ -86,7 +86,9 @@ for (const width of [1440, 979, 390, 320])
       expect(bounds.scroll).toBeLessThanOrEqual(bounds.width + 1);
     }
     await rows.first().scrollIntoViewIfNeeded();
-    await p.screenshot({ path: `/downloads/orv73-error-${width}.png` });
+    await p.screenshot({
+      path: test.info().outputPath(`orv73-error-${width}.png`),
+    });
     const title = await rows.first().locator('strong').textContent();
     await rows.first().locator('.import-retry').click();
     await expect(p.locator('#youtube-url')).toHaveValue(

@@ -173,5 +173,7 @@ test('background generation finishing after navigation does not replace the acti
     'POST /v1/audio-jobs',
   ]);
   expect(errors).toEqual([]);
-  await page.screenshot({ path: '/downloads/orv69-stale-navigation.png' });
+  await page.screenshot({
+    path: test.info().outputPath('orv69-stale-navigation.png'),
+  });
 });

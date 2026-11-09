@@ -36,9 +36,13 @@ test('patch language control is compact with all names readable and keyboard men
     await page.keyboard.press('Home');
     await page.keyboard.press('Enter');
     await expect(trigger).toHaveText(LANGUAGES.en);
-    await page.screenshot({ path: `/downloads/a18-${width}-closed.png` });
+    await page.screenshot({
+      path: test.info().outputPath(`a18-${width}-closed.png`),
+    });
     await trigger.click();
-    await page.screenshot({ path: `/downloads/a18-${width}-open.png` });
+    await page.screenshot({
+      path: test.info().outputPath(`a18-${width}-open.png`),
+    });
     await page.keyboard.press('Escape');
   }
 });

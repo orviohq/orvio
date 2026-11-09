@@ -19,7 +19,9 @@ test('actual local replay retry preserves decoded wallpaper presentation before 
     expect(
       await page.evaluate(() => (window as any).orvioDiagnostics?.active),
     ).toBe(false);
-    await page.screenshot({ path: `/downloads/orv63-wallpaper-${run}.png` });
+    await page.screenshot({
+      path: test.info().outputPath(`orv63-wallpaper-${run}.png`),
+    });
     await page.waitForFunction(() => (window as any).orvioDiagnostics?.active);
     const elapsed = (await page.evaluate(() => performance.now())) - at;
     console.log('LOCAL_RETRY_WALLPAPER_MS', run, elapsed);

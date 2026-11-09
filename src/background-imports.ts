@@ -11,6 +11,8 @@ import {
 export interface PendingImport {
   videoId: string;
   jobId?: string;
+  transportVersion?: 2;
+  audioFormat?: 'orvio-opus-v1';
   title?: string;
   thumbnailUrl?: string;
   state: 'loading' | 'error';
@@ -44,6 +46,14 @@ export class BackgroundImports {
           this.rows.set(row.videoId, {
             videoId: row.videoId,
             ...(row.jobId ? { jobId: row.jobId } : {}),
+            ...(row.transportVersion === 2 &&
+            row.audioFormat === 'orvio-opus-v1' &&
+            row.jobId
+              ? {
+                  transportVersion: 2 as const,
+                  audioFormat: 'orvio-opus-v1' as const,
+                }
+              : {}),
             ...(typeof row.title === 'string' && row.title.length <= 300
               ? { title: row.title }
               : {}),
@@ -104,6 +114,9 @@ export class BackgroundImports {
       stage: 'checking',
       ...(previous?.title ? { title: previous.title } : {}),
       ...(previous?.jobId ? { jobId: previous.jobId } : {}),
+      ...(previous?.transportVersion === 2
+        ? { transportVersion: 2, audioFormat: 'orvio-opus-v1' as const }
+        : {}),
     };
     this.rows.set(videoId, row);
     try {
@@ -169,13 +182,19 @@ export class BackgroundImports {
         AbortSignal.timeout(90000),
         {
           jobId: row.jobId,
+          transportVersion: row.transportVersion,
+          audioFormat: row.audioFormat,
           retryFailed,
           onStage: (stage) => {
             row.stage = stage;
             this.changed();
           },
           onJob: (job) => {
-            row.jobId = job.status === 'error' ? undefined : job.jobId;
+            if ('transportVersion' in job && job.transportVersion === 2) {
+              row.jobId = job.jobId;
+              row.transportVersion = 2;
+              row.audioFormat = 'orvio-opus-v1';
+            } else row.jobId = job.status === 'error' ? undefined : job.jobId;
             if (job.title) row.title = job.title;
             try {
               this.persist();

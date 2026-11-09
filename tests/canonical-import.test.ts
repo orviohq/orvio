@@ -1,3 +1,5 @@
+vi.mock('../src/opus/opus35-import', () => ({ importOpus35: vi.fn() }));
+import { importOpus35 } from '../src/opus/opus35-import';
 vi.mock('../src/local-generated-library', () => ({
   savedLocalGenerated: vi.fn(),
 }));
@@ -95,7 +97,7 @@ it('missing retained bytes/service/integrity failure never fall through to extra
     expect(readAudioJob).not.toHaveBeenCalled();
   }
 });
-it('an explicit add of a truly missing canonical still creates exactly one normal job', async () => {
+it('an explicit add of a truly missing canonical uses exactly one qualified Opus import, never legacy create', async () => {
   vi.mocked(refreshCanonical).mockResolvedValue({ state: 'missing' });
   vi.mocked(createAudioJob).mockResolvedValue({
     jobId: 'new-job',
@@ -110,12 +112,17 @@ it('an explicit add of a truly missing canonical still creates exactly one norma
     bytes,
     restored: false,
   });
+  vi.mocked(importOpus35).mockResolvedValue({
+    prepared: { record, bytes, restored: false },
+    jobId: 'opus-job',
+  });
   const result = await importYoutube(
     record.videoId,
     new AbortController().signal,
   );
-  expect(result.jobId).toBe('new-job');
-  expect(createAudioJob).toHaveBeenCalledTimes(1);
+  expect(result.jobId).toBe('opus-job');
+  expect(importOpus35).toHaveBeenCalledTimes(1);
+  expect(createAudioJob).not.toHaveBeenCalled();
   expect(loadCanonicalAudio).not.toHaveBeenCalled();
 });
 

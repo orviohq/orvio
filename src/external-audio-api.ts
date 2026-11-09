@@ -1,6 +1,12 @@
 import { AUDIO_MAX_BYTES, AUDIO_MAX_SECONDS } from './audio-limits.mjs';
 import { readAudioLimit, type AudioLimit } from './audio-limit-message';
 import { queryClient, queryKeys, runMutation } from './query-client';
+import {
+  traceErrorName,
+  traceMark,
+  traceSpan,
+  type ImportTrace,
+} from './import-trace';
 export const AUDIO_BASE = 'https://orvio-share.pn-26f.workers.dev';
 const JOB = /^[A-Za-z0-9_-]{1,128}$/;
 const SHA = /^[a-f0-9]{64}$/;
@@ -298,6 +304,7 @@ export async function loadAudio(
   expectedVideoId: string,
   expectedHash?: string,
   signal?: AbortSignal,
+  trace?: ImportTrace | null,
 ): Promise<ArrayBuffer> {
   if (
     job.status !== 'done' ||
@@ -338,6 +345,7 @@ export async function loadAudio(
         expectedVideoId,
         signal ? AbortSignal.any([querySignal, signal]) : querySignal,
         expectedHash,
+        trace,
       ),
   });
 }
@@ -346,14 +354,33 @@ async function downloadJobAudio(
   expectedVideoId: string,
   signal: AbortSignal,
   expectedHash?: string,
+  trace?: ImportTrace | null,
 ): Promise<ArrayBuffer> {
   const deadline = Date.now() + 90000;
   let response: Response;
+  let attempt = 0;
   for (;;) {
-    response = await fetchAudio(
-      `${AUDIO_BASE}/v1/audio-jobs/${job.jobId}/audio`,
-      { signal },
-    );
+    attempt++;
+    const ttfbStart = performance.now();
+    traceMark(trace, 'audio-get-ttfb:begin', { attempt });
+    try {
+      response = await fetchAudio(
+        `${AUDIO_BASE}/v1/audio-jobs/${job.jobId}/audio`,
+        { signal },
+      );
+    } catch (error) {
+      traceMark(trace, 'audio-get-ttfb:error', {
+        attempt,
+        ms: Math.round((performance.now() - ttfbStart) * 10) / 10,
+        error: traceErrorName(error),
+      });
+      throw error;
+    }
+    traceMark(trace, 'audio-get-ttfb:end', {
+      attempt,
+      status: response.status,
+      ms: Math.round((performance.now() - ttfbStart) * 10) / 10,
+    });
     if (response.ok) break;
     const raw = await response.json().catch(() => null);
     const retry = seconds(raw?.error?.retryAfterSec);
@@ -368,7 +395,15 @@ async function downloadJobAudio(
       const delay = retry * 1000;
       if (Date.now() + delay > deadline)
         throw new AudioJobError('request_timeout');
-      await waitForAudio(delay, signal);
+      await traceSpan(
+        trace,
+        'audio-retry-wait',
+        () => waitForAudio(delay, signal),
+        {
+          attempt,
+          retrySec: retry,
+        },
+      );
       continue;
     }
     throw new AudioJobError(
@@ -405,26 +440,43 @@ async function downloadJobAudio(
       undefined,
       'response',
     );
+  const bodyStart = performance.now();
+  traceMark(trace, 'audio-body-read:begin');
   const reader = response.body.getReader(),
     joined = new Uint8Array(job.audio.sizeBytes);
   let length = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (length + value.byteLength > joined.byteLength) {
-      await reader.cancel();
-      throw new AudioJobError('integrity_failed');
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (length + value.byteLength > joined.byteLength) {
+        await reader.cancel();
+        throw new AudioJobError('integrity_failed');
+      }
+      joined.set(value, length);
+      length += value.byteLength;
     }
-    joined.set(value, length);
-    length += value.byteLength;
+  } catch (error) {
+    traceMark(trace, 'audio-body-read:error', {
+      bytes: length,
+      ms: Math.round((performance.now() - bodyStart) * 10) / 10,
+      error: traceErrorName(error),
+    });
+    throw error;
   }
+  traceMark(trace, 'audio-body-read', {
+    bytes: length,
+    ms: Math.round((performance.now() - bodyStart) * 10) / 10,
+  });
   const bytes = joined.buffer;
   if (length !== job.audio.sizeBytes || bytes.byteLength > AUDIO_MAX_BYTES)
     throw new AudioJobError('integrity_failed');
-  const digest = Array.from(
-    new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
-    (b) => b.toString(16).padStart(2, '0'),
-  ).join('');
+  const digest = await traceSpan(trace, 'audio-digest', async () =>
+    Array.from(
+      new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
+      (b) => b.toString(16).padStart(2, '0'),
+    ).join(''),
+  );
   if (digest !== hash) throw new AudioJobError('integrity_failed');
   return bytes;
 }

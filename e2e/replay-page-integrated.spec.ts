@@ -167,7 +167,9 @@ test('integrated replay collection preserves all sessions and follow-on controls
   expect(projection.rows).toHaveLength(3);
   expect(projection.rows[0].mode).toContain('0:01');
   expect(projection.rows[0].title).toContain('AAAAAAAAAAA');
-  await page.screenshot({ path: '/downloads/coherent-a24-desktop.png' });
+  await page.screenshot({
+    path: test.info().outputPath('coherent-a24-desktop.png'),
+  });
   await page.reload();
   await expect(page.locator('.replay-row')).toHaveCount(3);
   await page.locator('.replay-row').first().click();
@@ -181,7 +183,9 @@ test('integrated replay collection preserves all sessions and follow-on controls
   await page.goto('/replays/');
   await expect(page.locator('.replay-row')).toHaveCount(3);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: '/downloads/coherent-a24-mobile.png' });
+  await page.screenshot({
+    path: test.info().outputPath('coherent-a24-mobile.png'),
+  });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
-test('real misses keep corridor clear in normal/reduced motion and replay', async ({
-  browser,
-}, testInfo) => {
-  for (const reduced of [false, true]) {
+for (const reduced of [false, true])
+  test(`real misses keep corridor clear in ${reduced ? 'reduced' : 'normal'} motion and replay`, async ({
+    browser,
+  }, testInfo) => {
     const c = await browser.newContext({
         viewport: { width: 1280, height: 720 },
         reducedMotion: reduced ? 'reduce' : 'no-preference',
@@ -64,8 +64,7 @@ test('real misses keep corridor clear in normal/reduced motion and replay', asyn
     });
     await c.close();
     expect(errors).toEqual([]);
-  }
-});
+  });
 test('mobile actual replay misses keep note corridor clear', async ({
   browser,
 }, testInfo) => {

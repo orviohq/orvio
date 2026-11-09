@@ -7,3 +7,8 @@ test-results
 
 source-harness
 fixtures
+
+# Hash-bound codec fixtures must retain exact canonical bytes.
+test-support/opus35-frost/
+# Local qualification evidence harnesses are not portable CI inputs.
+qualification-local/

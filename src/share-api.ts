@@ -1,7 +1,9 @@
 import { V5_MAX_FRAGMENT_CHARS } from './external-share';
 import { queryClient, queryKeys, runMutation } from './query-client';
 function fragmentLimit(fragment: string) {
-  return fragment.startsWith('v=5&d=') ? V5_MAX_FRAGMENT_CHARS : 160000;
+  return fragment.startsWith('v=5&d=') || fragment.startsWith('v=6&d=')
+    ? V5_MAX_FRAGMENT_CHARS
+    : 160000;
 }
 export const SHARE_API = 'https://orvio-share.pn-26f.workers.dev';
 export class ShareError extends Error {

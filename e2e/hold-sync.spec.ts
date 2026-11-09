@@ -1,4 +1,4 @@
-import { atKey } from './input';
+import { atHeldKey, heldBindingCodes } from './hold-input';
 import { judge } from '../src/engine';
 import { test, expect } from '@playwright/test';
 test('legacy calibration removed and held body stays visible past head culling', async ({
@@ -24,8 +24,8 @@ test('legacy calibration removed and held body stays visible past head culling',
     () =>
       (window as any).orvioDiagnostics.notes.find((s: any) => s.note.end).note,
   );
-  const keys = ['d', 'f', 'Space', 'j', 'k'];
-  await atKey(page, n.time, keys[n.lane], true);
+  const keys = await heldBindingCodes(page);
+  await atHeldKey(page, n.time, keys[n.lane], true);
   await page.waitForFunction(
     (t) => (window as any).orvioDiagnostics.clock >= t,
     n.time + 0.5,
@@ -47,7 +47,7 @@ test('legacy calibration removed and held body stays visible past head culling',
   expect(head.value).toBeGreaterThan(0);
   // Do not take a screenshot between head and tail: capture latency can exceed
   // the remaining hold on a loaded runner and delay the real key-up event.
-  await atKey(page, n.end, keys[n.lane], false);
+  await atHeldKey(page, n.end, keys[n.lane], false);
   const tail = await page.evaluate(
     (id) =>
       (window as any).orvioDiagnostics.events.find(

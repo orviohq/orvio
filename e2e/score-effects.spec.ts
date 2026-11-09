@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { atKey } from './input';
+import { atHeldKey, heldBindingCodes } from './hold-input';
 for (const reduced of [false, true])
   test(
     'score display animates without changing judgment, reduced=' + reduced,
@@ -13,11 +13,13 @@ for (const reduced of [false, true])
         reduced,
       );
       await page.goto('/play/first-light/5/low/');
-      await page.click('#ready-start');
+      // A37 direct-play refresh enters the gesture gate, not a visible ready button.
+      await page.keyboard.press('Enter');
       await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
       const note = await page.evaluate(
         () => (window as any).orvioDiagnostics.notes[0].note,
       );
+      const key = (await heldBindingCodes(page))[note.lane];
       // Capture on the page's first score mutation, not a later remote read.
       // A production network/trace round-trip may exceed the 220ms effect.
       await page.evaluate(() => {
@@ -39,12 +41,7 @@ for (const reduced of [false, true])
           characterData: true,
         });
       });
-      await atKey(
-        page,
-        note.time,
-        ['d', 'f', 'Space', 'j', 'k'][note.lane],
-        true,
-      );
+      await atHeldKey(page, note.time, key, true);
       await page.waitForFunction(
         () =>
           Number(
@@ -70,6 +67,6 @@ for (const reduced of [false, true])
         () => (window as any).orvioDiagnostics.events[0],
       );
       expect(event.value).toBeGreaterThan(0);
-      await page.keyboard.up(['d', 'f', 'Space', 'j', 'k'][note.lane]);
+      await page.keyboard.up(key);
     },
   );

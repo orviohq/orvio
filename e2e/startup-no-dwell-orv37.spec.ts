@@ -47,7 +47,9 @@ test('audio readiness is cached while fresh pre-play preserves wallpaper and an 
       'data-song',
       'afterimage',
     );
-    await page.screenshot({ path: `/downloads/orv37-${kind}.png` });
+    await page.screenshot({
+      path: test.info().outputPath(`orv37-${kind}.png`),
+    });
     if (kind === 'indexeddb') expect(duration - 1250).toBeLessThan(1100);
     if (kind === 'memory') expect(duration).toBeGreaterThanOrEqual(1180);
   };
@@ -66,7 +68,7 @@ test('audio readiness is cached while fresh pre-play preserves wallpaper and an 
   expect(await page.evaluate(() => (window as any).__renders)).toBe(0);
   console.log('STARTUP_SAMPLES', JSON.stringify(samples));
   fs.writeFileSync(
-    '/downloads/orv37-startup-samples.json',
+    test.info().outputPath('orv37-startup-samples.json'),
     JSON.stringify(samples, null, 2),
   );
 });

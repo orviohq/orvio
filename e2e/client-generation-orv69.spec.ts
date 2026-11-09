@@ -167,7 +167,9 @@ test('new client-mode import uses the real current35 worker, keeps local identit
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
   await page.waitForTimeout(500);
   expect(calls.filter((c) => c.endsWith('/audio'))).toHaveLength(downloads);
-  await page.screenshot({ path: '/downloads/orv69-actual-local-play.png' });
+  await page.screenshot({
+    path: test.info().outputPath('orv69-actual-local-play.png'),
+  });
   expect(calls.filter((c) => c.startsWith('POST '))).toEqual([
     'POST /v1/audio-jobs',
   ]);

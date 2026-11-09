@@ -43,9 +43,13 @@ test('all locales remove own-estimate/rules UI, hide auto-FEVER control and keep
     );
   }
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.screenshot({ path: '/downloads/coherent-a21-desktop.png' });
+  await page.screenshot({
+    path: test.info().outputPath('coherent-a21-desktop.png'),
+  });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: '/downloads/coherent-a21-mobile.png' });
+  await page.screenshot({
+    path: test.info().outputPath('coherent-a21-mobile.png'),
+  });
 });
 test('new gameplay ignores previously saved auto-FEVER off while new replay metadata stays automatic', async ({
   page,

@@ -11,6 +11,23 @@ for (const mode of [
 ]) {
   test(`startup recovery ${mode}`, async ({ page }) => {
     test.setTimeout(25000);
+    // A37 preloads the song at the play-route gate, before any gesture, so
+    // the first render happens during page load. Hold that first render from
+    // the start of the document, not after it has already completed.
+    if (mode === 'late-render')
+      await page.addInitScript(() => {
+        const w = window as any;
+        const native = OfflineAudioContext.prototype.startRendering;
+        let first = true;
+        OfflineAudioContext.prototype.startRendering = function () {
+          if (!first) return native.call(this);
+          first = false;
+          const rendered = native.call(this);
+          return new Promise<AudioBuffer>((resolve, reject) => {
+            w.releaseOld = () => rendered.then(resolve, reject);
+          });
+        };
+      });
     await page.goto('/play/first-light/5/low/');
     await page.evaluate((mode) => {
       const w = window as any;
@@ -30,16 +47,7 @@ for (const mode of [
         }) as any;
       }
       if (mode === 'late-render') {
-        const native = OfflineAudioContext.prototype.startRendering;
-        let first = true;
-        OfflineAudioContext.prototype.startRendering = function () {
-          if (!first) return native.call(this);
-          first = false;
-          const rendered = native.call(this);
-          return new Promise<AudioBuffer>((resolve, reject) => {
-            w.releaseOld = () => rendered.then(resolve, reject);
-          });
-        };
+        // hook installed before navigation (see addInitScript above)
       } else if (mode === 'warmup') {
         const native = window.requestAnimationFrame;
         w.savedRaf = native;

@@ -46,7 +46,7 @@ for (const locale of ['en-US', 'ko-KR'])
         await p.locator('#library-first-paint header nav').innerText(),
       ).toBe(nav);
       await p.screenshot({
-        path: `/downloads/orv64-after-cached-${mobile}.png`,
+        path: test.info().outputPath(`orv64-after-cached-${mobile}.png`),
       });
       await p.keyboard.press('Tab');
       expect(
@@ -61,6 +61,8 @@ for (const locale of ['en-US', 'ko-KR'])
       await p.locator('#add-youtube').click();
       await expect(p.locator('#youtube-import')).toBeVisible();
       await p.locator('#youtube-cancel').click();
-      await p.screenshot({ path: `/downloads/orv64-after-live-${mobile}.png` });
+      await p.screenshot({
+        path: test.info().outputPath(`orv64-after-live-${mobile}.png`),
+      });
       await context.close();
     });

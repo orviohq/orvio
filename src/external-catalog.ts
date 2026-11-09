@@ -1,26 +1,35 @@
 import type { Song, Note, Difficulty, Lanes } from './chart';
-import type { SourceRecord } from './external-source';
+import {
+  isOpusRecord,
+  type PlayableSourceRecord as SourceRecord,
+} from './playable-source';
+import { opus35SourceId, opus35AudioId } from './opus/opus35-identity';
+import { opusPcmToAudioBuffer } from './opus/opus-chart-worker-client.mjs';
 import { inspectWav } from './canonical-pcm.mjs';
-export interface ExternalSong {
+export interface ExternalSong<
+  R extends SourceRecord = import('./external-source').SourceRecord,
+> {
   song: Song;
-  record: SourceRecord;
+  record: R;
   jobId?: string;
   bytes?: ArrayBuffer;
 }
-const sources = new Map<string, ExternalSong>();
+const sources = new Map<string, ExternalSong<SourceRecord>>();
 export function sourceId(r: SourceRecord) {
+  if (isOpusRecord(r)) return opus35SourceId(r);
   return `${sourceAudioId(r)}${r.chartSetSha256 ? `-c${r.chartSetSha256.slice(0, 16)}` : ''}`;
 }
 export function sourceAudioId(r: SourceRecord) {
+  if (isOpusRecord(r)) return opus35AudioId(r);
   return `yt-${r.videoId}-${r.audioSha256.slice(0, 16)}`;
 }
-export function installExternalSource(
-  record: SourceRecord,
+export function installExternalSource<R extends SourceRecord>(
+  record: R,
   title: string,
   bytes?: ArrayBuffer,
   jobId?: string,
   author?: string,
-): ExternalSong {
+): ExternalSong<R> {
   const existing = sources.get(sourceId(record));
   if (
     existing &&
@@ -38,7 +47,7 @@ export function installExternalSource(
     if (author) existing.song.subtitle = author;
     if (bytes !== undefined) existing.bytes = bytes;
     if (jobId !== undefined) existing.jobId = jobId;
-    return existing;
+    return existing as ExternalSong<R>;
   }
   const song: Song = {
     id: sourceId(record),
@@ -82,6 +91,8 @@ export function externalAudio(
 ): AudioBuffer {
   const item = sources.get(id);
   if (!item?.bytes) throw Error('Matching source audio unavailable');
+  if (isOpusRecord(item.record))
+    return opusPcmToAudioBuffer(context, item.bytes, item.record.frames);
   const p = inspectWav(item.bytes),
     buffer = context.createBuffer(p.channels, p.frames, p.sampleRate);
   for (let ch = 0; ch < p.channels; ch++) {

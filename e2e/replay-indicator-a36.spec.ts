@@ -7,7 +7,7 @@ test('new A36 replay indicator is visible only for actual watching on desktop an
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   const fragment = JSON.parse(
-    fs.readFileSync('/downloads/v027-public-proof.json', 'utf8'),
+    fs.readFileSync('e2e/fixtures/v027-public-proof.json', 'utf8'),
   )[0].shareCaptures[0].fragment;
   await page.goto('/play/first-light/5/low/');
   await page.keyboard.press('Enter');
@@ -45,7 +45,7 @@ test('new A36 replay indicator is visible only for actual watching on desktop an
       ),
     ).toBe(true);
     await page.screenshot({
-      path: `/downloads/a36-replay-indicator-${width}.png`,
+      path: test.info().outputPath(`a36-replay-indicator-${width}.png`),
     });
     if (width === 1280) {
       await expect(page.locator('#results')).toBeVisible({ timeout: 50000 });

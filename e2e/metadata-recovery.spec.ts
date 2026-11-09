@@ -4,7 +4,7 @@ test('metadata fresh and existing cached recovery preserves identities and audio
   page,
 }) => {
   const fixture = JSON.parse(
-    fs.readFileSync('/downloads/v027-synthetic-fixture.json', 'utf8'),
+    fs.readFileSync('e2e/fixtures/v027-synthetic-fixture.json', 'utf8'),
   );
   const audio = Buffer.from(fixture.bytes);
   const errors: string[] = [];
@@ -164,7 +164,9 @@ test('metadata fresh and existing cached recovery preserves identities and audio
   await expect(page.locator('#selected-title')).toContainText(
     'Recovered Song <text>',
   );
-  await page.screenshot({ path: '/downloads/metadata-existing-recovered.png' });
+  await page.screenshot({
+    path: test.info().outputPath('metadata-existing-recovered.png'),
+  });
   await page.reload();
   await expect(page.locator('#songs')).toContainText('Recovered Song <text>');
   expect(await snapshot()).toEqual(before);

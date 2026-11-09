@@ -71,7 +71,9 @@ for (const width of [1440, 979, 390, 320])
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    await p.screenshot({ path: `/downloads/orv68-local-${width}.png` });
+    await p.screenshot({
+      path: test.info().outputPath(`orv68-local-${width}.png`),
+    });
     await normal.click();
     await expect(p.locator('body')).toHaveClass(/previewing/);
     await p.keyboard.press('Escape');

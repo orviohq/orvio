@@ -90,7 +90,9 @@ test('A32 archive art/time/duration and wheel keyboard touch scroll preserve arc
   const a = await state();
   expect(a.max).toBeGreaterThan(1000);
   expect(a.width).toBe(a.client);
-  await page.screenshot({ path: '/downloads/a32-archive-desktop.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a32-archive-desktop.png'),
+  });
   await page.locator('.replay-row').first().hover();
   await page.mouse.wheel(0, 1200);
   await expect.poll(async () => (await state()).top).toBeGreaterThan(500);
@@ -107,7 +109,9 @@ test('A32 archive art/time/duration and wheel keyboard touch scroll preserve arc
   await page.reload();
   await expect(page.locator('.replay-row')).toHaveCount(24);
   await page.locator('#replays').evaluate((el) => (el.scrollTop = 0));
-  await page.screenshot({ path: '/downloads/a32-archive-mobile.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a32-archive-mobile.png'),
+  });
   const cdp = await context.newCDPSession(page);
   await cdp.send('Input.dispatchTouchEvent', {
     type: 'touchStart',
@@ -133,7 +137,9 @@ test('A32 archive art/time/duration and wheel keyboard touch scroll preserve arc
     .toBeLessThan(2);
   await expect(page.locator('.replay-row').last()).toBeInViewport();
   expect((await state()).width).toBe((await state()).client);
-  await page.screenshot({ path: '/downloads/a32-archive-mobile-bottom.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a32-archive-mobile-bottom.png'),
+  });
   const after = await page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const r = indexedDB.open('orvio.builtin-replays.v1', 1);

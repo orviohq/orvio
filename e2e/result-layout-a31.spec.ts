@@ -4,7 +4,7 @@ test('A31 result panel title and actions fully reachable with honest internal sc
   page,
 }) => {
   const fragment = JSON.parse(
-    fs.readFileSync('/downloads/v027-public-proof.json', 'utf8'),
+    fs.readFileSync('e2e/fixtures/v027-public-proof.json', 'utf8'),
   )[0].shareCaptures[0].fragment;
   for (const [width, height] of [
     [1280, 720],
@@ -36,12 +36,12 @@ test('A31 result panel title and actions fully reachable with honest internal sc
     await page.locator('#results').evaluate((el) => (el.scrollTop = 0));
     await expect(page.locator('#result-song')).toBeInViewport();
     await page.screenshot({
-      path: `/downloads/a31-result-top-${width}-${height}.png`,
+      path: test.info().outputPath(`a31-result-top-${width}-${height}.png`),
     });
     await page.locator('#retry').scrollIntoViewIfNeeded();
     await expect(page.locator('#retry')).toBeInViewport();
     await page.screenshot({
-      path: `/downloads/a31-result-bottom-${width}-${height}.png`,
+      path: test.info().outputPath(`a31-result-bottom-${width}-${height}.png`),
     });
   }
 });

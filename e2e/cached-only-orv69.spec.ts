@@ -40,7 +40,9 @@ for (const [status, code] of [
       },
     ]);
     expect(errors).toEqual([]);
-    await page.screenshot({ path: `/downloads/orv69-cached-${status}.png` });
+    await page.screenshot({
+      path: test.info().outputPath(`orv69-cached-${status}.png`),
+    });
   });
 test('flag-off pending job stops polling without fallback admission', async ({
   page,

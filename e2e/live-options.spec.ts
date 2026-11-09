@@ -1,4 +1,4 @@
-import { atKey } from './input';
+import { atHeldKey, heldBindingCodes } from './hold-input';
 import { test, expect } from '@playwright/test';
 test('game option readout, pause edit, cancel shuffle and explicit restart keep chart consistent', async ({
   page,
@@ -77,8 +77,8 @@ test('held note survives speed and effect changes without a new chart or remappi
     () =>
       (window as any).orvioDiagnostics.notes.find((s: any) => s.note.end).note,
   );
-  const key = ['d', 'f', 'Space', 'j', 'k'][note.lane];
-  await atKey(page, note.time, key, true);
+  const key = (await heldBindingCodes(page))[note.lane];
+  await atHeldKey(page, note.time, key, true);
   await page.keyboard.press('F3');
   await expect(page.locator('#game-options')).toBeVisible();
   const state = await page.evaluate(
@@ -101,7 +101,7 @@ test('held note survives speed and effect changes without a new chart or remappi
     ),
   ).toEqual(state);
   await page.click('#resume');
-  const release = await atKey(page, note.end, key, false);
+  const release = await atHeldKey(page, note.end, key, false);
   const tail = await page.evaluate(
     (id) =>
       (window as any).orvioDiagnostics.events.find(

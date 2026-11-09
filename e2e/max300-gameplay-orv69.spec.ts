@@ -192,7 +192,9 @@ test('maximum 300s generated chart enters actual desktop gameplay without renewe
   expect(frameTiming.samples).toBeGreaterThan(500);
   expect(frameTiming.p95).toBeLessThan(34);
   expect(calls.filter((c) => c.endsWith('/audio'))).toHaveLength(downloads);
-  await page.screenshot({ path: '/downloads/orv69-max300-actual-play.png' });
+  await page.screenshot({
+    path: test.info().outputPath('orv69-max300-actual-play.png'),
+  });
   expect(calls.filter((c) => c.startsWith('POST '))).toEqual([
     'POST /v1/audio-jobs',
   ]);

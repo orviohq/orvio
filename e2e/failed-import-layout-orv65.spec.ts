@@ -58,7 +58,9 @@ for (const width of [1440, 979, 390, 320])
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    await p.screenshot({ path: `/downloads/orv65-independent-${width}.png` });
+    await p.screenshot({
+      path: test.info().outputPath(`orv65-independent-${width}.png`),
+    });
     await row.locator('.import-retry').click();
     await expect(p.locator('#youtube-import')).toBeVisible();
     await expect(p.locator('#youtube-url')).toHaveValue(

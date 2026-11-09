@@ -111,13 +111,17 @@ test('cold replay starts verified before full download, freezes for stall, resum
   );
   expect(Math.abs(after - before)).toBeLessThan(0.001);
   expect(await audioRows(page)).toBe(0);
-  await page.screenshot({ path: '/downloads/orv16-actual-stall.png' });
+  await page.screenshot({
+    path: test.info().outputPath('orv16-actual-stall.png'),
+  });
   await page.waitForFunction(
     () => (window as any).orvioDiagnostics?.audioContextState === 'running',
   );
   await expect.poll(() => audioRows(page)).toBe(1);
   await page.waitForFunction(() => (window as any).orvioDiagnostics.clock > 3);
-  await page.screenshot({ path: '/downloads/orv16-actual-resume.png' });
+  await page.screenshot({
+    path: test.info().outputPath('orv16-actual-resume.png'),
+  });
   await expect(page.locator('#results')).toBeVisible({ timeout: 20000 });
   expect(errors).toEqual([]);
   const calls = await page.evaluate(() => (window as any).__streamCalls);

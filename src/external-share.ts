@@ -1,8 +1,9 @@
+import { isOpusRecord } from './playable-source';
 import {
-  validSourceRecord,
-  verifyChartHashes,
-  type SourceRecord,
-} from './external-source';
+  validPlayableSource as validSourceRecord,
+  verifyPlayableSource as verifyChartHashes,
+  type PlayableSourceRecord as SourceRecord,
+} from './playable-source';
 import { sourceId } from './external-catalog';
 import { Engine } from './engine';
 import { transformChart } from './game-options';
@@ -18,15 +19,17 @@ export const V5_MAX_FRAGMENT_CHARS = 699058;
 export const V5_MAX_COMPRESSED_BYTES = 524288;
 export const V5_MAX_INFLATED_BYTES = 4 * 1024 * 1024;
 export type ExternalResult = Omit<SharedResult, 'song'> & { song: string };
-export interface ExternalSharedReplay {
-  record: SourceRecord;
+export interface ExternalSharedReplay<
+  R extends SourceRecord = import('./external-source').SourceRecord,
+> {
+  record: R;
   replay: RuntimeReplay;
   result: ExternalResult;
   title: string;
   jobId?: string;
 }
 const utf8 = new TextEncoder();
-function b64(bytes: Uint8Array) {
+export function shareB64(bytes: Uint8Array) {
   let binary = '';
   for (let i = 0; i < bytes.length; i += 8192)
     binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
@@ -35,7 +38,7 @@ function b64(bytes: Uint8Array) {
     .replace(/\//g, '_')
     .replace(/=+$/, '');
 }
-function unb64(text: string) {
+export function shareUnb64(text: string) {
   if (!/^[A-Za-z0-9_-]+$/.test(text)) throw Error('Invalid replay encoding');
   return Uint8Array.from(
     atob(text.replace(/-/g, '+').replace(/_/g, '/')),
@@ -48,7 +51,7 @@ async function sha(text: string) {
     (x) => x.toString(16).padStart(2, '0'),
   ).join('');
 }
-async function transform(bytes: Uint8Array, compress: boolean) {
+export async function shareTransform(bytes: Uint8Array, compress: boolean) {
   const reader = new Blob([bytes as BlobPart])
     .stream()
     .pipeThrough(
@@ -137,7 +140,7 @@ export function matchesExternalReplay(
     )
   );
 }
-function checkedResult(raw: unknown): ExternalResult {
+export function checkedResult(raw: unknown): ExternalResult {
   if (!raw || typeof raw !== 'object') throw Error('Invalid shared result');
   const r = raw as ExternalResult;
   if (typeof r.song !== 'string' || !Array.isArray(r.judgments))
@@ -146,7 +149,7 @@ function checkedResult(raw: unknown): ExternalResult {
   if (!safe) throw Error('Invalid shared result');
   return { ...safe, song: r.song };
 }
-async function verify(data: ExternalSharedReplay) {
+async function verify<R extends SourceRecord>(data: ExternalSharedReplay<R>) {
   if (
     !validSourceRecord(data.record) ||
     !(await verifyChartHashes(data.record))
@@ -168,20 +171,21 @@ async function verify(data: ExternalSharedReplay) {
 }
 /** No fetch, audio, account identity or upload. Call only from the explicit share click. */
 export async function encodeExternalShare(data: ExternalSharedReplay) {
+  if (isOpusRecord(data.record)) throw Error('opus35_share_not_bound');
   const safe = await verify(data);
   const sourceRecord = JSON.stringify(safe.record);
   const envelope = {
     kind: 'external-replay',
     sourceRecord,
     sourceRecordSha256: await sha(sourceRecord),
-    replayR2: b64(packReplay(safe.replay as ReplayData)),
+    replayR2: shareB64(packReplay(safe.replay as ReplayData)),
     title: safe.title,
     ...(safe.jobId ? { jobId: safe.jobId } : {}),
     result: safe.result,
   };
   const bytes = utf8.encode(JSON.stringify(envelope));
   if (bytes.length > V5_MAX_INFLATED_BYTES) throw Error('Share too large');
-  const fragment = 'v=5&d=' + b64(await transform(bytes, true));
+  const fragment = 'v=5&d=' + shareB64(await shareTransform(bytes, true));
   if (fragment.length > V5_MAX_FRAGMENT_CHARS) throw Error('Share too large');
   return fragment;
 }
@@ -194,11 +198,11 @@ export async function decodeExternalShare(
     !/^v=5&d=[A-Za-z0-9_-]+$/.test(fragment)
   )
     throw Error('Invalid shared replay');
-  const packed = unb64(fragment.slice(6));
+  const packed = shareUnb64(fragment.slice(6));
   if (packed.length > V5_MAX_COMPRESSED_BYTES) throw Error('Share too large');
   const obj = JSON.parse(
     new TextDecoder('utf-8', { fatal: true }).decode(
-      await transform(packed, false),
+      await shareTransform(packed, false),
     ),
   );
   if (
@@ -221,10 +225,12 @@ export async function decodeExternalShare(
     typeof obj.replayR2 !== 'string'
   )
     throw Error('Invalid shared replay');
-  const raw = unb64(obj.replayR2);
+  const raw = shareUnb64(obj.replayR2);
   if (raw[0] !== 82 || raw[1] !== 50) throw Error('Invalid replay format');
+  const record = JSON.parse(obj.sourceRecord);
+  if (isOpusRecord(record)) throw Error('legacy_share_codec');
   return verify({
-    record: JSON.parse(obj.sourceRecord),
+    record,
     replay: unpackReplay(raw),
     result: obj.result,
     title: obj.title,

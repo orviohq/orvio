@@ -7,12 +7,12 @@ test('wrong key, misses, late hit, bad hold, duplicate binding, positions and re
 }) => {
   await page.goto('/select/');
   await page.click('#open-settings');
-  await page.click('[data-bind="0"]');
+  await page.click('[data-slot="0"]');
   await page.keyboard.press('f');
   await expect(page.locator('[data-sonner-toast]')).toContainText('이미');
-  await expect(page.locator('[data-bind="1"]')).toHaveText('F');
+  await expect(page.locator('[data-slot="3"]')).toContainText('F');
   await page.keyboard.press('a');
-  await expect(page.locator('[data-bind="0"]')).toHaveText('A');
+  await expect(page.locator('[data-slot="0"]')).toContainText('A');
   for (const pos of ['left', 'center', 'right']) {
     await page.click(`[data-pos="${pos}"]`);
     await page.locator('#settings .close').click();
@@ -25,12 +25,12 @@ test('wrong key, misses, late hit, bad hold, duplicate binding, positions and re
     await page.click('#open-settings');
   }
   await page.click('#reset');
-  await expect(page.locator('[data-bind="0"]')).toHaveText('D');
+  await expect(page.locator('[data-slot="0"]')).toContainText('A');
   await page.locator('#settings .close').click();
   await page.click('#start');
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
   const notes = (await diag(page)).notes.map((s: any) => s.note);
-  const keys = ['d', 'f', 'Space', 'j', 'k'];
+  const keys = ['s', 'd', 'f', 'g', 'h'];
   await page.keyboard.press('q');
   expect((await diag(page)).resolved).toBe(0);
   // Skip first note; hit a later non-hold 75ms late; release the first subsequent hold early.

@@ -160,7 +160,7 @@ test('cached list paints before delayed audio reads and slow metadata', async ({
   );
   expect(samples[first].t).toBeLessThan(250);
   fs.writeFileSync(
-    '/downloads/orv37-static-first-paint.json',
+    test.info().outputPath('orv37-static-first-paint.json'),
     JSON.stringify(
       {
         scenario:
@@ -212,7 +212,7 @@ for (const viewport of [
       });
     expect(cached.width).toBeGreaterThanOrEqual(112);
     await page.screenshot({
-      path: `/downloads/orv37-cached-${viewport.width}.png`,
+      path: test.info().outputPath(`orv37-cached-${viewport.width}.png`),
     });
     await expect(page.locator('#library-first-paint')).toHaveCount(0, {
       timeout: 15000,
@@ -229,7 +229,7 @@ for (const viewport of [
     expect(Math.abs(live.height - cached.height)).toBeLessThan(1);
     expect(Math.abs(live.row - cached.row)).toBeLessThan(2);
     await page.screenshot({
-      path: `/downloads/orv37-live-${viewport.width}.png`,
+      path: test.info().outputPath(`orv37-live-${viewport.width}.png`),
     });
   });
 }
@@ -309,6 +309,15 @@ test('offline reload retains cached library and verified local playback', async 
     serviceWorkers: 'allow',
     locale: 'ko-KR',
   });
+  // This test uses only its seeded synthetic source. Block foreign traffic
+  // before any page exists, including background metadata/thumbnails.
+  const blocked: string[] = [];
+  await context.route('**/*', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.origin === new URL(baseURL!).origin) return route.continue();
+    blocked.push(route.request().method() + ' ' + url.href);
+    await route.abort('blockedbyclient');
+  });
   const page = await context.newPage();
   const id = await seedExternalFixture(page);
   await page.goto('/select/?song=' + id);
@@ -321,10 +330,14 @@ test('offline reload retains cached library and verified local playback', async 
   await context.setOffline(true);
   await page.reload();
   await expect(page.locator('#selected-title')).toHaveText('YT Fixture');
-  await page.screenshot({ path: '/downloads/orv37-offline.png' });
+  await page.screenshot({ path: test.info().outputPath('orv37-offline.png') });
   await page.locator('#start').click();
   await page.waitForFunction(() => (window as any).orvioDiagnostics?.active);
   await expect(page.locator('#game')).toHaveAttribute('data-song', id);
+  await test.info().attach('blocked-synthetic-foreign-requests', {
+    body: JSON.stringify(blocked),
+    contentType: 'application/json',
+  });
   await context.close();
 });
 
@@ -357,7 +370,7 @@ test('normal repeated reload paints saved list without audio preload', async ({
   }
   console.log('NORMAL_RELOADS', JSON.stringify(runs));
   fs.writeFileSync(
-    '/downloads/orv37-normal-reloads.json',
+    test.info().outputPath('orv37-normal-reloads.json'),
     JSON.stringify(runs, null, 2),
   );
 });

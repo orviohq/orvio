@@ -64,7 +64,9 @@ test('actual APT cached fallback recovers title author via live bound metadata o
   expect(before.sha).toBe(
     '61d893d80b4fa3ac37ad2ce91385d6dfacd971eda77b42df3776be1dd0bbd58e',
   );
-  await page.screenshot({ path: '/downloads/metadata-apt-before.png' });
+  await page.screenshot({
+    path: test.info().outputPath('metadata-apt-before.png'),
+  });
   metadataAllowed = true;
   calls.length = 0;
   await page.reload();
@@ -80,7 +82,9 @@ test('actual APT cached fallback recovers title author via live bound metadata o
   expect(await snapshot()).toEqual(before);
   expect(calls.every((c) => c.endsWith('/metadata'))).toBe(true);
   expect(calls.length).toBe(1);
-  await page.screenshot({ path: '/downloads/metadata-apt-after.png' });
+  await page.screenshot({
+    path: test.info().outputPath('metadata-apt-after.png'),
+  });
   await page.reload();
   await expect(page.locator('#songs')).toContainText(
     'ROSÉ & Bruno Mars - APT. (Official Music Video)',
@@ -91,7 +95,9 @@ test('actual APT cached fallback recovers title author via live bound metadata o
     Boolean((window as any).orvioDiagnostics?.active),
   );
   await page.waitForTimeout(5200);
-  await page.screenshot({ path: '/downloads/metadata-apt-play.png' });
+  await page.screenshot({
+    path: test.info().outputPath('metadata-apt-play.png'),
+  });
   expect(errors).toEqual([]);
   console.log(
     'APT_METADATA_ONLY_PROOF',

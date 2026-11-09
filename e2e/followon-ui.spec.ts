@@ -61,7 +61,9 @@ test('context menu reuses hide-only confirmation, keyboard/Escape and viewport p
   await row.click({ button: 'right' });
   const menu = page.locator('.library-context-menu');
   await expect(menu).toBeVisible();
-  await page.screenshot({ path: '/downloads/a25-desktop-menu.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a25-desktop-menu.png'),
+  });
   await page.keyboard.press('Escape');
   await expect(menu).not.toBeVisible();
   await row.focus();
@@ -75,7 +77,9 @@ test('context menu reuses hide-only confirmation, keyboard/Escape and viewport p
   await row.scrollIntoViewIfNeeded();
   await page.waitForTimeout(100);
   await row.click({ button: 'right', position: { x: 10, y: 10 } });
-  await page.screenshot({ path: '/downloads/a25-mobile-menu.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a25-mobile-menu.png'),
+  });
   const b = await menu.boundingBox();
   expect(b!.x).toBeGreaterThanOrEqual(0);
   expect(b!.x + b!.width).toBeLessThanOrEqual(390);
@@ -123,7 +127,9 @@ test('all builtin select/list/result thumbnail frames match 16:9 without cropped
         ),
       );
     });
-    await page.screenshot({ path: `/downloads/a26-${width}-select.png` });
+    await page.screenshot({
+      path: test.info().outputPath(`a26-${width}-select.png`),
+    });
   }
   const e = new Engine(makeChart(SONGS[0], 'low', 5));
   e.update(9999);
@@ -162,9 +168,13 @@ test('all builtin select/list/result thumbnail frames match 16:9 without cropped
   });
   expect(Math.abs(art.ratio - 16 / 9)).toBeLessThan(0.01);
   expect(art.fit).toBe('contain');
-  await page.screenshot({ path: '/downloads/a26-mobile-result.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a26-mobile-result.png'),
+  });
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.screenshot({ path: '/downloads/a26-desktop-result.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a26-desktop-result.png'),
+  });
 });
 test('loading copy is not painted while assistive state and Escape cancellation remain', async ({
   page,
@@ -189,7 +199,7 @@ test('loading copy is not painted while assistive state and Escape cancellation 
       .evaluate((el) => getComputedStyle(el).clipPath),
   ).toBe('inset(50%)');
   expect(await page.locator('#cancel-startup').innerText()).toContain('ESC');
-  await page.screenshot({ path: '/downloads/a27-loading.png' });
+  await page.screenshot({ path: test.info().outputPath('a27-loading.png') });
   await page.keyboard.press('Escape');
   await expect(page.locator('#song-loading')).toBeHidden();
   await expect(page.locator('#lobby')).toBeVisible();
@@ -204,6 +214,8 @@ test('built-in gameplay keeps original wallpaper and readable gear', async ({
     Boolean((window as any).orvioDiagnostics?.active),
   );
   await page.waitForTimeout(1300);
-  await page.screenshot({ path: '/downloads/a26-game-unchanged.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a26-game-unchanged.png'),
+  });
   await page.keyboard.press('Escape');
 });

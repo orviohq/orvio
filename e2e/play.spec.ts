@@ -6,9 +6,9 @@ test('settings, real keyboard input, results and replay', async ({ page }) => {
   await expect(page.locator('.song-card')).toHaveCount(3);
   await page.click('[data-lanes="7"]');
   await page.click('#open-settings');
-  await page.click('[data-bind="0"]');
+  await page.click('[data-slot="0"]');
   await page.keyboard.press('a');
-  await expect(page.locator('[data-bind="0"]')).toHaveText('A');
+  await expect(page.locator('[data-slot="0"]')).toContainText('A');
   await page.click('[data-pos="right"]');
   await page.locator('#settings .close').click();
   await page.reload();
@@ -18,7 +18,7 @@ test('settings, real keyboard input, results and replay', async ({ page }) => {
     (window as any).orvioDiagnostics.notes.map((s: any) => s.note),
   );
   let seq = 0;
-  const keys = ['a', 'd', 'f', 'Space', 'j', 'k', 'l'];
+  const keys = ['a', 's', 'd', 'f', 'g', 'h', 'j'];
   const events = notes
     .flatMap((n: any) => [
       { at: n.time, lane: n.lane, down: true },
@@ -56,8 +56,8 @@ test('mobile layout is browse-only, no overflow', async ({ browser }) => {
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBeTruthy();
-  await page.click('#start');
-  await expect(page.locator('[data-sonner-toast]')).toContainText('데스크톱');
+  await expect(page.locator('#start')).toBeDisabled();
+  await expect(page.locator('#start')).toHaveAttribute('title', /데스크톱/);
   expect(
     await page.evaluate(() => (window as any).orvioDiagnostics.active),
   ).toBeFalsy();

@@ -1,6 +1,6 @@
 import { AUDIO_BASE } from './external-audio-api';
 import type { SourceRecord } from './external-source';
-import { queryClient, queryKeys } from './query-client';
+import { queryClient, queryKeys, markQueryEphemeral } from './query-client';
 /** Internal sentinel: an unavailable/missing metadata read never becomes
  * cached data; it surfaces as the original null at the call site. */
 class MetadataUnavailable extends Error {}
@@ -42,17 +42,24 @@ export function validCanonicalMetadata(
 export async function readCanonicalMetadata(
   record: SourceRecord,
   signal?: AbortSignal,
+  options?: { persist?: boolean },
 ): Promise<CanonicalMetadata | null> {
   // Keyed by video + chart set so metadata validated against one record
   // can never be served for another. Persisted; a validated entry is
   // immutable, while an unavailable/missing read keeps the original
   // one-fetch-per-call semantics (errors are never cached as data).
+  const queryKey = queryKeys.canonicalMetadata(
+    record.videoId,
+    record.chartSetSha256 ?? '',
+  );
+  // Pre-consent callers (shared-link inspect) pass persist: false: the key
+  // is marked ephemeral on this page's client so a link view never writes
+  // the query-cache snapshot. A normal read clears the mark, so the warm
+  // result-route persistence of the same shared key is never downgraded.
+  markQueryEphemeral(queryKey, options?.persist === false);
   return queryClient
     .fetchQuery({
-      queryKey: queryKeys.canonicalMetadata(
-        record.videoId,
-        record.chartSetSha256 ?? '',
-      ),
+      queryKey,
       queryFn: async () => {
         const data = await fetchCanonicalMetadata(record, signal);
         if (data === null) throw new MetadataUnavailable();

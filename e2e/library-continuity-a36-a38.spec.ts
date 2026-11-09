@@ -28,7 +28,7 @@ test('A33 A34 A36 A38 stable selection contextual removal and current per-song c
     'Afterimage',
   );
   const fragment = JSON.parse(
-    fs.readFileSync('/downloads/v027-public-proof.json', 'utf8'),
+    fs.readFileSync('e2e/fixtures/v027-public-proof.json', 'utf8'),
   )[0].shareCaptures[0].fragment;
   await page.goto('/result/#' + fragment);
   await expect(page.locator('#results')).toBeVisible();
@@ -65,13 +65,15 @@ test('A33 A34 A36 A38 stable selection contextual removal and current per-song c
       '#chart-info,.under-start,#remove-song,.library .section-title>span',
     ),
   ).toHaveCount(0);
-  await page.screenshot({ path: '/downloads/a36-a38-selection-desktop.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a36-a38-selection-desktop.png'),
+  });
   // A canonical row is new-first, so count labels must bind dataset identity, not DOM position.
   await page.route('https://i.ytimg.com/**', (r) =>
     r.fulfill({ status: 404, body: '' }),
   );
   const f = JSON.parse(
-    fs.readFileSync('/downloads/v027-synthetic-fixture.json', 'utf8'),
+    fs.readFileSync('e2e/fixtures/v027-synthetic-fixture.json', 'utf8'),
   );
   await page.route('https://orvio-share.pn-26f.workers.dev/**', (r) => {
     if (r.request().method() !== 'GET') throw Error('No POST');
@@ -159,6 +161,8 @@ test('A33 A34 A36 A38 stable selection contextual removal and current per-song c
   await expect(page.locator('#songs>[data-song]')).toHaveCount(3);
   await expect(page.locator('#songs')).not.toContainText('AAAAAAAAAAA');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: '/downloads/a36-a38-selection-mobile.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a36-a38-selection-mobile.png'),
+  });
   expect(errors).toEqual([]);
 });

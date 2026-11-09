@@ -57,7 +57,8 @@ test('real keyboard performance shares a local input replay with exact judgments
   ).toBe(true);
   await page.screenshot({ path: 'test-results/actual-result-with-replay.png' });
   const url = page.url();
-  expect(url).toContain('/result/?local=builtin');
+  expect(url).toContain('/result/#v=4&');
+  expect(new URL(url).searchParams.has('local')).toBe(false);
   expect(url.length).toBeLessThan(120000);
   expect(external).toEqual([]);
   const other = await context.newPage();
@@ -82,6 +83,7 @@ test('real keyboard performance shares a local input replay with exact judgments
     resolved: (window as any).orvioDiagnostics.resolved,
   }));
   expect(replay).toEqual(original);
-  expect(new URL(other.url()).searchParams.get('local')).toMatch(/^builtin:/);
+  expect(new URL(other.url()).hash).toContain('r=');
+  expect(new URL(other.url()).searchParams.has('local')).toBe(false);
   await other.close();
 });

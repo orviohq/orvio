@@ -20,7 +20,9 @@ for (const viewport of [
     await expect(p.locator('#results')).toBeVisible();
     await p.waitForTimeout(1200);
     const live = await p.locator('#results').boundingBox();
-    await p.screenshot({ path: `/downloads/orv62-live-${viewport.width}.png` });
+    await p.screenshot({
+      path: test.info().outputPath(`orv62-live-${viewport.width}.png`),
+    });
     await c.route('**/_astro/*.js', async (r) => {
       await new Promise((x) => setTimeout(x, 2500));
       await r.continue();
@@ -30,7 +32,7 @@ for (const viewport of [
     await expect(p.locator('#result-first-paint')).toBeVisible();
     const cached = await p.locator('#rpaint').boundingBox();
     await p.screenshot({
-      path: `/downloads/orv62-initial-${viewport.width}.png`,
+      path: test.info().outputPath(`orv62-initial-${viewport.width}.png`),
     });
     console.log('RESULT_GEOMETRY', { live, cached });
     await expect(p.locator('#result-entry')).toBeHidden();

@@ -1,6 +1,9 @@
 import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e',
+  // These specs route/fetch through a dev server on 127.0.0.1:4207
+  // (metadata-apt-live directly; shared-result-title-a38 as its local origin).
+  testMatch: ['metadata-apt-live.spec.ts', 'shared-result-title-a38.spec.ts'],
   workers: 1,
   timeout: 60000,
   use: {

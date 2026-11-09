@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "song": "yt-opus35-CORPUSB0002-57372ffe82f43b1aa0c15cd759648c7755e49199d94bd561639d62c0877bdf1c-cbbbdc6466fb677a68896a04f3e0f90d1ecf8522b718ab8bf6c1ce2b5544e4a6f",
+  "lanes": 5,
+  "difficulty": "low",
+  "options": {
+    "speed": 1.5,
+    "fader": "off",
+    "shuffle": "off",
+    "seed": 1
+  },
+  "audioLeadIn": 1.7,
+  "fever": {
+    "version": 1,
+    "rulesId": "orvio-auto-v1",
+    "auto": true
+  },
+  "end": 20000,
+  "ops": [
+    [
+      1,
+      20000,
+      9999
+    ]
+  ]
+}

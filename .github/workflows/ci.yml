@@ -17,17 +17,75 @@ jobs:
       - run: npm test
       - run: npm run check
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
-      - run: npx playwright test --config playwright.renderer.config.ts
+      - id: browser-ready
+        run: npx playwright install --with-deps chromium
+      # Each suite retains its own evidence. A failed suite does not hide later suites.
+      - name: Browser coverage - metadata
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.metadata.config.ts --output test-results/metadata --trace retain-on-failure
+      - name: Browser coverage - default
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npm run test:e2e -- --output test-results/default --trace retain-on-failure
+      - name: Browser coverage - a37-static
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.a37-static.config.ts --output test-results/a37-static --trace retain-on-failure
+      - name: Browser coverage - library-paint
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.library-paint.config.ts --output test-results/library-paint --trace retain-on-failure
+      - name: Browser coverage - offline-library
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.offline-library.config.ts --output test-results/offline-library --trace retain-on-failure
+      - name: Browser coverage - orv64
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.orv64.config.ts --output test-results/orv64 --trace retain-on-failure
+      - name: Browser coverage - orv65
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.orv65.config.ts --output test-results/orv65 --trace retain-on-failure
+      - name: Browser coverage - orv68
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.orv68.config.ts --output test-results/orv68 --trace retain-on-failure
+      - name: Browser coverage - orv69
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.orv69.config.ts --output test-results/orv69 --trace retain-on-failure
+      - name: Browser coverage - a24
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.a24.config.ts --output test-results/a24 --trace retain-on-failure
+      - name: Browser coverage - orv71
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.orv71.config.ts --output test-results/orv71 --trace retain-on-failure
+      - name: Browser coverage - orv72
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.orv72.config.ts --output test-results/orv72 --trace retain-on-failure
+      - name: Browser coverage - orv73
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.orv73.config.ts --output test-results/orv73 --trace retain-on-failure
+      - name: Browser coverage - progressive
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.progressive.config.ts --output test-results/progressive --trace retain-on-failure
+      - name: Browser coverage - result-parity
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.result-parity.config.ts --output test-results/result-parity --trace retain-on-failure
+      - name: Browser coverage - result-static
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.result-static.config.ts --output test-results/result-static --trace retain-on-failure
+      - name: Browser coverage - renderer
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.renderer.config.ts --output test-results/renderer --trace retain-on-failure
       - name: Restore licensed exact-audio test fixture
+        id: audio-fixture
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
         run: |
           command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
           python scripts/restore-audio1.py
-      - run: node scripts/build-source-flow.mjs
+      - id: source-build
+        if: ${{ !cancelled() && steps.audio-fixture.outcome == 'success' }}
+        run: node scripts/build-source-flow.mjs
       - name: Source and original-UI integration (mock backend only)
-        run: npx playwright test --config playwright.source.config.ts --grep-invert "real origin backend|actual production origin|original UI reads live"
-      - run: npx playwright test --config playwright.pwa.config.ts
+        if: ${{ !cancelled() && steps.source-build.outcome == 'success' }}
+        run: npx playwright test --config playwright.source.config.ts --grep-invert "real origin backend|actual production origin|original UI reads live" --output test-results/source --trace retain-on-failure
+      - name: Browser coverage - pwa
+        if: ${{ !cancelled() && steps.browser-ready.outcome == 'success' }}
+        run: npx playwright test --config playwright.pwa.config.ts --output test-results/pwa --trace retain-on-failure
       - name: Keep quality failure evidence
         if: failure()
         uses: actions/upload-artifact@v4

@@ -1,3 +1,12 @@
+import { isOpusRecord, type PlayableSourceRecord } from './playable-source';
+import { listOpus35Metadata } from './opus/opus35-store';
+import { readVerifiedOpusByRoots } from './opus/opus-cache.mjs';
+import { encodeOpus35Share, decodeOpus35Share } from './opus/opus35-share';
+import {
+  rememberBuiltinResultOwner,
+  isArchivedBuiltinResult,
+} from './builtin-result-owner';
+import { captureLibraryRowFocus } from './library-row-focus';
 import { savedLocalGenerated } from './local-generated-library';
 import { youtubeAddIcon } from './library-actions';
 import {
@@ -95,6 +104,7 @@ import {
   externalSource,
   externalAudio,
   installExternalSource,
+  sourceId,
 } from './external-catalog';
 import { FULLSCREEN_WARNING } from './fullscreen-labels';
 import { saveSharedReplay, loadSharedReplay, ShareError } from './share-api';
@@ -255,8 +265,14 @@ let startup: StartupAttempt | undefined;
 type UiResult = Omit<SharedResult, 'song'> & { song: string };
 let lastResult: UiResult | undefined;
 let localSessionKey: string | undefined;
+/** True only when the current local session was opened from the archive
+ * (library handoff or ?local= route), not archived after a fresh play.
+ * A fresh play's address stays the canonical shareable fragment link. */
+let localSessionOpened = false;
 const ownResults = new WeakSet<UiResult>();
-let receivedShare: { fragment: string; data: ExternalSharedReplay } | undefined;
+let receivedShare:
+  | { fragment: string; data: ExternalSharedReplay<PlayableSourceRecord> }
+  | undefined;
 let shareRouteRequest = 0;
 let navigationVersion = 0;
 let sessionReplay: RuntimeReplay | undefined,
@@ -388,7 +404,14 @@ async function shareLibrarySong(id: string) {
   if (!item || sharingSong) return;
   sharingSong = true;
   try {
-    await copySongLink(createSongLink(item.record, location.origin));
+    await copySongLink(
+      createSongLink(
+        item.record,
+        location.origin,
+        item.song.title,
+        item.song.subtitle,
+      ),
+    );
     toast(
       settings.language === 'ko' ? '곡 링크를 복사했어요' : 'Song link copied',
     );
@@ -675,6 +698,7 @@ async function openLocalSession(id: string) {
     replayIssue = false;
     lastResult = session.result;
     localSessionKey = session.key;
+    localSessionOpened = true;
     ownResults.add(session.result);
     showResult(session.result);
   } catch {
@@ -923,6 +947,10 @@ function chartLevel(
     : 'SC --';
 }
 function songCards() {
+  const restoreRowFocus = captureLibraryRowFocus(
+    $('#songs'),
+    screen === 'select',
+  );
   const listScroll = $('#songs').scrollTop;
   const visible = visibleSongIndices();
   $('#songs').innerHTML = visible
@@ -989,12 +1017,14 @@ function songCards() {
     } else {
       const retry = document.createElement('button');
       retry.className = 'quiet';
+      retry.dataset.libraryFocusAction = 'retry';
       retry.textContent = importRetryLabel(settings.language);
       retry.onclick = () => void reconcileLibraryRow(row);
       actions.append(retry);
     }
     const inspect = document.createElement('button');
     inspect.className = 'quiet';
+    inspect.dataset.libraryFocusAction = 'inspect';
     inspect.textContent = deviceInspectionButton(settings.language);
     inspect.onclick = async () => {
       const dialog = document.createElement('dialog');
@@ -1020,11 +1050,13 @@ function songCards() {
     actions.append(inspect);
     const history = document.createElement('button');
     history.className = 'quiet';
+    history.dataset.libraryFocusAction = 'history';
     history.textContent = externalLabels(settings.language).replay;
     history.onclick = () => void openVideoHistory(row.videoId);
     actions.append(history);
     const remove = document.createElement('button');
     remove.className = 'quiet';
+    remove.dataset.libraryFocusAction = 'remove';
     remove.textContent = removalLabels(settings.language).button;
     remove.onclick = () => openSongRemoval('yt:' + row.videoId, row.title);
     actions.append(remove);
@@ -1096,6 +1128,7 @@ function songCards() {
     } else {
       const retry = document.createElement('button');
       retry.className = 'quiet';
+      retry.dataset.libraryFocusAction = 'retry';
       retry.textContent = importRetryLabel(settings.language);
       retry.onclick = () => {
         addYoutube.click();
@@ -1104,6 +1137,7 @@ function songCards() {
       };
       const dismiss = document.createElement('button');
       dismiss.className = 'quiet';
+      dismiss.dataset.libraryFocusAction = 'dismiss';
       dismiss.textContent = '×';
       dismiss.setAttribute('aria-label', t('close'));
       dismiss.onclick = () => {
@@ -1139,7 +1173,20 @@ function songCards() {
     return libraryAddOrder.rank(video(a)) - libraryAddOrder.rank(video(b));
   });
   $('#songs').append(...rows);
+  for (const row of rows) {
+    const el = row as HTMLElement;
+    const song =
+      el.dataset.song !== undefined
+        ? SONGS[Number(el.dataset.song)]
+        : undefined;
+    const video =
+      el.dataset.canonicalVideo ??
+      el.dataset.importVideo ??
+      (song ? externalSource(song.id)?.record.videoId : undefined);
+    el.dataset.libraryFocusKey = video ? 'yt:' + video : song?.id;
+  }
   $('#songs').scrollTop = listScroll;
+  restoreRowFocus(screen === 'select');
   if (libraryHydrated && screen === 'select')
     rememberLibraryFirstPaint(
       visible.map((i) => SONGS[i].id),
@@ -1179,11 +1226,10 @@ function syncSettings() {
     !makeChart(selected, 'sc', settings.lanes).length
   )
     settings.difficulty = 'high';
-  $<HTMLButtonElement>('#start').disabled = !makeChart(
-    selected,
-    settings.difficulty,
-    settings.lanes,
-  ).length;
+  $<HTMLButtonElement>('#start').disabled =
+    mobilePlaybackOnly() ||
+    preparing ||
+    !makeChart(selected, settings.difficulty, settings.lanes).length;
   document.querySelectorAll<HTMLButtonElement>('[data-diff]').forEach((b) => {
     const diff = b.dataset.diff as Difficulty;
     b.disabled = !makeChart(selected, diff, settings.lanes).length;
@@ -1329,7 +1375,12 @@ async function prepare(attempt: StartupAttempt, joinGatePreload = false) {
   await attempt.wait(audio.activate());
   const song = SONGS[songIndex];
   const external = externalSource(song.id);
-  if (external?.record.manifestSha256 && !external.bytes) {
+  if (
+    external &&
+    !isOpusRecord(external.record) &&
+    external.record.manifestSha256 &&
+    !external.bytes
+  ) {
     const local = await attempt.wait(localAudio(external.record));
     if (local) external.bytes = local.bytes;
     else {
@@ -1387,6 +1438,7 @@ async function start() {
   if (!playReplay) {
     localBuiltinNotes = undefined;
     localSessionKey = undefined;
+    localSessionOpened = false;
   }
   if (screen === 'home') {
     $('#home-start').click();
@@ -1613,6 +1665,7 @@ async function start() {
     let bufferingAt: number | undefined;
     if ('progressive' in track && track.progressive) {
       const item = track.progressive;
+      if (isOpusRecord(item.record)) throw Error('opus35_not_progressive');
       const playingClock = clock;
       await attempt.wait(
         clock.playProgressive(
@@ -1979,7 +2032,15 @@ function finish() {
       replayText = '';
     }
     if (lastResult === completed) {
-      history.replaceState(null, '', resultLink(completed));
+      const link = resultLink(completed);
+      if (localSessionKey?.startsWith('builtin:') && !localSessionOpened) {
+        await rememberBuiltinResultOwner(
+          new URL(link).hash.slice(1),
+          localSessionKey,
+        );
+      }
+      if (lastResult !== completed) return;
+      history.replaceState(null, '', link);
       replayIssue = !savedReplay;
       syncReplayButton();
     }
@@ -1994,7 +2055,10 @@ function finish() {
 function resultLink(result: UiResult) {
   if (receivedShare?.data.result === result)
     return new URL('/result/#' + receivedShare.fragment, location.origin).href;
-  if (externalSource(result.song) || localSessionKey?.startsWith('builtin:'))
+  if (
+    externalSource(result.song) ||
+    (localSessionOpened && localSessionKey?.startsWith('builtin:'))
+  )
     return new URL(
       '/result/?local=' + encodeURIComponent(localSessionKey ?? result.song),
       location.origin,
@@ -2585,7 +2649,7 @@ $('#share-result').onclick = async () => {
       throw new ShareError(400);
     const item = externalSource(lastResult!.song);
     const fragment = item
-      ? await encodeExternalShare({
+      ? await encodeCodecShare({
           record: item.record,
           replay: savedReplay!,
           result: lastResult!,
@@ -2990,14 +3054,16 @@ async function openExternalShare(fragment: string) {
   const request = ++shareRouteRequest;
   const href = location.href;
   const navigation = navigationVersion;
-  const data = await decodeExternalShare(fragment);
+  const data = fragment.startsWith('v=6&d=')
+    ? await decodeOpus35Share(fragment)
+    : await decodeExternalShare(fragment);
   if (
     request !== shareRouteRequest ||
     location.href !== href ||
     navigationVersion !== navigation
   )
     return;
-  await pinSource(data.record);
+  if (!isOpusRecord(data.record)) await pinSource(data.record);
   if (
     request !== shareRouteRequest ||
     location.href !== href ||
@@ -3027,7 +3093,7 @@ function readRoute(initial = false) {
   const fragment = location.hash.slice(1);
   if (
     location.pathname === '/result/' &&
-    fragment.startsWith('v=5&d=') &&
+    (fragment.startsWith('v=5&d=') || fragment.startsWith('v=6&d=')) &&
     receivedShare?.fragment !== fragment
   ) {
     const routeHref = location.href,
@@ -3079,6 +3145,7 @@ function readRoute(initial = false) {
       : null);
   if (shared && !externalShared) {
     lastResult = shared;
+    if (verifiedOwnFragment === location.hash.slice(1)) ownResults.add(shared);
     const replayParams = new URLSearchParams(location.hash.slice(1));
     const encoded = replayParams.get('r');
     replayExpected = replayParams.get('rp') === '1' || !!encoded;
@@ -3271,6 +3338,7 @@ async function resolveSharedReplay(
   }
   return loadSharedReplay(id);
 }
+let verifiedOwnFragment: string | null = null;
 let initialArrivalKey: string | null = null;
 let initialArrivalFragment: string | null = null;
 async function readInitialRoute() {
@@ -3285,7 +3353,10 @@ async function readInitialRoute() {
     navigationVersion === initialNavigation && location.href === expectedHref;
   const id = new URLSearchParams(location.search).get('s');
   if (!id) {
-    if (location.hash.startsWith('#v=5&d=')) {
+    if (
+      location.hash.startsWith('#v=5&d=') ||
+      location.hash.startsWith('#v=6&d=')
+    ) {
       try {
         await openExternalShare(location.hash.slice(1));
       } catch {
@@ -3303,6 +3374,12 @@ async function readInitialRoute() {
       history.replaceState(null, '', '/select/');
       toast(shareLabels(settings.language).missing);
     }
+    const fragment = location.hash.slice(1);
+    if (location.pathname === '/result/' && fragment.startsWith('v=4&')) {
+      const own = await isArchivedBuiltinResult(fragment);
+      if (!stillInitial()) return;
+      verifiedOwnFragment = own ? fragment : null;
+    }
     readRoute(true);
     await replayEncoding;
     document.documentElement.removeAttribute('data-result-pending');
@@ -3316,7 +3393,7 @@ async function readInitialRoute() {
     const loaded = await resolveSharedReplay(id);
     if (!stillInitial()) return;
     const params = new URLSearchParams(loaded.fragment);
-    if (params.get('v') === '5') {
+    if (['5', '6'].includes(params.get('v') || '')) {
       shortCache.set(loaded.fragment, { id, expiresAt: loaded.expiresAt });
       history.replaceState(null, '', '/result/#' + loaded.fragment);
       expectedHref = location.href;
@@ -3340,6 +3417,10 @@ async function readInitialRoute() {
     if (params.get('rp') === '1' && !encoded) throw new ShareError(400);
     shortCache.set(loaded.fragment, { id, expiresAt: loaded.expiresAt });
     history.replaceState(null, '', '/result/#' + loaded.fragment);
+    expectedHref = location.href;
+    const own = await isArchivedBuiltinResult(loaded.fragment);
+    if (!stillInitial()) return;
+    verifiedOwnFragment = own ? loaded.fragment : null;
     readRoute();
   } catch (error) {
     if (!stillInitial()) return;
@@ -3373,7 +3454,9 @@ const deferredLibraryRoute =
   initialQuery.get('song')?.startsWith('yt-') ||
   initialQuery.has('local') ||
   initialQuery.has('s') ||
-  location.hash.startsWith('#v=5&d=');
+  location.hash.startsWith('#v=5&d=') ||
+  location.hash.startsWith('#v=6&d=') ||
+  location.hash.startsWith('#v=4&');
 // A37: until the library hydrate finishes and the initial route is read, no
 // screen owns this route; the default markup would paint the home screen's
 // start button under the user's refresh.
@@ -3423,9 +3506,8 @@ async function reconcileLibraryRow(row: CanonicalLibraryRow) {
   }
 }
 const displayMetadataRequests = new Set<string>();
-function recoverDisplayMetadata(
-  record: import('./external-source').SourceRecord,
-) {
+function recoverDisplayMetadata(record: PlayableSourceRecord) {
+  if (isOpusRecord(record)) return;
   const key =
     record.videoId + ':' + record.audioSha256 + ':' + record.chartSetSha256;
   if (displayMetadataRequests.has(key)) return;
@@ -3470,6 +3552,17 @@ function recoverDisplayMetadata(
 }
 async function initializeLibrary() {
   try {
+    const opusRows = await listOpus35Metadata();
+    for (const row of opusRows) {
+      const item = installExternalSource(
+        row.record,
+        row.title,
+        undefined,
+        row.jobId,
+        row.author,
+      );
+      if (!SONGS.some((s) => s.id === item.song.id)) SONGS.push(item.song);
+    }
     for (const record of await allPinnedSources()) {
       const saved = await localMetadata(record);
       const item = installExternalSource(
@@ -3512,6 +3605,11 @@ async function initializeLibrary() {
         /* Keep archive and pending recovery, never select an unverified chart. */
       }
     }
+    for (const row of opusRows) {
+      const id = sourceId(row.record);
+      canonicalPreferred.set(row.record.videoId, id);
+      canonicalPending.delete(row.record.videoId);
+    }
   } catch {
     if (location.pathname !== '/replays/' && location.pathname !== '/replays')
       toast(REPLAY_READ_ERROR[settings.language]);
@@ -3550,6 +3648,7 @@ async function initializeLibrary() {
       replayIssue = false;
       songIndex = SONGS.findIndex((s) => s.id === session.replay.song);
       localSessionKey = session.key;
+      localSessionOpened = true;
       ownResults.add(session.result);
       settings.lanes = session.replay.lanes;
       settings.difficulty = session.replay.difficulty;
@@ -3661,3 +3760,24 @@ document.addEventListener('orvio:art-ready', (event) => {
       `url("${url}"), url("${ART_FALLBACK}")`,
     );
 });
+
+async function encodeCodecShare(
+  data: import('./external-share').ExternalSharedReplay<PlayableSourceRecord>,
+) {
+  if (!isOpusRecord(data.record))
+    return encodeExternalShare({ ...data, record: data.record });
+  const received = receivedShare?.data;
+  const descriptorBytes =
+    received &&
+    isOpusRecord(received.record) &&
+    sourceId(received.record) === sourceId(data.record) &&
+    'descriptorBytes' in received
+      ? (received.descriptorBytes as Uint8Array)
+      : (await readVerifiedOpusByRoots(data.record))?.descriptorBytes;
+  if (!descriptorBytes) throw Error('opus35_share_descriptor_unavailable');
+  return encodeOpus35Share({
+    ...data,
+    record: data.record,
+    descriptorBytes,
+  });
+}

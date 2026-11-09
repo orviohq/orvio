@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { LANGUAGES } from '../src/i18n';
+import { LANGUAGES, translate, type Language } from '../src/i18n';
 import { PATCHES } from '../src/patch-notes';
-test('thirteen-language layout states, fixed binding capture size, symbols and miniature position controls', async ({
-  page,
-}) => {
-  for (const width of [320, 390, 768, 1280])
-    for (const language of Object.keys(LANGUAGES)) {
+
+for (const width of [320, 390, 768, 1280])
+  for (const language of Object.keys(LANGUAGES))
+    test(`layout binding capture symbols positions ${width}px ${language}`, async ({
+      page,
+    }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.addInitScript(
         (l) =>
@@ -17,39 +18,38 @@ test('thirteen-language layout states, fixed binding capture size, symbols and m
       );
       await page.goto('/select/');
       await page.click('#open-settings');
+      if (await page.locator('#settings-keys-tab').isVisible())
+        await page.click('#settings-keys-tab');
       const dims = () =>
-        page.locator('.binding-keys .key-bind').evaluateAll((es) =>
+        page.locator('.binding-master .key-bind').evaluateAll((es) =>
           es.map((e) => ({
-            w: e.getBoundingClientRect().width,
-            y: e.getBoundingClientRect().y,
-            x: e.getBoundingClientRect().x,
-            h: e.getBoundingClientRect().height,
+            w: (e as HTMLElement).offsetWidth,
+            h: (e as HTMLElement).offsetHeight,
+            x: (e as HTMLElement).offsetLeft,
+            y: (e as HTMLElement).offsetTop,
           })),
         );
+      await page.locator('[data-preview-mode="5"]').click();
       const before = await dims();
-      await page.locator('[data-keymode="5"][data-slot="0"]').click();
+      await page.locator('[data-slot="1"]').click();
       expect(await dims()).toEqual(before);
-      await expect(
-        page.locator('#bind-hint>span[aria-hidden=false]'),
-      ).toContainText(/KEY/);
-      await expect(page.locator('.listening')).toHaveText('●');
+      await expect(page.locator('#bind-hint')).toContainText(
+        translate(language as Language, 'listening'),
+      );
+      await expect(page.locator('.listening')).toContainText('●');
       await page.keyboard.press(',');
-      await page.keyboard.press('.');
-      await page.keyboard.press('/');
-      await page.keyboard.press('Space');
-      await page.keyboard.press('Escape');
-      await expect(
-        page.locator('[data-keymode="5"][data-slot="0"]'),
-      ).toHaveText(',');
-      await expect(
-        page.locator('[data-keymode="5"][data-slot="1"]'),
-      ).toHaveText('.');
-      await expect(
-        page.locator('[data-keymode="5"][data-slot="2"]'),
-      ).toHaveText('/');
-      await expect(
-        page.locator('[data-keymode="5"][data-slot="3"]'),
-      ).toHaveText('␣');
+      for (const [slot, key] of [
+        [2, '.'],
+        [3, '/'],
+        [4, 'Space'],
+      ] as const) {
+        await page.locator(`[data-slot="${slot}"]`).click();
+        await page.keyboard.press(key);
+      }
+      for (const [index, symbol] of [',', '.', '/', '␣'].entries())
+        await expect(
+          page.locator('.binding-preview kbd').nth(index),
+        ).toHaveText(symbol);
       await expect(page.locator('.position-preview')).toHaveCount(3);
       await expect(page.locator('[data-pos="left"]')).toHaveAttribute(
         'aria-pressed',
@@ -78,8 +78,7 @@ test('thirteen-language layout states, fixed binding capture size, symbols and m
           () => document.documentElement.scrollWidth <= innerWidth + 1,
         ),
       ).toBe(true);
-    }
-});
+    });
 test('all releases and languages on website with safe small-screen layout', async ({
   page,
 }) => {

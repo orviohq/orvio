@@ -88,7 +88,9 @@ test('actual builtin completion persists frozen chart session and reload collect
   await expect(page.locator('#results')).toBeVisible();
   expect(errors).toEqual([]);
   await page.goto('/replays/');
-  await page.screenshot({ path: '/downloads/a24-builtin-session-page.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a24-builtin-session-page.png'),
+  });
 });
 test('builtin archive refuses tampered chart and mode while preserving untouched sessions', async ({
   page,

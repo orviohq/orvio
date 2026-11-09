@@ -101,7 +101,6 @@ test('ORV61 larger art, responsive rows and real selection contracts', async ({
   await page.reload();
   await expect(page.locator('#songs>[data-song]')).toHaveCount(11);
   await page.evaluate(() => document.fonts.ready);
-  fs.mkdirSync('/downloads/orv61', { recursive: true });
   for (const [w, h] of [
     [1280, 800],
     [979, 1173],
@@ -139,7 +138,7 @@ test('ORV61 larger art, responsive rows and real selection contracts', async ({
       ),
     ).toBe(true);
     await page.screenshot({
-      path: `/downloads/orv61/list-${w}x${h}.png`,
+      path: test.info().outputPath(`orv61/list-${w}x${h}.png`),
       fullPage: true,
     });
     const listBox = await page.locator('#songs').boundingBox();
@@ -148,7 +147,9 @@ test('ORV61 larger art, responsive rows and real selection contracts', async ({
     await expect(page.locator('#start')).toBeInViewport();
     const start = await page.locator('#start').boundingBox();
     expect(start!.height).toBeGreaterThanOrEqual(44);
-    await page.screenshot({ path: `/downloads/orv61/controls-${w}x${h}.png` });
+    await page.screenshot({
+      path: test.info().outputPath(`orv61/controls-${w}x${h}.png`),
+    });
     await page.locator('#songs>[data-song]').last().click();
     await page.locator('#songs').scrollIntoViewIfNeeded();
     const last = await page.locator('#songs>.selected').evaluate((e) => {

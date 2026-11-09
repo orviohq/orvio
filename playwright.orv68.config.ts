@@ -1,10 +1,8 @@
 import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e',
-  testMatch: [
-    'loading-library-orv68.spec.ts',
-    'failed-import-layout-orv65.spec.ts',
-  ],
+  // Sibling dedicated configs own the other static library specs; run each once in CI.
+  testMatch: 'loading-library-orv68.spec.ts',
   workers: 2,
   timeout: 30000,
   use: {

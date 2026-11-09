@@ -14,14 +14,18 @@ test('red miss feedback resets for next song, actual end retry and replay start'
   await page.click('#start');
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
   await expect(page.locator('#highway-wrap')).not.toHaveClass(/danger/);
-  await page.screenshot({ path: '/downloads/coherent-a17-next-start.png' });
+  await page.screenshot({
+    path: test.info().outputPath('coherent-a17-next-start.png'),
+  });
   // Let a real complete song resolve naturally. Last misses legitimately set danger.
   await expect(page.locator('#results')).toBeVisible({ timeout: 55000 });
   await expect(page.locator('#highway-wrap')).toHaveClass(/danger/);
   await page.click('#retry');
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
   await expect(page.locator('#highway-wrap')).not.toHaveClass(/danger/);
-  await page.screenshot({ path: '/downloads/coherent-a17-result-retry.png' });
+  await page.screenshot({
+    path: test.info().outputPath('coherent-a17-result-retry.png'),
+  });
   await expect(page.locator('#highway-wrap')).toHaveClass(/danger/, {
     timeout: 12000,
   });
@@ -33,7 +37,9 @@ test('red miss feedback resets for next song, actual end retry and replay start'
       (window as any).orvioDiagnostics.replayActive,
   );
   await expect(page.locator('#highway-wrap')).not.toHaveClass(/danger/);
-  await page.screenshot({ path: '/downloads/coherent-a17-replay-start.png' });
+  await page.screenshot({
+    path: test.info().outputPath('coherent-a17-replay-start.png'),
+  });
 });
 test('English start-game wording is visible and accessible on home and selection', async ({
   page,
@@ -48,7 +54,9 @@ test('English start-game wording is visible and accessible on home and selection
   await expect(
     page.getByRole('button', { name: 'START GAME ENTER ↵', exact: true }),
   ).toBeVisible();
-  await page.screenshot({ path: '/downloads/coherent-a19-home.png' });
+  await page.screenshot({
+    path: test.info().outputPath('coherent-a19-home.png'),
+  });
   await page.click('#home-start');
   await expect(page.locator('#start')).toContainText('START GAME');
   expect(await page.locator('body').innerText()).not.toContain('START SESSION');

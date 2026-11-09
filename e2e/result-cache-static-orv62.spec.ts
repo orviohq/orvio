@@ -217,23 +217,45 @@ test('ORV-62 static: warm ?s= projection is visible with typed badges BEFORE mod
   const url = '/result/?s=static-demo-62-00000001';
   await page.goto(url);
   await expect(page.locator('#results')).toBeVisible();
-  await slowModules(context);
+  // Hold the warm visit's modules until the pre-module snapshot is taken.
+  // A timed delay only narrows the race: under CI contention the assertion
+  // chain can still cross the hydration boundary mid-read, and once the
+  // verified render consumes the projection (#result-first-paint is
+  // removed) the remaining locators fail with element(s) not found even
+  // though the projection painted correctly (run 42552770144 #80).
+  let releaseModules!: () => void;
+  const modulesHeld = new Promise<void>((resolve) => {
+    releaseModules = resolve;
+  });
+  await context.route('**/_astro/*.js', async (route) => {
+    await modulesHeld;
+    await route.continue();
+  });
   await page.goto(url, { waitUntil: 'commit' });
-  // 150ms into a 400ms module wait: the projection must already be painted.
+  // 150ms into the held module wait: the projection must already be painted.
   await page.waitForTimeout(150);
   await expect(page.locator('#result-first-paint')).toBeVisible();
-  await expect(page.locator('#rp-score')).toHaveText('500,000');
-  await expect(page.locator('#rp-song')).toHaveText('First Light');
-  await expect(page.locator('#rp-options .result-option-keys b')).toHaveText(
-    '5K',
-  );
-  await expect(
-    page.locator('#rp-options .result-option-difficulty b'),
-  ).toHaveText('NM 2');
+  const projection = await page.evaluate(() => {
+    const q = (s: string) => document.querySelector(s);
+    return {
+      score: q('#rp-score')?.textContent ?? null,
+      song: q('#rp-song')?.textContent ?? null,
+      keys: q('#rp-options .result-option-keys b')?.textContent ?? null,
+      difficulty:
+        q('#rp-options .result-option-difficulty b')?.textContent ?? null,
+      watchReplayClass: q('#rp-watch-replay')?.className ?? null,
+      feverClass: q('#rp-fever')?.className ?? null,
+    };
+  });
+  expect(projection.score).toBe('500,000');
+  expect(projection.song).toBe('First Light');
+  expect(projection.keys).toBe('5K');
+  expect(projection.difficulty).toBe('NM 2');
   // Replay-less fragment: the projection must not invent a watch button.
-  await expect(page.locator('#rp-watch-replay')).toHaveClass(/hidden/);
-  await expect(page.locator('#rp-fever')).toHaveClass(/hidden/);
+  expect(projection.watchReplayClass).toMatch(/hidden/);
+  expect(projection.feverClass).toMatch(/hidden/);
   await page.screenshot({ path: 'test-results/orv62-pre-module-150ms.png' });
+  releaseModules();
   await expect(page.locator('#results')).toBeVisible({ timeout: 20000 });
   const outcome = await page.evaluate(
     () => (window as any).__resultFirstPaintOutcome,

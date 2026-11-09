@@ -122,6 +122,8 @@ test('browser consumers retain separate transfer, frozen identity and cancellati
     cancellation: ['rejected', 'fulfilled'],
     count: 8,
   });
-  await page.screenshot({ path: '/downloads/orv47-browser-select.png' });
+  await page.screenshot({
+    path: test.info().outputPath('orv47-browser-select.png'),
+  });
   console.log('OWNERSHIP_BROWSER', JSON.stringify(proof));
 });

@@ -29,6 +29,17 @@ test('physical custom keys stay on their pixel lane across repeated starts and 5
       return result;
     } as any;
   });
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'orvio.settings.v1',
+      JSON.stringify({
+        keys: {
+          5: ['KeyN', 'KeyM', 'Comma', 'Period', 'Slash'],
+          7: ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT', 'KeyY', 'KeyU'],
+        },
+      }),
+    );
+  });
   await page.goto('/select/');
   // Isolate the canvas lane geometry from DOM judgment overlays. BREAK can
   // dim the whole clipped screenshot even while the actual key glow is right.
@@ -36,13 +47,7 @@ test('physical custom keys stay on their pixel lane across repeated starts and 5
   await page.addStyleTag({
     content: '#impact, #judge, #combo { visibility: hidden !important; }',
   });
-  await page.click('#open-settings');
-  await page.click('[data-keymode="5"][data-slot="0"]');
-  for (const key of ['n', 'm', ',', '.', '/']) await page.keyboard.press(key);
-  await page.click('[data-keymode="7"][data-slot="0"]');
-  for (const key of ['q', 'w', 'e', 'r', 't', 'y', 'u'])
-    await page.keyboard.press(key);
-  await page.locator('#settings .close').click();
+  // Legacy mode overrides remain exact across unified-settings migration.
   // Use the standard BLIND option to remove note heads and hold bodies from
   // this key-geometry measurement, without changing the renderer or chart.
   await page.keyboard.press('F3');

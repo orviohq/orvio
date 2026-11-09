@@ -1,3 +1,4 @@
+import { decodeOpus35Song } from './opus/opus35-song';
 import {
   parseSongShare,
   inspectSongLink,
@@ -72,7 +73,9 @@ cancel.focus();
 void (async () => {
   let identity;
   try {
-    identity = parseSongShare(location.hash);
+    identity = location.hash.startsWith('#v=2&d=')
+      ? await decodeOpus35Song(location.hash)
+      : parseSongShare(location.hash);
   } catch {
     status.textContent = text.invalid;
     clearTimeout(timer);

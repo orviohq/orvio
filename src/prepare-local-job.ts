@@ -13,56 +13,79 @@ import { inspectWav } from './canonical-pcm.mjs';
 import { audioAtStage } from './audio-error-stage';
 import type { PreparedSource } from './external-source-flow';
 import type { ImportStage } from './import-progress';
+import { traceSpan, type ImportTrace } from './import-trace';
 /** A confirmed GET, not a POST mode echo, decides the new local-generation path. */
 export async function prepareClientJob(
   videoId: string,
   jobId: string,
   signal: AbortSignal,
   onStage?: (s: ImportStage) => void,
+  trace?: ImportTrace | null,
 ): Promise<PreparedSource | null> {
-  const job = await readAudioJob(jobId, signal);
+  const job = await traceSpan(trace, 'job-read', () =>
+    readAudioJob(jobId, signal),
+  );
   if (
     job.generationMode !== 'client' ||
     job.status !== 'done' ||
     job.canonical?.status !== 'client_generation'
   )
     return null;
-  const canonical = await refreshCanonical(videoId, signal);
+  const canonical = await traceSpan(trace, 'canonical-lookup', () =>
+    refreshCanonical(videoId, signal),
+  );
   if (canonical.state === 'ready') {
-    const cached = await localAudio(canonical.record);
+    const cached = await traceSpan(trace, 'local-audio-lookup', () =>
+      localAudio(canonical.record),
+    );
     return {
       record: canonical.record,
       bytes:
-        cached?.bytes ?? (await loadCanonicalAudio(canonical.record, signal)),
+        cached?.bytes ??
+        (await traceSpan(trace, 'canonical-audio-download', () =>
+          loadCanonicalAudio(canonical.record, signal),
+        )),
       restored: true,
     };
   }
   if (canonical.state !== 'missing') throw new AudioJobError('request_timeout');
-  const saved = await savedLocalGenerated(videoId);
+  const saved = await traceSpan(trace, 'local-generated-lookup', () =>
+    savedLocalGenerated(videoId),
+  );
   if (saved) {
     if (saved.audioSha256 !== job.audio?.sha256)
       throw new AudioJobError('source_changed');
-    const cached = await localAudio(saved);
+    const cached = await traceSpan(trace, 'local-audio-lookup', () =>
+      localAudio(saved),
+    );
     return {
       record: saved,
-      bytes: cached?.bytes ?? (await loadRetainedAudio(saved, signal)),
+      bytes:
+        cached?.bytes ??
+        (await traceSpan(trace, 'retained-audio-download', () =>
+          loadRetainedAudio(saved, signal),
+        )),
       restored: true,
     };
   }
   if (!job.audio || job.canonical.audioSha256 !== job.audio.sha256)
     throw new AudioJobError('integrity_failed');
   onStage?.('downloading');
-  const bytes = await loadAudio(job, videoId, job.audio.sha256, signal);
+  const bytes = await traceSpan(trace, 'audio-download', () =>
+    loadAudio(job, videoId, job.audio!.sha256, signal, trace),
+  );
   // This download uses the existing audio GET route. It has never been
   // attached to catalog/playback state; the worker takes sole ownership, no copy.
   onStage?.('charting');
-  const generated = await audioAtStage('analysis', () =>
-    prepareLocalChartOwned({
-      bytes,
-      videoId,
-      audioSha256: job.audio!.sha256,
-      signal,
-    }),
+  const generated = await traceSpan(trace, 'chart-local', () =>
+    audioAtStage('analysis', () =>
+      prepareLocalChartOwned({
+        bytes,
+        videoId,
+        audioSha256: job.audio!.sha256,
+        signal,
+      }),
+    ),
   );
   signal.throwIfAborted();
   const r = generated.record,
@@ -78,10 +101,14 @@ export async function prepareClientJob(
   )
     throw new AudioJobError('integrity_failed');
   const localRecord = { ...r, sourceProvenance: 'local-current35-v1' as const };
-  const digest = await recordDigest(localRecord);
+  const digest = await traceSpan(trace, 'chart-digest', () =>
+    recordDigest(localRecord),
+  );
   signal.throwIfAborted();
-  await audioAtStage('storage', () =>
-    rememberLocalGenerated(localRecord, digest, signal),
+  await traceSpan(trace, 'idb-save', () =>
+    audioAtStage('storage', () =>
+      rememberLocalGenerated(localRecord, digest, signal),
+    ),
   );
   signal.throwIfAborted();
   return { record: localRecord, bytes: generated.bytes, restored: false };

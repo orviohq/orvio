@@ -41,7 +41,9 @@ test('options separate from system settings, saved URL, keyboard, defaults and s
   const url = page.url();
   expect(url).toContain('shuffle=random');
   await page.reload();
-  await expect(page.locator('#ready-screen')).toBeVisible();
+  // A37: direct play refresh must not flash the ready/start button.
+  await expect(page.locator('#song-loading')).toBeVisible();
+  await expect(page.locator('#ready-screen')).toBeHidden();
   await page.keyboard.press('F3');
   await expect(page.locator('#game-options')).toBeVisible();
   await page.keyboard.press('Escape');

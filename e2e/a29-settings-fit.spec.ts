@@ -38,14 +38,16 @@ test('all unified previews keep reset onscreen in every language on compact scre
       }
       if (width === 320 && (lang === 'fr' || lang === 'ru'))
         await page.screenshot({
-          path: `/downloads/a29-settings-fit-${lang}-320.png`,
+          path: test.info().outputPath(`a29-settings-fit-${lang}-320.png`),
         });
     }
     await page.locator('#reset').focus();
     await page.keyboard.press('Enter');
     await expect(page.locator('#reset')).toBeFocused();
     if (width === 390)
-      await page.screenshot({ path: '/downloads/a29-settings-fit-390.png' });
+      await page.screenshot({
+        path: test.info().outputPath('a29-settings-fit-390.png'),
+      });
     await page.keyboard.press('Escape');
   }
 });

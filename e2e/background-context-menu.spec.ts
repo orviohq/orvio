@@ -72,6 +72,17 @@ test('real background loading/error rows context removal supports keyboard, canc
     return { records, bytes: Array.from(bytes), sha };
   });
   const audio = Buffer.from(fixture.bytes);
+  const menu = page.locator('.library-context-menu');
+  const remove = menu.locator('[data-action="remove"]');
+  const share = menu.locator('[data-action="share"]');
+  const removeUnavailableRow = async () => {
+    await expect(menu).toBeVisible();
+    await expect(share).toBeHidden();
+    await expect(remove).toBeVisible();
+    await expect(remove).toBeEnabled();
+    await expect(menu.getByRole('menuitem')).toHaveCount(1);
+    await remove.click();
+  };
   const posts: string[] = [];
   let failCanonical = false;
   let releaseAudio!: () => void;
@@ -137,14 +148,17 @@ test('real background loading/error rows context removal supports keyboard, canc
   await submit('BBBBBBBBBBB');
   const loading = page.locator('[data-import-video="BBBBBBBBBBB"]');
   await expect(loading).toHaveAttribute('data-state', 'loading');
+  // The fixture holds the audio response. Wait for that real loading phase,
+  // rather than focus a transient checking row that the phase change replaces.
+  await expect(loading).toHaveAttribute('data-import-stage', 'downloading');
   await loading.focus();
   await page.keyboard.press('Shift+F10');
   await expect(page.locator('.library-context-menu')).toBeVisible();
-  await page.locator('.library-context-menu button').click();
+  await removeUnavailableRow();
   await page.click('#remove-song-cancel');
   await expect(loading).toBeVisible();
   await loading.click({ button: 'right', force: true });
-  await page.locator('.library-context-menu button').click();
+  await removeUnavailableRow();
   await page.click('#remove-song-confirm');
   await expect(loading).toHaveCount(0);
   releaseAudio();
@@ -196,13 +210,13 @@ test('real background loading/error rows context removal supports keyboard, canc
   await page.keyboard.press('Escape');
   await expect(error).toBeFocused();
   await error.click({ button: 'right' });
-  await page.locator('.library-context-menu button').click();
+  await removeUnavailableRow();
   await page.click('#remove-song-cancel');
   await expect(error).toBeVisible();
   await error.click({ button: 'right' });
-  await page.locator('.library-context-menu button').click();
+  await removeUnavailableRow();
   await page.screenshot({
-    path: '/downloads/a25-real-background-error-confirm.png',
+    path: test.info().outputPath('a25-real-background-error-confirm.png'),
   });
   await page.click('#remove-song-confirm');
   await expect(error).toHaveCount(0);

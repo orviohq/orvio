@@ -1,3 +1,4 @@
+import { isOpusRecord } from './playable-source';
 import { loadCanonicalAudio, loadRetainedAudio } from './canonical-audio-api';
 import {
   createAudioJob,
@@ -8,6 +9,8 @@ import {
 } from './external-audio-api';
 import { localAudio, saveLocalAudio } from './external-local';
 import { inspectWav } from './canonical-pcm.mjs';
+import type { PlayableSourceRecord } from './playable-source';
+import { restoreOpus35Record } from './opus/opus35-api';
 import type { ExternalSong } from './external-catalog';
 function wait(ms: number, signal: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
@@ -26,7 +29,11 @@ function wait(ms: number, signal: AbortSignal) {
     signal.addEventListener('abort', abort, { once: true });
   });
 }
-async function attach(item: ExternalSong, job: AudioJob, signal: AbortSignal) {
+async function attach(
+  item: ExternalSong<PlayableSourceRecord>,
+  job: AudioJob,
+  signal: AbortSignal,
+) {
   if (job.status === 'error')
     throw new AudioJobError(job.error?.code ?? 'unavailable');
   if (job.status !== 'done') throw new AudioJobError('unavailable');
@@ -51,15 +58,27 @@ async function attach(item: ExternalSong, job: AudioJob, signal: AbortSignal) {
 }
 /** Playback may read the existing artifact, never create a replacement extraction. */
 export async function readSharedAudio(
-  item: ExternalSong,
+  item: ExternalSong<PlayableSourceRecord>,
   signal = AbortSignal.timeout(90000),
 ) {
   if (item.bytes) return item.bytes;
-  const local = await localAudio(item.record);
+  const local = await localAudio(item.record, signal);
   if (local) {
     item.bytes = local.bytes;
     item.jobId = local.jobId;
     return local.bytes;
+  }
+  if (isOpusRecord(item.record)) {
+    const bytes = await restoreOpus35Record(item.record, signal);
+    await saveLocalAudio(
+      item.record,
+      item.song.title,
+      item.jobId,
+      bytes,
+      item.song.subtitle,
+    );
+    item.bytes = bytes;
+    return bytes;
   }
   // Read by exact frozen video+audio SHA, without trusting a client chart as a
   // global canonical pin. Verify the entire WAV/hash before local persistence.
@@ -74,9 +93,10 @@ export async function readSharedAudio(
 }
 /** Only an explicit recovery button may call this. Frozen chart is never regenerated. */
 export async function recoverSharedAudio(
-  item: ExternalSong,
+  item: ExternalSong<PlayableSourceRecord>,
   signal = AbortSignal.timeout(90000),
 ) {
+  if (isOpusRecord(item.record)) return readSharedAudio(item, signal);
   let job = await createAudioJob(
     'https://www.youtube.com/watch?v=' + item.record.videoId,
     signal,

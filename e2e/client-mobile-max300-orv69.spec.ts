@@ -199,7 +199,7 @@ test('emulated mobile 4x CPU maximum 300 second local import retains responsive 
   expect(heartbeat.count).toBeGreaterThan(5);
   expect(heartbeat.max).toBeLessThan(2000);
   await page.screenshot({
-    path: '/downloads/orv69-mobile-max300-selection.png',
+    path: test.info().outputPath('orv69-mobile-max300-selection.png'),
   });
   expect(calls.filter((c) => c.endsWith('/audio'))).toHaveLength(downloads);
   expect(errors).toEqual([]);

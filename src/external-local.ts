@@ -1,11 +1,19 @@
+import { isOpusRecord } from './playable-source';
+import {
+  saveOpus35Metadata,
+  readOpus35Metadata,
+  readOpus35Pcm,
+  opus35Operation,
+} from './opus/opus35-store';
+import { sha256 } from './opus/opus-descriptor.mjs';
 import { retainAudioStorage } from './audio-storage-persistence';
 import { AUDIO_MAX_BYTES } from './audio-limits.mjs';
 import { externalSource, sourceId, sourceAudioId } from './external-catalog';
 import {
-  validSourceRecord,
-  verifyChartHashes,
-  type SourceRecord,
-} from './external-source';
+  validPlayableSource as validSourceRecord,
+  verifyPlayableSource as verifyChartHashes,
+  type PlayableSourceRecord as SourceRecord,
+} from './playable-source';
 import {
   validateRuntimeReplay,
   replayMatches,
@@ -74,6 +82,15 @@ export async function saveLocalAudio(
   bytes: ArrayBuffer,
   author?: string,
 ) {
+  if (isOpusRecord(record)) {
+    if (
+      bytes.byteLength !== record.frames * 4 ||
+      (await sha256(new Uint8Array(bytes))) !== record.audioSha256
+    )
+      throw Error('opus35_pcm_identity');
+    await saveOpus35Metadata(record, title, jobId, author);
+    return;
+  }
   const previous = await localMetadata(record);
   const db = await open();
   try {
@@ -103,7 +120,21 @@ export async function saveLocalAudio(
 }
 export async function localAudio(
   record: SourceRecord,
+  signal?: AbortSignal,
 ): Promise<LocalAsset | null> {
+  if (isOpusRecord(record)) {
+    const meta = await readOpus35Metadata(record);
+    const bytes = await readOpus35Pcm(record, signal);
+    return bytes
+      ? {
+          key: sourceAudioId(record),
+          title: meta?.title ?? 'YouTube · ' + record.videoId,
+          author: meta?.author,
+          jobId: meta?.jobId,
+          bytes,
+        }
+      : null;
+  }
   const a = await get('audio', sourceAudioId(record));
   if (!a) return null;
   if (
@@ -129,28 +160,49 @@ export async function saveLocalSession(replay: RuntimeReplay, result: Result) {
   if (!item || !replayMatches(replay, result))
     throw Error('Replay does not match');
   const key = replay.song + ':' + crypto.randomUUID();
-  await put('sessions', {
+  const storeSession = isOpusRecord(item.record)
+    ? (value: unknown) =>
+        opus35Operation('sessions', 'readwrite', (s) =>
+          s.put({ ...(value as any), kind: 'opus35-replay' }),
+        )
+    : (value: unknown) => put('sessions', value);
+  await storeSession({
     key,
     source: item.record,
     playedAt: Date.now(),
     replay,
     result,
   });
-  await put('metadata', {
-    ...(await localMetadata(item.record)),
-    key: replay.song,
-    latestSession: key,
-  });
+  if (isOpusRecord(item.record)) {
+    const meta = await localMetadata(item.record);
+    await opus35Operation('metadata', 'readwrite', (s) =>
+      s.put({ ...meta, key: replay.song, latestSession: key }),
+    );
+  } else
+    await put('metadata', {
+      ...(await localMetadata(item.record)),
+      key: replay.song,
+      latestSession: key,
+    });
   return key;
 }
 export async function readLocalSession(
   key: string,
 ): Promise<LocalSession | null> {
-  let raw = await get('sessions', key);
+  const opus = key.startsWith('yt-opus35-');
+  let raw = opus
+    ? await opus35Operation('sessions', 'readonly', (s) => s.get(key))
+    : await get('sessions', key);
   if (!raw && !key.includes(':')) {
-    const metadata = await get('metadata', key);
+    const metadata = opus
+      ? await opus35Operation('metadata', 'readonly', (s) => s.get(key))
+      : await get('metadata', key);
     if (metadata?.latestSession)
-      raw = await get('sessions', metadata.latestSession);
+      raw = opus
+        ? await opus35Operation('sessions', 'readonly', (s) =>
+            s.get(metadata.latestSession),
+          )
+        : await get('sessions', metadata.latestSession);
   }
 
   if (!raw) return null;
@@ -179,6 +231,7 @@ export async function readLocalSession(
 export async function localMetadata(
   record: SourceRecord,
 ): Promise<Omit<LocalAsset, 'bytes'> | null> {
+  if (isOpusRecord(record)) return readOpus35Metadata(record);
   const raw = await get('metadata', sourceId(record));
   if (!raw) return null;
   if (
@@ -212,7 +265,10 @@ export interface ListedLocalSession extends LocalSession {
 // Each entry goes through the full readLocalSession validation contract;
 // corrupt archives are skipped and left untouched, never rewritten.
 export async function listLocalSessions(): Promise<ListedLocalSession[]> {
-  const raws = await getAll('sessions');
+  const raws = [
+    ...(await getAll('sessions')),
+    ...(await opus35Operation('sessions', 'readonly', (s) => s.getAll())),
+  ];
   const out: ListedLocalSession[] = [];
   for (const raw of raws) {
     if (!raw || typeof raw.key !== 'string') continue;
@@ -237,6 +293,12 @@ export async function updateLocalDisplayMetadata(
   title: string,
   author: string | null,
 ) {
+  if (isOpusRecord(record)) {
+    const old = await readOpus35Metadata(record);
+    if (old)
+      await saveOpus35Metadata(record, title, old.jobId, author ?? old.author);
+    return;
+  }
   const db = await open();
   try {
     await new Promise<void>((resolve, reject) => {
@@ -271,6 +333,10 @@ export async function saveSongMetadata(
   title: string,
   author: string | null,
 ) {
+  if (isOpusRecord(record)) {
+    const old = await readOpus35Metadata(record);
+    return saveOpus35Metadata(record, title, old?.jobId, author ?? undefined);
+  }
   await put('metadata', {
     ...(await localMetadata(record)),
     key: sourceId(record),

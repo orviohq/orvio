@@ -1,3 +1,10 @@
+import { isOpusRecord, type PlayableSourceRecord } from './playable-source';
+import {
+  encodeOpus35Song,
+  decodeOpus35Song,
+  type Opus35SongIdentity,
+} from './opus/opus35-song';
+import { restoreOpus35Record } from './opus/opus35-api';
 import { readCanonicalSource } from './canonical-source-api';
 import { readCanonicalMetadata } from './canonical-metadata-api';
 import { rememberCanonical } from './canonical-library';
@@ -67,7 +74,17 @@ export function sameSong(
   );
 }
 /** Sender reads only. Archived or changed canonical identities cannot silently share a new chart. */
-export async function createSongLink(record: SourceRecord, origin: string) {
+export async function createSongLink(
+  record: PlayableSourceRecord,
+  origin: string,
+  title = 'YouTube',
+  author: string | null = null,
+) {
+  if (isOpusRecord(record)) {
+    const u = new URL('/song/', origin);
+    u.hash = await encodeOpus35Song(record, title, author);
+    return u.href;
+  }
   const result = await readCanonicalSource(
     record.videoId,
     AbortSignal.timeout(15000),
@@ -89,21 +106,52 @@ export async function createSongLink(record: SourceRecord, origin: string) {
 }
 /** Receiver reads only until explicit Add. No extraction, POST or result-share decoding. */
 export async function inspectSongLink(
-  identity: SongIdentity,
+  identity: SongIdentity | Opus35SongIdentity,
   signal: AbortSignal,
 ) {
-  const result = await readCanonicalSource(identity.videoId, signal);
+  if ('kind' in identity && identity.kind === 'opus35-song')
+    return {
+      kind: 'opus35-song' as const,
+      record: identity.record,
+      metadata: { title: identity.title, author: identity.author },
+      descriptorBytes: identity.descriptorBytes,
+    };
+  const legacy = identity as SongIdentity;
+  const result = await readCanonicalSource(legacy.videoId, signal);
   if (result.state !== 'ready')
     throw Error(result.state === 'missing' ? 'missing' : 'pending');
-  if (!sameSong(identity, result.record, result.recordSha256))
+  if (!sameSong(legacy, result.record, result.recordSha256))
     throw Error('changed');
-  const metadata = await readCanonicalMetadata(result.record, signal);
+  // Inspect is pre-consent: persist nothing. Only the Add gesture may
+  // write storage (addSharedSong -> canonical IDB / localStorage).
+  const metadata = await readCanonicalMetadata(result.record, signal, {
+    persist: false,
+  });
   if (!metadata) throw Error('metadata');
   return { ...result, metadata };
 }
 export type InspectedSong = Awaited<ReturnType<typeof inspectSongLink>>;
 /** Called only from the recipient's Add gesture. Immutable pins are add-only. */
 export async function addSharedSong(song: InspectedSong) {
+  if ('kind' in song && song.kind === 'opus35-song') {
+    const bytes = await restoreOpus35Record(
+      song.record,
+      AbortSignal.timeout(60000),
+    );
+    await saveLocalAudio(
+      song.record,
+      song.metadata.title,
+      undefined,
+      bytes,
+      song.metadata.author ?? undefined,
+    );
+    const hidden = hiddenLibraryIds();
+    hidden.delete(sourceId(song.record));
+    hidden.delete('yt:' + song.record.videoId);
+    saveHiddenLibraryIds(hidden);
+    new LibraryAddOrder(localStorage).added(song.record.videoId);
+    return sourceId(song.record);
+  }
   // Add is the explicit consent boundary for retained audio GET and local saving.
   // Saving ready audio lets the library open the exact song without a new extraction.
   if (!(await localAudio(song.record))) {

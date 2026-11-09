@@ -64,7 +64,9 @@ for (const width of [1440, 390])
         });
       });
     const expected = await geometry();
-    await page.screenshot({ path: `/downloads/orv72-live-${width}.png` });
+    await page.screenshot({
+      path: test.info().outputPath(`orv72-live-${width}.png`),
+    });
     await context.route('**/_astro/*.js', async (r) => {
       await new Promise((x) => setTimeout(x, 2200));
       await r.continue();
@@ -93,7 +95,9 @@ for (const width of [1440, 390])
     for (let i = 0; i < 3; i++)
       for (const key of ['x', 'y', 'width', 'height'] as const)
         expect(Math.abs(expected[i][key] - actual[i][key])).toBeLessThan(1);
-    await page.screenshot({ path: `/downloads/orv72-initial-${width}.png` });
+    await page.screenshot({
+      path: test.info().outputPath(`orv72-initial-${width}.png`),
+    });
     await expect(page.locator('#replay-first-paint')).toHaveCount(0, {
       timeout: 20000,
     });

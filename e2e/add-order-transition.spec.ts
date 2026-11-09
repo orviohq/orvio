@@ -169,9 +169,13 @@ test('explicit additions stay newest first while loading, ready and after reload
   expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(712);
   expect(bounds!.x + bounds!.width).toBeGreaterThanOrEqual(1271);
   expect(bounds!.y + bounds!.height).toBeGreaterThanOrEqual(711);
-  await page.screenshot({ path: '/downloads/a25-ready-edge-menu.png' });
+  await page.screenshot({
+    path: test.info().outputPath('a25-ready-edge-menu.png'),
+  });
   await page.mouse.click(5, 5);
   await expect(menu).not.toBeVisible();
   expect(posts).toEqual([]);
-  await page.screenshot({ path: '/downloads/coherent-a23-order.png' });
+  await page.screenshot({
+    path: test.info().outputPath('coherent-a23-order.png'),
+  });
 });

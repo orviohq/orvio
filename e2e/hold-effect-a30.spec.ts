@@ -1,7 +1,8 @@
+import { heldBindingCodes } from './hold-input';
 import { test, expect } from '@playwright/test';
 test('A30 integrated real-clock held effects persist and stop on release, then replay', async ({
   page,
-}) => {
+}, testInfo) => {
   test.setTimeout(75000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -35,26 +36,29 @@ test('A30 integrated real-clock held effects persist and stop on release, then r
     () =>
       (window as any).orvioDiagnostics.notes.find((s: any) => s.note.end).note,
   );
-  await page.evaluate((n) => {
-    const keys = ['KeyD', 'KeyF', 'Space', 'KeyJ', 'KeyK'];
-    const schedule = (time: number, down: boolean) => {
-      const tick = () => {
-        if ((window as any).orvioAudioTime < time) {
-          setTimeout(tick, 1);
-          return;
-        }
-        window.dispatchEvent(
-          new KeyboardEvent(down ? 'keydown' : 'keyup', {
-            code: keys[n.lane],
-            bubbles: true,
-          }),
-        );
+  const keys = await heldBindingCodes(page);
+  await page.evaluate(
+    ({ n, keys }) => {
+      const schedule = (time: number, down: boolean) => {
+        const tick = () => {
+          if ((window as any).orvioAudioTime < time) {
+            setTimeout(tick, 1);
+            return;
+          }
+          window.dispatchEvent(
+            new KeyboardEvent(down ? 'keydown' : 'keyup', {
+              code: keys[n.lane],
+              bubbles: true,
+            }),
+          );
+        };
+        tick();
       };
-      tick();
-    };
-    schedule(n.time, true);
-    schedule(n.end, false);
-  }, note);
+      schedule(n.time, true);
+      schedule(n.end, false);
+    },
+    { n: note, keys },
+  );
   await page.waitForFunction(
     (n) => (window as any).orvioAudioTime >= n.time + 0.35,
     note,
@@ -74,7 +78,9 @@ test('A30 integrated real-clock held effects persist and stop on release, then r
   expect(held.state.done).toBe(false);
   expect(held.fx.beams[note.lane].visible).toBe(true);
   expect(held.fx.sparks[note.lane]).toBeGreaterThan(0);
-  await page.screenshot({ path: '/downloads/a30-integrated-live-held.png' });
+  await page.screenshot({
+    path: testInfo.outputPath('a30-integrated-live-held.png'),
+  });
   await page.waitForFunction(
     (n) => (window as any).orvioAudioTime >= n.end + 0.3,
     note,
@@ -92,7 +98,9 @@ test('A30 integrated real-clock held effects persist and stop on release, then r
   expect(released.state.done).toBe(true);
   expect(released.fx.beams[note.lane].visible).toBe(false);
   expect(released.fx.sparks[note.lane]).toBe(0);
-  await page.screenshot({ path: '/downloads/a30-integrated-released.png' });
+  await page.screenshot({
+    path: testInfo.outputPath('a30-integrated-released.png'),
+  });
   await expect(page.locator('#results')).toBeVisible({ timeout: 50000 });
   await page.click('#watch-replay');
   await page.waitForFunction(() =>
@@ -116,7 +124,9 @@ test('A30 integrated real-clock held effects persist and stop on release, then r
   expect(replay.state.held).toBe(true);
   expect(replay.fx.beams[note.lane].visible).toBe(true);
   expect(replay.fx.sparks[note.lane]).toBeGreaterThan(0);
-  await page.screenshot({ path: '/downloads/a30-integrated-replay-held.png' });
+  await page.screenshot({
+    path: testInfo.outputPath('a30-integrated-replay-held.png'),
+  });
   await page.waitForFunction(
     (n) => (window as any).orvioAudioTime >= n.end + 0.3,
     note,
@@ -140,7 +150,7 @@ test('A30 integrated real-clock held effects persist and stop on release, then r
 });
 test('A30 integrated renderer simultaneous lanes reduced-motion and bounded draw cost', async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto('/select/');
   const result = await page.evaluate(async () => {
     const { Playfield } = await import(
@@ -190,7 +200,7 @@ test('A30 integrated renderer simultaneous lanes reduced-motion and bounded draw
   expect(result.loops).toEqual([0, 6, 0, 6, 0]);
   expect(result.reduced).toBe(0);
   await page.screenshot({
-    path: '/downloads/a30-integrated-multilane-stub.png',
+    path: testInfo.outputPath('a30-integrated-multilane-stub.png'),
   });
   console.log('A30_STUB_COST', JSON.stringify(result));
 });
