@@ -5,7 +5,7 @@ import { decodeVerifiedOpus } from '../src/opus-codec/verified-opus-client.mjs';
 import { parsePinnedPcmAnalysis } from '../src/opus/opus-pcm-analysis.mjs';
 // Freeze the old extra-STFT call shape, not a second copy of the large generator.
 const source = fs.readFileSync(
-  new URL('../src/current35-budget-v1.mjs', import.meta.url),
+  new URL('../test-support/unified/current35-reference.mjs', import.meta.url),
   'utf8',
 );
 const oldSource = source

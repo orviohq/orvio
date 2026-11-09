@@ -94,6 +94,7 @@ export function createOpus468AdaptiveDerivedVerifier({
     const resolved = await resolveArtifacts(
       {
         videoId: ext.videoId,
+        chartSetSha256: base.chartSetSha256,
         audioSha256: ext.audioSha256,
         encodedAudioSha256: ext.encodedAudioSha256,
         audioDescriptorSha256: dSha,

@@ -107,6 +107,7 @@ export function createOpus468ReplayInstaller({
         descriptor,
         extension.audioDescriptorSha256,
         signal,
+        base,
       );
     } catch (e) {
       const err = Error('replay_install_audio_unavailable');

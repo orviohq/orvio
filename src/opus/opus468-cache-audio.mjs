@@ -15,6 +15,7 @@ export async function readOpus468CacheAudio(base, signal, descriptorBytes) {
     descriptor,
     base.audioDescriptorSha256,
     signal,
+    base,
   );
   if (!cached) throw Error('extension_audio_cache_missing');
   if (JSON.stringify(cached.record) !== JSON.stringify(base))

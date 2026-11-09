@@ -1,3 +1,8 @@
+## [0.3.4] - 2026-11-10
+
+- Use one chart engine for automatic YouTube charts across 4, 5, 6, 7 and 8 keys.
+- Preserve existing results and replays with their original charts.
+
 ## [0.3.3] - 2026-11-10
 
 - Remove hidden songs from the visible list immediately, while keeping their saved audio, results and replays.

@@ -24,3 +24,8 @@ src/opus/public468-v7.mjs
 
 # Astro-generated declarations, not authored source.
 .astro/
+
+# Generated unified producer embeds exact hash-bound source and worker bytes.
+src/opus/unified/*.generated.mjs
+# Immutable pre-unification oracle used for independent byte-equivalence tests.
+test-support/unified/current35-reference.mjs
