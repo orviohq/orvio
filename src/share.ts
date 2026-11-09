@@ -6,7 +6,7 @@ export const SHARED_SONGS = {
 } as const;
 export interface SharedResult {
   song: keyof typeof SHARED_SONGS;
-  lanes: 5 | 7;
+  lanes: import('./chart').Lanes;
   difficulty: 'low' | 'mid' | 'high' | 'sc';
   score: number;
   accuracy: number;
@@ -29,7 +29,7 @@ export function readResult(params: URLSearchParams): SharedResult | null {
   const combo = Number(params.get('combo'));
   if (
     !Object.hasOwn(SHARED_SONGS, song) ||
-    ![5, 7].includes(lanes) ||
+    ![4, 5, 6, 7, 8].includes(lanes) ||
     !['low', 'mid', 'high', 'sc'].includes(difficulty) ||
     !Number.isInteger(score) ||
     score < 0 ||
@@ -97,7 +97,7 @@ export function readResult(params: URLSearchParams): SharedResult | null {
     ...(options ? { options } : {}),
     ...(judgments ? { judgments } : {}),
     song,
-    lanes: lanes as 5 | 7,
+    lanes: lanes as import('./chart').Lanes,
     difficulty,
     score,
     accuracy: Math.round(accuracy * 100) / 100,

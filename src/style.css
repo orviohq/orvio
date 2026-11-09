@@ -4917,3 +4917,161 @@ html {
     grid-template-columns: 112px minmax(0, 1fr);
   }
 }
+
+/* A29 isolated settings prototype: one contiguous master, active per-mode preview. */
+.binding-modes {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 18px;
+}
+.binding-modes button {
+  font-size: 11px;
+  padding: 10px 4px;
+}
+.binding-modes button[aria-pressed='true'] {
+  background: #23434d;
+  border-color: #29d8ff;
+  color: #8ceaff;
+}
+.binding-master {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 5px;
+}
+#settings .binding-master .key-bind {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+  height: 64px;
+  margin: 0;
+  padding: 12px 1px 2px;
+  color: #728293;
+  border: 1px solid #34424e;
+}
+#settings .binding-master .key-bind.mode-active {
+  background: #203e48;
+  color: #edfaff;
+  border-color: #3894aa;
+}
+#settings .binding-master .key-bind.listening {
+  background: #493f20;
+  border-color: #ffe074;
+  color: #ffe074;
+}
+.binding-master small {
+  position: absolute;
+  top: 5px;
+  left: 6px;
+  font-size: 8px;
+  color: #8099a9;
+}
+.binding-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 20px;
+  padding: 16px 0;
+  border-top: 1px solid #34424e;
+}
+.binding-preview strong {
+  font-size: 11px;
+  color: #8ceaff;
+  margin-right: 12px;
+}
+.binding-preview kbd {
+  font: inherit;
+  font-size: 12px;
+  padding: 5px;
+  background: #1a2d39;
+}
+.binding-override {
+  font-size: 11px;
+  color: #c6b58e;
+  line-height: 1.8;
+}
+.binding-override button {
+  font-size: 11px;
+  padding: 6px;
+}
+#lanes {
+  flex-wrap: wrap;
+}
+#lanes button {
+  font-size: 11px;
+  padding-left: 9px;
+  padding-right: 9px;
+}
+@media (max-width: 540px) {
+  .selection {
+    flex-wrap: wrap;
+  }
+  #lanes {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .binding-master {
+    gap: 3px;
+  }
+  #settings .binding-master .key-bind {
+    height: 56px;
+    font-size: 14px;
+  }
+}
+
+/* Keep unified keys and the reset action visible on short screens. */
+@media (max-height: 759px) {
+  #settings .binding-modes {
+    margin-bottom: 6px;
+  }
+  #settings .binding-modes button {
+    padding: 6px 2px;
+    min-height: 32px;
+  }
+  #settings .binding-master .key-bind {
+    height: 40px;
+  }
+  #settings .binding-preview {
+    margin-top: 6px;
+    padding: 6px 0;
+    gap: 3px;
+  }
+  #settings .binding-preview strong {
+    margin-right: 3px;
+  }
+  #settings .binding-preview kbd {
+    padding: 3px;
+  }
+  #settings #bindings {
+    gap: 4px;
+  }
+  #settings #bind-hint {
+    margin-top: 6px;
+  }
+  #settings #reset {
+    margin-top: 4px;
+  }
+}
+@media (max-width: 699px) and (max-height: 900px) {
+  #settings {
+    padding: 12px;
+  }
+  #settings .dialog-title {
+    margin-bottom: 2px;
+  }
+  #settings .settings-tabs {
+    margin: 4px 0;
+  }
+  #settings .settings-tabs button {
+    padding: 6px 4px;
+  }
+  #settings label {
+    margin-top: 6px;
+    margin-bottom: 4px;
+  }
+  #settings #bind-hint {
+    line-height: 1.45;
+  }
+}

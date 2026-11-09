@@ -2,7 +2,7 @@ import { externalNotes, externalDuration } from './external-catalog';
 export type Difficulty = 'low' | 'mid' | 'high' | 'sc';
 /** A4 additive: SC family key for the procedural generator. Existing IDs unchanged. */
 export type FamilyDifficulty = Difficulty | 'sc';
-export type Lanes = 5 | 7;
+export type Lanes = 4 | 5 | 6 | 7 | 8;
 export interface Song {
   id: string;
   title: string;

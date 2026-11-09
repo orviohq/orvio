@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.50] - 2026-11-09
+
+- Add 4-, 6- and 8-key modes for built-in songs alongside 5 and 7 keys.
+- Configure one centered eight-key layout with per-mode previews. Preserve custom legacy five- and seven-key bindings.
+- YouTube charts remain limited to their verified five- and seven-key modes.
+
 ## [0.2.49] - 2026-11-09
 
 - Restore sharing for valid older score-only result links without inventing replay data. Missing required replays, corrupted replays and frozen chart mismatches still fail closed. Local result storage and current replay sharing are unchanged.

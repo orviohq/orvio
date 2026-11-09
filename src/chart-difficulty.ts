@@ -3,7 +3,7 @@ import type { Language } from './i18n';
 import type { Note } from './chart';
 /** A4: existing six keys keep their IDs; the two SC keys are additive. */
 export type FamilyChartKey =
-  '5:low' | '5:mid' | '5:high' | '5:sc' | '7:low' | '7:mid' | '7:high' | '7:sc';
+  `${import('./chart').Lanes}:${import('./chart').Difficulty}`;
 export const FAMILY_CHART_KEYS: FamilyChartKey[] = [
   '5:low',
   '5:mid',

@@ -39,7 +39,7 @@ export const fr = {
   local: 'Enregistré sur cet appareil uniquement. Aucun compte ni envoi.',
   auto: 'Les notes et les entrées suivent automatiquement la musique entendue.',
   bindHint:
-    'Choisissez une case du mode 5 ou 7 touches, puis saisissez les touches de gauche à droite. Passage automatique à la suivante. Échap annule. Une touche déjà utilisée reste sur la même case.',
+    'Choisissez une case puis appuyez sur une touche. Tous les modes partagent la même disposition de huit touches. Échap annule. Les doublons sont interdits.',
   mobile:
     'Parcourez les morceaux et les réglages ici. Jouez sur un ordinateur avec un clavier.',
   easy: 'FACILE',
@@ -47,7 +47,7 @@ export const fr = {
   hard: 'DIFFICILE',
   choose: 'CHOISISSEZ UN MORCEAU',
   selectionHint:
-    '↑ ↓ MORCEAU / ← → DIFFICULTÉ / 5 7 TOUCHES / ENTRÉE JOUER / F2 OPTIONS',
+    '↑ ↓ MORCEAU / ← → DIFFICULTÉ / 4 5 6 7 8 TOUCHES / ENTRÉE JOUER / F2 OPTIONS',
   selected: 'MORCEAU CHOISI',
   nowPlaying: 'EXTRAIT EN COURS',
   preparing: 'PRÉPARATION AUDIO',

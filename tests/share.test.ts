@@ -18,7 +18,7 @@ describe('privacy-safe result sharing', () => {
     expect(resultParams(readResult(p)!).has('name')).toBe(false);
     for (const [k, v] of [
       ['song', '<script>'],
-      ['keys', '6'],
+      ['keys', '9'],
       ['score', '1000001'],
       ['score', 'NaN'],
       ['acc', '101'],

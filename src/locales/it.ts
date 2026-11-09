@@ -39,7 +39,7 @@ export const it = {
   local: 'Salvato solo su questo dispositivo. Nessun account o invio.',
   auto: 'Note e comandi seguono automaticamente la musica udibile.',
   bindHint:
-    'Scegli una casella a 5 o 7 tasti e premi i tasti da sinistra a destra. Passaggio automatico alla successiva. Esc annulla. Un tasto duplicato resta nella stessa casella.',
+    'Scegli una posizione e premi un tasto. Tutte le modalità usano la stessa disposizione di otto tasti. Esc annulla. I duplicati non sono ammessi.',
   mobile:
     'Qui puoi esplorare brani e impostazioni. Gioca su un computer con tastiera.',
   easy: 'FACILE',
@@ -47,7 +47,7 @@ export const it = {
   hard: 'DIFFICILE',
   choose: 'SCEGLI IL TUO BRANO',
   selectionHint:
-    '↑ ↓ BRANO / ← → DIFFICOLTÀ / 5 7 TASTI / INVIO INIZIA / F2 OPZIONI',
+    '↑ ↓ BRANO / ← → DIFFICOLTÀ / 4 5 6 7 8 TASTI / INVIO INIZIA / F2 OPZIONI',
   selected: 'BRANO SELEZIONATO',
   nowPlaying: 'ANTEPRIMA IN CORSO',
   preparing: 'PREPARAZIONE AUDIO',

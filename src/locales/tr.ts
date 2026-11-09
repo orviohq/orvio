@@ -39,14 +39,14 @@ export const tr = {
   local: 'Yalnızca bu cihazda saklanır. Hesap veya yükleme yok.',
   auto: 'Notalar ve girişler duyulan müziğin saatini otomatik izler.',
   bindHint:
-    '5 veya 7 tuş modunda bir kutu seçin, sonra tuşlara soldan sağa basın. Sonraki kutuya otomatik geçilir. Esc iptal eder. Yinelenen tuşta aynı kutuda kalınır.',
+    'Bir yuva seçip bir tuşa basın. Tüm modlar aynı sekiz tuş düzenini kullanır. Esc iptal eder. Aynı tuş iki kez kullanılamaz.',
   mobile:
     'Burada şarkılara ve ayarlara göz atın. Klavyeli bir bilgisayarda oynayın.',
   easy: 'KOLAY',
   normal: 'NORMAL',
   hard: 'ZOR',
   choose: 'ŞARKINI SEÇ',
-  selectionHint: '↑ ↓ ŞARKI / ← → ZORLUK / 5 7 TUŞ / ENTER BAŞLAT / F2 AYARLAR',
+  selectionHint: '↑ ↓ ŞARKI / ← → ZORLUK / 4 5 6 7 8 TUŞ / ENTER BAŞLAT / F2 AYARLAR',
   selected: 'SEÇİLEN ŞARKI',
   nowPlaying: 'ÖNİZLEME ÇALIYOR',
   preparing: 'SES HAZIRLANIYOR',

@@ -32,6 +32,17 @@ import {
   readBuiltinSession,
 } from './builtin-replay-library';
 import { REPLAY_READ_ERROR } from './replay-read-error';
+import {
+  KEY_MODES,
+  DEFAULT_MASTER_BINDINGS,
+  modeBindings,
+  modePositions,
+  migrateBindings,
+  readBindingProfile,
+  resolvedModeBindings,
+  type BindingProfile,
+  isKeyMode,
+} from './key-mode-registry';
 import { libraryContextMenu } from './library-context-menu';
 import { LibraryAddOrder } from './library-add-order';
 import { inspectDeviceAudio } from './device-audio-inspection';
@@ -145,10 +156,9 @@ import { AudioClock, renderSong, type Soundtrack } from './audio';
 import { Playfield } from './renderer';
 const $ = <T extends HTMLElement = HTMLElement>(s: string) =>
   document.querySelector<T>(s)!;
-const defaults = {
-  5: ['KeyD', 'KeyF', 'Space', 'KeyJ', 'KeyK'],
-  7: ['KeyS', 'KeyD', 'KeyF', 'Space', 'KeyJ', 'KeyK', 'KeyL'],
-};
+const defaults = Object.fromEntries(
+  KEY_MODES.map((mode) => [mode, modeBindings(DEFAULT_MASTER_BINDINGS, mode)]),
+) as Record<Lanes, string[]>;
 interface Settings {
   language: Language;
   languageMode: 'auto' | 'manual';
@@ -162,6 +172,7 @@ interface Settings {
   shuffle: Shuffle;
   volume: number;
   keys: Record<Lanes, string[]>;
+  bindingProfile: BindingProfile;
 }
 function getSettings(): Settings {
   let saved = {};
@@ -185,6 +196,7 @@ function getSettings(): Settings {
     shuffle: 'off',
     volume: 0.7,
     keys: structuredClone(defaults),
+    bindingProfile: migrateBindings((automatic as { keys?: unknown }).keys),
     ...automatic,
     language: resolvedLanguage(automatic, navigator.languages),
     languageMode: automatic.languageMode === 'manual' ? 'manual' : 'auto',
@@ -192,6 +204,20 @@ function getSettings(): Settings {
   };
 }
 let settings = getSettings();
+settings.bindingProfile = readBindingProfile(
+  settings.bindingProfile,
+  settings.keys,
+);
+if (!isKeyMode(settings.lanes)) settings.lanes = 5;
+function resolveBindings() {
+  settings.keys = Object.fromEntries(
+    KEY_MODES.map((mode) => [
+      mode,
+      resolvedModeBindings(settings.bindingProfile, mode),
+    ]),
+  ) as Record<Lanes, string[]>;
+}
+resolveBindings();
 settings.speed =
   Math.round(Math.max(1, Math.min(9, Number(settings.speed) || 1.5)) * 10) / 10;
 if (!(FADERS as readonly string[]).includes(settings.fader))
@@ -218,7 +244,9 @@ let sequence = 0;
 let frame = 0;
 let seenEvents = 0;
 let binding = -1;
+let bindingLegacy = false;
 let bindingLanes: Lanes = settings.lanes;
+let bindingPreviewLanes: Lanes = settings.lanes;
 let rendered: Soundtrack | undefined;
 let preview: AudioBufferSourceNode | undefined;
 let previewGain: GainNode | undefined;
@@ -327,9 +355,9 @@ function persist() {
 const app = $('#app');
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.49</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.2.50</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
 <section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><p class="mobile-playback-note"></p><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status"></span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
-<section class="library" aria-label="Track selection"><p class="mobile-playback-note"></p><div class="section-title"><strong>${label('select')}</strong></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">NM</button><button data-diff="mid">HD</button><button data-diff="high">MX</button><button data-diff="sc">SC</button></div><div class="segmented compact" id="lanes"><button data-lanes="5">5 KEY</button><button data-lanes="7">7 KEY</button></div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div></section>
+<section class="library" aria-label="Track selection"><p class="mobile-playback-note"></p><div class="section-title"><strong>${label('select')}</strong></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">NM</button><button data-diff="mid">HD</button><button data-diff="high">MX</button><button data-diff="sc">SC</button></div><div class="segmented compact" id="lanes">${KEY_MODES.map((mode) => `<button data-lanes="${mode}">${mode} KEY</button>`).join('')}</div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div></section>
 <section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
 <section id="game" class="hidden" aria-label="Rhythm game"><div class="game-top"><button id="exit" class="quiet">ESC ${label('exit')}</button><div class="song-now"><span id="replay-playing" role="status"></span><strong id="now-title"></strong><span id="now-detail"></span></div><span id="fps" hidden></span></div><div id="progress"><div></div></div><div id="arena" data-position="center"><aside class="score-block"><span class="eyebrow">${label('score')}</span><strong id="score">0000000</strong><div><b id="rate">100.00</b><span>% ${label('accuracy')}</span></div><section id="fever-hud" class="hidden" aria-live="off"></section></aside><div id="highway-wrap"><div id="highway"></div><div id="impact" aria-hidden="true"></div><div id="fever-burst" aria-hidden="true"></div><div id="judge" aria-live="off"></div><div id="combo"></div><div id="keycaps"></div><button id="play-options" class="quiet option-readout"></button><div id="countdown"></div></div><aside class="track-block"><div class="orb-mini"></div><span class="eyebrow">ORVIO ORIGINALS</span><h2 id="side-title"></h2><div id="lane-detail"></div></aside></div><div class="game-footer"></div></section>
 <dialog id="pause"><div class="eyebrow">ORVIO / SESSION</div><h2>${label('pause')}</h2><button id="resume" class="primary">${label('resume')} ↵</button><button id="pause-settings" class="quiet">F2 ${label('options')}</button><button id="pause-exit" class="quiet">${label('back')}</button></dialog><dialog id="settings"><form method="dialog"><div class="dialog-title"><div><span class="eyebrow">SYSTEM / OPTIONS</span><h2>${label('options')}</h2></div><button class="close" aria-label="Close">×</button></div></form><div class="settings-tabs" role="tablist"><button data-settings-tab="general" id="settings-general-tab" role="tab" aria-controls="settings-general" aria-selected="true">${label('options')}</button><button data-settings-tab="keys" id="settings-keys-tab" role="tab" aria-controls="settings-keys" aria-selected="false" tabindex="-1">${label('bindings')}</button></div><div class="settings-grid"><section class="settings-general" id="settings-general" role="tabpanel" aria-labelledby="settings-general-tab"><label for="language">${label('language')}</label><select id="language"><option value="auto">${t('browserLanguage')}</option>${Object.entries(
@@ -886,7 +914,9 @@ function chartLevel(
   const notes = makeChart(song, diff, lanes);
   return notes.length
     ? difficultyText(
-        externalSource(song.id)?.record.chartMetadata?.[`${lanes}:${diff}`] ??
+        (lanes === 5 || lanes === 7
+          ? externalSource(song.id)?.record.chartMetadata?.[`${lanes}:${diff}`]
+          : undefined) ??
           difficultyForChart(notes, duration(song), `${lanes}:${diff}`),
         settings.language,
       )
@@ -1142,12 +1172,18 @@ function updateOptionReadout() {
 }
 
 function syncSettings() {
+  resolveBindings();
   const selected = SONGS[songIndex];
   if (
     settings.difficulty === 'sc' &&
     !makeChart(selected, 'sc', settings.lanes).length
   )
     settings.difficulty = 'high';
+  $<HTMLButtonElement>('#start').disabled = !makeChart(
+    selected,
+    settings.difficulty,
+    settings.lanes,
+  ).length;
   document.querySelectorAll<HTMLButtonElement>('[data-diff]').forEach((b) => {
     const diff = b.dataset.diff as Difficulty;
     b.disabled = !makeChart(selected, diff, settings.lanes).length;
@@ -1210,39 +1246,49 @@ function syncSettings() {
   $<HTMLSelectElement>('#fader').value = settings.fader;
   $<HTMLSelectElement>('#shuffle').value = settings.shuffle;
   $('#speed-value').textContent = settings.speed.toFixed(1) + '×';
-  $('#binding-mode').textContent = '5 KEY / 7 KEY';
+  $('#binding-mode').textContent = '4 - 8 KEY';
   const hint = $('#bind-hint');
-  hint.replaceChildren();
-  for (const [text, visible] of [
-    [t('bindHint'), binding < 0],
-    [
-      `${t('listening')} · ${bindingLanes} KEY · ${Math.max(1, binding + 1)}/${bindingLanes}`,
-      binding >= 0,
-    ],
-  ] as const) {
-    const part = document.createElement('span');
-    part.textContent = text;
-    part.style.visibility = visible ? 'visible' : 'hidden';
-    part.setAttribute('aria-hidden', String(!visible));
-    hint.append(part);
-  }
-  $('#bindings').innerHTML = ([5, 7] as Lanes[])
-    .map(
-      (lanes) =>
-        `<section class="binding-row" aria-label="${lanes} KEY"><strong>${lanes} KEY</strong><div class="binding-keys">${settings.keys[lanes].map((k, i) => `<button data-slot="${i}" data-keymode="${lanes}" ${lanes === settings.lanes ? `data-bind="${i}"` : ''} aria-label="${binding === i && bindingLanes === lanes ? t('listening') : keyLabel(k)}" class="key-bind ${binding === i && bindingLanes === lanes ? 'listening' : ''}">${binding === i && bindingLanes === lanes ? '●' : keyLabel(k)}</button>`).join('')}</div></section>`,
-    )
-    .join('');
-  document.querySelectorAll<HTMLButtonElement>('[data-slot]').forEach(
-    (b) =>
-      (b.onclick = () => {
-        binding = Number(b.dataset.slot);
-        bindingLanes = Number(b.dataset.keymode) as Lanes;
+  hint.textContent =
+    binding < 0 ? t('bindHint') : `${t('listening')} · ${binding + 1}/8`;
+  const profile = settings.bindingProfile;
+  const activePositions = modePositions(bindingPreviewLanes);
+  $('#bindings').innerHTML =
+    `<nav class="binding-modes" aria-label="KEY">${KEY_MODES.map((mode) => `<button type="button" data-preview-mode="${mode}" aria-pressed="${mode === bindingPreviewLanes}">${mode} KEY</button>`).join('')}</nav><div class="binding-master">${profile.master.map((key, index) => `<button type="button" data-slot="${index}" class="key-bind ${!profile.overrides[bindingPreviewLanes] && activePositions.includes(index) ? 'mode-active' : ''} ${binding === index ? 'listening' : ''}" aria-label="${index + 1}: ${keyLabel(key)}"><small>${index + 1}</small>${binding === index ? '●' : keyLabel(key)}</button>`).join('')}</div><div class="binding-preview"><strong>${bindingPreviewLanes} KEY</strong>${settings.keys[bindingPreviewLanes].map((key) => `<kbd>${keyLabel(key)}</kbd>`).join('')}</div>${profile.overrides[bindingPreviewLanes] ? `<div class="binding-override"><span>${t('keyboard')} · ${bindingPreviewLanes} KEY</span><div>${settings.keys[bindingPreviewLanes].map((key, i) => `<button type="button" data-legacy-slot="${i}">${keyLabel(key)}</button>`).join('')}</div><button type="button" id="use-common-bindings">${t('reset')}</button></div>` : ''}`;
+  document.querySelectorAll<HTMLButtonElement>('[data-preview-mode]').forEach(
+    (button) =>
+      (button.onclick = () => {
+        binding = -1;
+        bindingPreviewLanes = Number(button.dataset.previewMode) as Lanes;
         syncSettings();
-        $<HTMLButtonElement>(
-          `[data-keymode="${bindingLanes}"][data-slot="${binding}"]`,
-        ).focus();
       }),
   );
+  document.querySelectorAll<HTMLButtonElement>('[data-slot]').forEach(
+    (button) =>
+      (button.onclick = () => {
+        binding = Number(button.dataset.slot);
+        bindingLanes = bindingPreviewLanes;
+        bindingLegacy = false;
+        syncSettings();
+        $<HTMLButtonElement>(`[data-slot="${binding}"]`).focus();
+      }),
+  );
+  document.querySelectorAll<HTMLButtonElement>('[data-legacy-slot]').forEach(
+    (button) =>
+      (button.onclick = () => {
+        binding = Number(button.dataset.legacySlot);
+        bindingLanes = bindingPreviewLanes;
+        bindingLegacy = true;
+        hint.textContent = t('listening');
+      }),
+  );
+  const common = document.querySelector<HTMLButtonElement>(
+    '#use-common-bindings',
+  );
+  if (common)
+    common.onclick = () => {
+      delete profile.overrides[bindingPreviewLanes];
+      syncSettings();
+    };
   persist();
   if (
     !readingRoute &&
@@ -1329,6 +1375,11 @@ $('#song-loading').addEventListener('click', (e) => {
   $('#ready-start').click();
 });
 async function start() {
+  if (
+    !playReplay &&
+    !makeChart(SONGS[songIndex], settings.difficulty, settings.lanes).length
+  )
+    return;
   if (!playReplay && mobilePlaybackOnly()) {
     toast(t('unsupported'));
     return;
@@ -2192,19 +2243,19 @@ window.addEventListener('keydown', (e) => {
       return;
     }
     if (
-      settings.keys[bindingLanes].some((k, i) => k === e.code && i !== binding)
+      (bindingLegacy
+        ? settings.bindingProfile.overrides[bindingLanes]!
+        : settings.bindingProfile.master
+      ).some((k, i) => k === e.code && i !== binding)
     ) {
       toast(t('duplicate'));
       return;
     }
-    settings.keys[bindingLanes][binding] = e.code;
-    const finished = binding + 1 >= bindingLanes;
-    binding = finished ? -1 : binding + 1;
+    (bindingLegacy
+      ? settings.bindingProfile.overrides[bindingLanes]!
+      : settings.bindingProfile.master)[binding] = e.code;
+    binding = -1;
     syncSettings();
-    if (!finished)
-      $<HTMLButtonElement>(
-        `[data-keymode="${bindingLanes}"][data-slot="${binding}"]`,
-      ).focus();
     return;
   }
   if (paused && $<HTMLDialogElement>('#settings').open && e.code === 'Escape') {
@@ -2316,8 +2367,8 @@ window.addEventListener('keydown', (e) => {
       syncSettings();
       return;
     }
-    if (e.code === 'Digit5' || e.code === 'Digit7') {
-      settings.lanes = e.code === 'Digit5' ? 5 : 7;
+    if (/^Digit[4-8]$/.test(e.code)) {
+      settings.lanes = Number(e.code.slice(-1)) as Lanes;
       syncSettings();
       return;
     }
@@ -2859,6 +2910,7 @@ $('#reset').onclick = () => {
     shuffle: 'off',
     volume: 0.7,
     keys: structuredClone(defaults),
+    bindingProfile: migrateBindings({}),
   };
   syncSettings();
 };
@@ -3084,7 +3136,7 @@ function readRoute(initial = false) {
     songIndex = visibleSongIndices()[0];
   const lanes = parts[0] === 'play' ? parts[2] : q.get('lanes');
   const difficulty = parts[0] === 'play' ? parts[3] : q.get('difficulty');
-  if (lanes === '5' || lanes === '7') settings.lanes = Number(lanes) as Lanes;
+  if (isKeyMode(Number(lanes))) settings.lanes = Number(lanes) as Lanes;
   if (
     difficulty === 'low' ||
     difficulty === 'mid' ||
@@ -3514,7 +3566,7 @@ void initializeLibrary();
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
 Object.defineProperty(window, 'orvioDiagnostics', {
   get: () => ({
-    version: '0.2.49',
+    version: '0.2.50',
     active,
     paused,
     fever: engine

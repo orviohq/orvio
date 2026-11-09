@@ -40,7 +40,7 @@ export const de = {
   local: 'Nur auf diesem Gerät gespeichert. Kein Konto, kein Upload.',
   auto: 'Noten und Eingaben folgen automatisch der hörbaren Musik.',
   bindHint:
-    'Wähle ein Feld für 5 oder 7 Tasten und drücke die Tasten von links nach rechts. Das nächste Feld folgt automatisch. Esc bricht ab. Doppelte Tasten bleiben im selben Feld.',
+    'Wähle ein Feld und drücke eine Taste. Alle Modi verwenden dieselbe Acht-Tasten-Belegung. Esc bricht ab. Doppelte Tasten sind nicht erlaubt.',
   mobile:
     'Hier kannst du Titel und Einstellungen ansehen. Spiele am Computer mit einer Tastatur.',
   easy: 'LEICHT',
@@ -48,7 +48,7 @@ export const de = {
   hard: 'SCHWER',
   choose: 'WÄHLE DEINEN TITEL',
   selectionHint:
-    '↑ ↓ TITEL / ← → SCHWIERIGKEIT / 5 7 TASTEN / ENTER START / F2 OPTIONEN',
+    '↑ ↓ TITEL / ← → SCHWIERIGKEIT / 4 5 6 7 8 TASTEN / ENTER START / F2 OPTIONEN',
   selected: 'AUSGEWÄHLTER TITEL',
   nowPlaying: 'VORSCHAU LÄUFT',
   preparing: 'AUDIO WIRD VORBEREITET',

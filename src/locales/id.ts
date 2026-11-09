@@ -39,7 +39,7 @@ export const id = {
   local: 'Hanya disimpan di perangkat ini. Tanpa akun atau unggahan.',
   auto: 'Not dan input otomatis mengikuti waktu musik yang terdengar.',
   bindHint:
-    'Pilih kotak mode 5 atau 7 tombol, lalu tekan tombol dari kiri ke kanan. Pindah ke kotak berikutnya secara otomatis. Esc membatalkan. Tombol duplikat tetap di kotak yang sama.',
+    'Pilih kotak lalu tekan tombol. Semua mode memakai susunan delapan tombol yang sama. Esc membatalkan. Tombol duplikat tidak diizinkan.',
   mobile:
     'Jelajahi lagu dan pengaturan di sini. Bermainlah di komputer dengan keyboard.',
   easy: 'MUDAH',
@@ -47,7 +47,7 @@ export const id = {
   hard: 'SULIT',
   choose: 'PILIH LAGUMU',
   selectionHint:
-    '↑ ↓ LAGU / ← → KESULITAN / 5 7 TOMBOL / ENTER MULAI / F2 PENGATURAN',
+    '↑ ↓ LAGU / ← → KESULITAN / 4 5 6 7 8 TOMBOL / ENTER MULAI / F2 PENGATURAN',
   selected: 'LAGU TERPILIH',
   nowPlaying: 'PRATINJAU DIPUTAR',
   preparing: 'MENYIAPKAN AUDIO',

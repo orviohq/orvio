@@ -12,7 +12,7 @@ test('real keyboard performance shares a local input replay with exact judgments
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => (window as any).orvioDiagnostics.active);
   const d = await page.evaluate(() => (window as any).orvioDiagnostics);
-  const keys = ['d', 'f', 'Space', 'j', 'k'];
+  const keys = (await page.locator('#keycaps span').allTextContents()).map(k=>k === '␣' ? 'Space' : k.toLowerCase());
   for (const { note: n } of d.notes.slice(0, 7)) {
     await page.waitForFunction(
       (t) => (window as any).orvioAudioTime >= t,
@@ -55,7 +55,7 @@ test('real keyboard performance shares a local input replay with exact judgments
   ).toBe(true);
   await page.screenshot({ path: 'test-results/actual-result-with-replay.png' });
   const url = page.url();
-  expect(url).toContain('&r=');
+  expect(url).toContain('/result/?local=builtin');
   expect(url.length).toBeLessThan(120000);
   expect(external).toEqual([]);
   const other = await context.newPage();
@@ -80,6 +80,6 @@ test('real keyboard performance shares a local input replay with exact judgments
     resolved: (window as any).orvioDiagnostics.resolved,
   }));
   expect(replay).toEqual(original);
-  expect(new URL(other.url()).search).toBe('');
+  expect(new URL(other.url()).searchParams.get('local')).toMatch(/^builtin:/);
   await other.close();
 });

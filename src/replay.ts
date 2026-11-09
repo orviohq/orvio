@@ -54,7 +54,7 @@ export function validateRuntimeReplay(
     r.version !== 1 ||
     typeof r.song !== 'string' ||
     !allowed(r.song) ||
-    ![5, 7].includes(r.lanes) ||
+    ![4, 5, 6, 7, 8].includes(r.lanes) ||
     !['low', 'mid', 'high', 'sc'].includes(r.difficulty) ||
     !r.options ||
     !Array.isArray(r.ops) ||

@@ -39,7 +39,7 @@ export const pt = {
   local: 'Salvo apenas neste dispositivo. Sem conta ou envio.',
   auto: 'Notas e comandos seguem automaticamente o relógio da música ouvida.',
   bindHint:
-    'Escolha uma posição de 5 ou 7 teclas e pressione da esquerda para a direita. O avanço é automático. Esc cancela. Teclas repetidas ficam na mesma posição.',
+    'Escolha uma posição e prima uma tecla. Todos os modos usam a mesma disposição de oito teclas. Esc cancela. Não são permitidas teclas repetidas.',
   mobile:
     'Explore músicas e configurações aqui. Jogue no computador com teclado.',
   easy: 'FÁCIL',
@@ -47,7 +47,7 @@ export const pt = {
   hard: 'DIFÍCIL',
   choose: 'ESCOLHA SUA MÚSICA',
   selectionHint:
-    '↑ ↓ MÚSICA / ← → DIFICULDADE / 5 7 TECLAS / ENTER INICIAR / F2 OPÇÕES',
+    '↑ ↓ MÚSICA / ← → DIFICULDADE / 4 5 6 7 8 TECLAS / ENTER INICIAR / F2 OPÇÕES',
   selected: 'MÚSICA SELECIONADA',
   nowPlaying: 'PRÉVIA EM REPRODUÇÃO',
   preparing: 'PREPARANDO ÁUDIO',

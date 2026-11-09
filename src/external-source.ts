@@ -5,7 +5,7 @@ import {
   familyForKey,
   type ChartDifficultyMetadata,
 } from './chart-difficulty';
-export type ChartKey = `${Lanes}:${Difficulty}`;
+export type ChartKey = `${5 | 7}:${Difficulty}`;
 export interface SourceRecord {
   /** Local-worker provenance, not a server/official derivation attestation. */
   sourceProvenance?: 'local-current35-v1';
@@ -22,10 +22,10 @@ export interface SourceRecord {
   config: string;
   chartSetSha256?: string;
   charts: Record<
-    `${Lanes}:${Exclude<Difficulty, 'sc'>}`,
+    `${5 | 7}:${Exclude<Difficulty, 'sc'>}`,
     { notes: Note[]; sha256: string }
   > &
-    Partial<Record<`${Lanes}:sc`, { notes: Note[]; sha256: string }>>;
+    Partial<Record<`${5 | 7}:sc`, { notes: Note[]; sha256: string }>>;
   chartMetadata?: Partial<Record<ChartKey, ChartDifficultyMetadata>>;
 }
 const hash = /^[a-f0-9]{64}$/;

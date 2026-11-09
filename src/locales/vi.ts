@@ -39,14 +39,14 @@ export const vi = {
   local: 'Chỉ lưu trên thiết bị này. Không cần tài khoản hay tải lên.',
   auto: 'Nốt và thao tác nhập tự đồng bộ với thời gian nhạc đang nghe.',
   bindHint:
-    'Chọn ô ở chế độ 5 hoặc 7 phím, rồi nhấn từ trái sang phải. Tự chuyển sang ô tiếp theo. Esc hủy. Phím trùng giữ nguyên ô hiện tại.',
+    'Chọn một ô rồi nhấn phím. Mọi chế độ dùng chung bố cục tám phím. Esc để hủy. Không được dùng phím trùng.',
   mobile: 'Xem bài hát và cài đặt tại đây. Chơi trên máy tính có bàn phím.',
   easy: 'DỄ',
   normal: 'THƯỜNG',
   hard: 'KHÓ',
   choose: 'CHỌN BÀI HÁT CỦA BẠN',
   selectionHint:
-    '↑ ↓ BÀI HÁT / ← → ĐỘ KHÓ / 5 7 PHÍM / ENTER BẮT ĐẦU / F2 CÀI ĐẶT',
+    '↑ ↓ BÀI HÁT / ← → ĐỘ KHÓ / 4 5 6 7 8 PHÍM / ENTER BẮT ĐẦU / F2 CÀI ĐẶT',
   selected: 'BÀI HÁT ĐÃ CHỌN',
   nowPlaying: 'ĐANG NGHE THỬ',
   preparing: 'ĐANG CHUẨN BỊ ÂM THANH',
