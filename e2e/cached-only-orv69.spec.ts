@@ -37,6 +37,7 @@ for (const [status, code] of [
       {
         youtubeUrl: 'https://www.youtube.com/watch?v=AAAAAAAAAAA',
         generationMode: 'client',
+        audioFormat: 'orvio-opus-v1',
       },
     ]);
     expect(errors).toEqual([]);

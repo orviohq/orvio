@@ -13,11 +13,13 @@ test('full storage is distinct in all thirteen languages and never silently retr
       body:
         r.request().method() === 'POST'
           ? JSON.stringify({
-              error: 'storage_full',
-              capacity: {
-                budgetBytes: 400000000,
-                usedBytes: 380000000,
-                reserveBytes: 57800000,
+              error: {
+                code: 'storage_full',
+                capacity: {
+                  budgetBytes: 400000000,
+                  usedBytes: 380000000,
+                  reserveBytes: 57800000,
+                },
               },
             })
           : '{"error":"chart_source_not_found"}',

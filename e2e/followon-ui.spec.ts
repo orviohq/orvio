@@ -58,7 +58,17 @@ test('context menu reuses hide-only confirmation, keyboard/Escape and viewport p
   await page.reload();
   const row = page.locator('[data-canonical-video="AAAAAAAAAAA"]');
   await expect(row).toHaveAttribute('data-state', 'error');
-  await row.click({ button: 'right' });
+  await row.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    el.dispatchEvent(
+      new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: r.left + r.width / 2,
+        clientY: r.top + r.height / 2,
+      }),
+    );
+  });
   const menu = page.locator('.library-context-menu');
   await expect(menu).toBeVisible();
   await page.screenshot({
@@ -76,7 +86,17 @@ test('context menu reuses hide-only confirmation, keyboard/Escape and viewport p
   await page.waitForTimeout(250);
   await row.scrollIntoViewIfNeeded();
   await page.waitForTimeout(100);
-  await row.click({ button: 'right', position: { x: 10, y: 10 } });
+  await row.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    el.dispatchEvent(
+      new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: r.left + 10,
+        clientY: r.top + 10,
+      }),
+    );
+  });
   await page.screenshot({
     path: test.info().outputPath('a25-mobile-menu.png'),
   });
