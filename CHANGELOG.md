@@ -1,3 +1,7 @@
+## [0.3.2] - 2026-11-10
+
+- Fix a click-handling error after returning from a replay to the song list.
+
 ## [0.3.1] - 2026-11-09
 
 - Preserve initial shared result and replay routes during chart startup.
