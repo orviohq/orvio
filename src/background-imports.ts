@@ -1,3 +1,5 @@
+import { waitImportPaint } from './import-paint';
+import { createImportBudget } from './import-budget';
 import { earlyYoutubeMetadata } from './early-youtube-metadata';
 import { IMPORT_STAGES, type ImportStage } from './import-progress';
 import { readAudioLimit } from './audio-limit-message';
@@ -213,6 +215,7 @@ export class BackgroundImports {
     void this.perform(next.row, next.retryFailed);
   }
   private async perform(row: PendingImport, retryFailed: boolean) {
+    const budget = createImportBudget();
     try {
       // Clear the durable never-started marker BEFORE any external effect.
       // If this write fails, do not start or resume a request.
@@ -222,40 +225,44 @@ export class BackgroundImports {
       this.persist();
       this.changed();
       // Let the immediate pending row paint before cached audio/chart work starts.
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      );
-      const result = await importYoutube(
-        row.videoId,
-        AbortSignal.timeout(90000),
-        {
-          jobId: row.jobId,
-          transportVersion: row.transportVersion,
-          audioFormat: row.audioFormat,
-          retryFailed,
-          onStage: (stage) => {
-            row.stage = stage;
-            this.changed();
-          },
-          onJob: (job) => {
-            if ('transportVersion' in job && job.transportVersion === 2) {
-              row.jobId = job.jobId;
-              row.transportVersion = 2;
-              row.audioFormat = 'orvio-opus-v1';
-            } else row.jobId = job.status === 'error' ? undefined : job.jobId;
-            if (job.title) row.title = job.title;
-            try {
-              this.persist();
-            } catch (error) {
-              // Keep the known handle in memory, but never advance v2 work
-              // without a durable handle for reload/unknown-effect recovery.
-              if ('transportVersion' in job && job.transportVersion === 2)
-                throw error;
-            }
-            this.changed();
-          },
+      await waitImportPaint(budget.signal);
+      const result = await importYoutube(row.videoId, budget.signal, {
+        jobId: row.jobId,
+        transportVersion: row.transportVersion,
+        audioFormat: row.audioFormat,
+        retryFailed,
+        onStage: (stage) => {
+          budget.stage(stage);
+          row.stage = stage;
+          this.changed();
         },
-      );
+        onJob: (job) => {
+          if ('transportVersion' in job && job.transportVersion === 2) {
+            row.jobId = job.jobId;
+            row.transportVersion = 2;
+            row.audioFormat = 'orvio-opus-v1';
+          } else row.jobId = job.status === 'error' ? undefined : job.jobId;
+          if (job.title) row.title = job.title;
+          try {
+            this.persist();
+          } catch (error) {
+            // Keep the known handle in memory, but never advance v2 work
+            // without a durable handle for reload/unknown-effect recovery.
+            if ('transportVersion' in job && job.transportVersion === 2)
+              throw error;
+          }
+          // Persist the exact handle BEFORE extending beyond acquisition.
+          if (
+            'transportVersion' in job &&
+            job.transportVersion === 2 &&
+            job.status === 'done'
+          )
+            budget.verified();
+          this.changed();
+        },
+      });
+      budget.signal.throwIfAborted();
+      budget.dispose();
       row.stage = 'saving';
       this.changed();
       await this.complete({ ...result, title: result.title ?? row.title });
@@ -266,7 +273,8 @@ export class BackgroundImports {
         /* Ready source is independently persisted before pending removal. */
       }
       this.changed();
-    } catch (error) {
+    } catch (caught) {
+      const error = budget.signal.aborted ? budget.signal.reason : caught;
       row.state = 'error';
       row.error =
         error instanceof AudioJobError
@@ -291,6 +299,7 @@ export class BackgroundImports {
       } catch {}
       this.changed();
     } finally {
+      budget.dispose();
       this.active.delete(row.videoId);
       this.drain();
     }

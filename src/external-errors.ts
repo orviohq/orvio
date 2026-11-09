@@ -1,3 +1,4 @@
+import { importCompletionTimeout } from './import-timeout-message';
 import { LOCAL_GENERATION_ERRORS } from './local-generation-errors';
 import { AUDIO_STORAGE_FULL } from './audio-storage-full';
 import { audioStageMessage } from './audio-stage-message';
@@ -138,6 +139,12 @@ const errors: Record<Language, string[]> = {
   ],
 };
 export function externalError(error: unknown, language: Language) {
+  if (
+    error instanceof AudioJobError &&
+    error.code === 'request_timeout' &&
+    ['response', 'analysis', 'storage'].includes(error.stage ?? '')
+  )
+    return importCompletionTimeout(error.stage!, language);
   if (
     error instanceof AudioJobError &&
     error.code === 'client_audio_not_cached'

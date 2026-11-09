@@ -195,7 +195,7 @@ it('admits one import at a time and starts no timeout while the next waits', asy
         release = resolve;
       }),
   );
-  const timeout = vi.spyOn(AbortSignal, 'timeout');
+  const timeout = vi.spyOn(globalThis, 'setTimeout');
   const pending = new BackgroundImports(
     () => {},
     async () => {},
@@ -205,7 +205,7 @@ it('admits one import at a time and starts no timeout while the next waits', asy
   pending.enqueue('BBBBBBBBBBB');
   pending.enqueue('BBBBBBBBBBB');
   await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(1));
-  expect(timeout).toHaveBeenCalledTimes(1);
+  expect(timeout.mock.calls.filter((c) => c[1] === 90000)).toHaveLength(1);
   expect(pending.isWaiting('BBBBBBBBBBB')).toBe(true);
   expect(pending.rows.get('BBBBBBBBBBB')).toMatchObject({
     stage: 'queued',
@@ -213,7 +213,7 @@ it('admits one import at a time and starts no timeout while the next waits', asy
   });
   release({ prepared: { record: { videoId: 'AAAAAAAAAAA' } } });
   await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(2));
-  expect(timeout).toHaveBeenCalledTimes(2);
+  expect(timeout.mock.calls.filter((c) => c[1] === 90000)).toHaveLength(2);
   expect(pending.rows.get('BBBBBBBBBBB')?.waitingForTurn).toBeUndefined();
   timeout.mockRestore();
 });
@@ -414,4 +414,143 @@ it('a v2 job handle must persist before the importer can advance any known job',
     error: 'unavailable',
     failure: { stage: 'storage' },
   });
+});
+
+it('durably saved verified v2 receipt at88s completes after90s without a second import', async () => {
+  vi.useFakeTimers();
+  try {
+    vi.stubGlobal('requestAnimationFrame', (fn: () => void) => {
+      fn();
+      return 1;
+    });
+    const complete = vi.fn(async () => {}),
+      storage = store();
+    api.import.mockImplementationOnce(
+      async (_id: any, signal: any, options: any) => {
+        await new Promise<void>((resolve, reject) => {
+          const t = setTimeout(resolve, 88000);
+          signal.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(t);
+              reject(signal.reason);
+            },
+            { once: true },
+          );
+        });
+        options.onJob({
+          jobId: '11111111-2222-4333-8444-555555555555',
+          transportVersion: 2,
+          audioFormat: 'orvio-opus-v1',
+          status: 'done',
+        });
+        expect(
+          JSON.parse(storage.getItem('orvio.pending-imports.v1')!)[0].jobId,
+        ).toBe('11111111-2222-4333-8444-555555555555');
+        options.onStage('downloading');
+        await new Promise<void>((resolve, reject) => {
+          const t = setTimeout(resolve, 4000);
+          signal.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(t);
+              reject(signal.reason);
+            },
+            { once: true },
+          );
+        });
+        options.onStage('charting');
+        options.onStage('saving');
+        return {} as any;
+      },
+    );
+    const pending = new BackgroundImports(() => {}, complete, storage);
+    pending.enqueue('AAAAAAAAAAA');
+    await vi.advanceTimersByTimeAsync(93000);
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(pending.rows.size).toBe(0);
+    expect(api.import).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+it('completion transfer timeout keeps exact known handle and accurate failure for explicit resume, never auto imports again', async () => {
+  vi.useFakeTimers();
+  try {
+    vi.stubGlobal('requestAnimationFrame', (fn: () => void) => {
+      fn();
+      return 1;
+    });
+    const complete = vi.fn(async () => {}),
+      storage = store();
+    api.import.mockImplementationOnce(
+      async (_id: any, signal: any, options: any) => {
+        options.onJob({
+          jobId: '11111111-2222-4333-8444-555555555555',
+          transportVersion: 2,
+          audioFormat: 'orvio-opus-v1',
+          status: 'done',
+        });
+        options.onStage('downloading');
+        await new Promise<void>((_resolve, reject) =>
+          signal.addEventListener('abort', () => reject(signal.reason), {
+            once: true,
+          }),
+        );
+        return {} as any;
+      },
+    );
+    const pending = new BackgroundImports(() => {}, complete, storage);
+    pending.enqueue('AAAAAAAAAAA');
+    await vi.advanceTimersByTimeAsync(30001);
+    expect(pending.rows.get('AAAAAAAAAAA')).toMatchObject({
+      state: 'error',
+      jobId: '11111111-2222-4333-8444-555555555555',
+      transportVersion: 2,
+      error: 'request_timeout',
+      failure: { stage: 'response' },
+    });
+    expect(api.import).toHaveBeenCalledTimes(1);
+    expect(complete).not.toHaveBeenCalled();
+    pending.resume();
+    await vi.advanceTimersByTimeAsync(200000);
+    expect(api.import).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('paused paint times out, releases active admission, starts next queued row, and makes no external request', async () => {
+  vi.useFakeTimers();
+  try {
+    const frames = new Map<number, FrameRequestCallback>();
+    let next = 1;
+    vi.stubGlobal('requestAnimationFrame', (fn: FrameRequestCallback) => {
+      frames.set(next, fn);
+      return next++;
+    });
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
+    const complete = vi.fn(async () => {}),
+      pending = new BackgroundImports(() => {}, complete, store());
+    pending.enqueue('AAAAAAAAAAA');
+    pending.enqueue('BBBBBBBBBBB');
+    expect(pending.isWaiting('BBBBBBBBBBB')).toBe(true);
+    await vi.advanceTimersByTimeAsync(90000);
+    expect(pending.rows.get('AAAAAAAAAAA')).toMatchObject({
+      state: 'error',
+      error: 'request_timeout',
+    });
+    expect(pending.isWaiting('BBBBBBBBBBB')).toBe(false);
+    expect(frames.size).toBe(1);
+    expect(api.import).not.toHaveBeenCalled();
+    expect(complete).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(90000);
+    expect(pending.rows.get('BBBBBBBBBBB')?.state).toBe('error');
+    expect(frames.size).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
 });

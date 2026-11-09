@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.53] - 2026-11-09
+
+- Fix an import timeout that could stop an already prepared YouTube song during download.
+- Give download, audio analysis and saving separate time limits after preparation succeeds. Keep the saved request for retry and show which step timed out.
+
 ## [0.2.52] - 2026-11-09
 
 - Keep finished and reopened result reports on the same settled paint path; use straight rank-panel corners and release completed intro effects.
