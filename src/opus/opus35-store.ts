@@ -1,3 +1,4 @@
+import { discoverLibrary } from '../library-discovery';
 import DecoderUrl from '../opus-codec/opus-decoder.wasm?url';
 import ChartWorkerUrl from './opus-chart.worker.mjs?worker&url';
 import { readVerifiedOpusByRoots } from './opus-cache.mjs';
@@ -59,20 +60,8 @@ export async function saveOpus35Metadata(
     }),
   );
 }
-export async function listOpus35Metadata() {
-  const rows = await opus35Operation('metadata', 'readonly', (s) => s.getAll());
-  const out = [];
-  for (const row of rows) {
-    if (
-      row?.kind !== 'opus35-source' ||
-      typeof row.title !== 'string' ||
-      row.key !== opus35SourceId(row.record) ||
-      !(await verifyOpusRecord(row.record))
-    )
-      throw Error('opus35_catalog_corrupt');
-    out.push(row);
-  }
-  return out;
+export async function listOpus35Metadata(onVerified?: (row: any) => void) {
+  return discoverLibrary<any>('opus', onVerified);
 }
 export async function readOpus35Metadata(record: OpusRecord) {
   const row = await opus35Operation('metadata', 'readonly', (s) =>

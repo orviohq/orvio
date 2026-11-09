@@ -1,3 +1,5 @@
+import { visibleLibrarySelection } from './library-visible-selection';
+import { chartDisplay } from './chart-display';
 import { installDoubleTapGuard } from './touch-gestures';
 import { isOpusRecord, type PlayableSourceRecord } from './playable-source';
 import { listOpus35Metadata } from './opus/opus35-store';
@@ -508,6 +510,7 @@ window.addEventListener(
   { passive: true },
 );
 let libraryHydrated = false;
+let selectedDuringHydration = false;
 // Verified server canonical reference + chart identity, not an audio-ready flag.
 // Audio is independently loaded and hash/WAV-verified by prepare/watchReplay.
 // Preferred means verified server reference + pinned chart/source identity.
@@ -905,13 +908,19 @@ function selectedSong() {
 }
 function selectSong(index: number, audition = true) {
   if (preparing || active) return;
+  if (!libraryHydrated) selectedDuringHydration = true;
   songIndex = (index + SONGS.length) % SONGS.length;
   if (!visibleSongIndices().includes(songIndex))
     songIndex = visibleSongIndices()[0];
   stopPreview();
   rendered = cache.get(SONGS[songIndex].id);
-  songCards();
-  syncSettings();
+  // Selection changes no row content or membership. Keep live buttons and
+  // focus instead of rebuilding and re-rating every chart in the library.
+  for (const row of document.querySelectorAll<HTMLElement>(
+    '#songs [data-song]',
+  ))
+    row.classList.toggle('selected', Number(row.dataset.song) === songIndex);
+  syncSettings(false);
   selectedSong();
   const list = $('#songs');
   const selected = list.querySelector<HTMLElement>('.song-card.selected');
@@ -937,15 +946,9 @@ function chartLevel(
   diff: Difficulty,
   lanes: Lanes,
 ) {
-  const notes = makeChart(song, diff, lanes);
-  return notes.length
-    ? difficultyText(
-        (lanes === 5 || lanes === 7
-          ? externalSource(song.id)?.record.chartMetadata?.[`${lanes}:${diff}`]
-          : undefined) ??
-          difficultyForChart(notes, duration(song), `${lanes}:${diff}`),
-        settings.language,
-      )
+  const display = chartDisplay(song, diff, lanes);
+  return display.count
+    ? difficultyText(display.metadata, settings.language)
     : 'SC --';
 }
 function songCards() {
@@ -958,7 +961,7 @@ function songCards() {
   $('#songs').innerHTML = visible
     .map((i) => {
       const s = SONGS[i];
-      return `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${externalSource(s.id) ? `<img class="youtube-cover" data-song-art="${s.id}" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle) : t(('subtitle' + i) as Word)}</span><span class="song-note-count" data-chart-song="${i}">${makeChart(s, settings.difficulty, settings.lanes).length || '--'} ${t('notes')}</span></span><span class="song-time"><em class="song-level">${chartLevel(s, settings.difficulty, settings.lanes)}</em>${Math.floor(duration(s) / 60)}:${Math.floor(
+      return `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${externalSource(s.id) ? `<img class="youtube-cover" data-song-art="${s.id}" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) ? escapeText(s.subtitle) : t(('subtitle' + i) as Word)}</span><span class="song-note-count" data-chart-song="${i}">${chartDisplay(s, settings.difficulty, settings.lanes).count || '--'} ${t('notes')}</span></span><span class="song-time"><em class="song-level">${chartLevel(s, settings.difficulty, settings.lanes)}</em>${Math.floor(duration(s) / 60)}:${Math.floor(
         duration(s) % 60,
       )
         .toString()
@@ -1220,39 +1223,41 @@ function updateOptionReadout() {
   button.innerHTML = `<span class="option-chip" data-tip="${t('speed')}" title="${t('speed')}">${optionIcon('speed')}<b>${speedText}</b></span><span class="option-chip ${shuffle !== 'off' ? 'enabled' : ''}" data-tip="${t('shuffle')}" title="${t('shuffle')}">${optionIcon('shuffle', shuffle)}<b>${shuffle.toUpperCase()}</b></span><span class="option-chip ${fader !== 'off' ? 'enabled' : ''}" data-tip="${t('fader')}" title="${t('fader')}">${optionIcon('fader', fader)}<b>${faderText}</b></span><kbd>F3</kbd>`;
 }
 
-function syncSettings() {
+function syncSettings(updateLibrary = true) {
+  const priorDifficulty = settings.difficulty;
   resolveBindings();
   const selected = SONGS[songIndex];
   if (
     settings.difficulty === 'sc' &&
-    !makeChart(selected, 'sc', settings.lanes).length
+    !chartDisplay(selected, 'sc', settings.lanes).count
   )
     settings.difficulty = 'high';
   $<HTMLButtonElement>('#start').disabled =
     mobilePlaybackOnly() ||
     preparing ||
-    !makeChart(selected, settings.difficulty, settings.lanes).length;
+    !chartDisplay(selected, settings.difficulty, settings.lanes).count;
   document.querySelectorAll<HTMLButtonElement>('[data-diff]').forEach((b) => {
     const diff = b.dataset.diff as Difficulty;
-    b.disabled = !makeChart(selected, diff, settings.lanes).length;
+    b.disabled = !chartDisplay(selected, diff, settings.lanes).count;
     b.textContent = chartLevel(selected, diff, settings.lanes);
     b.removeAttribute('title');
   });
-  document
-    .querySelectorAll<HTMLElement>('#songs [data-song]')
-    .forEach((row) => {
-      const song = SONGS[Number(row.dataset.song)];
-      const level = row.querySelector<HTMLElement>('.song-level');
-      if (level)
-        level.textContent = chartLevel(
-          song,
-          settings.difficulty,
-          settings.lanes,
-        );
-      const count = row.querySelector<HTMLElement>('.song-note-count');
-      if (count)
-        count.textContent = `${makeChart(song, settings.difficulty, settings.lanes).length || '--'} ${t('notes')}`;
-    });
+  if (updateLibrary || priorDifficulty !== settings.difficulty)
+    document
+      .querySelectorAll<HTMLElement>('#songs [data-song]')
+      .forEach((row) => {
+        const song = SONGS[Number(row.dataset.song)];
+        const level = row.querySelector<HTMLElement>('.song-level');
+        if (level)
+          level.textContent = chartLevel(
+            song,
+            settings.difficulty,
+            settings.lanes,
+          );
+        const count = row.querySelector<HTMLElement>('.song-note-count');
+        if (count)
+          count.textContent = `${chartDisplay(song, settings.difficulty, settings.lanes).count || '--'} ${t('notes')}`;
+      });
   queueMicrotask(() => document.dispatchEvent(new Event('orvio:select-sync')));
   updateOptionReadout();
   clock?.setVolume(settings.volume);
@@ -3553,9 +3558,31 @@ function recoverDisplayMetadata(record: PlayableSourceRecord) {
   })();
 }
 async function initializeLibrary() {
+  document.documentElement.dataset.libraryHydrating = 'true';
+  let progressiveRouteRead = false;
+  let progressiveVisible = false;
+  let progressiveFrame = 0;
+  const flushVerifiedSelection = () => {
+    progressiveFrame = 0;
+    if (progressiveVisible) return;
+    if (!/^\/select\/?$/.test(location.pathname) || active || preparing) return;
+    const requested = new URLSearchParams(location.search).get('song');
+    if (requested && !SONGS.some((song) => song.id === requested)) return;
+    if (!progressiveRouteRead && deferredLibraryRoute) {
+      progressiveRouteRead = true;
+      void readInitialRoute();
+    } else {
+      songCards();
+      syncSettings();
+      selectedSong();
+    }
+    // Only verified records are installed above. No cached display row grants
+    // playback, and unfinished discovery no longer masks the whole live UI.
+    finishLibraryFirstPaint();
+    progressiveVisible = true;
+  };
   try {
-    const opusRows = await listOpus35Metadata();
-    for (const row of opusRows) {
+    const opusRows = await listOpus35Metadata((row) => {
       const item = installExternalSource(
         row.record,
         row.title,
@@ -3564,7 +3591,11 @@ async function initializeLibrary() {
         row.author,
       );
       if (!SONGS.some((s) => s.id === item.song.id)) SONGS.push(item.song);
-    }
+      canonicalPreferred.set(row.record.videoId, item.song.id);
+      canonicalPending.delete(row.record.videoId);
+      if (!progressiveVisible && !progressiveFrame)
+        progressiveFrame = requestAnimationFrame(flushVerifiedSelection);
+    });
     for (const record of await allPinnedSources()) {
       const saved = await localMetadata(record);
       const item = installExternalSource(
@@ -3616,17 +3647,27 @@ async function initializeLibrary() {
     if (location.pathname !== '/replays/' && location.pathname !== '/replays')
       toast(REPLAY_READ_ERROR[settings.language]);
   }
+  if (progressiveFrame) cancelAnimationFrame(progressiveFrame);
   libraryHydrated = true;
+  delete document.documentElement.dataset.libraryHydrating;
   for (const song of SONGS) {
     const item = externalSource(song.id);
     if (item) recoverDisplayMetadata(item.record);
   }
   for (const row of canonicalPending.values()) void reconcileLibraryRow(row);
   backgroundImports.resume();
-  if (deferredLibraryRoute) await readInitialRoute();
+  if (deferredLibraryRoute && !progressiveRouteRead) await readInitialRoute();
   else if (screen === 'select' && !active) {
-    if (!new URLSearchParams(location.search).has('song'))
+    if (
+      !selectedDuringHydration &&
+      !new URLSearchParams(location.search).has('song')
+    )
       restoreLibrarySelection();
+    songIndex = visibleLibrarySelection(
+      songIndex,
+      visibleSongIndices(),
+      (index) => externalSource(SONGS[index]?.id)?.record.videoId,
+    );
     songCards();
     selectedSong();
     syncSettings();

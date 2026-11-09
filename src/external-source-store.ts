@@ -1,3 +1,4 @@
+import { discoverLibrary } from './library-discovery';
 import {
   recordKey,
   validSourceRecord,
@@ -138,24 +139,5 @@ export async function listPinnedSources(
   return found;
 }
 export async function allPinnedSources(): Promise<SourceRecord[]> {
-  const db = await open();
-  try {
-    const rows: { record: unknown }[] = await new Promise((resolve, reject) => {
-      const r = db.transaction(STORE, 'readonly').objectStore(STORE).getAll();
-      r.onsuccess = () => resolve(r.result);
-      r.onerror = () => reject(r.error);
-    });
-    const records: SourceRecord[] = [];
-    for (const row of rows) {
-      if (
-        !validSourceRecord(row.record) ||
-        !(await verifyChartHashes(row.record))
-      )
-        throw Error('Saved chart integrity failed');
-      records.push(row.record);
-    }
-    return records;
-  } finally {
-    db.close();
-  }
+  return discoverLibrary<SourceRecord>('legacy');
 }

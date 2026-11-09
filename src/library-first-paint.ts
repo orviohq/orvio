@@ -12,7 +12,7 @@ function textTree(node: Node | null): unknown {
     children: [...node.childNodes].map(textTree),
   };
 }
-export function rememberLibraryFirstPaint(ids: string[], selected: string) {
+function writeLibraryFirstPaint(ids: string[], selected: string) {
   try {
     const songs = [
       ...document.querySelectorAll<HTMLElement>('#songs [data-song]'),
@@ -73,6 +73,20 @@ export function rememberLibraryFirstPaint(ids: string[], selected: string) {
   } catch {
     /* Optional paint cache must never block the live library. */
   }
+}
+// Persist optional display state once after a burst, outside the input task.
+// Playback authority is never read from this projection.
+let pending: { ids: string[]; selected: string } | undefined;
+let scheduled: ReturnType<typeof setTimeout> | undefined;
+export function rememberLibraryFirstPaint(ids: string[], selected: string) {
+  pending = { ids, selected };
+  if (scheduled !== undefined) return;
+  scheduled = setTimeout(() => {
+    scheduled = undefined;
+    const value = pending;
+    pending = undefined;
+    if (value) writeLibraryFirstPaint(value.ids, value.selected);
+  }, 0);
 }
 export function finishLibraryFirstPaint() {
   document.getElementById('library-first-paint')?.remove();
