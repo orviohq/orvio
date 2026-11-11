@@ -25,7 +25,7 @@ export function classifyApi(status, latencyMs, threw = false) {
     return { state: 'degraded', detail: 'unreachable' };
   }
   if (status === 404) {
-    return { state: 'reachable', detail: 'read path answered unknown id' };
+    return { state: 'reachable', detail: 'request validation answered (404); storage not probed' };
   }
   if (status >= 500) {
     return { state: 'degraded', detail: `HTTP ${status}` };
@@ -198,7 +198,7 @@ async function probeWebsite(fetchImpl, base) {
 }
 
 async function probeShareApi(fetchImpl, apiBase) {
-  const url = `${apiBase}/v1/replays/AAAAAAAAAAAAAAAAAAAAAA`;
+  const url = `${apiBase}/v1/replays/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`;
   const r = await probe(fetchImpl, url);
   return { ...classifyApi(r.status, r.latencyMs, r.threw), latencyMs: r.latencyMs };
 }
