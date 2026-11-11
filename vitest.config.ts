@@ -9,6 +9,9 @@ export default defineConfig({
       'tests/direct-local-allkeys-store.test.ts',
       'tests/direct-local-allkeys-worker.test.ts',
       'tests/youtube-origin-config.test.ts',
+      'tests/gatea-95s-repro.test.ts',
+      'tests/gatea-edge.test.ts',
+      'tests/gatea-progress.test.ts',
     ],
   },
 });

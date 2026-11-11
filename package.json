@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "astro dev --host 0.0.0.0",
     "build": "tsc --noEmit && astro build && node scripts/build-pwa.mjs",
-    "test": "npm run test:youtube-direct && npm run test:allkeys-node && npm run test:youtube-origin && vitest run",
+    "test": "npm run test:youtube-direct && npm run test:allkeys-node && npm run test:youtube-origin && npm run test:gatea-node && vitest run",
+    "test:gatea-node": "node --experimental-transform-types --import ./tests/youtube-direct-bootstrap.ts --import ./tests/gatea-node-after.ts --test tests/gatea-95s-repro.test.ts tests/gatea-edge.test.ts tests/gatea-progress.test.ts",
     "test:allkeys-node": "node --experimental-strip-types --test tests/direct-local-allkeys-store.test.ts tests/direct-local-allkeys-worker.test.ts",
     "test:youtube-direct": "node --experimental-transform-types --test tests/youtube-direct-api.test.ts",
     "test:youtube-origin": "node --experimental-transform-types --test tests/youtube-origin-config.test.ts",
