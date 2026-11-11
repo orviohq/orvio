@@ -1,27 +1,27 @@
 {
   "version": 1,
-  "checkedAt": "2026-11-11T15:51:55.789Z",
-  "overall": "degraded",
+  "checkedAt": "2026-11-11T16:20:39.160Z",
+  "overall": "unknown",
   "producer": {
     "repo": "orviohq/orvio",
-    "revision": "a20ffa029de4a332b475d2a6f41e0eb858d83040",
-    "runId": "43052552105",
+    "revision": "3ff4cd923f410e99617820986be5b52e3c20bba3",
+    "runId": "43057307094",
     "workflow": "status"
   },
   "components": {
     "websiteStatic": {
       "state": "operational",
       "detail": "static asset served",
-      "latencyMs": 119
+      "latencyMs": 133
     },
     "websiteFunctional": {
       "state": "unknown",
-      "detail": "latest production run in_progress (run 43052196052, main@a20ffa0, started 2026-11-11T15:49:34Z)"
+      "detail": "latest production run pending (run 43057010553, main@3ff4cd9, started 2026-11-11T16:18:26Z)"
     },
     "shareApiRead": {
-      "state": "degraded",
-      "detail": "unexpected HTTP 400",
-      "latencyMs": 192
+      "state": "reachable",
+      "detail": "request validation answered (404); storage not probed",
+      "latencyMs": 261
     },
     "transcription": {
       "state": "not_monitored",
@@ -35,6 +35,14 @@
       "latencyMs": {
         "websiteStatic": 119,
         "shareApiRead": 192
+      }
+    },
+    {
+      "checkedAt": "2026-11-11T16:20:39.160Z",
+      "overall": "unknown",
+      "latencyMs": {
+        "websiteStatic": 133,
+        "shareApiRead": 261
       }
     }
   ]
