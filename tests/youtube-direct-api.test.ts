@@ -1,6 +1,7 @@
+import { globalFetchCalls } from "./youtube-direct-bootstrap.ts";
 import assert from "node:assert/strict";
 import { getEventListeners } from "node:events";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import {
   acquireYoutubeAudio,
   YoutubeDirectApiError,
@@ -9,6 +10,8 @@ import {
   type YoutubeDirectFetch,
 } from "../src/youtube-direct-api.ts";
 import { makePcm16StereoWav } from "./youtube-direct-fixture.ts";
+
+after(() => assert.equal(globalFetchCalls, 0, "must use injected fetch only"));
 
 const videoId = "unitTest_01";
 const publicKey = "unit-only-public-key";
