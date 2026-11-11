@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "checkedAt": "2026-11-11T15:51:55.789Z",
+  "overall": "degraded",
+  "producer": {
+    "repo": "orviohq/orvio",
+    "revision": "a20ffa029de4a332b475d2a6f41e0eb858d83040",
+    "runId": "43052552105",
+    "workflow": "status"
+  },
+  "components": {
+    "websiteStatic": {
+      "state": "operational",
+      "detail": "static asset served",
+      "latencyMs": 119
+    },
+    "websiteFunctional": {
+      "state": "unknown",
+      "detail": "latest production run in_progress (run 43052196052, main@a20ffa0, started 2026-11-11T15:49:34Z)"
+    },
+    "shareApiRead": {
+      "state": "degraded",
+      "detail": "unexpected HTTP 400",
+      "latencyMs": 192
+    },
+    "transcription": {
+      "state": "not_monitored",
+      "detail": "external provider, not probed by the monitor"
+    }
+  },
+  "history": [
+    {
+      "checkedAt": "2026-11-11T15:51:55.789Z",
+      "overall": "degraded",
+      "latencyMs": {
+        "websiteStatic": 119,
+        "shareApiRead": 192
+      }
+    }
+  ]
+}
