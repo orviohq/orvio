@@ -3,6 +3,8 @@
 name: status
 
 on:
+  schedule:
+    - cron: '42 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -22,6 +24,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -33,12 +36,13 @@ jobs:
           set -euo pipefail
 
           if git ls-remote --exit-code origin refs/heads/status > /dev/null; then
-            echo "ERROR: origin/status already exists; bootstrap publish refuses to touch any existing lineage." >&2
-            exit 1
+            git fetch origin refs/heads/status:refs/remotes/origin/status
+            git show origin/status:public/status.json > status-prev.json
           else
             remote_exit=$?
             if [[ "$remote_exit" -eq 2 ]]; then
-              : > status-prev.json
+              echo "ERROR: status branch missing; known-root publish refuses to create" >&2
+              exit 1
             else
               echo "ERROR: Cannot determine whether origin/status exists (ls-remote exit $remote_exit)." >&2
               exit 1
@@ -57,33 +61,138 @@ jobs:
           set -euo pipefail
 
           if git ls-remote --exit-code origin refs/heads/status > /dev/null; then
-            echo "ERROR: origin/status already exists; bootstrap publish refuses to touch any existing lineage." >&2
-            exit 1
+            git fetch origin refs/heads/status:refs/remotes/origin/status
           else
             remote_exit=$?
             if [[ "$remote_exit" -eq 2 ]]; then
-              : # Genuine absence: bootstrap may create a fresh orphan.
+              echo "ERROR: status branch missing; known-root publish refuses to create" >&2
+              exit 1
             else
               echo "ERROR: Cannot determine whether origin/status exists (ls-remote exit $remote_exit)." >&2
               exit 1
             fi
           fi
 
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync } from 'node:fs';
+
+          const git = (...args) => execFileSync('git', args, { encoding: 'utf8' });
+          const fail = (message) => { throw new Error(message); };
+          const root = '496b96bfb820c356265bd89621d90cde7130a69c';
+          if (git('rev-list', '--max-parents=0', 'origin/status') !== `${root}\n`) {
+            fail('origin/status must have exactly the authorized root');
+          }
+
+          // Match validatePrevious's time/object semantics, but reject rather than sanitize.
+          const now = Date.now();
+          const plain = (value) => value !== null && typeof value === 'object' &&
+            (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+          const keys = (value, allowed) => plain(value) && Object.keys(value).every((key) => allowed.includes(key));
+          const time = (value) => typeof value === 'string' &&
+            Number.isFinite(Date.parse(value)) && Date.parse(value) <= now;
+          const latency = (value) => Number.isFinite(value) && value >= 0 && value <= 600000;
+          const names = ['websiteStatic', 'websiteFunctional', 'shareApiRead', 'transcription'];
+          const states = ['operational', 'reachable', 'degraded', 'not_monitored', 'unknown'];
+          const overall = ['operational', 'degraded', 'unknown'];
+          const markers = ['/home/', '/Users/', 'PRIVATE KEY', 'Bearer ', 'ghp_', 'secret'];
+          // Validation covers existing public/status.json content and CI-metadata scope only, not arbitrary strings.
+          // Require a full match: JavaScript's $ also permits a trailing newline.
+          const matches = (pattern, value) => typeof value === 'string' && pattern.exec(value)?.[0] === value;
+          const producerPatterns = {
+            repo: /^[A-Za-z0-9_.-]{1,39}\/[A-Za-z0-9_.-]{1,100}$/,
+            revision: /^[0-9a-f]{40}$/,
+            runId: /^[0-9]{1,20}$/,
+            workflow: /^[A-Za-z0-9_. -]{1,64}$/,
+          };
+          const branch = '[A-Za-z0-9._/-]{1,60}';
+          const status = '(?:[a-z_]{1,24}|null|undefined)';
+          const conclusion = status;
+          const id = '(?:[0-9]{1,20}|undefined|null)';
+          const shortSha = '[0-9a-f]{0,7}';
+          const ts = '(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]{8,16}Z|undefined|null)';
+          const revision = `${branch}@${shortSha}`;
+          const evidence = `run ${id}, ${revision}, ${ts}`;
+          const functionalPatterns = [
+            `no production run on ${branch}`,
+            String.raw`latest production run ${status} \(run ${id}, ${revision}, started ${ts}\)`,
+            String.raw`latest production run missing evidence \(${evidence}\)`,
+            String.raw`latest production run has future timestamp \(${evidence}\)`,
+            String.raw`latest production run stale \(${evidence}\); historical conclusion: ${conclusion}`,
+            String.raw`production check failed; current functionality unverified \(${conclusion}, ${evidence}\)`,
+            String.raw`production run ${conclusion} \(${evidence}\)`,
+            String.raw`CI ${revision} success ${ts} \(historical; current live release unverified\)`,
+          ].map((template) => new RegExp(`^${template}$`));
+          const detailPatterns = {
+            websiteStatic: [/^(?:unreachable|static asset served|HTTP [0-9]{3})$/],
+            shareApiRead: [/^(?:unreachable|request validation answered \(404\); storage not probed|HTTP [0-9]{3}|unexpected HTTP [0-9]{3})$/],
+            transcription: [/^external provider, not probed by the monitor$/],
+            websiteFunctional: functionalPatterns,
+          };
+          const detail = (name, value) => typeof value === 'string' && value.length <= 200 &&
+            detailPatterns[name].some((pattern) => matches(pattern, value));
+          const valid = (report) =>
+            keys(report, ['version', 'checkedAt', 'overall', 'producer', 'components', 'history']) &&
+            report.version === 1 && time(report.checkedAt) && overall.includes(report.overall) &&
+            (!Object.hasOwn(report, 'producer') ||
+              (keys(report.producer, ['repo', 'revision', 'runId', 'workflow']) &&
+                Object.entries(report.producer).every(([key, value]) => matches(producerPatterns[key], value)))) &&
+            keys(report.components, names) && Object.keys(report.components).length > 0 &&
+            Object.entries(report.components).every(([name, component]) =>
+              keys(component, ['state', 'detail', 'latencyMs']) && states.includes(component.state) &&
+              (!Object.hasOwn(component, 'detail') || detail(name, component.detail)) &&
+              (!Object.hasOwn(component, 'latencyMs') || latency(component.latencyMs))) &&
+            Array.isArray(report.history) && report.history.length <= 96 &&
+            report.history.every((entry) =>
+              keys(entry, ['checkedAt', 'overall', 'latencyMs']) && time(entry.checkedAt) &&
+              overall.includes(entry.overall) && keys(entry.latencyMs, ['websiteStatic', 'shareApiRead']) &&
+               Object.values(entry.latencyMs).every(latency));
+
+          const validate = (raw, source) => {
+            if (markers.some((marker) => raw.includes(marker))) fail(`Private marker at ${source}`);
+            let report;
+            try {
+              report = JSON.parse(raw);
+            } catch {
+              fail(`Invalid status JSON at ${source}`);
+            }
+            if (!valid(report)) fail(`Invalid status schema at ${source}`);
+            return report;
+          };
+
+          const commits = git('rev-list', 'origin/status').trim().split('\n');
+          for (const sha of commits) {
+            if (!/^[0-9a-f]{40}$/.test(sha)) fail('Invalid or empty status history');
+            // Include the root and each merge parent; NUL delimiters preserve unusual paths.
+            const paths = git('diff-tree', '--root', '-m', '--no-commit-id', '--name-only',
+              '--no-renames', '-r', '-z', sha).split('\0');
+            if (paths.pop() !== '' || paths.some((path) => path !== 'public/status.json')) {
+              fail(`Unexpected path in status history at ${sha}`);
+            }
+            const raw = git('show', `${sha}:public/status.json`);
+            validate(raw, sha);
+          }
+          let raw;
+          try {
+            raw = readFileSync('./status.json', 'utf8');
+          } catch {
+            fail('Cannot read new status.json');
+          }
+          const report = validate(raw, './status.json');
+          if (report.history.length > 96 || Date.parse(report.checkedAt) > now + 5 * 60 * 1000) {
+            fail('Invalid new status history length or checkedAt');
+          }
+          NODE
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           cp status.json "$RUNNER_TEMP/status.json"
 
-          git checkout --orphan status > /dev/null 2>&1
-
-          git ls-files -z | while IFS= read -r -d '' path; do
-            if [[ "$path" != public/status.json ]]; then
-              git --literal-pathspecs rm -f --quiet -- "$path" 2> /dev/null
-            fi
-          done
+          git checkout -B status origin/status
 
           mkdir -p public
-          cp --remove-destination "$RUNNER_TEMP/status.json" public/status.json
+          cp "$RUNNER_TEMP/status.json" public/status.json
 
           git add public/status.json
           if git diff --cached --quiet; then
@@ -94,16 +203,4 @@ jobs:
           checked_at="$(node -p "require('./public/status.json').checkedAt || new Date().toISOString()")"
           git commit --quiet -m "status ${checked_at}"
 
-          if git ls-remote --exit-code origin refs/heads/status > /dev/null; then
-            echo "ERROR: origin/status already exists; bootstrap publish refuses to touch any existing lineage." >&2
-            exit 1
-          else
-            remote_exit=$?
-            if [[ "$remote_exit" -eq 2 ]]; then
-              : # Still absent: attempt a plain non-force push.
-            else
-              echo "ERROR: Cannot determine whether origin/status exists (ls-remote exit $remote_exit)." >&2
-              exit 1
-            fi
-          fi
           git push origin status
