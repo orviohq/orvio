@@ -5,6 +5,7 @@ import {
   addSharedSong,
   type InspectedSong,
 } from './song-share';
+import { SongShareSaveError } from './song-share-save-diagnostic';
 const ko = navigator.language.toLowerCase().startsWith('ko');
 const text = ko
   ? {
@@ -20,7 +21,29 @@ const text = ko
       unavailable:
         '곡을 확인할 수 없습니다. 곡이 준비되지 않았거나 연결이 변경됐을 수 있습니다. 자동으로 다시 추출하지 않습니다.',
       failed:
-        '저장하지 못했습니다. 보관된 오디오의 연결 상태와 이 브라우저의 저장 공간을 확인한 뒤 다시 시도해 주세요. 새 추출은 시작하지 않습니다.',
+        '저장을 완료하지 못했습니다. 같은 링크에서 추가를 다시 눌러 주세요. 새 추출은 시작하지 않습니다.',
+      noExtraction: '새 추출은 시작하지 않습니다.',
+      cause: {
+        connection: '잠시 후 내 곡 목록에 추가를 다시 눌러 주세요.',
+        http: '같은 링크에서 추가를 다시 눌러 주세요.',
+        integrity: '같은 링크에서 추가를 다시 눌러 주세요.',
+        quota: '이 브라우저의 저장 공간을 확인한 뒤 다시 눌러 주세요.',
+        storage: '브라우저의 저장 설정을 확인한 뒤 다시 눌러 주세요.',
+        aborted: '다시 추가를 눌러 주세요.',
+        unknown: '같은 링크에서 추가를 다시 눌러 주세요.',
+      },
+      stage: {
+        descriptor_fetch: '보관된 곡 정보를 확인하지 못했습니다.',
+        audio_fetch: '보관된 오디오를 불러오지 못했습니다.',
+        artifact_verify: '보관된 오디오를 확인하지 못했습니다.',
+        decoder_fetch: '오디오 재생 도구를 준비하지 못했습니다.',
+        decoder_verify: '오디오 재생 도구를 확인하지 못했습니다.',
+        worker_decode: '오디오를 변환하지 못했습니다.',
+        cache_write: '오디오 정보를 저장하지 못했습니다.',
+        local_save: '이 브라우저에 곡을 저장하지 못했습니다.',
+        visibility_write: '목록에 표시하는 정보를 저장하지 못했습니다.',
+        order_write: '목록 순서 정보를 저장하지 못했습니다.',
+      },
     }
   : {
       heading: 'Add this song to your library?',
@@ -35,7 +58,29 @@ const text = ko
       unavailable:
         'This song could not be verified. It may not be ready or its source may have changed. No new extraction was started.',
       failed:
-        'Could not save. Check the retained audio connection, storage space and browser permissions, then try again. No new extraction was started.',
+        'Saving did not finish. Try Add again from the same link. No new extraction was started.',
+      noExtraction: 'No new extraction was started.',
+      cause: {
+        connection: 'Try Add again shortly.',
+        http: 'Try Add again from the same link.',
+        integrity: 'Try Add again from the same link.',
+        quota: 'Check this browser’s storage space, then try Add again.',
+        storage: 'Check this browser’s storage settings, then try Add again.',
+        aborted: 'Try Add again.',
+        unknown: 'Try Add again from the same link.',
+      },
+      stage: {
+        descriptor_fetch: 'The retained song details could not be checked.',
+        audio_fetch: 'The retained audio could not be loaded.',
+        artifact_verify: 'The retained audio could not be verified.',
+        decoder_fetch: 'The audio tool could not be prepared.',
+        decoder_verify: 'The audio tool could not be verified.',
+        worker_decode: 'The audio could not be converted.',
+        cache_write: 'The audio details could not be saved.',
+        local_save: 'This browser could not save the song.',
+        visibility_write: 'The list visibility information could not be saved.',
+        order_write: 'The list order information could not be saved.',
+      },
     };
 document.documentElement.lang = ko ? 'ko' : 'en';
 const $ = <T extends HTMLElement>(id: string) =>
@@ -58,6 +103,20 @@ function leave() {
   location.replace('/select/');
 }
 cancel.onclick = leave;
+dialog.onclick = (e) => {
+  const dialog = e.currentTarget as HTMLDialogElement;
+  if (e.target !== dialog || busy) return;
+  const bounds = dialog.getBoundingClientRect();
+  if (
+    e.clientX < bounds.left - 4 ||
+    e.clientX > bounds.right + 4 ||
+    e.clientY < bounds.top - 4 ||
+    e.clientY > bounds.bottom + 4
+  ) {
+    dialog.close();
+    leave();
+  }
+};
 dialog.addEventListener('cancel', (event) => {
   event.preventDefault();
   if (!busy) leave();
@@ -110,8 +169,15 @@ add.onclick = async () => {
       location.assign('/select/?song=' + encodeURIComponent(id));
     add.disabled = false;
     cancel.hidden = true;
-  } catch {
-    status.textContent = text.failed;
+  } catch (error) {
+    status.textContent =
+      error instanceof SongShareSaveError
+        ? text.stage[error.stage] +
+          ' ' +
+          text.cause[error.cause] +
+          ' ' +
+          text.noExtraction
+        : text.failed;
     add.disabled = false;
     cancel.disabled = false;
   } finally {

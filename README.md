@@ -31,3 +31,7 @@ npm test
 ## License and credits
 
 The project declares the MIT license in `package.json`. YouTube-linked music belongs to its respective rights holders; the project license does not grant rights to that music.
+
+### Private deployment configuration
+
+Set `PUBLIC_YOUTUBE_API_ORIGIN` to the approved HTTPS audio service origin in the private build environment. Do not commit its value, an `.env` file, API credentials, or generated bundles to this repository. Direct browser requests necessarily show the configured origin to the browser. A missing or invalid origin fails closed before audio acquisition.

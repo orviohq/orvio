@@ -1,3 +1,5 @@
+import { songVideoId } from './song-art';
+
 /** A small, display-only projection of the verified library. Never contains
  * records, audio, replay state, credentials, or playback authority. */
 function textTree(node: Node | null): unknown {
@@ -16,27 +18,35 @@ function writeLibraryFirstPaint(ids: string[], selected: string) {
   try {
     const songs = [
       ...document.querySelectorAll<HTMLElement>('#songs [data-song]'),
-    ].map((element, index) => ({
-      id: ids[index],
-      title: element.querySelector('strong')?.textContent ?? '',
-      subtitle:
-        element.querySelector('.song-copy > span:not(.song-note-count)')
-          ?.textContent ?? '',
-      meta: element.querySelector('small')?.textContent ?? '',
-      notes: element.querySelector('.song-note-count')?.textContent ?? '',
-      level: element.querySelector('.song-level')?.textContent ?? '',
-      time: [...(element.querySelector('.song-time')?.childNodes ?? [])]
-        .filter((n) => n.nodeType === Node.TEXT_NODE)
-        .map((n) => n.textContent)
-        .join('')
-        .trim(),
-      coverClass: element.querySelector('.cover')?.className ?? 'cover',
-      external: !!element.querySelector('.youtube-cover'),
-      color: element.style.getPropertyValue('--accent'),
-      art:
-        element.querySelector<HTMLImageElement>('img')?.src ??
-        `/wallpapers/${ids[index]}.png`,
-    }));
+    ].map((element, index) => {
+      const videoId = songVideoId(ids[index]);
+      const artVideoId =
+        typeof videoId === 'string' && /^[A-Za-z0-9_-]{11}$/.test(videoId)
+          ? videoId
+          : undefined;
+      const art = element.querySelector<HTMLImageElement>('img')?.src;
+      return {
+        id: ids[index],
+        title: element.querySelector('strong')?.textContent ?? '',
+        subtitle:
+          element.querySelector('.song-copy > span:not(.song-note-count)')
+            ?.textContent ?? '',
+        meta: element.querySelector('.song-meta')?.textContent ?? '',
+        notes: element.querySelector('.song-note-count')?.textContent ?? '',
+        level: element.querySelector('.song-level')?.textContent ?? '',
+        time: element.querySelector('.song-duration')?.textContent ?? '',
+        coverClass: element.querySelector('.cover')?.className ?? 'cover',
+        external: !!element.querySelector('.youtube-cover'),
+        color: element.style.getPropertyValue('--accent'),
+        // Object URLs belong to this document, not the next reload. Persist only
+        // a validated display key; the bootstrap resolves it from local art cache.
+        artVideoId,
+        art:
+          artVideoId || art?.startsWith('blob:')
+            ? '/wallpapers/first-light.png'
+            : art ?? `/wallpapers/${ids[index]}.png`,
+      };
+    });
     const projection = {
       v: 1,
       addLabel:

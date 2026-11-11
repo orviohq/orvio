@@ -141,10 +141,9 @@ const errors: Record<Language, string[]> = {
 export function externalError(error: unknown, language: Language) {
   if (
     error instanceof AudioJobError &&
-    error.code === 'request_timeout' &&
-    ['response', 'analysis', 'storage'].includes(error.stage ?? '')
+    error.code === 'request_timeout'
   )
-    return importCompletionTimeout(error.stage!, language);
+    return importCompletionTimeout(error.stage, language);
   if (
     error instanceof AudioJobError &&
     error.code === 'client_audio_not_cached'
@@ -156,6 +155,12 @@ export function externalError(error: unknown, language: Language) {
   )
     return LOCAL_GENERATION_ERRORS[language][1];
 
+  if (
+    error instanceof AudioJobError &&
+    error.code === 'storage_full' &&
+    error.stage === 'storage'
+  )
+    return audioStageMessage('storage', language);
   if (error instanceof AudioJobError && error.code === 'storage_full')
     return AUDIO_STORAGE_FULL[language];
   if (!(error instanceof AudioJobError))

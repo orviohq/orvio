@@ -18,7 +18,25 @@ export const fr = {
   gameOptions: 'OPTIONS DE JEU',
   fader: 'Effets des notes',
   shuffle: 'Ordre des pistes',
-  optionHint: 'S’applique à la prochaine partie.',
+  faderOffTooltip: 'Les notes restent visibles pendant tout leur trajet.',
+  faderInTooltip: 'Les notes apparaissent progressivement à mi-parcours.',
+  faderIn2Tooltip:
+    'Les notes apparaissent plus tard, près de la ligne de jugement.',
+  faderOutTooltip:
+    'Les notes disparaissent progressivement avant la ligne de jugement.',
+  faderOut2Tooltip:
+    'Les notes disparaissent plus tôt, dès le milieu du parcours.',
+  faderBlinkTooltip: 'Les notes clignotent au rythme de la musique.',
+  faderBlink2Tooltip: 'Toute la zone de jeu clignote au rythme de la musique.',
+  faderFogTooltip: 'Un brouillard masque la moitié inférieure de la zone de jeu.',
+  faderPixelTooltip: 'La zone de jeu se pixellise à mesure que le combo augmente.',
+  faderPixel2Tooltip:
+    'La pixellisation peut devenir plus forte à mesure que le combo augmente.',
+  faderBlindTooltip: 'Toutes les notes sont invisibles.',
+  shuffleOffTooltip: 'Conserve l’ordre original des pistes.',
+  shuffleMirrorTooltip: 'Inverse les pistes de gauche à droite.',
+  shuffleRandomTooltip:
+    'Mélange les pistes une fois et conserve cet ordre pendant tout le morceau.',
   pause: 'PAUSE',
   resume: 'REPRENDRE',
   select: 'CHOIX DU MORCEAU',
@@ -71,6 +89,10 @@ export const fr = {
   unsupported: 'Jouez sur un ordinateur avec un clavier.',
   startError:
     "Le son n'a pas pu démarrer. Vérifiez les autorisations du navigateur et réessayez.",
+  integrityError:
+    "Les données audio n'ont pas pu être vérifiées. Elles ont peut-être été modifiées ou endommagées. Demandez un nouveau lien à l'expéditeur.",
+  transportError:
+    "Impossible de charger l'audio. Vérifiez la connexion réseau et réessayez.",
   aborted: 'Partie arrêtée. Recommencez pour un nouveau score.',
   focus: 'La fenêtre a perdu le focus. Partie arrêtée en sécurité.',
   otherKey: 'Choisissez une autre touche.',

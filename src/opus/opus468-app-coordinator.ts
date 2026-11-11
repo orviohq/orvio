@@ -15,6 +15,10 @@ interface Runtime {
     },
     options: { signal: AbortSignal },
   ): Promise<{ song: { id: string }; localPinCommitted: boolean }>;
+  restoreSourceRecord?(
+    record: OpusRecord,
+    options: { signal: AbortSignal },
+  ): Promise<unknown>;
 }
 export function createOpus468AppCoordinator(runtime: Runtime) {
   let tail: Promise<unknown> = Promise.resolve();
@@ -47,8 +51,11 @@ export function createOpus468AppCoordinator(runtime: Runtime) {
           signal.throwIfAborted();
           // Stable exact-root source GET only when encoded cache is missing. Never
           // create/advance a provider job or silently reinterpret a legacy WAV source.
-          if (!(await readVerifiedOpusByRoots(base, { signal })))
-            await restoreOpus35Record(base, signal);
+          if (!(await readVerifiedOpusByRoots(base, { signal }))) {
+            if (typeof runtime.restoreSourceRecord === 'function')
+              await runtime.restoreSourceRecord(base, { signal });
+            else await restoreOpus35Record(base, signal);
+          }
           signal.throwIfAborted();
           const metadata = await readOpus468SourceMetadata(base, { signal });
           const result = await runtime.extendCachedBase(

@@ -1,5 +1,6 @@
 import { AUDIO_MAX_BYTES, AUDIO_MAX_SECONDS } from './audio-limits.mjs';
 import { readAudioLimit, type AudioLimit } from './audio-limit-message';
+import { assertRuntimeFetch } from './client-only-runtime';
 import { queryClient, queryKeys, runMutation } from './query-client';
 import {
   traceErrorName,
@@ -101,6 +102,7 @@ function seconds(value: unknown) {
     : undefined;
 }
 async function fetchAudio(input: string, init?: RequestInit) {
+  assertRuntimeFetch(input, init?.method);
   try {
     return await fetch(input, init);
   } catch (error) {
@@ -267,6 +269,7 @@ async function fetchAudioSignal(
   signal: AbortSignal,
   callerSignal?: AbortSignal,
 ): Promise<Response> {
+  assertRuntimeFetch(input);
   try {
     return await fetch(input, { signal });
   } catch (error) {

@@ -1,4 +1,13 @@
 import { test, expect } from '@playwright/test';
+// Acquisition responses below are fixtures; never contact remote providers.
+test.beforeEach(async ({ page }) => {
+  await page.route('**/*', route => {
+    const url = new URL(route.request().url());
+    return url.hostname === '127.0.0.1' || url.hostname === 'localhost'
+      ? route.continue()
+      : route.abort('blockedbyclient');
+  });
+});
 test('checking to downloading preserves keyboard context row identity', async ({
   page,
 }) => {
@@ -135,6 +144,30 @@ test('checking to downloading preserves keyboard context row identity', async ({
       });
     },
   );
+  // Exercise the current direct acquisition adapter with a gated streaming
+  // response. Only transport is mocked; normal Add UI owns all row updates.
+  await page.addInitScript(({ bytes }) => {
+    const original = window.fetch.bind(window);
+    let release!: () => void;
+    const headersReady = new Promise<void>(resolve => { release = resolve; });
+    (window as any).__releaseFixtureHeaders = release;
+    window.fetch = async (input, init) => {
+      const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href);
+      if (url.origin !== 'https://provider.fixture.invalid') return original(input, init);
+      if (!url.pathname.endsWith('/audio'))
+        return Response.json({ title: 'Fixture song', author: 'Fixture' });
+      await headersReady;
+      return new Response(new ReadableStream({
+        start(controller) {
+          controller.enqueue(new Uint8Array(bytes.slice(0, 4096)));
+          (window as any).__releaseFixtureAudio = () => {
+            controller.enqueue(new Uint8Array(bytes.slice(4096)));
+            controller.close();
+          };
+        },
+      }), { headers: { 'Content-Type': 'audio/wav', 'Content-Length': String(bytes.length) } });
+    };
+  }, { bytes: fixture.bytes });
   await page.goto('/select/');
   const submit = async (id: string) => {
     await page.click('#add-youtube');
@@ -147,17 +180,40 @@ test('checking to downloading preserves keyboard context row identity', async ({
   await loading.focus();
   await loading.evaluate((el) => {
     (window as any).__focusedPending = el;
+    (window as any).__pendingCover = el.querySelector('.cover');
+    (window as any).__pendingAnimations = el.getAnimations({ subtree: true });
+    (window as any).__pendingAnimationTimes = el
+      .getAnimations({ subtree: true })
+      .map((a) => a.currentTime);
+    (window as any).__pendingDetached = false;
+    new MutationObserver((records) => {
+      for (const record of records)
+        for (const removed of record.removedNodes)
+          if (removed === el || removed.contains(el))
+            (window as any).__pendingDetached = true;
+    }).observe(el.parentElement!, { childList: true, subtree: true });
   });
   expect(await loading.evaluate((el) => document.activeElement === el)).toBe(
     true,
   );
   releaseRecord();
+  await page.evaluate(() => (window as any).__releaseFixtureHeaders());
   await expect(loading).toHaveAttribute('data-import-stage', 'downloading');
   const transition = await loading.evaluate((el) => ({
     sameNode: el === (window as any).__focusedPending,
     oldConnected: (window as any).__focusedPending.isConnected,
     focused: document.activeElement === el,
     activeTag: document.activeElement?.tagName,
+    sameCover: el.querySelector('.cover') === (window as any).__pendingCover,
+    detached: (window as any).__pendingDetached,
+    continuous:
+      (window as any).__pendingAnimations.length > 0 &&
+      (window as any).__pendingAnimations.every(
+        (a: Animation, i: number) =>
+          el.getAnimations({ subtree: true }).includes(a) &&
+          Number(a.currentTime) >=
+            Number((window as any).__pendingAnimationTimes[i]),
+      ),
   }));
   await page.keyboard.press('Shift+F10');
   const menuVisible = await page.locator('.library-context-menu').isVisible();
@@ -165,8 +221,11 @@ test('checking to downloading preserves keyboard context row identity', async ({
     'FOCUS_COUNTEREXAMPLE',
     JSON.stringify({ transition, menuVisible }),
   );
-  expect(transition.sameNode).toBe(false);
-  expect(transition.oldConnected).toBe(false);
+  expect(transition.sameNode).toBe(true);
+  expect(transition.oldConnected).toBe(true);
+  expect(transition.sameCover).toBe(true);
+  expect(transition.detached).toBe(false);
+  expect(transition.continuous).toBe(true);
   expect(transition.focused).toBe(true);
   expect(menuVisible).toBe(true);
   expect(posts).toEqual([]);
@@ -174,7 +233,97 @@ test('checking to downloading preserves keyboard context row identity', async ({
     path: test.info().outputPath('context-focus-preserved.png'),
   });
   releaseAudio();
+  await page.evaluate(() => (window as any).__releaseFixtureAudio());
 });
+
+for (const reduced of [false, true]) {
+  test(`two streamed imports: completion, error/retry, reduced=${reduced}`, async ({ page }) => {
+    await installTwoImportFixture(page);
+    await page.goto('/select/');
+    if (reduced) await page.evaluate(() => document.body.classList.add('reduced-motion'));
+    for (const id of ['AAAAAAAAAAA', 'BBBBBBBBBBB']) {
+      await page.click('#add-youtube');
+      await page.fill('#youtube-url', 'https://youtu.be/' + id);
+      await page.click('#youtube-submit');
+    }
+    const b = page.locator('[data-import-video="BBBBBBBBBBB"]');
+    await expect(b).toHaveAttribute('data-import-stage', 'downloading');
+    await b.focus();
+    await rememberPending(b);
+    const before = await page.locator('#songs > *').evaluateAll(rows => rows.map(row => (row as HTMLElement).dataset.libraryFocusKey));
+    await page.evaluate(() => (window as any).__streams.AAAAAAAAAAA.finish());
+    await expect(page.locator('[data-import-video="AAAAAAAAAAA"]')).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator('#songs [data-library-focus-key="yt:AAAAAAAAAAA"][data-song]')).toHaveCount(1);
+    expect(await pendingContinuity(b, reduced)).toEqual({ same: true, cover: true, connected: true, detached: false, focus: true, animation: true });
+    expect(await page.locator('#songs > *').evaluateAll(rows => rows.map(row => (row as HTMLElement).dataset.libraryFocusKey))).toEqual(before);
+    await page.evaluate(() => (window as any).__streams.BBBBBBBBBBB.fail());
+    await expect(b).toHaveAttribute('data-state', 'error');
+    await expect(b).not.toHaveClass(/import-shine/);
+    expect(await b.evaluate(el => el.getAnimations({ subtree: true }).length)).toBe(0);
+    await page.screenshot({ path: test.info().outputPath('B-error.png') });
+    await b.locator('[data-library-focus-action="retry"]').click();
+    await expect(page.locator('#youtube-url')).toHaveValue('https://www.youtube.com/watch?v=BBBBBBBBBBB');
+    await page.click('#youtube-submit');
+    await expect(b).toHaveAttribute('data-state', 'loading');
+    await expect(b).toHaveAttribute('data-import-stage', 'downloading');
+    await expect(b).toHaveClass(/import-shine/);
+    await expect(b.locator('[role="status"]')).not.toHaveText('');
+    expect(await b.evaluate(el => el === (window as any).__kept.row && el.querySelector('.cover') === (window as any).__kept.cover)).toBe(true);
+    expect(await b.evaluate(el => el.getAnimations({ subtree: true }).length > 0)).toBe(!reduced);
+    await page.screenshot({ path: test.info().outputPath('B-retry.png') });
+  });
+}
+
+async function installTwoImportFixture(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    const bytes = new Uint8Array(44 + 48000 * 4 * 8), v = new DataView(bytes.buffer);
+    for (const [offset, word] of [[0, 'RIFF'], [8, 'WAVE'], [12, 'fmt '], [36, 'data']] as const)
+      for (let i = 0; i < word.length; i++) v.setUint8(offset + i, word.charCodeAt(i));
+    v.setUint32(4, bytes.length - 8, true); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 2, true); v.setUint32(24, 48000, true);
+    v.setUint32(28, 192000, true); v.setUint16(32, 4, true); v.setUint16(34, 16, true);
+    v.setUint32(40, bytes.length - 44, true);
+    for (let i = 0; i < 48000 * 8; i++) {
+      const sample = Math.round(Math.sin(i * 2 * Math.PI * 440 / 48000) * Math.exp(-(i % 12000) / 1800) * 24000);
+      v.setInt16(44 + i * 4, sample, true); v.setInt16(46 + i * 4, sample, true);
+    }
+    const original = window.fetch.bind(window);
+    (window as any).__streams = {};
+    window.fetch = async (input, init) => {
+      const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href);
+      if (url.origin !== 'https://provider.fixture.invalid') return original(input, init);
+      const id = url.pathname.split('/')[3];
+      if (!url.pathname.endsWith('/audio')) return Response.json({ title: 'Fixture ' + id, author: 'Fixture' });
+      return new Response(new ReadableStream({ start(controller) {
+        controller.enqueue(bytes.slice(0, 4096));
+        let offset = 4096;
+        (window as any).__streams[id] = {
+          progress() { controller.enqueue(bytes.slice(offset, offset + 4096)); offset += 4096; },
+          finish() { controller.enqueue(bytes.slice(offset)); controller.close(); },
+          fail() { controller.error(new Error('fixture download failure')); },
+        };
+      }}), { headers: { 'Content-Type': 'audio/wav', 'Content-Length': String(bytes.length) } });
+    };
+  });
+}
+
+async function rememberPending(row: import('@playwright/test').Locator) {
+  await row.evaluate(el => {
+    const kept = (window as any).__kept = { row: el, cover: el.querySelector('.cover'), animations: el.getAnimations({ subtree: true }), detached: false };
+    new MutationObserver(records => {
+      for (const record of records) for (const removed of record.removedNodes)
+        if (removed === el || removed.contains(el)) kept.detached = true;
+    }).observe(el.parentElement!, { childList: true });
+  });
+}
+
+async function pendingContinuity(row: import('@playwright/test').Locator, reduced: boolean) {
+  return row.evaluate((el, reduced) => {
+    const kept = (window as any).__kept, animations = el.getAnimations({ subtree: true });
+    return { same: el === kept.row, cover: el.querySelector('.cover') === kept.cover, connected: el.isConnected, detached: kept.detached, focus: document.activeElement === el,
+      animation: reduced ? animations.length === 0 : kept.animations.length > 0 && kept.animations.every((a: Animation) => animations.includes(a) && a.playState === 'running') };
+  }, reduced);
+}
 
 test('row focus restore refuses removed/changed identity, modal or successor focus; matches exact surviving action', async ({
   page,
@@ -265,4 +414,26 @@ test('row focus restore refuses removed/changed identity, modal or successor foc
     hidden: true,
     missingAction: true,
   });
+});
+
+test('fallback insertBefore actual reorder preserves pending continuity', async({page})=>{
+ await installTwoImportFixture(page);await page.addInitScript(()=>Object.defineProperty(Element.prototype,'moveBefore',{configurable:true,value:undefined}));await page.goto('/select/');
+ for(const id of ['AAAAAAAAAAA','BBBBBBBBBBB']){await page.click('#add-youtube');await page.fill('#youtube-url','https://youtu.be/'+id);await page.click('#youtube-submit');}
+ const a=page.locator('[data-import-video="BBBBBBBBBBB"]');await expect(a).toHaveAttribute('data-import-stage','downloading');
+ await a.evaluate(el=>el.parentElement!.append(el));await a.focus();await rememberPending(a);
+ await page.evaluate(()=> (window as any).__streams.BBBBBBBBBBB.progress());
+ await expect.poll(()=>page.locator('#songs > *').first().getAttribute('data-import-video')).toBe('BBBBBBBBBBB');
+ const result=await pendingContinuity(a,false);console.log('FALLBACK_REORDER',JSON.stringify(result));await page.screenshot({path:test.info().outputPath('fallback-reorder.png')});expect(result).toEqual({same:true,cover:true,connected:true,detached:false,focus:true,animation:true});
+});
+
+test('legacy unranked error retry keeps all pending rows connected and ordered',async({page})=>{
+ await installTwoImportFixture(page);
+ await page.addInitScript(()=>{Object.defineProperty(Element.prototype,'moveBefore',{configurable:true,value:undefined});localStorage.removeItem('orvio.library-add-order.v1');localStorage.setItem('orvio.pending-imports.v1',JSON.stringify([{videoId:'BBBBBBBBBBB',state:'loading',stage:'checking'},{videoId:'AAAAAAAAAAA',state:'error',error:'network_error'},{videoId:'CCCCCCCCCCC',state:'loading',stage:'checking'}]));});
+ await page.goto('/select/');const b=page.locator('[data-import-video="BBBBBBBBBBB"]'),a=page.locator('[data-import-video="AAAAAAAAAAA"]'),c=page.locator('[data-import-video="CCCCCCCCCCC"]');await expect(b).toHaveAttribute('data-import-stage','downloading');await expect(c).toHaveAttribute('data-import-stage','downloading');await expect(a).toHaveAttribute('data-state','error');
+ await page.evaluate(()=>{(window as any).__legacyRows=[...document.querySelectorAll('#songs [data-import-video]')].map(el=>({el,cover:el.querySelector('.cover'),animations:el.getAnimations({subtree:true}),detached:false}));const tracked=(window as any).__legacyRows;new MutationObserver(records=>{for(const record of records)for(const removed of record.removedNodes)for(const item of tracked)if(removed===item.el||removed.contains(item.el))item.detached=true;}).observe(document.querySelector('#songs')!,{childList:true});});
+ const before=await page.locator('#songs [data-import-video]').evaluateAll(rows=>rows.map(el=>(el as HTMLElement).dataset.importVideo));
+ await a.locator('[data-library-focus-action="retry"]').click();await page.click('#youtube-submit');await expect(a).toHaveAttribute('data-state','loading');await expect(a).toHaveAttribute('data-import-stage','downloading');
+ const after=await page.locator('#songs [data-import-video]').evaluateAll(rows=>rows.map(el=>(el as HTMLElement).dataset.importVideo));
+ const rows=await page.evaluate(()=>(window as any).__legacyRows.map((item:any)=>({id:item.el.dataset.importVideo,connected:item.el.isConnected,sameCover:item.el.querySelector('.cover')===item.cover,detached:item.detached,continuous:item.animations.every((x:Animation)=>item.el.getAnimations({subtree:true}).includes(x))})));
+ console.log('LEGACY_RETRY',JSON.stringify({before,after,rows}));await page.screenshot({path:test.info().outputPath('legacy-retry.png')});expect(after).toEqual(before);expect(rows.every((x:any)=>x.connected&&x.sameCover&&!x.detached&&x.continuous)).toBe(true);
 });

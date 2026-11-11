@@ -6,6 +6,7 @@ import {
 } from './opus/opus35-song';
 import { restoreOpus35Record } from './opus/opus35-api';
 import { readCanonicalSource } from './canonical-source-api';
+import { createYoutubeSongLink } from './youtube-song-link';
 import { readCanonicalMetadata } from './canonical-metadata-api';
 import { rememberCanonical } from './canonical-library';
 import { saveSongMetadata, localAudio, saveLocalAudio } from './external-local';
@@ -13,6 +14,7 @@ import { loadCanonicalAudio } from './canonical-audio-api';
 import { hiddenLibraryIds, saveHiddenLibraryIds } from './library-removal';
 import { sourceId } from './external-catalog';
 import { LibraryAddOrder } from './library-add-order';
+import { songShareSaveAtStage } from './song-share-save-diagnostic';
 import type { SourceRecord } from './external-source';
 
 export interface SongIdentity {
@@ -74,7 +76,7 @@ export function sameSong(
   );
 }
 /** Sender reads only. Archived or changed canonical identities cannot silently share a new chart. */
-export async function createSongLink(
+export async function createExactSongLink(
   record: PlayableSourceRecord,
   origin: string,
   title = 'YouTube',
@@ -103,6 +105,19 @@ export async function createSongLink(
     recordSha256: result.recordSha256,
   });
   return url.href;
+}
+/** Songs with a YouTube video id share only that id; the receiver prepares the rest after Add. */
+export async function createSongLink(
+  record: PlayableSourceRecord,
+  origin: string,
+  title = 'YouTube',
+  author: string | null = null,
+) {
+  if (VIDEO.test(record.videoId))
+    return createYoutubeSongLink(record.videoId, origin);
+  if (isOpusRecord(record))
+    return createExactSongLink(record, origin, title, author);
+  throw Error('Song unavailable');
 }
 /** Receiver reads only until explicit Add. No extraction, POST or result-share decoding. */
 export async function inspectSongLink(
@@ -138,45 +153,58 @@ export async function addSharedSong(song: InspectedSong) {
       song.record,
       AbortSignal.timeout(60000),
     );
-    await saveLocalAudio(
-      song.record,
-      song.metadata.title,
-      undefined,
-      bytes,
-      song.metadata.author ?? undefined,
+    await songShareSaveAtStage('local_save', () =>
+      saveLocalAudio(
+        song.record,
+        song.metadata.title,
+        undefined,
+        bytes,
+        song.metadata.author ?? undefined,
+      ),
     );
-    const hidden = hiddenLibraryIds();
-    hidden.delete(sourceId(song.record));
-    hidden.delete('yt:' + song.record.videoId);
-    saveHiddenLibraryIds(hidden);
-    new LibraryAddOrder(localStorage).added(song.record.videoId);
+    await songShareSaveAtStage('visibility_write', () => {
+      const hidden = hiddenLibraryIds();
+      hidden.delete(sourceId(song.record));
+      hidden.delete('yt:' + song.record.videoId);
+      saveHiddenLibraryIds(hidden);
+    });
+    await songShareSaveAtStage('order_write', () =>
+      new LibraryAddOrder(localStorage).added(song.record.videoId),
+    );
     return sourceId(song.record);
   }
   // Add is the explicit consent boundary for retained audio GET and local saving.
   // Saving ready audio lets the library open the exact song without a new extraction.
-  if (!(await localAudio(song.record))) {
-    const bytes = await loadCanonicalAudio(
-      song.record,
-      AbortSignal.timeout(60000),
+  if (
+    !(await songShareSaveAtStage('local_save', () => localAudio(song.record)))
+  ) {
+    const bytes = await songShareSaveAtStage('audio_fetch', () =>
+      loadCanonicalAudio(song.record, AbortSignal.timeout(60000)),
     );
-    await saveLocalAudio(
-      song.record,
-      song.metadata.title,
-      undefined,
-      bytes,
-      song.metadata.author ?? undefined,
+    await songShareSaveAtStage('local_save', () =>
+      saveLocalAudio(
+        song.record,
+        song.metadata.title,
+        undefined,
+        bytes,
+        song.metadata.author ?? undefined,
+      ),
     );
   }
-  await saveSongMetadata(
-    song.record,
-    song.metadata.title,
-    song.metadata.author,
+  await songShareSaveAtStage('local_save', () =>
+    saveSongMetadata(song.record, song.metadata.title, song.metadata.author),
   );
-  await rememberCanonical(song.record, song.recordSha256);
-  const hidden = hiddenLibraryIds();
-  hidden.delete('yt:' + song.record.videoId);
-  hidden.delete(sourceId(song.record));
-  saveHiddenLibraryIds(hidden);
-  new LibraryAddOrder(localStorage).added(song.record.videoId);
+  await songShareSaveAtStage('cache_write', () =>
+    rememberCanonical(song.record, song.recordSha256),
+  );
+  await songShareSaveAtStage('visibility_write', () => {
+    const hidden = hiddenLibraryIds();
+    hidden.delete('yt:' + song.record.videoId);
+    hidden.delete(sourceId(song.record));
+    saveHiddenLibraryIds(hidden);
+  });
+  await songShareSaveAtStage('order_write', () =>
+    new LibraryAddOrder(localStorage).added(song.record.videoId),
+  );
   return sourceId(song.record);
 }

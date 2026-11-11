@@ -1,6 +1,7 @@
 import { AUDIO_BASE } from './external-audio-api';
 import type { SourceRecord } from './external-source';
 import { queryClient, queryKeys, markQueryEphemeral } from './query-client';
+import { assertRuntimeFetch } from './client-only-runtime';
 /** Internal sentinel: an unavailable/missing metadata read never becomes
  * cached data; it surfaces as the original null at the call site. */
 class MetadataUnavailable extends Error {}
@@ -78,10 +79,12 @@ async function fetchCanonicalMetadata(
   record: SourceRecord,
   signal?: AbortSignal,
 ): Promise<CanonicalMetadata | null> {
-  const response = await fetch(
-    `${AUDIO_BASE}/v1/chart-sources/${encodeURIComponent(record.videoId)}/metadata`,
-    { signal: signal ?? AbortSignal.timeout(8000), cache: 'no-store' },
-  );
+  const url = `${AUDIO_BASE}/v1/chart-sources/${encodeURIComponent(record.videoId)}/metadata`;
+  assertRuntimeFetch(url);
+  const response = await fetch(url, {
+    signal: signal ?? AbortSignal.timeout(8000),
+    cache: 'no-store',
+  });
   if (!response.ok) return null;
   const reader = response.body?.getReader();
   if (!reader) return null;

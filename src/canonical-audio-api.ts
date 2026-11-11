@@ -1,4 +1,5 @@
 import { AUDIO_BASE, AudioJobError } from './external-audio-api';
+import { assertRuntimeFetch } from './client-only-runtime';
 import { queryClient, queryKeys } from './query-client';
 import { readAudioLimit } from './audio-limit-message';
 import { AUDIO_MAX_BYTES } from './audio-limits.mjs';
@@ -48,14 +49,14 @@ async function downloadCanonicalAudio(
   callerSignal?: AbortSignal,
   route: 'canonical' | 'retained' = 'canonical',
 ): Promise<ArrayBuffer> {
+  const url =
+    route === 'retained'
+      ? `${AUDIO_BASE}/v1/audio-sources/${record.videoId}/${record.audioSha256}/audio`
+      : `${AUDIO_BASE}/v1/chart-sources/${record.videoId}/audio`;
+  assertRuntimeFetch(url);
   let response: Response;
   try {
-    response = await fetch(
-      route === 'retained'
-        ? `${AUDIO_BASE}/v1/audio-sources/${record.videoId}/${record.audioSha256}/audio`
-        : `${AUDIO_BASE}/v1/chart-sources/${record.videoId}/audio`,
-      { signal },
-    );
+    response = await fetch(url, { signal });
   } catch (error) {
     if (callerSignal?.aborted || signal.aborted) throw error;
     throw new AudioJobError(

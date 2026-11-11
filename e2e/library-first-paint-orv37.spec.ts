@@ -1,9 +1,53 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator } from '@playwright/test';
 import fs from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 const fixture = JSON.parse(
   fs.readFileSync('a37-external-fixture.json', 'utf8'),
 );
+async function durableSnapshot(page: any) {
+  return page.evaluate(async () => {
+    const stores: Record<string, unknown[]> = {};
+    for (const name of [
+      'orvio.external-sources.v1',
+      'orvio.external-library.v1',
+    ]) {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(name);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      for (const store of Array.from(db.objectStoreNames)) {
+        const rows = await new Promise<any[]>((resolve, reject) => {
+          const request = db.transaction(store).objectStore(store).getAll();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        stores[`${name}/${store}`] = await Promise.all(
+          rows.map(async (row) => {
+            if (!row.bytes) return row;
+            const digest = await crypto.subtle.digest('SHA-256', row.bytes);
+            return {
+              ...row,
+              bytes: Array.from(new Uint8Array(digest)),
+              byteLength: row.bytes.byteLength,
+            };
+          }),
+        );
+      }
+      db.close();
+    }
+    // Selection/scroll is intentionally updated by the requested behavior.
+    const local = Object.fromEntries(
+      Object.keys(localStorage)
+        .filter((key) => key !== 'orvio.library-selection.v1')
+        .sort()
+        .map((key) => [key, localStorage.getItem(key)]),
+    );
+    return { stores, local };
+  });
+}
+
+
 async function seedExternalFixture(
   page: any,
   input = fixture,
@@ -374,3 +418,231 @@ test('normal repeated reload paints saved list without audio preload', async ({
     JSON.stringify(runs, null, 2),
   );
 });
+
+// ORV96-1: integrator-run against the full static build and its existing fixture.
+// Hold hydration until after the loading-state assertions/screenshots, rather
+// than racing a fixed sleep or accepting a settled-only image.
+async function expectCachedArtwork(row: Locator, hero: Locator) {
+  const image = row.locator('img.youtube-cover');
+  await expect(image).toBeVisible();
+  await expect(image).toHaveAttribute('src', /^blob:/);
+  await expect.poll(() => image.evaluate((node: HTMLImageElement) =>
+    node.complete && node.naturalWidth >= 240 && node.naturalHeight >= 135,
+  )).toBe(true);
+  await expect(hero).toBeVisible();
+  await expect.poll(() => hero.evaluate(async (node) => {
+    const url = getComputedStyle(node).backgroundImage.match(
+      /url\(["']?(blob:[^"')]+)["']?\)/,
+    )?.[1];
+    if (!url) return false;
+    const image = new Image();
+    image.src = url;
+    try {
+      await image.decode();
+      return image.naturalWidth >= 240 && image.naturalHeight >= 135;
+    } catch { return false; }
+  })).toBe(true);
+}
+
+for (const viewport of [
+  { width: 1280, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  test.describe(`ORV96-1 cached thumbnail loading ${viewport.width}`, () => {
+    test.use({ serviceWorkers: 'block' });
+    test('cached row and hero paint before main and IDB, then hand off offline', async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize(viewport);
+      const blocked: string[] = [];
+      const audioRequests: string[] = [];
+      let origin = '';
+      await page.route('**/*', async (route) => {
+        const request = route.request();
+        const url = new URL(request.url());
+        if (!origin && request.isNavigationRequest()) origin = url.origin;
+        if (request.resourceType() === 'media' ||
+          /\.(?:wav|mp3|ogg|opus|m4a|aac|flac|pcm)(?:$|\?)/i.test(url.href) ||
+          /\/(?:audio|pcm|preview)(?:\/|$)/i.test(url.pathname)) {
+          audioRequests.push(url.href);
+          return route.abort('blockedbyclient');
+        }
+        if (url.origin !== origin) {
+          blocked.push(url.href);
+          return route.abort('blockedbyclient');
+        }
+        await route.continue();
+      });
+      // Uses actual saved source, metadata and PCM stores from the ORV37 helper.
+      const id = await seedExternalFixture(page);
+      const videoId = id.match(/^yt-([A-Za-z0-9_-]{11})-/)?.[1];
+      expect(videoId).toMatch(/^[A-Za-z0-9_-]{11}$/);
+      const artKey = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
+      // Generate genuine, recognizable JPEG pixels locally (not a mock Response
+      // body or the fallback wallpaper), then seed through CacheStorage.add.
+      const jpeg = await page.evaluate(async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 320;
+        canvas.height = 180;
+        const ctx = canvas.getContext('2d')!;
+        ctx.fillStyle = '#1265ce';
+        ctx.fillRect(0, 0, 320, 180);
+        ctx.fillStyle = '#ffb638';
+        ctx.fillRect(20, 20, 140, 140);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.fillText('ORV96-1', 90, 100);
+        const blob = await new Promise<Blob>((resolve, reject) =>
+          canvas.toBlob((value) => value ? resolve(value) : reject(Error('JPEG encode')), 'image/jpeg'),
+        );
+        return Array.from(new Uint8Array(await blob.arrayBuffer()));
+      });
+      await page.route(artKey, (route) => route.fulfill({
+        contentType: 'image/jpeg',
+        headers: { 'access-control-allow-origin': '*' },
+        body: Buffer.from(jpeg),
+      }));
+      await page.evaluate(async (key) => {
+        const cache = await caches.open('orvio-youtube-art-v1');
+        await cache.add(new Request(key, { mode: 'cors', credentials: 'omit' }));
+      }, artKey);
+      await page.unroute(artKey);
+      // All foreign images are now blocked, including the exact cached key.
+      await page.goto('/select/?song=' + id);
+      await expect(page.locator('#selected-title')).toHaveText('YT Fixture');
+      await expectCachedArtwork(
+        page.locator('#songs .song-card').filter({ hasText: 'YT Fixture' }),
+        page.locator('#selected-art'),
+      );
+      await expect.poll(() => page.evaluate((id) => {
+        const saved = JSON.parse(localStorage.getItem('orvio.library-display.v1') || 'null');
+        return saved?.songs.find((song: any) => song.id === id)?.artVideoId;
+      }, id)).toBe(videoId);
+
+      await page.addInitScript(() => {
+        const w = window as any;
+        w.__orv961AudioReads = 0;
+        w.__orv961IDBHeld = 0;
+        w.__orv961IDBReleased = false;
+        const callbacks: (() => void)[] = [];
+        w.__releaseOrv961IDB = () => {
+          w.__orv961IDBReleased = true;
+          for (const callback of callbacks.splice(0)) callback();
+        };
+        const get = IDBObjectStore.prototype.get;
+        const getAll = IDBObjectStore.prototype.getAll;
+        IDBObjectStore.prototype.get = function (...args: any[]) {
+          if (this.name === 'audio') w.__orv961AudioReads++;
+          return (get as any).apply(this, args);
+        };
+        IDBObjectStore.prototype.getAll = function (...args: any[]) {
+          if (this.name === 'audio') w.__orv961AudioReads++;
+          return (getAll as any).apply(this, args);
+        };
+        // Delay DB-open success delivery, not transactions (which auto-close).
+        const open = indexedDB.open.bind(indexedDB);
+        indexedDB.open = ((...args: any[]) => {
+          const req = (open as any)(...args);
+          const descriptor = Object.getOwnPropertyDescriptor(IDBRequest.prototype, 'onsuccess')!;
+          Object.defineProperty(req, 'onsuccess', {
+            get() { return descriptor.get!.call(req); },
+            set(fn) {
+              descriptor.set!.call(req, typeof fn !== 'function' ? fn : (event: Event) => {
+                if (w.__orv961IDBReleased) return fn.call(req, event);
+                w.__orv961IDBHeld++;
+                callbacks.push(() => fn.call(req, event));
+              });
+            },
+          });
+          return req;
+        }) as typeof indexedDB.open;
+      });
+      let releaseMain!: () => void;
+      let mainHeld = 0;
+      const mainGate = new Promise<void>((resolve) => { releaseMain = resolve; });
+      await page.route('**/*.js', async (route) => {
+        if (/\/main\.[^/]+\.js$/.test(route.request().url())) {
+          mainHeld++;
+          await mainGate;
+        }
+        await route.fallback();
+      });
+      const evidence: any[] = [];
+      const capture = async (phase: string) => {
+        evidence.push({ phase, mainHeld, ...await page.evaluate(() => ({
+          time: performance.now(),
+          skeleton: !!document.querySelector('#library-first-paint:not([hidden])'),
+          row: document.querySelector<HTMLImageElement>('#cached-songs .selected img')?.src,
+          hero: document.querySelector<HTMLElement>('#cached-selected-art')?.style.backgroundImage,
+          liveRow: document.querySelector<HTMLImageElement>('#songs .selected img')?.src,
+          liveHero: document.querySelector<HTMLElement>('#selected-art')?.style.backgroundImage,
+          idbHeld: (window as any).__orv961IDBHeld,
+          idbReleased: (window as any).__orv961IDBReleased,
+          audioReads: (window as any).__orv961AudioReads,
+        })) });
+        const path = testInfo.outputPath(`orv961-${phase}-${viewport.width}.png`);
+        await page.screenshot({ path });
+        await testInfo.attach(`orv961-${phase}-${viewport.width}`, { path, contentType: 'image/png' });
+        // At narrow widths the hero and list can occupy separate scroll areas.
+        // Include decoded pixel evidence for each while the same gate is held.
+        for (const [name, target] of [
+          ['row', page.locator(phase === 'live' ? '#songs .song-card' : '#cached-songs .song-card')
+            .filter({ hasText: 'YT Fixture' })],
+          ['hero', page.locator(phase === 'live' ? '#selected-art' : '#cached-selected-art')],
+        ] as const) {
+          await target.scrollIntoViewIfNeeded();
+          await expect(target).toBeInViewport();
+          const detailPath = testInfo.outputPath(`orv961-${phase}-${name}-${viewport.width}.png`);
+          await target.screenshot({ path: detailPath });
+          await testInfo.attach(`orv961-${phase}-${name}-${viewport.width}`, {
+            path: detailPath, contentType: 'image/png',
+          });
+        }
+      };
+      try {
+        const durableBefore = await durableSnapshot(page);
+        blocked.length = 0;
+        await page.reload({ waitUntil: 'commit' });
+        await expect.poll(() => mainHeld).toBeGreaterThan(0);
+        const root = page.locator('#library-first-paint');
+        const row = page.locator('#cached-songs .song-card').filter({ hasText: 'YT Fixture' });
+        const hero = page.locator('#cached-selected-art');
+        await expect(root).toBeVisible();
+        await expect(root).toHaveAttribute('aria-busy', 'true');
+        await expect(page.locator('#cached-selected-title')).toHaveText('YT Fixture');
+        await expectCachedArtwork(row, hero);
+        expect(await page.evaluate(() => (window as any).__orv961IDBHeld)).toBe(0);
+        expect(blocked).toEqual([]); // Bootstrap did not even attempt foreign fetches.
+        await capture('pre-main');
+
+        releaseMain();
+        await expect.poll(() => page.evaluate(() => (window as any).__orv961IDBHeld)).toBeGreaterThan(0);
+        await expect(root).toBeVisible();
+        await expectCachedArtwork(row, hero);
+        expect(await page.evaluate(() => (window as any).__orv961IDBReleased)).toBe(false);
+        await capture('pre-idb');
+        await page.evaluate(() => (window as any).__releaseOrv961IDB());
+
+        await expect(root).toHaveCount(0, { timeout: 15000 });
+        await expect(page.locator('#selected-title')).toHaveText('YT Fixture');
+        await expectCachedArtwork(
+          page.locator('#songs .song-card').filter({ hasText: 'YT Fixture' }),
+          page.locator('#selected-art'),
+        );
+        await capture('live');
+        expect(audioRequests).toEqual([]);
+        expect(await page.evaluate(() => (window as any).__orv961AudioReads)).toBe(0);
+        expect(blocked.filter((url) => new URL(url).hostname === 'i.ytimg.com')).toEqual([]);
+        const durableAfter = await durableSnapshot(page);
+        expect(durableAfter.stores).toEqual(durableBefore.stores);
+      } finally {
+        releaseMain();
+        await page.evaluate(() => (window as any).__releaseOrv961IDB?.()).catch(() => {});
+        await testInfo.attach(`orv961-evidence-${viewport.width}`, {
+          body: JSON.stringify({ viewport, evidence, blocked, audioRequests }, null, 2),
+          contentType: 'application/json',
+        });
+      }
+    });
+  });
+}

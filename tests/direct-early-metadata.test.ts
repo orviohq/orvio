@@ -1,0 +1,10 @@
+import {it,expect,vi}from'vitest';
+const api=vi.hoisted(()=>({audio:vi.fn(),metadata:vi.fn(),worker:vi.fn(),list:vi.fn(async()=>[])}));
+vi.mock('../src/youtube-direct-api',()=>({acquireYoutubeAudio:api.audio}));
+vi.mock('../src/youtube-direct-metadata',()=>({readDirectYoutubeMetadata:api.metadata}));
+vi.mock('../src/local-allkeys-worker-client',()=>({prepareLocalAllKeysOwned:api.worker}));
+vi.mock('../src/local-allkeys-store',()=>({listLocalAllKeys:api.list,readLocalAllKeys:vi.fn(),saveLocalAllKeys:vi.fn()}));
+vi.mock('../src/local-allkeys-record',()=>({validateLocalAllKeysRecord:vi.fn(),localAllKeysIdentity:vi.fn()}));
+import{prepareDirectAllKeys}from'../src/prepare-direct-allkeys';
+it('actual direct allkeys publishes genuine metadata while audio is unresolved',async()=>{let resolveMeta!:(x:any)=>void;api.metadata.mockReturnValueOnce(new Promise(r=>{resolveMeta=r}));api.audio.mockReturnValueOnce(new Promise(()=>{}));const notify=vi.fn();const c=new AbortController();const work=prepareDirectAllKeys('AAAAAAAAAAA',c.signal,{publicKey:'fixture',onMetadata:notify});const observed=work.catch(e=>e);await vi.waitFor(()=>expect(api.metadata).toHaveBeenCalled());resolveMeta({title:'Real metadata title',author:'Artist'});await vi.waitFor(()=>expect(notify).toHaveBeenCalledWith({title:'Real metadata title',author:'Artist'}));expect(api.worker).not.toHaveBeenCalled();c.abort(new Error('test end'));expect((await observed).message).toBe('test end');});
+it('metadata resolved after cancellation is not published',async()=>{let resolveMeta!:(x:any)=>void;api.metadata.mockReturnValueOnce(new Promise(r=>{resolveMeta=r}));api.audio.mockReturnValueOnce(new Promise(()=>{}));const notify=vi.fn();const c=new AbortController();const observed=prepareDirectAllKeys('BBBBBBBBBBB',c.signal,{publicKey:'fixture',onMetadata:notify}).catch(e=>e);await vi.waitFor(()=>expect(resolveMeta).toBeTypeOf('function'));c.abort(new Error('cancel'));resolveMeta({title:'Late'});await observed;await new Promise(r=>setTimeout(r,0));expect(notify).not.toHaveBeenCalled();});

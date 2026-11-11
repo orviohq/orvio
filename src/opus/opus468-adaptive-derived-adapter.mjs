@@ -9,23 +9,35 @@
 // level-2 self-verify (actual pinned modules) -> build-owned resolver output
 // re-hashed against the bound roots -> owned pinned-worker verdict requiring
 // full safePCM decode + level-2 canonical regeneration matches.
-// FE 12:11: context.signal is a LOCAL AbortSignal passed BY REFERENCE. It is
-// never serialized, retained, or structuredCloned; the rest of the context is
-// detached/copied. Exact signal identity is preserved into the resolver and
-// the worker loader, and a late TRUE verdict after abort still rejects.
+// context.signal is a LOCAL AbortSignal passed BY REFERENCE. It is never
+// serialized or structuredCloned. The construction opt-in uses it only as a
+// WeakMap key, clears that key on abort, and reuses deterministic worker work,
+// never owner-A exchange state or authority/currentness verdicts.
 import { selfVerifyOpus468Extension, sha256Hex } from './opus468-record.mjs';
 import { validOpusDescriptor } from './opus-descriptor.mjs';
 
 const TE = new TextEncoder();
+const WORKER_REUSE_TTL_MS = 95000;
 
 export function createOpus468AdaptiveDerivedVerifier({
   resolveArtifacts,
   verifyInWorker,
+  operationWorkerReuse = false,
 } = {}) {
   if (typeof resolveArtifacts !== 'function')
     throw Error('adapter_resolver_missing');
   if (typeof verifyInWorker !== 'function')
     throw Error('adapter_worker_missing');
+  const workerReuse = operationWorkerReuse === true;
+  const verifiedBySignal = new WeakMap();
+  const rememberSignal = (signal) => {
+    if (!verifiedBySignal.has(signal)) {
+      verifiedBySignal.set(signal, new Map());
+      const clear = () => verifiedBySignal.delete(signal);
+      signal.addEventListener('abort', clear, { once: true });
+    }
+    return verifiedBySignal.get(signal);
+  };
   return async function verifyDerivedRecord(extension, context = {}) {
     const { signal } = context;
     if (signal !== undefined && !(signal instanceof AbortSignal)) return false;
@@ -123,6 +135,28 @@ export function createOpus468AdaptiveDerivedVerifier({
     if (sha256Hex(audio) !== ext.encodedAudioSha256) return false;
     if (sha256Hex(resolvedDescriptor) !== dSha) return false;
     if (sha256Hex(decoderWasm) !== desc.decoderWasmSha256) return false;
+    const reuseKey =
+      workerReuse && signal
+        ? JSON.stringify([
+            JSON.stringify(ext),
+            raw,
+            JSON.stringify(desc),
+            dSha,
+            ext.encodedAudioSha256,
+            dSha,
+            desc.decoderWasmSha256,
+          ])
+        : undefined;
+    const signalCache =
+      reuseKey === undefined ? undefined : rememberSignal(signal);
+    const prior = signalCache?.get(reuseKey);
+    if (prior !== undefined) {
+      if (performance.now() - prior.createdAt < WORKER_REUSE_TTL_MS) {
+        signal.throwIfAborted();
+        return true;
+      }
+      signalCache.delete(reuseKey);
+    }
     // Hand the loader freshly detached, exactly-sized ArrayBuffers (it
     // transfers them into the owned worker); caller buffers stay untouched.
     const audioBytes = audio.slice().buffer;
@@ -141,11 +175,17 @@ export function createOpus468AdaptiveDerivedVerifier({
       signal,
     });
     signal?.throwIfAborted();
-    return (
+    const valid =
       verdict?.ok === true &&
       verdict?.steps?.regeneration?.level === 2 &&
       verdict.steps.regeneration.extensionSha256Match === true &&
-      verdict.steps.regeneration.canonicalRecordMatch === true
-    );
+      verdict.steps.regeneration.canonicalRecordMatch === true;
+    signal?.throwIfAborted();
+    if (valid && signalCache) {
+      if (signalCache.size >= 2)
+        signalCache.delete(signalCache.keys().next().value);
+      signalCache.set(reuseKey, { createdAt: performance.now() });
+    }
+    return valid;
   };
 }

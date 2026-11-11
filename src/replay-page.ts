@@ -16,6 +16,11 @@ import {
 // Additive module: owns its own DOM (header nav entry + #replays section),
 // reads sessions through the external-local validation contract only.
 import { listLocalSessions, type ListedLocalSession } from './external-local';
+import {
+  readReplayCount,
+  writeReplayCount,
+  replayMenuVisible,
+} from './replay-menu-count';
 
 export interface ReplayPageLabels {
   title: string;
@@ -59,6 +64,10 @@ export function installPrivateReplayList(read: () => Promise<any[]>) {
   privateSessions = read;
 }
 
+// ORV-78: the nav entry exists only while at least one saved replay exists.
+let navButton: HTMLButtonElement | undefined;
+let lastNavLabel = '';
+
 export function initReplayPage(options: {
   getLanguage: () => Language;
   getLabels: () => ReplayPageLabels;
@@ -71,13 +80,17 @@ export function initReplayPage(options: {
   onOpen = options.onOpen;
 
   // Entry relocated off the song selection page into the global header nav.
-  const navButton = document.createElement('button');
+  navButton = document.createElement('button');
   navButton.id = 'open-replays';
   navButton.className = 'quiet';
   navButton.type = 'button';
   navButton.onclick = () => options.onNavigate();
-  const fullscreen = document.querySelector('#fullscreen');
-  fullscreen?.before(navButton);
+  if (lastNavLabel) navButton.textContent = lastNavLabel;
+  // ORV-78: insert only when the cached count says replays exist; verified
+  // stores reconcile right after boot. The button is removed from the DOM
+  // (never merely hidden) so the home first-paint nav projection stays true.
+  if (replayMenuVisible(readReplayCount()))
+    document.querySelector('#fullscreen')?.before(navButton);
 
   const section = document.createElement('section');
   section.id = 'replays';
@@ -110,8 +123,20 @@ export function initReplayPage(options: {
 }
 
 export function setReplayNavLabel(text: string) {
-  const b = document.querySelector('#open-replays');
-  if (b) b.textContent = text;
+  lastNavLabel = text;
+  if (navButton) navButton.textContent = text;
+}
+
+/** ORV-78: the cached count drives menu presence; verified stores reconcile. */
+export function setReplayMenuCount(n: number) {
+  writeReplayCount(n);
+  if (!navButton) return;
+  if (replayMenuVisible(n)) {
+    if (!navButton.isConnected) {
+      if (lastNavLabel) navButton.textContent = lastNavLabel;
+      document.querySelector('#fullscreen')?.before(navButton);
+    }
+  } else if (navButton.isConnected) navButton.remove();
 }
 
 function renderRow(
@@ -185,6 +210,245 @@ function renderRow(
   return row;
 }
 
+async function listAllSessions(): Promise<
+  (ListedLocalSession | BuiltinSession)[]
+> {
+  const [external, builtin, extensions] = await Promise.all([
+    listLocalSessions(),
+    listBuiltinSessions(),
+    privateSessions ? privateSessions() : Promise.resolve([]),
+  ]);
+  return [...external, ...builtin, ...extensions];
+}
+
+function sortSessions(sessions: (ListedLocalSession | BuiltinSession)[]) {
+  // New sessions are newest first. Legacy rows keep deterministic title/score
+  // order at the end; no fabricated date and no historical archive rewrite.
+  sessions.sort(
+    (a, b) =>
+      (recordedTime(b.playedAt) ?? 0) - (recordedTime(a.playedAt) ?? 0) ||
+      (a.title ?? a.replay.song).localeCompare(b.title ?? b.replay.song) ||
+      b.result.score - a.result.score,
+  );
+  return sessions;
+}
+
+function projectDisplayCache(
+  listEl: HTMLElement,
+  fresh: ReplayPageLabels,
+): string {
+  const rows = [...listEl.querySelectorAll('.replay-row')].map((row) => ({
+    title: row.querySelector('.replay-copy strong')?.textContent ?? '',
+    mode: row.querySelector('.replay-mode')?.textContent ?? '',
+    time: row.querySelector('.replay-time')?.textContent ?? '',
+    dateTime: row.querySelector('time')?.getAttribute('datetime') ?? '',
+    score: row.querySelector('.replay-score strong')?.textContent ?? '',
+    stats: row.querySelector('.replay-score span')?.textContent ?? '',
+    art: row.querySelector('img.replay-art')?.getAttribute('src') ?? '',
+    artHidden:
+      row.querySelector<HTMLImageElement>('img.replay-art')?.hidden === true,
+  }));
+  return JSON.stringify({
+    v: 2,
+    nav: [...document.querySelectorAll('#app > header nav button')].map(
+      (node) => node.textContent ?? '',
+    ),
+    lang: getLanguage(),
+    header: { title: fresh.title, back: fresh.back },
+    rows,
+  });
+}
+
+// A72: remember the verified list as a display-only projection for the next
+// plain reload's pre-module paint. Serialized-identical entries are never
+// rewritten; quota failure silently skips this optional cache.
+function writeDisplayCache(json: string) {
+  try {
+    if (json.length > 200000) {
+      localStorage.removeItem(REPLAY_DISPLAY_KEY);
+    } else if (localStorage.getItem(REPLAY_DISPLAY_KEY) !== json) {
+      localStorage.setItem(REPLAY_DISPLAY_KEY, json);
+    }
+  } catch {
+    /* Optional paint cache never blocks the verified list. */
+  }
+}
+
+interface CachedRow {
+  title: string;
+  mode: string;
+  time: string;
+  dateTime: string;
+  score: string;
+  stats: string;
+  art: string;
+  artHidden: boolean;
+}
+
+// ORV-78: validate the paint cache exactly like replay-first-paint-bootstrap.js
+// so an in-app open paints the same rows a cold load would.
+function readCachedRows(): CachedRow[] | null {
+  try {
+    const raw = localStorage.getItem(REPLAY_DISPLAY_KEY);
+    if (!raw || raw.length > 200000) return null;
+    const cache = JSON.parse(raw);
+    if (
+      cache?.v !== 2 ||
+      cache.lang !== getLanguage() ||
+      !Array.isArray(cache.nav) ||
+      cache.nav.length !== 3 ||
+      !Array.isArray(cache.rows) ||
+      !cache.rows.length ||
+      cache.rows.length > 1000
+    )
+      return null;
+    const text = (value: unknown, max = 300) =>
+      typeof value === 'string' && value.length <= max ? value : '';
+    const art = (value: unknown): string => {
+      if (typeof value !== 'string' || !value || value.length > 300) return '';
+      let url: URL;
+      try {
+        url = new URL(value, location.origin);
+      } catch {
+        return '';
+      }
+      if (url.search || url.hash) return '';
+      if (
+        url.origin === location.origin &&
+        /^\/(wallpapers|art)\/[A-Za-z0-9_.-]+$/.test(url.pathname)
+      )
+        return url.pathname;
+      if (
+        url.origin === 'https://i.ytimg.com' &&
+        /^\/vi\/[A-Za-z0-9_-]{11}\/(mqdefault|maxresdefault)\.jpg$/.test(
+          url.pathname,
+        )
+      )
+        return url.href;
+      return '';
+    };
+    const rows: CachedRow[] = [];
+    for (const row of cache.rows) {
+      const parsed: CachedRow = {
+        title: text(row?.title),
+        mode: text(row?.mode, 120),
+        time: text(row?.time, 120),
+        dateTime: text(row?.dateTime, 40),
+        score: text(row?.score, 60),
+        stats: text(row?.stats, 120),
+        art: art(row?.art),
+        artHidden: row?.artHidden === true,
+      };
+      if (
+        !parsed.title ||
+        !parsed.mode ||
+        !parsed.time ||
+        !parsed.score ||
+        !parsed.stats
+      )
+        return null;
+      rows.push(parsed);
+    }
+    return rows;
+  } catch {
+    return null;
+  }
+}
+
+// ORV-78: inert cached row; the verified render always replaces it.
+function renderCachedRow(row: CachedRow): HTMLButtonElement {
+  const el = document.createElement('button');
+  el.className = 'replay-row';
+  el.type = 'button';
+  el.tabIndex = -1;
+  const frame = document.createElement('span');
+  frame.className = 'replay-art-frame';
+  const placeholder = document.createElement('span');
+  placeholder.className = 'replay-art-placeholder';
+  placeholder.textContent = '♪';
+  placeholder.setAttribute('aria-hidden', 'true');
+  frame.append(placeholder);
+  if (row.art && !row.artHidden) {
+    const img = document.createElement('img');
+    img.className = 'replay-art';
+    img.alt = '';
+    img.loading = 'lazy';
+    img.referrerPolicy = 'no-referrer';
+    img.src = row.art;
+    img.onerror = () => {
+      img.hidden = true;
+    };
+    frame.append(img);
+  }
+  const copy = document.createElement('span');
+  copy.className = 'replay-copy';
+  const name = document.createElement('strong');
+  name.textContent = row.title;
+  const mode = document.createElement('span');
+  mode.className = 'replay-mode';
+  mode.textContent = row.mode;
+  const time = document.createElement('time');
+  time.className = 'replay-time';
+  time.textContent = row.time;
+  if (row.dateTime && Number.isFinite(Date.parse(row.dateTime)))
+    time.dateTime = row.dateTime;
+  copy.append(name, mode, time);
+  const score = document.createElement('span');
+  score.className = 'replay-score';
+  const value = document.createElement('strong');
+  value.textContent = row.score;
+  const stats = document.createElement('span');
+  stats.textContent = row.stats;
+  score.append(value, stats);
+  const open = document.createElement('span');
+  open.className = 'replay-open';
+  open.textContent = '▶';
+  open.setAttribute('aria-hidden', 'true');
+  el.append(frame, copy, score, open);
+  return el;
+}
+
+/** ORV-78: a completed play just saved a session; show the menu at once, then
+ * let the verified stores reconcile the count and refresh the paint cache. */
+export function noteReplaySessionSaved() {
+  let bumped = 1;
+  try {
+    bumped = readReplayCount() + 1;
+  } catch {
+    /* Keep the fallback bump. */
+  }
+  setReplayMenuCount(bumped);
+  void (async () => {
+    try {
+      const sessions = sortSessions(await listAllSessions());
+      setReplayMenuCount(sessions.length);
+      if (!sessions.length) {
+        try {
+          localStorage.removeItem(REPLAY_DISPLAY_KEY);
+        } catch {
+          /* Optional paint cache. */
+        }
+        return;
+      }
+      const container = document.createElement('div');
+      for (const session of sessions) container.append(renderRow(session));
+      writeDisplayCache(projectDisplayCache(container, getLabels()));
+    } catch {
+      /* Keep the bumped count; the next open reconciles. */
+    }
+  })();
+}
+
+/** ORV-78: deferred self-heal; failures keep the cached count. */
+export async function reconcileReplayMenuCount() {
+  try {
+    const sessions = await listAllSessions();
+    setReplayMenuCount(sessions.length);
+  } catch {
+    /* Keep the cached count. */
+  }
+}
+
 export async function showReplays() {
   const version = ++showVersion;
   const labels = getLabels();
@@ -194,14 +458,14 @@ export async function showReplays() {
   const empty = q('#replays-empty');
   list.replaceChildren();
   empty.classList.add('hidden');
+  // ORV-78: paint the last verified list instantly, like the cold-load first
+  // paint; the verified stores replace it below. An invalid or absent cache
+  // simply skips the pre-paint.
+  const cached = readCachedRows();
+  if (cached) for (const row of cached) list.append(renderCachedRow(row));
   let sessions: (ListedLocalSession | BuiltinSession)[];
   try {
-    const [external, builtin, extensions] = await Promise.all([
-      listLocalSessions(),
-      listBuiltinSessions(),
-      privateSessions ? privateSessions() : Promise.resolve([]),
-    ]);
-    sessions = [...external, ...builtin, ...extensions];
+    sessions = await listAllSessions();
   } catch {
     if (version !== showVersion) return;
     dropFirstPaint();
@@ -221,56 +485,23 @@ export async function showReplays() {
   q('#replays-title').textContent = fresh.title;
   q<HTMLButtonElement>('#replays-back').textContent = `ESC ${fresh.back}`;
   if (!sessions.length) {
+    list.replaceChildren();
     dropFirstPaint();
     try {
       localStorage.removeItem(REPLAY_DISPLAY_KEY);
     } catch {
       /* Optional paint cache. */
     }
+    setReplayMenuCount(0);
     empty.textContent = fresh.empty;
     empty.classList.remove('hidden');
     return;
   }
-  // New sessions are newest first. Legacy rows keep deterministic title/score
-  // order at the end; no fabricated date and no historical archive rewrite.
-  sessions.sort(
-    (a, b) =>
-      (recordedTime(b.playedAt) ?? 0) - (recordedTime(a.playedAt) ?? 0) ||
-      (a.title ?? a.replay.song).localeCompare(b.title ?? b.replay.song) ||
-      b.result.score - a.result.score,
-  );
+  sortSessions(sessions);
+  // The cached pre-paint is fully replaced, never mixed with verified rows.
+  list.replaceChildren();
   for (const session of sessions) list.append(renderRow(session));
   dropFirstPaint();
-  // A72: remember the verified list as a display-only projection for the next
-  // plain reload's pre-module paint. Serialized-identical entries are never
-  // rewritten; quota failure silently skips this optional cache.
-  try {
-    const rows = [...list.querySelectorAll('.replay-row')].map((row) => ({
-      title: row.querySelector('.replay-copy strong')?.textContent ?? '',
-      mode: row.querySelector('.replay-mode')?.textContent ?? '',
-      time: row.querySelector('.replay-time')?.textContent ?? '',
-      dateTime: row.querySelector('time')?.getAttribute('datetime') ?? '',
-      score: row.querySelector('.replay-score strong')?.textContent ?? '',
-      stats: row.querySelector('.replay-score span')?.textContent ?? '',
-      art: row.querySelector('img.replay-art')?.getAttribute('src') ?? '',
-      artHidden:
-        row.querySelector<HTMLImageElement>('img.replay-art')?.hidden === true,
-    }));
-    const json = JSON.stringify({
-      v: 2,
-      nav: [...document.querySelectorAll('#app > header nav button')].map(
-        (node) => node.textContent ?? '',
-      ),
-      lang: getLanguage(),
-      header: { title: fresh.title, back: fresh.back },
-      rows,
-    });
-    if (json.length > 200000) {
-      localStorage.removeItem(REPLAY_DISPLAY_KEY);
-    } else if (localStorage.getItem(REPLAY_DISPLAY_KEY) !== json) {
-      localStorage.setItem(REPLAY_DISPLAY_KEY, json);
-    }
-  } catch {
-    /* Optional paint cache never blocks the verified list. */
-  }
+  setReplayMenuCount(sessions.length);
+  writeDisplayCache(projectDisplayCache(list, fresh));
 }

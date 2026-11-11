@@ -19,7 +19,24 @@ export const de = {
   gameOptions: 'SPIELOPTIONEN',
   fader: 'Noteneffekte',
   shuffle: 'Spurfolge',
-  optionHint: 'Gilt für das nächste Spiel.',
+  faderOffTooltip: 'Die Noten bleiben auf ihrem gesamten Weg sichtbar.',
+  faderInTooltip: 'Die Noten werden ab der Hälfte ihres Weges eingeblendet.',
+  faderIn2Tooltip:
+    'Die Noten werden später, nahe der Wertungslinie, eingeblendet.',
+  faderOutTooltip: 'Die Noten werden vor der Wertungslinie ausgeblendet.',
+  faderOut2Tooltip:
+    'Die Noten werden früher, schon ab der Hälfte ihres Weges, ausgeblendet.',
+  faderBlinkTooltip: 'Die Noten blinken im Takt der Musik.',
+  faderBlink2Tooltip: 'Das gesamte Spielfeld blinkt im Takt der Musik.',
+  faderFogTooltip: 'Nebel verdeckt die untere Hälfte des Spielfelds.',
+  faderPixelTooltip: 'Mit steigender Kombo wird das Spielfeld zunehmend pixelig.',
+  faderPixel2Tooltip:
+    'Mit steigender Kombo kann das Spielfeld noch stärker verpixelt werden.',
+  faderBlindTooltip: 'Alle Noten sind unsichtbar.',
+  shuffleOffTooltip: 'Behält die ursprüngliche Reihenfolge der Spuren bei.',
+  shuffleMirrorTooltip: 'Spiegelt die Spuren von links nach rechts.',
+  shuffleRandomTooltip:
+    'Mischt die Spuren einmal zufällig und behält diese Reihenfolge im ganzen Song bei.',
   pause: 'PAUSE',
   resume: 'FORTSETZEN',
   select: 'TITELAUSWAHL',
@@ -72,6 +89,10 @@ export const de = {
   unsupported: 'Spiele am Computer mit einer Tastatur.',
   startError:
     'Audio konnte nicht starten. Prüfe die Browserberechtigung und versuche es erneut.',
+  integrityError:
+    'Die Audiodaten konnten nicht überprüft werden. Sie wurden möglicherweise geändert oder beschädigt. Bitte den Absender um einen neuen Link.',
+  transportError:
+    'Die Audiodaten konnten nicht geladen werden. Prüfe die Netzwerkverbindung und versuche es erneut.',
   aborted: 'Spiel angehalten. Starte neu für einen neuen Punktestand.',
   focus: 'Fokus gewechselt. Das Spiel wurde sicher angehalten.',
   otherKey: 'Wähle eine andere Taste.',

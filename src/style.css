@@ -449,6 +449,11 @@ nav a:hover {
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
+  gap: 12px;
+}
+.game-top #exit {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .game-top small {
   font-size: 9px;
@@ -460,10 +465,16 @@ nav a:hover {
   flex-direction: column;
   align-items: center;
   gap: 5px;
+  min-width: 0;
+  overflow: hidden;
 }
 .song-now strong {
   font-size: 18px;
   font-weight: 500;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .song-now span {
   font-size: 8px;
@@ -3531,9 +3542,50 @@ body.perf-enabled #fps {
 .import-pending button {
   flex-shrink: 0;
 }
+@property --import-shine-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+/* Paint only a thin border ring; the row's content and geometry stay still. */
+.import-pending.import-shine[data-state='loading']::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 2px;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--import-shine-angle),
+    transparent 0turn 0.8turn,
+    rgb(107 231 255 / 1) 0.90turn,
+    rgb(240 253 255 / 1) 0.95turn,
+    transparent 1turn
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: import-border-shine 3.6s linear infinite;
+}
+@keyframes import-border-shine {
+  to {
+    --import-shine-angle: 360deg;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .import-pending .youtube-spinner {
+  .import-pending.import-shine[data-state='loading']::before {
     animation: none;
+    background: none;
+    -webkit-mask: none;
+    mask: none;
+    box-shadow:
+      inset 0 0 0 1px rgb(174 226 245 / 0.18),
+      0 0 6px rgb(174 226 245 / 0.08);
   }
 }
 
@@ -4799,6 +4851,68 @@ html {
     font-size: 16px;
   }
 }
+/* DJMAX-like NM blue, HD yellow, MX red, SC purple; selection adds an outline. */
+:is(#difficulty, #cached-difficulty) [data-diff='low'] {
+  --family-color: #69c5ff;
+}
+:is(#difficulty, #cached-difficulty) [data-diff='mid'] {
+  --family-color: #f5d85b;
+}
+:is(#difficulty, #cached-difficulty) [data-diff='high'] {
+  --family-color: #ff737d;
+}
+:is(#difficulty, #cached-difficulty) [data-diff='sc'] {
+  --family-color: #c79aff;
+}
+:is(#difficulty, #cached-difficulty) button {
+  color: var(--family-color);
+  font-weight: 700;
+}
+:is(#difficulty, #cached-difficulty) button.selected {
+  background: color-mix(in srgb, var(--family-color) 15%, #111c28);
+  box-shadow: inset 0 0 0 1px var(--family-color);
+}
+/* Reserve the rightmost column for the level, including narrow viewports. */
+:is(#songs > .song-card[data-song], #cached-songs > .song-card) {
+  grid-template-columns: 144px minmax(0, 1fr) 2.5rem;
+}
+:is(#songs > .song-card[data-song], #cached-songs > .song-card) > .cover {
+  grid-row: 1;
+}
+:is(#songs > .song-card[data-song], #cached-songs > .song-card) > .song-level {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  align-self: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+  color: #f3f6fa;
+}
+.song-duration {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 1100px) {
+  :is(#songs > .song-card[data-song], #cached-songs > .song-card) {
+    grid-template-columns: 120px minmax(0, 1fr) 2.5rem;
+  }
+}
+@media (max-width: 540px) {
+  :is(#songs > .song-card[data-song], #cached-songs > .song-card) {
+    grid-template-columns: 80px minmax(0, 1fr) 2rem;
+    column-gap: 10px;
+  }
+  :is(#songs > .song-card[data-song], #cached-songs > .song-card) > .cover {
+    width: 80px;
+  }
+  :is(#songs > .song-card[data-song], #cached-songs > .song-card) > .song-level {
+    font-size: 24px;
+  }
+}
 @media (min-width: 651px) and (max-height: 540px) {
   /* Short landscape screens scroll the page instead of reducing the list to a sliver. */
   body:has(#lobby:not(.hidden)) {
@@ -4866,9 +4980,20 @@ html {
 #songs > .import-pending .song-copy > [role='status'] {
   color: #9bbdce;
 }
-.preview-status:has(#preview-status:empty),
-.preview-status:has(#cached-preview-status:empty) {
+.preview-status {
   visibility: hidden;
+}
+body.previewing #lobby .preview-status {
+  visibility: visible;
+}
+#cached-lobby .preview-status {
+  visibility: hidden;
+}
+#cached-lobby .preview-status #cached-preview-status:empty {
+  display: inline-block;
+  font-size: 14px;
+  line-height: 1.5;
+  min-block-size: 1.5em;
 }
 @media (max-width: 1100px) {
   #songs > .import-pending .youtube-spinner {
@@ -5115,4 +5240,27 @@ body * {
 }
 #songs > .song-unready .import-actions button {
   cursor: pointer;
+}
+
+.library-context-menu button[data-action='source'] {
+  color: #edf1f5;
+}
+
+#game-options .game-option-tooltip {
+  position: fixed;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 6px 10px;
+  border: 1px solid #ffffff19;
+  border-radius: 8px;
+  background: #0d1620;
+  color: #efebf4;
+  font-size: 12px;
+  line-height: 1.5;
+  z-index: 6;
+  pointer-events: none;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+#game-options .game-option-tooltip[hidden] {
+  display: none;
 }

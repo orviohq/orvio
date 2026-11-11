@@ -26,7 +26,7 @@ export function jobImportStage(job: AudioJob): ImportStage | undefined {
 const labels: Record<Language, Record<ImportStage, string>> = {
   en: {
     checking: 'Checking the song…',
-    queued: 'Waiting for preparation…',
+    queued: 'Preparing the audio…',
     extracting: 'Preparing the audio…',
     charting: 'Analyzing audio and creating charts…',
     downloading: 'Downloading the audio…',
@@ -34,7 +34,7 @@ const labels: Record<Language, Record<ImportStage, string>> = {
   },
   ko: {
     checking: '곡을 확인하고 있습니다…',
-    queued: '준비 순서를 기다리고 있습니다…',
+    queued: '음원을 준비하고 있습니다…',
     extracting: '음원을 준비하고 있습니다…',
     charting: '음원 분석 · 채보 생성 중…',
     downloading: '음원을 내려받고 있습니다…',
@@ -42,7 +42,7 @@ const labels: Record<Language, Record<ImportStage, string>> = {
   },
   zh: {
     checking: '正在检查歌曲…',
-    queued: '正在等待准备…',
+    queued: '正在准备音频…',
     extracting: '正在准备音频…',
     charting: '正在分析音频并生成谱面…',
     downloading: '正在下载音频…',
@@ -50,7 +50,7 @@ const labels: Record<Language, Record<ImportStage, string>> = {
   },
   ja: {
     checking: '曲を確認中…',
-    queued: '準備の順番を待っています…',
+    queued: '音源を準備中…',
     extracting: '音源を準備中…',
     charting: '音源解析・譜面作成中…',
     downloading: '音源をダウンロード中…',
@@ -58,7 +58,7 @@ const labels: Record<Language, Record<ImportStage, string>> = {
   },
   es: {
     checking: 'Comprobando la canción…',
-    queued: 'Esperando la preparación…',
+    queued: 'Preparando el audio…',
     extracting: 'Preparando el audio…',
     charting: 'Analizando audio y creando mapas…',
     downloading: 'Descargando el audio…',
@@ -66,7 +66,7 @@ const labels: Record<Language, Record<ImportStage, string>> = {
   },
   fr: {
     checking: 'Vérification du morceau…',
-    queued: 'En attente de préparation…',
+    queued: 'Préparation audio…',
     extracting: 'Préparation audio…',
     charting: 'Analyse audio et création des partitions…',
     downloading: 'Téléchargement audio…',
@@ -74,7 +74,7 @@ const labels: Record<Language, Record<ImportStage, string>> = {
   },
   de: {
     checking: 'Song wird geprüft…',
-    queued: 'Warten auf Vorbereitung…',
+    queued: 'Audio wird vorbereitet…',
     extracting: 'Audio wird vorbereitet…',
     charting: 'Audioanalyse und Erstellung der Notenkarten…',
     downloading: 'Audio wird heruntergeladen…',
@@ -82,7 +82,7 @@ const labels: Record<Language, Record<ImportStage, string>> = {
   },
   pt: {
     checking: 'Verificando a música…',
-    queued: 'Aguardando preparação…',
+    queued: 'Preparando o áudio…',
     extracting: 'Preparando o áudio…',
     charting: 'Analisando áudio e criando mapas…',
     downloading: 'Baixando o áudio…',
@@ -90,7 +90,7 @@ const labels: Record<Language, Record<ImportStage, string>> = {
   },
   it: {
     checking: 'Controllo del brano…',
-    queued: 'In attesa della preparazione…',
+    queued: 'Preparazione audio…',
     extracting: 'Preparazione audio…',
     charting: 'Analisi audio e creazione delle mappe…',
     downloading: 'Download audio…',
@@ -98,7 +98,7 @@ const labels: Record<Language, Record<ImportStage, string>> = {
   },
   ru: {
     checking: 'Проверка песни…',
-    queued: 'Ожидание подготовки…',
+    queued: 'Подготовка аудио…',
     extracting: 'Подготовка аудио…',
     charting: 'Анализ аудио и создание карт…',
     downloading: 'Загрузка аудио…',
@@ -106,7 +106,7 @@ const labels: Record<Language, Record<ImportStage, string>> = {
   },
   id: {
     checking: 'Memeriksa lagu…',
-    queued: 'Menunggu persiapan…',
+    queued: 'Menyiapkan audio…',
     extracting: 'Menyiapkan audio…',
     charting: 'Menganalisis audio dan membuat chart…',
     downloading: 'Mengunduh audio…',
@@ -114,7 +114,7 @@ const labels: Record<Language, Record<ImportStage, string>> = {
   },
   tr: {
     checking: 'Şarkı kontrol ediliyor…',
-    queued: 'Hazırlık bekleniyor…',
+    queued: 'Ses hazırlanıyor…',
     extracting: 'Ses hazırlanıyor…',
     charting: 'Ses analiz ediliyor ve nota haritaları oluşturuluyor…',
     downloading: 'Ses indiriliyor…',
@@ -122,7 +122,7 @@ const labels: Record<Language, Record<ImportStage, string>> = {
   },
   vi: {
     checking: 'Đang kiểm tra bài hát…',
-    queued: 'Đang chờ chuẩn bị…',
+    queued: 'Đang chuẩn bị âm thanh…',
     extracting: 'Đang chuẩn bị âm thanh…',
     charting: 'Đang phân tích âm thanh và tạo bản nhạc…',
     downloading: 'Đang tải âm thanh…',

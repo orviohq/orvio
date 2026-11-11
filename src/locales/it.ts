@@ -18,7 +18,25 @@ export const it = {
   gameOptions: 'OPZIONI DI GIOCO',
   fader: 'Effetti delle note',
   shuffle: 'Ordine delle corsie',
-  optionHint: 'Si applica alla prossima partita.',
+  faderOffTooltip: 'Le note restano visibili lungo tutto il percorso.',
+  faderInTooltip: 'Le note appaiono gradualmente a metà percorso.',
+  faderIn2Tooltip:
+    'Le note appaiono più tardi, vicino alla linea di giudizio.',
+  faderOutTooltip:
+    'Le note scompaiono gradualmente prima della linea di giudizio.',
+  faderOut2Tooltip: 'Le note scompaiono prima, già a metà percorso.',
+  faderBlinkTooltip: 'Le note lampeggiano a ritmo di musica.',
+  faderBlink2Tooltip: 'Tutto il campo di gioco lampeggia a ritmo di musica.',
+  faderFogTooltip: 'La nebbia copre la metà inferiore del campo di gioco.',
+  faderPixelTooltip:
+    'Il campo di gioco diventa più pixelato man mano che la combo aumenta.',
+  faderPixel2Tooltip:
+    'La pixelatura può diventare ancora più intensa man mano che la combo aumenta.',
+  faderBlindTooltip: 'Tutte le note sono invisibili.',
+  shuffleOffTooltip: 'Mantiene l’ordine originale delle corsie.',
+  shuffleMirrorTooltip: 'Inverte le corsie da sinistra a destra.',
+  shuffleRandomTooltip:
+    'Mescola le corsie una volta e mantiene questo ordine per tutto il brano.',
   pause: 'PAUSA',
   resume: 'RIPRENDI',
   select: 'SCELTA BRANO',
@@ -71,6 +89,10 @@ export const it = {
   unsupported: 'Gioca su un computer con tastiera.',
   startError:
     "Impossibile avviare l'audio. Controlla i permessi del browser e riprova.",
+  integrityError:
+    "I dati audio non hanno potuto essere verificati. Potrebbero essere stati modificati o danneggiati. Chiedi un nuovo link al mittente.",
+  transportError:
+    "Impossibile caricare l'audio. Controlla la connessione di rete e riprova.",
   aborted: 'Partita interrotta. Ricomincia per un nuovo punteggio.',
   focus: 'Il focus è cambiato. Partita interrotta in sicurezza.',
   otherKey: 'Scegli un altro tasto.',

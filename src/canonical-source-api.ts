@@ -1,5 +1,6 @@
 import { readAudioLimit } from './audio-limit-message';
 import { AUDIO_BASE, AudioJobError } from './external-audio-api';
+import { assertRuntimeFetch } from './client-only-runtime';
 import { queryClient, queryKeys } from './query-client';
 import {
   validSourceRecord,
@@ -73,9 +74,11 @@ async function fetchCanonicalSource(
   signal: AbortSignal | undefined,
   callerSignal: AbortSignal | undefined,
 ): Promise<CanonicalLookup> {
+  const url = `${AUDIO_BASE}/v1/chart-sources/${videoId}`;
+  assertRuntimeFetch(url);
   let response: Response;
   try {
-    response = await fetch(`${AUDIO_BASE}/v1/chart-sources/${videoId}`, {
+    response = await fetch(url, {
       signal,
     });
   } catch (error) {

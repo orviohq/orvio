@@ -1,30 +1,135 @@
 import type { Language } from './i18n';
 import type { AudioFailureStage } from './external-audio-api';
-import { importStageLabel } from './import-progress';
-const copy: Record<Language, string> = {
-  en: 'This step took too long. Retry to continue the saved request. No new request was sent automatically.',
-  ko: '이 단계가 제한 시간 안에 끝나지 않았습니다. 다시 시도하면 저장된 요청에서 이어갑니다. 새 요청을 자동으로 보내지는 않았습니다.',
-  zh: '此步骤未在时限内完成。重试将继续已保存的请求。未自动发送新请求。',
-  ja: 'この段階が制限時間内に終わりませんでした。再試行すると保存済みリクエストから続行します。新しいリクエストは自動送信していません。',
-  es: 'Este paso tardó demasiado. Reintenta para continuar la solicitud guardada. No se envió otra solicitud automáticamente.',
-  fr: 'Cette étape a pris trop de temps. Réessayez pour continuer la demande enregistrée. Aucune nouvelle demande automatique.',
-  de: 'Dieser Schritt dauerte zu lange. Erneut versuchen, um die gespeicherte Anfrage fortzusetzen. Keine neue automatische Anfrage.',
-  pt: 'Esta etapa demorou demais. Tente novamente para continuar o pedido salvo. Nenhum novo pedido automático.',
-  it: 'Questo passaggio ha richiesto troppo tempo. Riprova per continuare la richiesta salvata. Nessuna nuova richiesta automatica.',
-  ru: 'Этот этап занял слишком много времени. Повторите, чтобы продолжить сохранённый запрос. Новый запрос автоматически не отправлен.',
-  id: 'Tahap ini terlalu lama. Coba lagi untuk melanjutkan permintaan tersimpan. Tidak ada permintaan baru otomatis.',
-  tr: 'Bu adım çok uzun sürdü. Kayıtlı isteğe devam etmek için tekrar deneyin. Otomatik yeni istek gönderilmedi.',
-  vi: 'Bước này mất quá nhiều thời gian. Thử lại để tiếp tục yêu cầu đã lưu. Không tự gửi yêu cầu mới.',
+// Generic, provider wait, download, analysis, storage, browser, manual retry.
+const copy: Record<Language, [string, string, string, string, string, string, string]> = {
+  en: [
+    'The import did not finish in time.',
+    'Timed out waiting for the audio provider. Preparation may still be running.',
+    'The audio download did not finish in time.',
+    'Audio analysis and chart creation did not finish in time.',
+    'Saving on this device did not finish in time.',
+    'Processing in this browser did not finish in time.',
+    'Try again to resume the import. No new request is sent automatically.',
+  ],
+  ko: [
+    '제한 시간 안에 가져오기가 끝나지 않았습니다.',
+    '음원 제공 서비스의 응답을 기다리다 시간이 초과되었습니다. 서비스에서 아직 준비 중일 수 있습니다.',
+    '제한 시간 안에 음원 다운로드가 끝나지 않았습니다.',
+    '제한 시간 안에 음원 분석과 채보 생성이 끝나지 않았습니다.',
+    '제한 시간 안에 이 기기에 저장하지 못했습니다.',
+    '제한 시간 안에 이 브라우저의 처리가 끝나지 않았습니다.',
+    '다시 시도하면 가져오기를 재개합니다. 자동으로 새 요청을 보내지 않습니다.',
+  ],
+  zh: [
+    '导入未在时限内完成。',
+    '等待音频提供服务的响应超时。服务可能仍在准备音频。',
+    '音频下载未在时限内完成。',
+    '音频分析和谱面生成未在时限内完成。',
+    '未在时限内完成保存到此设备。',
+    '此浏览器中的处理未在时限内完成。',
+    '请重试以继续导入。不会自动发送新请求。',
+  ],
+  ja: [
+    '制限時間内にインポートが完了しませんでした。',
+    '音源提供サービスの応答待ちがタイムアウトしました。サービスで準備が続いている可能性があります。',
+    '制限時間内に音源のダウンロードが完了しませんでした。',
+    '制限時間内に音源解析と譜面作成が完了しませんでした。',
+    '制限時間内にこの端末への保存が完了しませんでした。',
+    '制限時間内にこのブラウザでの処理が完了しませんでした。',
+    '再試行してインポートを再開してください。新しいリクエストは自動で送信されません。',
+  ],
+  es: [
+    'La importación no terminó a tiempo.',
+    'Se agotó el tiempo de espera del proveedor de audio. La preparación puede seguir en curso.',
+    'La descarga del audio no terminó a tiempo.',
+    'El análisis del audio y la creación de mapas no terminaron a tiempo.',
+    'El guardado en este dispositivo no terminó a tiempo.',
+    'El procesamiento en este navegador no terminó a tiempo.',
+    'Reintenta para reanudar la importación. No se envía una nueva solicitud automáticamente.',
+  ],
+  fr: [
+    'L’importation n’a pas terminé à temps.',
+    'Le délai d’attente du fournisseur audio a expiré. La préparation peut encore être en cours.',
+    'Le téléchargement audio n’a pas terminé à temps.',
+    'L’analyse audio et la création des partitions n’ont pas terminé à temps.',
+    'L’enregistrement sur cet appareil n’a pas terminé à temps.',
+    'Le traitement dans ce navigateur n’a pas terminé à temps.',
+    'Réessayez pour reprendre l’importation. Aucune nouvelle demande n’est envoyée automatiquement.',
+  ],
+  de: [
+    'Der Import wurde nicht rechtzeitig abgeschlossen.',
+    'Zeitüberschreitung beim Warten auf den Audioanbieter. Die Vorbereitung läuft möglicherweise noch.',
+    'Der Audio-Download wurde nicht rechtzeitig abgeschlossen.',
+    'Audioanalyse und Erstellung der Notenkarten wurden nicht rechtzeitig abgeschlossen.',
+    'Das Speichern auf diesem Gerät wurde nicht rechtzeitig abgeschlossen.',
+    'Die Verarbeitung in diesem Browser wurde nicht rechtzeitig abgeschlossen.',
+    'Versuche es erneut, um den Import fortzusetzen. Eine neue Anfrage wird nicht automatisch gesendet.',
+  ],
+  pt: [
+    'A importação não terminou a tempo.',
+    'O tempo de espera pelo provedor de áudio se esgotou. A preparação pode continuar em andamento.',
+    'O download do áudio não terminou a tempo.',
+    'A análise do áudio e a criação dos mapas não terminaram a tempo.',
+    'O salvamento neste dispositivo não terminou a tempo.',
+    'O processamento neste navegador não terminou a tempo.',
+    'Tente novamente para retomar a importação. Não é enviado um novo pedido automaticamente.',
+  ],
+  it: [
+    'L’importazione non è terminata in tempo.',
+    'Il tempo di attesa del fornitore audio è scaduto. La preparazione potrebbe essere ancora in corso.',
+    'Il download audio non è terminato in tempo.',
+    'L’analisi audio e la creazione delle mappe non sono terminate in tempo.',
+    'Il salvataggio sul dispositivo non è terminato in tempo.',
+    'L’elaborazione in questo browser non è terminata in tempo.',
+    'Riprova per riprendere l’importazione. Nessuna nuova richiesta viene inviata automaticamente.',
+  ],
+  ru: [
+    'Импорт не завершился вовремя.',
+    'Истекло время ожидания аудиопровайдера. Подготовка может ещё продолжаться.',
+    'Загрузка аудио не завершилась вовремя.',
+    'Анализ аудио и создание карт не завершились вовремя.',
+    'Сохранение на этом устройстве не завершилось вовремя.',
+    'Обработка в этом браузере не завершилась вовремя.',
+    'Повторите попытку, чтобы возобновить импорт. Новый запрос не отправляется автоматически.',
+  ],
+  id: [
+    'Impor tidak selesai tepat waktu.',
+    'Waktu menunggu penyedia audio habis. Persiapan mungkin masih berjalan.',
+    'Unduhan audio tidak selesai tepat waktu.',
+    'Analisis audio dan pembuatan chart tidak selesai tepat waktu.',
+    'Penyimpanan di perangkat ini tidak selesai tepat waktu.',
+    'Pemrosesan di browser ini tidak selesai tepat waktu.',
+    'Coba lagi untuk melanjutkan impor. Permintaan baru tidak dikirim secara otomatis.',
+  ],
+  tr: [
+    'İçe aktarma zamanında tamamlanmadı.',
+    'Ses sağlayıcısını bekleme süresi doldu. Hazırlık hâlâ devam ediyor olabilir.',
+    'Ses indirme zamanında tamamlanmadı.',
+    'Ses analizi ve nota haritalarının oluşturulması zamanında tamamlanmadı.',
+    'Bu cihaza kaydetme zamanında tamamlanmadı.',
+    'Bu tarayıcıdaki işlem zamanında tamamlanmadı.',
+    'İçe aktarmaya devam etmek için tekrar deneyin. Otomatik olarak yeni istek gönderilmez.',
+  ],
+  vi: [
+    'Quá trình nhập không hoàn tất trong thời gian cho phép.',
+    'Đã hết thời gian chờ nhà cung cấp âm thanh. Quá trình chuẩn bị có thể vẫn đang chạy.',
+    'Tải âm thanh không hoàn tất trong thời gian cho phép.',
+    'Phân tích âm thanh và tạo bản nhạc không hoàn tất trong thời gian cho phép.',
+    'Lưu trên thiết bị này không hoàn tất trong thời gian cho phép.',
+    'Xử lý trong trình duyệt này không hoàn tất trong thời gian cho phép.',
+    'Thử lại để tiếp tục nhập. Không tự động gửi yêu cầu mới.',
+  ],
 };
 export function importCompletionTimeout(
-  stage: AudioFailureStage,
+  stage: AudioFailureStage | undefined,
   language: Language,
 ) {
-  const label =
-    stage === 'response'
-      ? 'downloading'
-      : stage === 'analysis'
-        ? 'charting'
-        : 'saving';
-  return importStageLabel(label, language) + ' ' + copy[language];
+  const index = stage === undefined ? 0 : {
+    service: 1,
+    response: 2,
+    analysis: 3,
+    storage: 4,
+    browser: 5,
+  }[stage];
+  return copy[language][index] + ' ' + copy[language][6];
 }

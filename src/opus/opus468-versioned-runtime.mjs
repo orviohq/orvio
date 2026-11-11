@@ -25,6 +25,16 @@ export function createVersioned468Runtime({ legacy, unified, parseSharedV7 }) {
     releaseBinding: unified.releaseBinding,
     extendCachedBase: (...args) => unified.extendCachedBase(...args),
     consumeAcquiredJob: (...args) => unified.consumeAcquiredJob(...args),
+    consumeFixedLegacySidecar: (...args) => {
+      if (typeof unified.consumeFixedLegacySidecar !== 'function')
+        throw Error('versioned_unified_capability');
+      return unified.consumeFixedLegacySidecar(...args);
+    },
+    restoreSourceRecord: (...args) => {
+      if (typeof unified.restoreSourceRecord !== 'function')
+        throw Error('versioned_unified_capability');
+      return unified.restoreSourceRecord(...args);
+    },
     cancel() {
       legacy.cancel();
       unified.cancel();

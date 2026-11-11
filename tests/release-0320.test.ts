@@ -1,0 +1,2 @@
+import{readFileSync}from'node:fs';import{expect,test}from'vitest';import{APP_VERSION}from'../src/app-version';import{LANGUAGES}from'../src/i18n';import{PATCHES}from'../src/patch-notes';import{PATCH_V0320}from'../src/patch-notes-v0320';import{PATCH_V0319}from'../src/patch-notes-v0319';import{patchGroups}from'../src/patch-groups';
+test('0.3.20 retains translated information notes',()=>{const i=PATCHES.indexOf(PATCH_V0320);expect(i).toBeGreaterThan(0);expect(PATCHES[i+1]).toBe(PATCH_V0319);expect(Object.keys(PATCH_V0320.notes).sort()).toEqual(Object.keys(LANGUAGES).sort());});

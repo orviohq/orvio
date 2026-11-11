@@ -2,10 +2,17 @@ import { it, expect, vi, afterEach } from 'vitest';
 import { songArt, ART_FALLBACK, thumbnailCandidates } from '../src/song-art';
 import { installExternalSource } from '../src/external-catalog';
 import type { SourceRecord } from '../src/external-source';
+import { ensureYoutubeArtwork } from '../src/youtube-artwork';
 afterEach(() => vi.unstubAllGlobals());
 function setup(outcomes: { width: number; height: number; error?: boolean }[]) {
   let n = 0;
   vi.stubGlobal('document', new EventTarget());
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      throw new TypeError('CORS fixture');
+    }),
+  );
   vi.stubGlobal(
     'Image',
     class {
@@ -29,20 +36,13 @@ function source(videoId: string) {
     'Example',
   ).song.id;
 }
-const settle = async () => {
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
-};
 it('prefers a real 16:9 high-resolution image without the 4:3 wrapper', async () => {
   setup([{ width: 1280, height: 720 }]);
   const id = source('AAAAAAAAAAA');
   songArt(id);
-  await settle();
+  await ensureYoutubeArtwork('AAAAAAAAAAA');
   expect(songArt(id)).toContain('/maxresdefault.jpg');
-  expect(
-    thumbnailCandidates('AAAAAAAAAAA').some((x) => x.includes('hqdefault')),
-  ).toBe(false);
+  expect(thumbnailCandidates('AAAAAAAAAAA')[1]).toContain('mqdefault');
 });
 it('rejects soft404 placeholder pixels and uses the 16:9 medium fallback', async () => {
   setup([
@@ -51,7 +51,7 @@ it('rejects soft404 placeholder pixels and uses the 16:9 medium fallback', async
   ]);
   const id = source('BBBBBBBBBBB');
   songArt(id);
-  await settle();
+  await ensureYoutubeArtwork('BBBBBBBBBBB');
   expect(songArt(id)).toContain('/mqdefault.jpg');
 });
 it('uses local fallback if neither original thumbnail can load', async () => {
@@ -61,7 +61,7 @@ it('uses local fallback if neither original thumbnail can load', async () => {
   ]);
   const id = source('CCCCCCCCCCC');
   songArt(id);
-  await settle();
+  await ensureYoutubeArtwork('CCCCCCCCCCC');
   expect(songArt(id)).toBe(ART_FALLBACK);
   expect(songArt('first-light')).toBe('/wallpapers/first-light.png');
 });

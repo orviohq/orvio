@@ -37,21 +37,46 @@ for (const width of [1440, 979, 390, 320])
         body: fs.readFileSync('public/wallpapers/first-light.png'),
       }),
     );
+    await p.route('**/src/prepare-direct-allkeys.ts*', (route) => route.fulfill({
+      contentType: 'application/javascript',
+      body: `
+        import { AudioJobError } from '/src/external-audio-api.ts';
+        export function prepareDirectAllKeys() {
+          return new Promise((_resolve, reject) => {
+            window.__orv65FailRetry = () => reject(new AudioJobError('request_timeout'));
+          });
+        }
+      `,
+    }));
     await p.goto('/select/');
-    const row = p.locator('.import-pending[data-state=error]');
+    const row = p.locator('.import-pending[data-import-video="AAAAAAAAAAA"]');
     await expect(row).toBeVisible();
     await expect(row.locator('img')).toBeVisible();
-    const rect = await row.boundingBox();
-    for (const e of [
-      '.import-retry',
-      '.import-dismiss',
-      '.song-copy strong',
-      '.cover',
-    ]) {
-      const b = await row.locator(e).boundingBox();
-      expect(b!.x).toBeGreaterThanOrEqual(rect!.x);
-      expect(b!.x + b!.width).toBeLessThanOrEqual(rect!.x + rect!.width + 1);
-      expect(b!.y + b!.height).toBeLessThanOrEqual(rect!.y + rect!.height + 1);
+    const { rect, children } = await row.evaluate((el) => {
+      const selectors = [
+        '.import-retry',
+        '.import-dismiss',
+        '.song-copy strong',
+        '.cover',
+      ];
+      const toBox = (r: DOMRect) => ({
+        x: r.x,
+        y: r.y,
+        width: r.width,
+        height: r.height,
+      });
+      return {
+        rect: toBox(el.getBoundingClientRect()),
+        children: selectors.map((selector) => {
+          const child = el.querySelector(selector);
+          return child ? toBox(child.getBoundingClientRect()) : null;
+        }),
+      };
+    });
+    for (const b of children) {
+      expect(b!.x).toBeGreaterThanOrEqual(rect.x);
+      expect(b!.x + b!.width).toBeLessThanOrEqual(rect.x + rect.width + 1);
+      expect(b!.y + b!.height).toBeLessThanOrEqual(rect.y + rect.height + 1);
     }
     expect(
       await p.evaluate(
@@ -62,11 +87,13 @@ for (const width of [1440, 979, 390, 320])
       path: test.info().outputPath(`orv65-independent-${width}.png`),
     });
     await row.locator('.import-retry').click();
-    await expect(p.locator('#youtube-import')).toBeVisible();
-    await expect(p.locator('#youtube-url')).toHaveValue(
-      'https://www.youtube.com/watch?v=AAAAAAAAAAA',
-    );
-    await p.locator('#youtube-cancel').click();
+    await expect(p.locator('#youtube-import')).not.toBeVisible();
+    await expect(row).toHaveAttribute('data-state', 'loading');
+    await expect(row).toHaveAttribute('aria-busy', 'true');
+    await expect(row).toHaveClass(/import-shine/);
+    await p.waitForFunction(() => !!(window as any).__orv65FailRetry);
+    await p.evaluate(() => (window as any).__orv65FailRetry());
+    await expect(row).toHaveAttribute('data-state', 'error');
     expect(mutations).toEqual([]);
     await row.locator('.import-dismiss').click();
     await expect(row).toHaveCount(0);

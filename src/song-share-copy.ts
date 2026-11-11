@@ -2,6 +2,18 @@
 export function showSongLink(url: string, korean: boolean) {
   const dialog = document.createElement('dialog');
   dialog.className = 'song-link-dialog';
+  dialog.onclick = (e) => {
+    const dialog = e.currentTarget as HTMLDialogElement;
+    if (e.target !== dialog) return;
+    const bounds = dialog.getBoundingClientRect();
+    if (
+      e.clientX < bounds.left - 4 ||
+      e.clientX > bounds.right + 4 ||
+      e.clientY < bounds.top - 4 ||
+      e.clientY > bounds.bottom + 4
+    )
+      dialog.close();
+  };
   const heading = document.createElement('h2');
   heading.textContent = korean ? '곡 공유 링크' : 'Song link';
   const note = document.createElement('p');

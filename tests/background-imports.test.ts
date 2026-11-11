@@ -1,5 +1,6 @@
 import { it, expect, vi, afterEach } from 'vitest';
 import { BackgroundImports } from '../src/background-imports';
+import { LibraryAddOrder } from '../src/library-add-order';
 const api = vi.hoisted(() => ({
   import: vi.fn((..._args: unknown[]) => new Promise(() => {})),
 }));
@@ -29,6 +30,34 @@ function store(value = '[]') {
 function raf() {
   vi.stubGlobal('requestAnimationFrame', (fn: () => void) => setTimeout(fn, 0));
 }
+it('restored B/error-A/C order survives actual enqueue retry and explicit added notification', async () => {
+  raf();
+  const storage = store(JSON.stringify([
+    { videoId: 'BBBBBBBBBBB', state: 'loading' },
+    { videoId: 'AAAAAAAAAAA', state: 'error', error: 'unavailable' },
+    { videoId: 'CCCCCCCCCCC', state: 'loading' },
+  ]));
+  const order = new LibraryAddOrder(storage);
+  const paints: string[][] = [];
+  const pending = new BackgroundImports(
+    () => paints.push([...pending.rows.keys()].sort((a, b) => order.rank(a) - order.rank(b))),
+    async () => {}, storage,
+  );
+  expect(paints).toEqual([]);
+  order.ensurePendingOrder(pending.rows.keys());
+  const restored = [...pending.rows.keys()];
+  const b = pending.rows.get('BBBBBBBBBBB');
+  const c = pending.rows.get('CCCCCCCCCCC');
+  pending.enqueue('AAAAAAAAAAA');
+  order.added('AAAAAAAAAAA');
+  expect(pending.rows.get('AAAAAAAAAAA')?.state).toBe('loading');
+  expect(pending.rows.get('BBBBBBBBBBB')).toBe(b);
+  expect(pending.rows.get('CCCCCCCCCCC')).toBe(c);
+  expect(paints.length).toBeGreaterThan(0);
+  for (const paint of paints) expect(paint).toEqual(restored);
+  expect([...pending.rows.keys()].sort((a, b) => order.rank(a) - order.rank(b))).toEqual(restored);
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(1));
+});
 it('adds immediate pending state, joins duplicates and never exposes pending data as a completed source', async () => {
   raf();
   const complete = vi.fn(async () => {}),
@@ -186,15 +215,9 @@ it('stage transitions reach saving before completion and remove row only after c
   await vi.waitFor(() => expect(pending.rows.size).toBe(0));
 });
 
-it('admits one import at a time and starts no timeout while the next waits', async () => {
+it('admits every enqueued import immediately in parallel and never marks a row queued', async () => {
   raf();
-  let release!: (value: unknown) => void;
-  api.import.mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        release = resolve;
-      }),
-  );
+  api.import.mockImplementation(() => new Promise(() => {}));
   const timeout = vi.spyOn(globalThis, 'setTimeout');
   const pending = new BackgroundImports(
     () => {},
@@ -204,20 +227,21 @@ it('admits one import at a time and starts no timeout while the next waits', asy
   pending.enqueue('AAAAAAAAAAA');
   pending.enqueue('BBBBBBBBBBB');
   pending.enqueue('BBBBBBBBBBB');
-  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(1));
-  expect(timeout.mock.calls.filter((c) => c[1] === 90000)).toHaveLength(1);
-  expect(pending.isWaiting('BBBBBBBBBBB')).toBe(true);
-  expect(pending.rows.get('BBBBBBBBBBB')).toMatchObject({
-    stage: 'queued',
-    waitingForTurn: true,
-  });
-  release({ prepared: { record: { videoId: 'AAAAAAAAAAA' } } });
   await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(2));
+  expect(api.import.mock.calls.map((c) => c[0])).toEqual([
+    'AAAAAAAAAAA',
+    'BBBBBBBBBBB',
+  ]);
   expect(timeout.mock.calls.filter((c) => c[1] === 90000)).toHaveLength(2);
-  expect(pending.rows.get('BBBBBBBBBBB')?.waitingForTurn).toBeUndefined();
+  expect(pending.rows.size).toBe(2);
+  for (const id of ['AAAAAAAAAAA', 'BBBBBBBBBBB']) {
+    expect(pending.rows.get(id)?.stage).not.toBe('queued');
+    expect(pending.rows.get(id)?.waitingForTurn).toBeUndefined();
+    expect(pending.isWaiting(id)).toBe(false);
+  }
   timeout.mockRestore();
 });
-it('cancelled never-started queued work does not issue any request', async () => {
+it('dismiss during an in-flight import is ignored and never cancels or removes it', async () => {
   raf();
   api.import.mockImplementation(() => new Promise(() => {}));
   const pending = new BackgroundImports(
@@ -227,12 +251,13 @@ it('cancelled never-started queued work does not issue any request', async () =>
   );
   pending.enqueue('AAAAAAAAAAA');
   pending.enqueue('BBBBBBBBBBB');
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(2));
   pending.dismiss('BBBBBBBBBBB');
-  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(1));
-  expect(pending.rows.has('BBBBBBBBBBB')).toBe(false);
-  expect(pending.isWaiting('BBBBBBBBBBB')).toBe(false);
+  expect(pending.rows.has('BBBBBBBBBBB')).toBe(true);
+  expect(pending.rows.get('BBBBBBBBBBB')?.state).toBe('loading');
+  expect(api.import).toHaveBeenCalledTimes(2);
 });
-it('reload resumes proven never-started work but not ambiguous interrupted pre-job work', async () => {
+it('reload resumes every proven never-started or known job but not ambiguous interrupted pre-job work', async () => {
   raf();
   api.import.mockImplementation(() => new Promise(() => {}));
   const pending = new BackgroundImports(
@@ -253,11 +278,79 @@ it('reload resumes proven never-started work but not ambiguous interrupted pre-j
     ),
   );
   pending.resume();
-  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(1));
-  expect(api.import.mock.calls[0][0]).toBe('AAAAAAAAAAA');
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(2));
+  expect(api.import.mock.calls.map((c) => c[0])).toEqual([
+    'AAAAAAAAAAA',
+    'CCCCCCCCCCC',
+  ]);
   expect(pending.rows.get('BBBBBBBBBBB')?.state).toBe('error');
   expect(pending.rows.get('CCCCCCCCCCC')?.jobId).toBe('known-existing');
-  expect(pending.isWaiting('CCCCCCCCCCC')).toBe(true);
+  expect(pending.isWaiting('CCCCCCCCCCC')).toBe(false);
+});
+it('reload resumes every concurrent known job with its own persisted handle', async () => {
+  raf();
+  api.import.mockImplementation(() => new Promise(() => {}));
+  const pending = new BackgroundImports(
+    () => {},
+    async () => {},
+    store(
+      JSON.stringify([
+        {
+          videoId: 'AAAAAAAAAAA',
+          state: 'loading',
+          jobId: 'job-a',
+          transportVersion: 2,
+          audioFormat: 'orvio-opus-v1',
+        },
+        {
+          videoId: 'BBBBBBBBBBB',
+          state: 'loading',
+          jobId: 'job-b',
+          transportVersion: 2,
+          audioFormat: 'orvio-opus-v1',
+        },
+      ]),
+    ),
+  );
+  pending.resume();
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(2));
+  expect(api.import.mock.calls.map((call) => call[0])).toEqual([
+    'AAAAAAAAAAA',
+    'BBBBBBBBBBB',
+  ]);
+  expect(api.import.mock.calls[0][2]).toMatchObject({ jobId: 'job-a' });
+  expect(api.import.mock.calls[1][2]).toMatchObject({ jobId: 'job-b' });
+  expect(pending.rows.get('AAAAAAAAAAA')?.jobId).toBe('job-a');
+  expect(pending.rows.get('BBBBBBBBBBB')?.jobId).toBe('job-b');
+});
+it('the persisted store cap still rejects a ninth distinct import', () => {
+  vi.useFakeTimers();
+  try {
+    raf();
+    api.import.mockImplementation(() => new Promise(() => {}));
+    const pending = new BackgroundImports(
+      () => {},
+      async () => {},
+      store(),
+    );
+    const ids = [
+      'AAAAAAAAAAA',
+      'BBBBBBBBBBB',
+      'CCCCCCCCCCC',
+      'DDDDDDDDDDD',
+      'EEEEEEEEEEE',
+      'FFFFFFFFFFF',
+      'GGGGGGGGGGG',
+      'HHHHHHHHHHH',
+      'IIIIIIIIIII',
+    ];
+    for (const id of ids.slice(0, 8)) pending.enqueue(id);
+    expect(pending.rows.size).toBe(8);
+    expect(() => pending.enqueue(ids[8]!)).toThrow();
+    expect(pending.rows.size).toBe(8);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 it('failure to durably clear the never-started marker blocks external effects', async () => {
   raf();
@@ -282,11 +375,16 @@ it('failure to durably clear the never-started marker blocks external effects', 
     failure: { stage: 'storage' },
   });
 });
-it('a failed active import hands off the queue without retrying the failed job', async () => {
+it('a failed concurrent import does not retry itself or disturb the other row', async () => {
   raf();
-  api.import
-    .mockRejectedValueOnce(new Error('failed'))
-    .mockImplementation(() => new Promise(() => {}));
+  let failA!: (error: unknown) => void;
+  api.import.mockImplementation((id: unknown) =>
+    id === 'AAAAAAAAAAA'
+      ? new Promise((_resolve, reject) => {
+          failA = reject;
+        })
+      : new Promise(() => {}),
+  );
   const pending = new BackgroundImports(
     () => {},
     async () => {},
@@ -295,65 +393,42 @@ it('a failed active import hands off the queue without retrying the failed job',
   pending.enqueue('AAAAAAAAAAA');
   pending.enqueue('BBBBBBBBBBB');
   await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(2));
-  expect(pending.rows.get('AAAAAAAAAAA')?.state).toBe('error');
+  failA(new Error('failed'));
+  await vi.waitFor(() =>
+    expect(pending.rows.get('AAAAAAAAAAA')?.state).toBe('error'),
+  );
+  expect(pending.rows.get('BBBBBBBBBBB')?.state).toBe('loading');
   expect(api.import.mock.calls.map((c) => c[0])).toEqual([
     'AAAAAAAAAAA',
     'BBBBBBBBBBB',
   ]);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(api.import).toHaveBeenCalledTimes(2);
 });
-it('queued explicit retry intent survives reload behind an active job and is consumed at admission', async () => {
+it('explicit retry intent survives reload for a never-started row and is consumed at admission', async () => {
   raf();
   const storage = store(
     JSON.stringify([
-      { videoId: 'AAAAAAAAAAA', state: 'loading', jobId: 'active-existing' },
       {
         videoId: 'BBBBBBBBBBB',
-        state: 'error',
+        state: 'loading',
         jobId: 'terminal-existing',
-        error: 'unavailable',
+        waitingForTurn: true,
+        retryWhenAdmitted: true,
         transportVersion: 2,
         audioFormat: 'orvio-opus-v1',
       },
     ]),
   );
-  let release!: (value: unknown) => void;
-  api.import
-    .mockImplementationOnce(() => new Promise(() => {}))
-    .mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          release = resolve;
-        }),
-    )
-    .mockImplementation(() => new Promise(() => {}));
-  const first = new BackgroundImports(
-    () => {},
-    async () => {},
-    storage,
-  );
-  first.resume();
-  first.enqueue('BBBBBBBBBBB');
-  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(1));
-  expect(
-    JSON.parse(storage.getItem('orvio.pending-imports.v1')!).find(
-      (r: any) => r.videoId === 'BBBBBBBBBBB',
-    ),
-  ).toMatchObject({
-    waitingForTurn: true,
-    retryWhenAdmitted: true,
-    jobId: 'terminal-existing',
-  });
+  api.import.mockImplementation(() => new Promise(() => {}));
   const reloaded = new BackgroundImports(
     () => {},
     async () => {},
     storage,
   );
   reloaded.resume();
-  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(2));
-  expect(reloaded.isWaiting('BBBBBBBBBBB')).toBe(true);
-  release({ prepared: { record: { videoId: 'AAAAAAAAAAA' } } });
-  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(3));
-  expect(api.import.mock.calls[2][2]).toMatchObject({
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(1));
+  expect(api.import.mock.calls[0][2]).toMatchObject({
     jobId: 'terminal-existing',
     retryFailed: true,
     transportVersion: 2,
@@ -364,16 +439,28 @@ it('queued explicit retry intent survives reload behind an active job and is con
   expect(saved.waitingForTurn).toBeUndefined();
   expect(saved.retryWhenAdmitted).toBeUndefined();
   // An interrupted admitted request has uncertain effects and must not replay retry authority.
+  const interruptedStorage = store(
+    JSON.stringify([
+      {
+        videoId: 'CCCCCCCCCCC',
+        state: 'loading',
+        jobId: 'terminal-existing',
+        transportVersion: 2,
+        audioFormat: 'orvio-opus-v1',
+      },
+    ]),
+  );
   const interrupted = new BackgroundImports(
     () => {},
     async () => {},
-    storage,
+    interruptedStorage,
   );
   interrupted.resume();
-  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(4));
-  expect(api.import.mock.calls[3][2]).toMatchObject({
+  await vi.waitFor(() => expect(api.import).toHaveBeenCalledTimes(2));
+  expect(api.import.mock.calls[1][2]).toMatchObject({
     jobId: 'terminal-existing',
     retryFailed: false,
+    transportVersion: 2,
   });
 });
 it('a v2 job handle must persist before the importer can advance any known job', async () => {
@@ -522,7 +609,7 @@ it('completion transfer timeout keeps exact known handle and accurate failure fo
   }
 });
 
-it('paused paint times out, releases active admission, starts next queued row, and makes no external request', async () => {
+it('paused paint times out for all concurrent rows and makes no external request', async () => {
   vi.useFakeTimers();
   try {
     const frames = new Map<number, FrameRequestCallback>();
@@ -536,19 +623,17 @@ it('paused paint times out, releases active admission, starts next queued row, a
       pending = new BackgroundImports(() => {}, complete, store());
     pending.enqueue('AAAAAAAAAAA');
     pending.enqueue('BBBBBBBBBBB');
-    expect(pending.isWaiting('BBBBBBBBBBB')).toBe(true);
-    await vi.advanceTimersByTimeAsync(90000);
-    expect(pending.rows.get('AAAAAAAAAAA')).toMatchObject({
-      state: 'error',
-      error: 'request_timeout',
-    });
     expect(pending.isWaiting('BBBBBBBBBBB')).toBe(false);
-    expect(frames.size).toBe(1);
+    expect(frames.size).toBe(2);
+    await vi.advanceTimersByTimeAsync(90000);
+    for (const id of ['AAAAAAAAAAA', 'BBBBBBBBBBB'])
+      expect(pending.rows.get(id)).toMatchObject({
+        state: 'error',
+        error: 'request_timeout',
+      });
+    expect(frames.size).toBe(0);
     expect(api.import).not.toHaveBeenCalled();
     expect(complete).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(90000);
-    expect(pending.rows.get('BBBBBBBBBBB')?.state).toBe('error');
-    expect(frames.size).toBe(0);
     expect(vi.getTimerCount()).toBe(0);
   } finally {
     vi.useRealTimers();

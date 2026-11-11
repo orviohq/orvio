@@ -44,8 +44,14 @@
       songs[0];
     const image = (value) => {
       if (typeof value !== 'string') return '/wallpapers/first-light.png';
-      const url = new URL(value, location.origin);
-      if (url.search || url.hash) return '/wallpapers/first-light.png';
+      let url;
+      try {
+        url = new URL(value, location.origin);
+      } catch {
+        return '/wallpapers/first-light.png';
+      }
+      if (url.search || url.hash || url.username || url.password)
+        return '/wallpapers/first-light.png';
       return (url.origin === location.origin &&
         /^\/wallpapers\/[a-z0-9-]+\.png$/.test(url.pathname)) ||
         (url.origin === 'https://i.ytimg.com' &&
@@ -54,6 +60,26 @@
           ))
         ? url.href
         : '/wallpapers/first-light.png';
+    };
+    // Even valid legacy CDN URLs are lookup keys, never first-paint requests.
+    const localImage = (value) => {
+      const url = image(value);
+      return url.startsWith('https://i.ytimg.com/')
+        ? '/wallpapers/first-light.png'
+        : url;
+    };
+    const artwork = new Map();
+    const queueArtwork = (song, apply) => {
+      const videoId =
+        typeof song.artVideoId === 'string' &&
+        /^[A-Za-z0-9_-]{11}$/.test(song.artVideoId)
+          ? song.artVideoId
+          : image(song.art).match(
+              /^https:\/\/i\.ytimg\.com\/vi\/([A-Za-z0-9_-]{11})\//,
+            )?.[1];
+      if (!videoId) return;
+      if (!artwork.has(videoId)) artwork.set(videoId, []);
+      artwork.get(videoId).push(apply);
     };
     const set = (selector, value) =>
       (root.querySelector(selector).textContent = text(value));
@@ -115,6 +141,14 @@
       if (cache.fragments?.[selector])
         root.querySelector(target).replaceWith(tree(cache.fragments[selector]));
     }
+    // Cached controls are display-only, but retain the live family palette.
+    const families = ['low', 'mid', 'high', 'sc'];
+    const familyLabels = ['NM', 'HD', 'MX', 'SC'];
+    root.querySelectorAll('#cached-difficulty button').forEach((button, index) => {
+      if (!families[index]) return;
+      button.dataset.diff = families[index];
+      button.textContent = familyLabels[index];
+    });
     set('[data-cached-title]', selected.title);
     set('[data-cached-subtitle]', selected.subtitle);
     set('[data-cached-genre]', text(selected.meta).split('·')[0].trim());
@@ -142,8 +176,13 @@
     const add = root.querySelector('#cached-add-youtube');
     add.setAttribute('aria-label', text(cache.addLabel) || 'Add YouTube');
     add.title = text(cache.addLabel) || 'Add YouTube';
-    root.querySelector('.selected-art').style.backgroundImage =
-      `url("${image(selected.art)}"), url("/wallpapers/first-light.png")`;
+    const hero = root.querySelector('.selected-art');
+    const paintHero = (url) => {
+      hero.style.backgroundImage =
+        `url("${url}"), url("/wallpapers/first-light.png")`;
+    };
+    paintHero(localImage(selected.art));
+    queueArtwork(selected, paintHero);
     const container = root.querySelector('.cached-songs');
     for (const song of songs) {
       const row = document.createElement('div');
@@ -161,9 +200,13 @@
       art.className = 'youtube-cover';
       art.alt = '';
       art.referrerPolicy = 'no-referrer';
-      art.src = image(song.art);
-      if (song.external) cover.append(art);
-      else {
+      art.src = localImage(song.art);
+      if (song.external) {
+        cover.append(art);
+        queueArtwork(song, (url) => {
+          art.src = url;
+        });
+      } else {
         const orb = document.createElement('span');
         orb.className = 'orb';
         cover.append(orb);
@@ -176,8 +219,23 @@
       }
       const copy = document.createElement('span');
       copy.className = 'song-copy';
+      const metadata = document.createElement('small');
+      const meta = document.createElement('span');
+      meta.className = 'song-meta';
+      // Accept both pre-relocation and intermediate v1 display caches.
+      const embeddedTime = text(song.meta).match(/\s*·\s*(\d+:\d{2})\s*$/);
+      meta.textContent = text(song.meta).replace(/\s*·\s*\d+:\d{2}\s*$/, '');
+      const duration = document.createElement('span');
+      duration.className = 'song-duration';
+      duration.textContent = text(song.time, 100).trim() || embeddedTime?.[1] || '';
+      metadata.append(meta);
+      if (duration.textContent) {
+        const separator = document.createElement('i');
+        separator.textContent = '·';
+        metadata.append(' ', separator, ' ', duration);
+      }
+      copy.append(metadata);
       for (const [tag, value, className] of [
-        ['small', song.meta, ''],
         ['strong', song.title, ''],
         ['span', song.subtitle, ''],
         ['span', song.notes, 'song-note-count'],
@@ -187,15 +245,10 @@
         node.className = className;
         copy.append(node);
       }
-      const time = document.createElement('span');
-      time.className = 'song-time';
       const level = document.createElement('em');
       level.className = 'song-level';
-      level.textContent = text(song.level, 50);
-      const arrow = document.createElement('b');
-      arrow.textContent = '↗';
-      time.append(level, document.createTextNode(text(song.time, 100)), arrow);
-      row.append(cover, copy, time);
+      level.textContent = text(song.level, 50).match(/(?:^|\s)(\d+|--)$/)?.[1] || '--';
+      row.append(cover, copy, level);
       container.append(row);
     }
     root.classList.toggle(
@@ -216,6 +269,58 @@
     ) {
       container.scrollTop = selection.scroll;
       root.scrollTop = selection.pageScroll;
+    }
+    if (artwork.size) {
+      const urls = new Set();
+      const observer = new MutationObserver(() => {
+        if (root.isConnected) return;
+        observer.disconnect();
+        for (const url of urls) URL.revokeObjectURL(url);
+        urls.clear();
+      });
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
+      // Keep cache name, candidate order, MIME/size limits in sync with
+      // youtube-artwork.ts. This pre-parse script cannot import the game module.
+      // CacheStorage reads are local: no fetch, IDB, or playback authority here.
+      const cachePromise = (async () => {
+        try {
+          return await caches.open('orvio-youtube-art-v1');
+        } catch {}
+      })();
+      for (const [videoId, apply] of artwork) {
+        void (async () => {
+          const artCache = await cachePromise;
+          for (const size of ['maxresdefault', 'mqdefault', 'hqdefault']) {
+            if (!root.isConnected) return;
+            let objectUrl;
+            try {
+              const key = `https://i.ytimg.com/vi/${videoId}/${size}.jpg`;
+              const response =
+                (await artCache?.match(key)) ?? (await caches.match(key));
+              if (
+                !response?.ok ||
+                !/^image\/(jpeg|png|webp)(?:;|$)/i.test(
+                  response.headers.get('content-type') ?? '',
+                )
+              )
+                continue;
+              const blob = await response.blob();
+              if (!root.isConnected) return;
+              if (!blob.size || blob.size > 4 * 1024 * 1024) continue;
+              objectUrl = URL.createObjectURL(blob);
+              for (const paint of apply) paint(objectUrl);
+              urls.add(objectUrl);
+              return;
+            } catch {
+              if (objectUrl) URL.revokeObjectURL(objectUrl);
+              // Cache access is optional; keep the synchronously painted fallback.
+            }
+          }
+        })();
+      }
     }
   } catch {
     discard();

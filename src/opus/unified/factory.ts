@@ -7,6 +7,19 @@ import {
   PUBLIC_CANDIDATE_LOADED_IDENTITY as PRIVATE_LOADED_IDENTITY,
 } from './release-binding.generated.mjs';
 import { createProduction468SplitProjectionReader } from './split-projection-reader.mjs';
+import { createProductionLegacySplitProjectionReader } from './legacy-split-projection-reader.mjs';
+import {
+  findLegacySourceRoots,
+  resolveVerifiedLegacySource,
+} from './legacy-source-registry.mjs';
+import {
+  DEFAULT_LEGACY_MANIFEST_ID,
+  recognizedLegacyManifestId,
+} from '../legacy-source-inventory.mjs';
+import { createLegacyCurrentnessExchange } from '../opus35-legacy-currentness-exchange.mjs';
+import { createBuildOwnedLegacySidecarAdder } from '../opus35-legacy-sidecar-add.mjs';
+import { createBuildOwnedLegacyFrozenRecordRestorer } from '../opus35-legacy-frozen-restore.mjs';
+import { restoreOpus35Record } from '../opus35-api';
 import { verifyUnifiedInWorker } from './derived-verifier.mjs';
 import { generateUnifiedExtensionOwned } from './owned-loader.mjs';
 import { createOpus468AdaptiveDerivedVerifier } from '../opus468-adaptive-derived-adapter.mjs';
@@ -38,13 +51,46 @@ import {
 export function createUnified468Candidate({
   readArtifact,
   exchangeProjection,
+  legacyConfig,
 }: any) {
   if (
     typeof readArtifact !== 'function' ||
     typeof exchangeProjection !== 'function'
   )
     throw Error('general_build_capabilities');
+  if (
+    legacyConfig !== undefined &&
+    (!legacyConfig ||
+      typeof legacyConfig !== 'object' ||
+      Array.isArray(legacyConfig) ||
+      typeof legacyConfig.endpoint !== 'string' ||
+      !legacyConfig.endpoint ||
+      Object.keys(legacyConfig).some(
+        (k) => k !== 'endpoint' && k !== 'fetchImpl',
+      ) ||
+      (legacyConfig.fetchImpl !== undefined &&
+        typeof legacyConfig.fetchImpl !== 'function'))
+  )
+    throw Error('general_legacy_config');
+  const legacyExchange = legacyConfig
+    ? createLegacyCurrentnessExchange({
+        endpoint: legacyConfig.endpoint,
+        ...(legacyConfig.fetchImpl
+          ? { fetchImpl: legacyConfig.fetchImpl }
+          : {}),
+      })
+    : null;
   const lifetime = new AbortController();
+  const operationSignals = new WeakMap<AbortSignal, AbortSignal>();
+  const operationSignal = (signal?: AbortSignal) => {
+    if (!signal) return AbortSignal.any([lifetime.signal]);
+    const prior = operationSignals.get(signal);
+    if (prior) return prior;
+    const merged = AbortSignal.any([signal, lifetime.signal]);
+    operationSignals.set(signal, merged);
+    operationSignals.set(merged, merged);
+    return merged;
+  };
   let revoked = false,
     generation = 0,
     pending: AbortController | undefined;
@@ -55,13 +101,15 @@ export function createUnified468Candidate({
   const verifyDerivedRecord = createOpus468AdaptiveDerivedVerifier({
     resolveArtifacts: resolveOpus468LocalArtifacts,
     verifyInWorker: verifyUnifiedInWorker,
+    operationWorkerReuse: true,
+  });
+  const consumerOptions = Object.freeze({
+    policyRows: Object.freeze([PRIVATE_POLICY]),
+    loadedProducerIdentity: PRIVATE_LOADED_IDENTITY,
+    verifyDerivedRecord,
   });
   const native = createProduction468SplitProjectionReader({
-    consumerOptions: Object.freeze({
-      policyRows: Object.freeze([PRIVATE_POLICY]),
-      loadedProducerIdentity: PRIVATE_LOADED_IDENTITY,
-      verifyDerivedRecord,
-    }),
+    consumerOptions,
     exchangeProjection: async (q: any, { signal }: any) => {
       check(signal);
       const result = await waitAcquired(
@@ -72,14 +120,35 @@ export function createUnified468Candidate({
       return structuredClone(result);
     },
   });
+  const legacyReader = legacyExchange
+    ? createProductionLegacySplitProjectionReader({
+        consumerOptions,
+        exchangeCurrentness: async (q: any, { signal }: any) => {
+          check(signal);
+          const result = await waitAcquired(
+            legacyExchange.exchange(structuredClone(q), { signal }),
+            signal,
+          );
+          check(signal);
+          return structuredClone(result);
+        },
+      })
+    : null;
   const reader = Object.freeze({
     readChart: async (r: any, d: any, c: any, { signal }: any = {}) => {
       check(signal);
-      const merged = signal
-        ? AbortSignal.any([signal, lifetime.signal])
-        : lifetime.signal;
+      const merged = operationSignal(signal);
+      const registered = await resolveVerifiedLegacySource({
+        descriptorBytes: d,
+        baseRecord: JSON.parse(r?.baseSourceRecordJson),
+        signal: merged,
+      });
+      check(merged);
+      if (registered && !legacyReader)
+        throw Error('general_legacy_unavailable');
+      const active = registered ? legacyReader! : native;
       const result = await waitAcquired(
-        native.readChart(r, d, c, { signal: merged }),
+        active.readChart(r, d, c, { signal: merged }),
         merged,
       );
       check(merged);
@@ -115,6 +184,36 @@ export function createUnified468Candidate({
     generation++;
     pending?.abort(Error('general_superseded'));
     pending = undefined;
+  };
+  let legacyAdderPromise: Promise<any> | undefined,
+    legacyRestorerPromise: Promise<any> | undefined;
+  const getLegacyAdder = () => {
+    if (!legacyConfig) return null;
+    if (!legacyAdderPromise)
+      legacyAdderPromise = createBuildOwnedLegacySidecarAdder({
+        currentnessEndpoint: legacyConfig.endpoint,
+        ...(legacyConfig.fetchImpl
+          ? { fetchImpl: legacyConfig.fetchImpl }
+          : {}),
+      }).catch((error: any) => {
+        legacyAdderPromise = undefined;
+        throw error;
+      });
+    return legacyAdderPromise;
+  };
+  const getLegacyRestorer = () => {
+    if (!legacyConfig) return null;
+    if (!legacyRestorerPromise)
+      legacyRestorerPromise = createBuildOwnedLegacyFrozenRecordRestorer({
+        currentnessEndpoint: legacyConfig.endpoint,
+        ...(legacyConfig.fetchImpl
+          ? { fetchImpl: legacyConfig.fetchImpl }
+          : {}),
+      }).catch((error: any) => {
+        legacyRestorerPromise = undefined;
+        throw error;
+      });
+    return legacyRestorerPromise;
   };
   const prepare = createAcquiredOpusV2Preparer({ readArtifact });
   const pinPrepared = async (
@@ -182,9 +281,7 @@ export function createUnified468Candidate({
     parseSharedV7: parseV7Bootstrap,
     async exportSharedV7(sessionKey: string, { signal }: any = {}) {
       check(signal);
-      const merged = signal
-        ? AbortSignal.any([signal, lifetime.signal])
-        : lifetime.signal;
+      const merged = operationSignal(signal);
       const source = await frontend.exportShare(sessionKey, { signal: merged });
       check(merged);
       return encodeV7SharedReplay(source, makeCodec(), { signal: merged });
@@ -192,9 +289,7 @@ export function createUnified468Candidate({
     async makeTransientSharedView(candidate: any, { signal }: any = {}) {
       check(signal);
       const captured = structuredClone(candidate),
-        merged = signal
-          ? AbortSignal.any([signal, lifetime.signal])
-          : lifetime.signal;
+        merged = operationSignal(signal);
       await validateRecoveredV7(captured, makeCodec(), { signal: merged });
       check(merged);
       return createTransient468View(captured, {
@@ -206,6 +301,86 @@ export function createUnified468Candidate({
       revoked = true;
       cancel();
       lifetime.abort(Error('general_revoked'));
+    },
+    async restoreSourceRecord(input: any, { signal: callerSignal }: any = {}) {
+      const record = structuredClone(input);
+      check(callerSignal);
+      const signal = operationSignal(callerSignal);
+      const registered = findLegacySourceRoots({
+        videoId: record.videoId,
+        encodedAudioSha256: record.encodedAudioSha256,
+        audioDescriptorSha256: record.audioDescriptorSha256,
+        audioSha256: record.audioSha256,
+        decoderWasmSha256: record.decoderWasmSha256,
+        frames: record.frames,
+        sampleRate: record.sampleRate,
+        channels: 2,
+      });
+      if (!registered) return restoreOpus35Record(record, signal);
+      if (!legacyConfig || !legacyReader)
+        throw Error('general_legacy_unavailable');
+      const restorer = await waitAcquired(getLegacyRestorer(), signal);
+      check(signal);
+      return restorer({ record, manifestId: registered.manifestId, signal });
+    },
+    async consumeFixedLegacySidecar(
+      input: any,
+      { signal: callerSignal }: any = {},
+    ) {
+      const captured = structuredClone(input);
+      check(callerSignal);
+      const manifestId =
+        captured.manifestId === undefined
+          ? DEFAULT_LEGACY_MANIFEST_ID
+          : captured.manifestId;
+      if (!recognizedLegacyManifestId(manifestId))
+        throw Error('general_legacy_manifest');
+      if (!legacyReader || !legacyConfig)
+        throw Error('general_legacy_unavailable');
+      if (
+        ![4, 6, 8].includes(captured.selection?.lanes) ||
+        !['low', 'mid', 'high', 'sc'].includes(captured.selection?.difficulty)
+      )
+        throw Error('general_selection');
+      cancel();
+      const token = generation,
+        c = new AbortController();
+      pending = c;
+      const signal = AbortSignal.any([
+        lifetime.signal,
+        c.signal,
+        ...(callerSignal ? [callerSignal] : []),
+      ]);
+      try {
+        const adder = await waitAcquired(getLegacyAdder(), signal);
+        check(signal);
+        if (token !== generation) throw Error('general_superseded');
+        const added = await waitAcquired(adder({ manifestId, signal }), signal);
+        check(signal);
+        if (token !== generation) throw Error('general_superseded');
+        if (
+          !added ||
+          added.kind !== 'orvio-opus-v1' ||
+          added.restored !== false ||
+          !added.record
+        )
+          throw Error('general_legacy_sidecar');
+        return await pinPrepared(
+          { record: added.record },
+          captured.selection,
+          {
+            title: String(
+              captured.metadata?.title ?? 'YouTube automatic chart',
+            ).slice(0, 300),
+            ...(captured.metadata?.author
+              ? { author: String(captured.metadata.author).slice(0, 100) }
+              : {}),
+          },
+          signal,
+        );
+      } finally {
+        if (pending === c) pending = undefined;
+      }
     },
     async extendCachedBase(input: any, { signal: callerSignal }: any = {}) {
       const captured = structuredClone(input);

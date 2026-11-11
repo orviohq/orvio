@@ -1,7 +1,13 @@
+import {
+  openSourceInNewTab,
+  type LibrarySourceAction,
+} from './library-source-open';
+
 export interface LibraryMenuTarget {
   label: string;
   remove: () => void;
   share?: { label: string; run: () => void };
+  source?: LibrarySourceAction;
 }
 /** Actions bind to the context row, independently of the selected preview. */
 export function libraryContextMenu(
@@ -18,13 +24,18 @@ export function libraryContextMenu(
   const share = document.createElement('button');
   share.type = 'button';
   share.setAttribute('role', 'menuitem');
+  const source = document.createElement('button');
+  source.type = 'button';
+  source.setAttribute('role', 'menuitem');
+  source.dataset.action = 'source';
   share.dataset.action = 'share';
   button.dataset.action = 'remove';
-  menu.append(share, button);
+  menu.append(source, share, button);
   document.body.append(menu);
   let anchor: HTMLElement | undefined,
     action: (() => void) | undefined,
-    shareAction: (() => void) | undefined;
+    shareAction: (() => void) | undefined,
+    sourceAction: LibrarySourceAction | undefined;
   let anchoredAt: { top: number; left: number } | undefined;
   function close(focus = false) {
     if (!menu.matches(':popover-open')) return;
@@ -32,6 +43,7 @@ export function libraryContextMenu(
     if (focus) anchor?.focus();
     action = undefined;
     shareAction = undefined;
+    sourceAction = undefined;
   }
   function show(row: HTMLElement, x: number, y: number) {
     const target = resolve(row);
@@ -40,6 +52,9 @@ export function libraryContextMenu(
     anchor = row;
     action = target.remove;
     shareAction = target.share?.run;
+    sourceAction = target.source;
+    source.hidden = !target.source;
+    source.textContent = target.source?.label ?? '';
     share.hidden = !target.share;
     share.textContent = target.share?.label ?? '';
     button.textContent = target.label;
@@ -50,9 +65,16 @@ export function libraryContextMenu(
       Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
     const anchorRect = row.getBoundingClientRect();
     anchoredAt = { top: anchorRect.top, left: anchorRect.left };
-    (share.hidden ? button : share).focus({ preventScroll: true });
+    (share.hidden ? (source.hidden ? button : source) : share).focus({
+      preventScroll: true,
+    });
     return true;
   }
+  source.onclick = () => {
+    const work = sourceAction;
+    close();
+    if (work) openSourceInNewTab(work.url);
+  };
   share.onclick = () => {
     const work = shareAction;
     close();
@@ -71,7 +93,7 @@ export function libraryContextMenu(
     } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
       e.preventDefault();
       e.stopPropagation();
-      const items = [share, button].filter((x) => !x.hidden);
+      const items = [source, share, button].filter((x) => !x.hidden);
       const current = items.indexOf(
         document.activeElement as HTMLButtonElement,
       );
@@ -102,9 +124,21 @@ export function libraryContextMenu(
       e.stopPropagation();
     }
   });
-  document.addEventListener('pointerdown', (e) => {
-    if (!menu.contains(e.target as Node)) close();
-  });
+  document.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (menu.contains(e.target as Node)) return;
+      const bounds = menu.getBoundingClientRect();
+      if (
+        e.clientX < bounds.left - 4 ||
+        e.clientX > bounds.right + 4 ||
+        e.clientY < bounds.top - 4 ||
+        e.clientY > bounds.bottom + 4
+      )
+        close();
+    },
+    true, // Dismiss even when an outside control stops propagation.
+  );
   window.addEventListener('resize', () => close());
   window.addEventListener(
     'scroll',

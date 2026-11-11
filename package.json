@@ -1,13 +1,16 @@
 {
   "name": "orvio",
-  "version": "0.3.4",
+  "version": "0.3.27",
   "private": true,
   "type": "module",
   "license": "MIT",
   "scripts": {
     "dev": "astro dev --host 0.0.0.0",
     "build": "tsc --noEmit && astro build && node scripts/build-pwa.mjs",
-    "test": "vitest run",
+    "test": "npm run test:youtube-direct && npm run test:allkeys-node && npm run test:youtube-origin && vitest run",
+    "test:allkeys-node": "node --experimental-strip-types --test tests/direct-local-allkeys-store.test.ts tests/direct-local-allkeys-worker.test.ts",
+    "test:youtube-direct": "node --experimental-transform-types --test tests/youtube-direct-api.test.ts",
+    "test:youtube-origin": "node --experimental-transform-types --test tests/youtube-origin-config.test.ts",
     "check": "prettier --check . && tsc --noEmit",
     "format": "prettier --write .",
     "preview": "astro preview --host 0.0.0.0",

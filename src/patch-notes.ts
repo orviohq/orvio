@@ -1,3 +1,26 @@
+import { PATCH_V0327 } from './patch-notes-v0327';
+import { PATCH_V0326 } from './patch-notes-v0326';
+import { PATCH_V0325 } from './patch-notes-v0325';
+import { PATCH_V0324 } from './patch-notes-v0324';
+import { PATCH_V0323 } from './patch-notes-v0323';
+import { PATCH_V0322 } from './patch-notes-v0322';
+import { PATCH_V0321 } from './patch-notes-v0321';
+import { PATCH_V0320 } from './patch-notes-v0320';
+import { PATCH_V0319 } from './patch-notes-v0319';
+import { PATCH_V0318 } from './patch-notes-v0318';
+import { PATCH_V0317 } from './patch-notes-v0317';
+import { PATCH_V0316 } from './patch-notes-v0316';
+import { PATCH_V0315 } from './patch-notes-v0315';
+import { PATCH_V0314 } from './patch-notes-v0314';
+import { PATCH_V0313 } from './patch-notes-v0313';
+import { PATCH_V0312 } from './patch-notes-v0312';
+import { PATCH_V0311 } from './patch-notes-v0311';
+import { PATCH_V0310 } from './patch-notes-v0310';
+import { PATCH_V0309 } from './patch-notes-v0309';
+import { PATCH_V0308 } from './patch-notes-v0308';
+import { PATCH_V0307 } from './patch-notes-v0307';
+import { PATCH_V0306 } from './patch-notes-v0306';
+import { PATCH_V0305 } from './patch-notes-v0305';
 import { PATCH_V0304 } from './patch-notes-v0304';
 import { PATCH_V0303 } from './patch-notes-v0303';
 import { PATCH_V0302 } from './patch-notes-v0302';
@@ -536,6 +559,21 @@ export const PATCH_LABELS: Record<
   { title: string; back: string; scope: string }
 > = { ...BASE_PATCH_LABELS, ...EXTRA_PATCH_LABELS };
 export const PATCHES = [
+  PATCH_V0327, PATCH_V0326, PATCH_V0325, PATCH_V0324,
+  PATCH_V0323, PATCH_V0322, PATCH_V0321, PATCH_V0320, PATCH_V0319,
+  PATCH_V0318,
+  PATCH_V0317,
+  PATCH_V0316, PATCH_V0315,
+  PATCH_V0314,
+  PATCH_V0313,
+  PATCH_V0312,
+  PATCH_V0311,
+  PATCH_V0310,
+  PATCH_V0309,
+  PATCH_V0308,
+  PATCH_V0307,
+  PATCH_V0306,
+  PATCH_V0305,
   PATCH_V0304,
   PATCH_V0303,
   PATCH_V0302,

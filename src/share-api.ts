@@ -1,5 +1,6 @@
 import { V5_MAX_FRAGMENT_CHARS } from './external-share';
 import { queryClient, queryKeys, runMutation } from './query-client';
+import { assertRuntimeFetch } from './client-only-runtime';
 function fragmentLimit(fragment: string) {
   return fragment.startsWith('v=5&d=') ||
     fragment.startsWith('v=6&d=') ||
@@ -19,6 +20,7 @@ export async function saveSharedReplay(
 ) {
   if (new TextEncoder().encode(fragment).length > fragmentLimit(fragment))
     throw new ShareError(413);
+  assertRuntimeFetch(SHARE_API + '/v1/replays', 'POST');
   return runMutation(['save-shared-replay'], async () => {
     const response = await fetch(SHARE_API + '/v1/replays', {
       method: 'POST',
@@ -46,10 +48,9 @@ async function fetchSharedReplay(
   id: string,
   signal: AbortSignal,
 ): Promise<{ fragment: string; expiresAt: string }> {
-  const response = await fetch(
-    SHARE_API + '/v1/replays/' + encodeURIComponent(id),
-    { signal, cache: 'no-store' },
-  );
+  const url = SHARE_API + '/v1/replays/' + encodeURIComponent(id);
+  assertRuntimeFetch(url);
+  const response = await fetch(url, { signal, cache: 'no-store' });
   if (!response.ok) throw new ShareError(response.status);
   const data = await response.json();
   if (
@@ -79,5 +80,6 @@ export async function loadSharedReplay(id: string) {
       ),
     staleTime: Infinity,
     gcTime: Infinity,
+    retry: false,
   });
 }

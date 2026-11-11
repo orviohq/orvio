@@ -1,0 +1,2 @@
+import {test,expect} from '@playwright/test';
+test('actual current game options hover creates tooltip',async({page})=>{await page.goto('/select/');await page.locator('#open-game-options').click();const option=page.locator('#game-options .icon-options').filter({has:page.locator('[data-value=off]')}).first();const pixel=page.locator('#game-options [data-value=pixel2]');await pixel.hover();await expect(page.locator('#game-option-tooltip')).toBeVisible();await expect(page.locator('#game-option-tooltip')).toContainText(/combo|콤보/);});

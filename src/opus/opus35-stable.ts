@@ -4,6 +4,11 @@ import {
 } from './opus-descriptor.mjs';
 import { readOpus35Artifact } from './opus35-api';
 import { verifyOpusRecord, type OpusRecord } from './opus-record';
+import {
+  songShareBodyAtStage,
+  songShareFetchAtStage,
+  songShareSaveAtStage,
+} from '../song-share-save-diagnostic';
 async function readBounded(
   r: Response,
   record: OpusRecord,
@@ -68,35 +73,44 @@ export async function readStableOpus35Artifacts(
   response: Response,
   signal: AbortSignal,
 ) {
-  const descriptorBytes = await readBounded(
-      response,
+  const descriptorBytes = await songShareBodyAtStage('artifact_verify', () =>
+      readBounded(response, record, 'descriptor', 32768, undefined, signal),
+    ),
+    descriptor = await songShareSaveAtStage('artifact_verify', () =>
+      parseVerifiedDescriptor(
+        descriptorBytes,
+        record.audioDescriptorSha256,
+      ),
+    );
+  await songShareSaveAtStage('artifact_verify', async () => {
+    if (
+      !(await verifyOpusRecord(
+        record,
+        descriptor,
+        record.audioDescriptorSha256,
+      ))
+    )
+      throw Error('opus35_stable_binding');
+  });
+  const audioResponse = await songShareFetchAtStage('audio_fetch', () =>
+    readOpus35Artifact(
+      { ...record, kind: 'audio' },
+      { method: 'GET', signal },
+    ),
+  );
+  const bytes = await songShareBodyAtStage('artifact_verify', () =>
+    readBounded(
+      audioResponse,
       record,
-      'descriptor',
-      32768,
-      undefined,
+      'audio',
+      6000000,
+      descriptor.oggBytes,
       signal,
     ),
-    descriptor = await parseVerifiedDescriptor(
-      descriptorBytes,
-      record.audioDescriptorSha256,
-    );
-  if (
-    !(await verifyOpusRecord(record, descriptor, record.audioDescriptorSha256))
-  )
-    throw Error('opus35_stable_binding');
-  const audioResponse = await readOpus35Artifact(
-    { ...record, kind: 'audio' },
-    { method: 'GET', signal },
   );
-  const bytes = await readBounded(
-    audioResponse,
-    record,
-    'audio',
-    6000000,
-    descriptor.oggBytes,
-    signal,
+  await songShareSaveAtStage('artifact_verify', () =>
+    verifyEncodedParts(bytes, descriptor),
   );
-  await verifyEncodedParts(bytes, descriptor);
   return {
     bytes,
     descriptorBytes,

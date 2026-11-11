@@ -1,4 +1,5 @@
 import { waitImportPaint } from './import-paint';
+import { recordFailure } from './status-failures';
 import { createImportBudget } from './import-budget';
 import { earlyYoutubeMetadata } from './early-youtube-metadata';
 import { IMPORT_STAGES, type ImportStage } from './import-progress';
@@ -24,8 +25,20 @@ export interface PendingImport {
   error?: AudioErrorCode;
   failure?: AudioJobError;
 }
+export type YoutubeImportRunner<
+  TResult extends { title?: string } = Awaited<ReturnType<typeof importYoutube>>,
+> = (
+  input: string,
+  signal: AbortSignal,
+  options: NonNullable<Parameters<typeof importYoutube>[2]> & {
+    onVerified?: () => void;
+    onMetadata?: (metadata: { title: string; author?: string }) => void;
+  },
+) => Promise<TResult>;
 const KEY = 'orvio.pending-imports.v1';
-export class BackgroundImports {
+export class BackgroundImports<
+  TResult extends { title?: string } = Awaited<ReturnType<typeof importYoutube>>,
+> {
   readonly rows = new Map<string, PendingImport>();
   private active = new Set<string>();
   private queue: { row: PendingImport; retryFailed: boolean }[] = [];
@@ -34,10 +47,9 @@ export class BackgroundImports {
   }
   constructor(
     private changed: () => void,
-    private complete: (
-      result: Awaited<ReturnType<typeof importYoutube>>,
-    ) => Promise<void>,
+    private complete: (result: TResult) => Promise<void>,
     private storage: Pick<Storage, 'getItem' | 'setItem'> = localStorage,
+    private directImport?: YoutubeImportRunner<TResult>,
   ) {
     try {
       const data = JSON.parse(storage.getItem(KEY) ?? '[]');
@@ -128,7 +140,7 @@ export class BackgroundImports {
     const row: PendingImport = {
       videoId,
       state: 'loading',
-      stage: this.active.size ? 'queued' : 'checking',
+      stage: 'checking',
       waitingForTurn: true,
       ...(previous?.state === 'error' && previous.jobId
         ? { retryWhenAdmitted: true as const }
@@ -149,25 +161,36 @@ export class BackgroundImports {
     }
     this.changed();
     // Start optional display metadata immediately, without delaying admission.
-    void earlyYoutubeMetadata(videoId).then((metadata) => {
-      if (
-        !metadata ||
-        this.rows.get(videoId) !== row ||
-        row.state !== 'loading'
-      )
-        return;
-      // Job metadata, when already received, wins over this early display hint.
-      if (!row.title) row.title = metadata.title;
-      row.thumbnailUrl = metadata.thumbnailUrl;
-      this.changed();
-    });
+    if (!this.directImport)
+      void earlyYoutubeMetadata(videoId).then((metadata) => {
+        if (
+          !metadata ||
+          this.rows.get(videoId) !== row ||
+          row.state !== 'loading'
+        )
+          return;
+        // Job metadata, when already received, wins over this early display hint.
+        if (!row.title) row.title = metadata.title;
+        row.thumbnailUrl = metadata.thumbnailUrl;
+        this.changed();
+      });
     void this.run(row, previous?.state === 'error');
     return videoId;
+  }
+  retry(videoId: string) {
+    if (
+      this.rows.get(videoId)?.state !== 'error' ||
+      this.active.has(videoId) ||
+      this.isWaiting(videoId)
+    )
+      return;
+    return this.enqueue(videoId);
   }
   resume() {
     for (const row of this.rows.values())
       if (row.state === 'loading') {
-        if (row.jobId || row.waitingForTurn) void this.run(row);
+        if (this.directImport || row.jobId || row.waitingForTurn)
+          void this.run(row);
         else {
           row.state = 'error';
           row.error = 'request_timeout';
@@ -197,25 +220,19 @@ export class BackgroundImports {
   ) {
     if (this.active.has(row.videoId) || this.isWaiting(row.videoId)) return;
     this.queue.push({ row, retryFailed });
-    if (this.active.size) {
-      row.stage = 'queued';
-      this.changed();
-    }
     this.drain();
   }
   private drain() {
-    if (this.active.size) return;
-    const next = this.queue.shift();
-    if (!next) return;
-    if (this.rows.get(next.row.videoId) !== next.row) {
-      this.drain();
-      return;
+    for (;;) {
+      const next = this.queue.shift();
+      if (!next) return;
+      if (this.rows.get(next.row.videoId) !== next.row) continue;
+      this.active.add(next.row.videoId);
+      void this.perform(next.row, next.retryFailed);
     }
-    this.active.add(next.row.videoId);
-    void this.perform(next.row, next.retryFailed);
   }
   private async perform(row: PendingImport, retryFailed: boolean) {
-    const budget = createImportBudget();
+    const budget = createImportBudget(this.directImport ? 195000 : 90000);
     try {
       // Clear the durable never-started marker BEFORE any external effect.
       // If this write fails, do not start or resume a request.
@@ -226,11 +243,19 @@ export class BackgroundImports {
       this.changed();
       // Let the immediate pending row paint before cached audio/chart work starts.
       await waitImportPaint(budget.signal);
-      const result = await importYoutube(row.videoId, budget.signal, {
+      const options: Parameters<YoutubeImportRunner<TResult>>[2] = {
         jobId: row.jobId,
         transportVersion: row.transportVersion,
         audioFormat: row.audioFormat,
         retryFailed,
+        ...(this.directImport ? { onVerified: () => budget.verified() } : {}),
+        onMetadata: (metadata) => {
+          if (budget.signal.aborted || this.rows.get(row.videoId) !== row || row.state !== 'loading') return;
+          if (typeof metadata.title !== 'string' || !metadata.title.trim() || metadata.title.length > 300 || /[\u0000-\u001f\u007f]/.test(metadata.title)) return;
+          row.title = metadata.title.trim();
+          try { this.persist(); } catch { /* Keep optional display hint in memory. */ }
+          this.changed();
+        },
         onStage: (stage) => {
           budget.stage(stage);
           row.stage = stage;
@@ -260,7 +285,14 @@ export class BackgroundImports {
             budget.verified();
           this.changed();
         },
-      });
+      };
+      const result = this.directImport
+        ? await this.directImport(row.videoId, budget.signal, options)
+        : ((await importYoutube(
+            row.videoId,
+            budget.signal,
+            options,
+          )) as unknown as TResult);
       budget.signal.throwIfAborted();
       budget.dispose();
       row.stage = 'saving';
@@ -282,6 +314,7 @@ export class BackgroundImports {
           : error instanceof DOMException && error.name === 'TimeoutError'
             ? 'request_timeout'
             : 'unavailable';
+      recordFailure('youtube-add', row.error);
       if (row.error === 'audio_expired' || row.error === 'not_found')
         row.jobId = undefined;
       row.failure =

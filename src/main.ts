@@ -1,66 +1,102 @@
-import { waitAcquired } from './opus/opus-acquired-v2-artifacts.mjs';
-import { recoverPublic468Source } from './opus/opus468-share-recovery';
-import { createOpus468ShareRouteOwner } from './opus/opus468-share-route-owner';
-import { validateRecoveredV7 } from './opus/opus468-versioned-v7-validation.mjs';
-import { createPrivateOpusV2ProjectionTransport } from './opus/opus-projection-v2-transport-private.mjs';
-import { createOpus468AppCoordinator } from './opus/opus468-app-coordinator';
-import { prepareCurrentOpusInstall } from './opus/opus468-current-install';
-import { createOpus468LibraryPairs } from './opus/opus468-library-pairs';
-import { privateOpus468ResultUrl } from './opus/opus468-result-url';
-import { opus468PlayerLabels } from './opus/opus468-player-labels';
-import { createCurrentOpus468Bridge } from './opus/opus468-current-entry-bridge';
-import type { createOpus468Frontend } from './opus/opus468-frontend';
-import { disableUnreadySongRow } from './unready-song-row';
-import { visibleLibrarySelection } from './library-visible-selection';
-import { chartDisplay as legacyChartDisplay } from './chart-display';
-import { installDoubleTapGuard } from './touch-gestures';
-import { isOpusRecord, type PlayableSourceRecord } from './playable-source';
+import { APP_VERSION } from "./app-version";
+import {
+  selectionSongPath,
+  selectionRouteOptions,
+  hasSelectionSong,
+  resolveSelectionSong,
+  selectionLinkStatus,
+} from "./selection-song-route";
+import { waitAcquired } from "./opus/opus-acquired-v2-artifacts.mjs";
+import { recordFailure, hasUnacknowledgedFailure } from "./status-failures";
+import { STATUS_LABELS } from "./status-labels";
+import { recoverPublic468Source } from "./opus/opus468-share-recovery";
+import { createOpus468ShareRouteOwner } from "./opus/opus468-share-route-owner";
+import { validateRecoveredV7 } from "./opus/opus468-versioned-v7-validation.mjs";
+import { createPrivateOpusV2ProjectionTransport } from "./opus/opus-projection-client-boundary";
+import { createOpus468AppCoordinator } from "./opus/opus468-app-coordinator";
+import { createBuildOwnedLegacySidecarAdd } from "./opus/opus468-legacy-sidecar-add";
+import { createLegacyMetadataAttemptGate } from "./opus/opus468-legacy-metadata-attempt";
+import { findLegacySourceRoots } from "./opus/unified/legacy-source-registry.mjs";
+import { prepareCurrentOpusInstall } from "./opus/opus468-current-install";
+import { createOpus468LibraryPairs } from "./opus/opus468-library-pairs";
+import { privateOpus468ResultUrl } from "./opus/opus468-result-url";
+import { opus468PlayerLabels } from "./opus/opus468-player-labels";
+import { createCurrentOpus468Bridge } from "./opus/opus468-current-entry-bridge";
+import {
+  createColdResultRestoreCoordinator,
+  isOwnedColdResultRoute,
+} from "./opus/opus468-cold-result-restore";
+import type { createOpus468Frontend } from "./opus/opus468-frontend";
+import { disableUnreadySongRow } from "./unready-song-row";
+import { visibleLibrarySelection } from "./library-visible-selection";
+import { chartDisplay as legacyChartDisplay } from "./chart-display";
+import { installDoubleTapGuard } from "./touch-gestures";
+import { isOpusRecord, type PlayableSourceRecord } from "./playable-source";
+import {
+  EXTENSION_READINESS_SELECTION,
+  chartPreparingLabel,
+  planGeneralReadiness,
+} from "./selection-readiness";
 import {
   listOpus35Metadata,
   saveOpus35Metadata,
   readOpus35Metadata,
-} from './opus/opus35-store';
-import { readVerifiedOpusByRoots } from './opus/opus-cache.mjs';
-import { encodeOpus35Share, decodeOpus35Share } from './opus/opus35-share';
+} from "./opus/opus35-store";
+import { readVerifiedOpusByRoots } from "./opus/opus-cache.mjs";
+import { encodeOpus35Share, decodeOpus35Share } from "./opus/opus35-share";
 import {
   rememberBuiltinResultOwner,
   isArchivedBuiltinResult,
-} from './builtin-result-owner';
-import { captureLibraryRowFocus } from './library-row-focus';
-import { savedLocalGenerated } from './local-generated-library';
-import { youtubeAddIcon } from './library-actions';
+} from "./builtin-result-owner";
+import { captureLibraryRowFocus } from "./library-row-focus";
+import { youtubeId } from "./external-import";
+import { YOUTUBE_DIRECT_ORIGIN } from "./youtube-direct-api";
+import { saveLocalAllKeys } from "./local-allkeys-store";
+import { youtubeDuplicateMessage } from "./youtube-duplicate-labels";
+import { youtubeDuplicateState } from "./youtube-duplicate";
+import { savedLocalGenerated } from "./local-generated-library";
+import { reconcileImportOrder } from "./reconcile-import-order";
+import { youtubeAddIcon } from "./library-actions";
 import {
   rememberLibraryFirstPaint,
   finishLibraryFirstPaint,
-} from './library-first-paint';
+} from "./library-first-paint";
 import {
   rememberResultFirstPaint,
   finishResultFirstPaint,
   resultIdentityKey,
-} from './result-first-paint';
-import { savedCanonical } from './canonical-library';
-import { importStageLabel } from './import-progress';
-import { showToast as toast } from './ui/sonner';
-import { copySongLink } from './song-share-clipboard';
-import { createSongLink } from './song-share';
+} from "./result-first-paint";
+import { savedCanonical } from "./canonical-library";
+import {
+  CLIENT_ONLY_MODE,
+  ClientOnlyLocalAudioError,
+  requireLocalAudio,
+} from "./client-only-runtime";
+import { importStageLabel } from "./import-progress";
+import { showToast as toast } from "./ui/sonner";
+import { copySongLink } from "./song-share-clipboard";
+import { createSongLink } from "./song-share";
+import { createYoutubeSongLink, youtubeWatchUrl } from "./youtube-song-link";
 import {
   readLibrarySelection,
   writeLibrarySelection,
   resolveLibrarySelection,
-} from './library-selection';
-import { readCanonicalMetadata } from './canonical-metadata-api';
-import { updateLocalDisplayMetadata } from './external-local';
-import { updateExternalDisplayMetadata } from './external-catalog';
+} from "./library-selection";
+import { readCanonicalMetadata } from "./canonical-metadata-api";
+import { earlyYoutubeMetadata } from "./early-youtube-metadata";
+import { resolveYoutubeChannel } from "./youtube-channel-recovery";
+import { updateLocalDisplayMetadata } from "./external-local";
+import { updateExternalDisplayMetadata } from "./external-catalog";
 import {
   builtinShareFragment,
   builtinScoreShareFragment,
-} from './builtin-share-fragment';
-import { REPLAY_SAVE_ERROR } from './replay-storage-labels';
+} from "./builtin-share-fragment";
+import { REPLAY_SAVE_ERROR } from "./replay-storage-labels";
 import {
   saveBuiltinSession,
   readBuiltinSession,
-} from './builtin-replay-library';
-import { REPLAY_READ_ERROR } from './replay-read-error';
+} from "./builtin-replay-library";
+import { REPLAY_READ_ERROR } from "./replay-read-error";
 import {
   KEY_MODES,
   DEFAULT_MASTER_BINDINGS,
@@ -71,77 +107,110 @@ import {
   resolvedModeBindings,
   type BindingProfile,
   isKeyMode,
-} from './key-mode-registry';
-import { libraryContextMenu } from './library-context-menu';
-import { LibraryAddOrder } from './library-add-order';
-import { inspectDeviceAudio } from './device-audio-inspection';
+} from "./key-mode-registry";
+import { libraryContextMenu } from "./library-context-menu";
+import { librarySourceAction } from "./library-source-open";
+import { LibraryAddOrder } from "./library-add-order";
+import { pendingImportRowVisible } from "./library-pending-imports";
+import { inspectDeviceAudio } from "./device-audio-inspection";
 import {
   deviceInspectionButton,
   deviceInspectionChecking,
   deviceInspectionMessage,
-} from './device-audio-labels';
-import { audioAtStage } from './audio-error-stage';
+} from "./device-audio-labels";
+import { audioAtStage } from "./audio-error-stage";
 import {
   reconcileCanonical,
   type CanonicalLibraryRow,
-} from './canonical-reconcile';
+} from "./canonical-reconcile";
 import {
   hiddenLibraryIds,
   saveHiddenLibraryIds,
   removalLabels,
-} from './library-removal';
-import { canonicalPendingMessage } from './canonical-library-labels';
-import { importRetryLabel } from './import-labels';
-import { BackgroundImports } from './background-imports';
+} from "./library-removal";
+import { canonicalPendingMessage } from "./canonical-library-labels";
+import { importRetryLabel } from "./import-labels";
+import { BackgroundImports } from "./background-imports";
 import {
   encodeExternalShare,
   decodeExternalShare,
   type ExternalSharedReplay,
-} from './external-share';
-import { readSharedAudio, recoverSharedAudio } from './external-share-audio';
-import { sharedAudioLabels } from './shared-audio-labels';
-import './scrollbars.css';
-import { replayFrameChanged } from './replay-frame';
-import { difficultyForChart, difficultyText } from './chart-difficulty';
-import { CURRENT_FEVER } from './fever';
-import { renderFeverHud } from './fever-hud';
-import { StartupAttempt } from './startup';
+} from "./external-share";
+import { readSharedAudio, recoverSharedAudio } from "./external-share-audio";
+import { sharedAudioLabels } from "./shared-audio-labels";
+import "./scrollbars.css";
+import { replayFrameChanged } from "./replay-frame";
+import { difficultyForChart, difficultyText } from "./chart-difficulty";
+import { CURRENT_FEVER } from "./fever";
+import { renderFeverHud } from "./fever-hud";
+import { StartupAttempt } from "./startup";
+import { youtubeArtwork } from "./youtube-artwork";
 import {
   songArt,
   songVideoId,
   attachOpus468Artwork,
   ART_FALLBACK,
-} from './song-art';
-import { AudioJobError } from './external-audio-api';
-import { externalError } from './external-errors';
+} from "./song-art";
+import { AudioJobError } from "./external-audio-api";
+import { externalError } from "./external-errors";
 import {
   localAudio,
   localMetadata,
   saveLocalAudio,
   readLocalSession,
   saveLocalSession,
-} from './external-local';
+} from "./external-local";
 import {
   initReplayPage,
   setReplayNavLabel,
   showReplays,
   installPrivateReplayList,
-} from './replay-page';
-import { externalLabels } from './external-labels';
-import { importYoutube } from './external-import';
-import { pinSource, allPinnedSources } from './external-source-store';
+  noteReplaySessionSaved,
+  reconcileReplayMenuCount,
+} from "./replay-page";
+import { externalLabels } from "./external-labels";
+import {
+  prepareDirectAllKeys,
+  type PreparedDirectAllKeys,
+} from "./prepare-direct-allkeys";
+import { readLocalAllKeys, listLocalAllKeys } from "./local-allkeys-store";
+import {
+  saveLocalAllKeysSession,
+  readLocalAllKeysSession,
+  listLocalAllKeysSessions,
+} from "./local-allkeys-sessions";
+import {
+  encodeLocalAllKeysShare,
+  decodeLocalAllKeysShare,
+  type LocalAllKeysShareResult,
+} from "./local-allkeys-share";
+import {
+  encodeProgressiveShare,
+  decodeProgressiveShare,
+  PROGRESSIVE_SHARE_PREFIX,
+} from "./progressive/share-proof";
+import { DirectIntegrityError, DirectServiceError, type DirectProof } from "./progressive/direct-playback";
+import { audioStageMessage } from "./audio-stage-message";
+import {
+  localAllKeysSource,
+  hasLocalAllKeysSource,
+  localAllKeysDisplay,
+  localAllKeysVideoId,
+  installLocalAllKeysSource,
+} from "./local-allkeys-catalog";
+import { pinSource, allPinnedSources } from "./external-source-store";
 import {
   externalSource,
   externalAudioCooperative,
   installExternalSource,
   sourceId,
-} from './external-catalog';
-import { FULLSCREEN_WARNING } from './fullscreen-labels';
-import { saveSharedReplay, loadSharedReplay, ShareError } from './share-api';
-import { queryClient, queryKeys, queryReady } from './query-client';
-import { shareLabels } from './share-labels';
-import { ScoreDisplay } from './score-display';
-import { REPLAY_LABELS, REPLAY_PLAYING } from './replay-labels';
+} from "./external-catalog";
+import { FULLSCREEN_WARNING } from "./fullscreen-labels";
+import { saveSharedReplay, loadSharedReplay, ShareError } from "./share-api";
+import { queryClient, queryKeys, queryReady } from "./query-client";
+import { shareLabels } from "./share-labels";
+import { ScoreDisplay } from "./score-display";
+import { REPLAY_LABELS, REPLAY_PLAYING } from "./replay-labels";
 import {
   encodeReplay,
   decodeReplay,
@@ -151,38 +220,40 @@ import {
   type ReplayData,
   type RuntimeReplay,
   type ReplayOp,
-} from './replay';
-import { RESULT_LABELS } from './result-labels';
+} from "./replay";
+import { RESULT_LABELS } from "./result-labels";
 import {
   guardFullscreenEscape,
   requestGameFullscreen,
   fullscreenEscapeStatus,
-} from './fullscreen-escape';
-import { resultBadgeData, resultBadges } from './result-badges';
-import { enhanceSelects } from './select-ui';
-import './select-ui.css';
-import { cachedAudio, saveAudio } from './audio-cache';
-import { browserLanguage, resolvedLanguage } from './language';
-import { keyLabel } from './key-label';
-import { countdownText, startupCountdownTiming } from './timing';
-import { optionIcon } from './option-icons';
+} from "./fullscreen-escape";
+import { resultBadgeData, resultBadges } from "./result-badges";
+import { enhanceSelects } from "./select-ui";
+import "./select-ui.css";
+import { cachedAudio, saveAudio } from "./audio-cache";
+import { browserLanguage, resolvedLanguage } from "./language";
+import { keyLabel } from "./key-label";
+import { countdownText, startupCountdownTiming } from "./timing";
+import { optionIcon } from "./option-icons";
 import {
   readResult,
   resultParams,
   SHARED_SONGS,
   type SharedResult,
-} from './share';
+} from "./share";
 import {
   FADERS,
   transformChart,
   type Fader,
   type Shuffle,
-} from './game-options';
-import { formatPerf } from './perf-overlay';
-import { LANGUAGES, translate, type Language, type Word } from './i18n';
-import './style.css';
-import './result-screen.css';
-import { ResultMotion } from './result-motion';
+} from "./game-options";
+import { formatPerf } from "./perf-overlay";
+import { LANGUAGES, translate, type Language, type Word } from "./i18n";
+import { installOptionTooltip } from "./option-tooltip";
+import { syncOptionDescriptions } from "./option-descriptions";
+import "./style.css";
+import "./result-screen.css";
+import { ResultMotion } from "./result-motion";
 import {
   SONGS,
   makeChart as legacyMakeChart,
@@ -190,10 +261,11 @@ import {
   type Difficulty,
   type Lanes,
   type Note,
-} from './chart';
-import { Engine, type JudgmentEvent } from './engine';
-import { AudioClock, renderSong, type Soundtrack } from './audio';
-import { Playfield } from './renderer';
+} from "./chart";
+import { Engine, type JudgmentEvent } from "./engine";
+import { AudioClock, renderSong, type Soundtrack } from "./audio";
+import { guardPreviewEnd, startPreview } from "./preview-playback";
+import { Playfield } from "./renderer";
 // PRIVATE scratch integration. No public composition calls this service.
 const private468Bridge = createCurrentOpus468Bridge();
 const extensionLibraryPairs = createOpus468LibraryPairs();
@@ -225,27 +297,125 @@ const extensionPending = new Set<string>(),
   extensionFailed = new Set<string>();
 const extensionDeferred = new Map<string, string>();
 let extensionFlushQueued = false;
+const registeredLegacyMetadataPending = new Set<string>();
+const registeredLegacyMetadataRows = new Map<string, any>();
+const legacyMetadataAttempt = createLegacyMetadataAttemptGate();
+const coldResultRestore = createColdResultRestoreCoordinator();
+let legacyMetadataReadyResolve: () => void;
+const legacyMetadataReady = new Promise<void>(
+  (resolve) => (legacyMetadataReadyResolve = resolve),
+);
+const legacyMetadataKey = (record: any) =>
+  `${record?.videoId}:${record?.audioSha256}:${record?.chartSetSha256}`;
+function registeredLegacyRecord(record: any) {
+  return !!findLegacySourceRoots({
+    videoId: record?.videoId,
+    encodedAudioSha256: record?.encodedAudioSha256,
+    audioDescriptorSha256: record?.audioDescriptorSha256,
+    audioSha256: record?.audioSha256,
+    decoderWasmSha256: record?.decoderWasmSha256,
+    frames: record?.frames,
+    sampleRate: record?.sampleRate,
+    channels: 2,
+  });
+}
+
+export function consumeFixedLegacySidecar(
+  input: {
+    selection: { lanes: 4 | 6 | 8; difficulty: Difficulty };
+    metadata: { title?: string; author?: string };
+    manifestId?: string;
+  },
+  { signal: callerSignal }: { signal?: AbortSignal } = {},
+) {
+  const captured = structuredClone(input),
+    href = location.href,
+    navigation = navigationVersion;
+  if (!general468Runtime)
+    return Promise.reject(Error("extension_runtime_unavailable"));
+  const run = async () => {
+    callerSignal?.throwIfAborted();
+    if (location.href !== href || navigationVersion !== navigation)
+      throw Error("extension_add_stale");
+    const c = new AbortController(),
+      timer = setTimeout(
+        () => c.abort(Error("extension_operation_timeout")),
+        95000,
+      );
+    const signal = callerSignal
+      ? AbortSignal.any([callerSignal, c.signal])
+      : c.signal;
+    try {
+      signal.throwIfAborted();
+      if (!general468Runtime) throw Error("extension_runtime_unavailable");
+      const add = createBuildOwnedLegacySidecarAdd({
+        runtime: general468Runtime,
+        install: (frontend, options) =>
+          installPrivateOpus468Frontend(frontend as any, options),
+        isCurrent: () =>
+          location.href === href &&
+          navigationVersion === navigation &&
+          canInstallExtension(),
+      });
+      return await add({
+        selection: captured.selection,
+        metadata: captured.metadata,
+        ...(captured.manifestId === undefined
+          ? {}
+          : { manifestId: captured.manifestId }),
+        signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const result = extensionWork.then(run, run);
+  extensionWork = result.catch(() => undefined);
+  return result;
+}
 export async function enableGeneral468Candidate(runtime: any) {
   if (general468Runtime && general468Runtime !== runtime)
-    throw Error('extension_frontend_conflict');
+    throw Error("extension_frontend_conflict");
   general468Runtime = runtime;
   general468ReadyResolve();
   general468Coordinator ??= createOpus468AppCoordinator(runtime);
-  const local = new URLSearchParams(location.search).get('local');
-  if (local?.startsWith('yt-opus-')) {
+  const local = new URLSearchParams(location.search).get("local");
+  if (local?.startsWith("yt-opus-")) {
+    const href = location.href,
+      navigation = navigationVersion;
     const c = new AbortController(),
       timer = setTimeout(
-        () => c.abort(Error('extension_operation_timeout')),
+        () => c.abort(Error("extension_operation_timeout")),
         95000,
       );
     try {
-      const loaded = await runtime.frontend.restoreSession(local, {
+      await waitAcquired(legacyMetadataReady, c.signal);
+      if (location.href !== href || navigationVersion !== navigation)
+        throw Error("extension_add_stale");
+      await coldResultRestore.restore({
+        href,
+        navigation,
+        currentHref: () => location.href,
+        currentNavigation: () => navigationVersion,
+        active: () => active,
+        preparing: () => preparing,
+        local,
         signal: c.signal,
-      });
-      if (!loaded) throw Error('extension_session_missing');
-      await installPrivateOpus468Frontend(runtime.frontend, {
-        song: loaded.session.song,
-        signal: c.signal,
+        restoreSession: (key, signal) =>
+          runtime.frontend.restoreSession(key, { signal }),
+        sessionSong: (session: any) => session.song,
+        catalogView: (song: string, options: any) =>
+          runtime.frontend.catalogView(song, options),
+        viewBase: (view: any) => view.baseRecord,
+        install: async (song, signal) => {
+          if (
+            (await installPrivateOpus468Frontend(runtime.frontend, {
+              song,
+              signal,
+            })) !== true
+          )
+            throw Error("extension_install_missing");
+        },
       });
     } finally {
       clearTimeout(timer);
@@ -260,17 +430,23 @@ export async function enableGeneral468Candidate(runtime: any) {
     /^\/select\/?$/.test(location.pathname)
   )
     syncSettings();
+  queueMicrotask(prepareGeneralReadiness);
 }
-const canInstallExtension = () => !active && !preparing && screen === 'select';
+const canInstallExtension = () => !active && !preparing && screen === "select";
+const frontendInstallCurrent = (href: string, navigation: number) =>
+  location.href === href &&
+  navigationVersion === navigation &&
+  !active &&
+  !preparing;
 function extendGeneralSource(
-  record: import('./opus/opus-record').OpusRecord,
+  record: import("./opus/opus-record").OpusRecord,
   selection: { lanes: 4 | 6 | 8; difficulty: Difficulty },
 ) {
   const id = sourceId(record);
   if (
     !general468Coordinator ||
     extensionPending.has(id) ||
-    extensionLibraryPairs.generation(id) === 'unified'
+    extensionLibraryPairs.generation(id) === "unified"
   )
     return Promise.resolve();
   extensionPending.add(id);
@@ -279,14 +455,14 @@ function extendGeneralSource(
   const run = async () => {
     const operation = new AbortController(),
       timer = setTimeout(
-        () => operation.abort(Error('extension_operation_timeout')),
+        () => operation.abort(Error("extension_operation_timeout")),
         95000,
       );
     try {
       if (canInstallExtension()) {
         const restored = await installPrivateOpus468Frontend(
           general468Runtime.frontend,
-          { base: record, signal: operation.signal },
+          { base: record, signal: operation.signal, notifyFailure: false },
         );
         if (restored === true) return;
       }
@@ -296,6 +472,7 @@ function extendGeneralSource(
       extensionDeferred.set(id, pin.song.id);
       if (canInstallExtension()) {
         await installPrivateOpus468Frontend(general468Runtime.frontend, {
+          notifyFailure: false,
           song: pin.song.id,
           signal: operation.signal,
         });
@@ -320,8 +497,10 @@ function extendGeneralSource(
   extensionWork = result.catch(() => undefined);
   return result;
 }
-function refreshGeneralSelection() {
+function prepareGeneralReadiness() {
   if (!general468Coordinator || !canInstallExtension()) return;
+  for (const row of registeredLegacyMetadataRows.values())
+    attachRegisteredLegacyMetadata(row);
   if (extensionDeferred.size && !extensionFlushQueued) {
     extensionFlushQueued = true;
     const flush = async () => {
@@ -332,13 +511,14 @@ function refreshGeneralSelection() {
           if (!canInstallExtension()) break;
           const operation = new AbortController(),
             timer = setTimeout(
-              () => operation.abort(Error('extension_operation_timeout')),
+              () => operation.abort(Error("extension_operation_timeout")),
               95000,
             );
           try {
             await installPrivateOpus468Frontend(general468Runtime.frontend, {
               song,
               signal: operation.signal,
+              notifyFailure: false,
             });
           } finally {
             clearTimeout(timer);
@@ -347,7 +527,7 @@ function refreshGeneralSelection() {
         }
       } finally {
         extensionFlushQueued = false;
-        // A route/lane change can invalidate the staged install while its refresh
+        // A route change can invalidate the staged install while its refresh
         // was coalesced by this flush. Retry only that new navigation, not a
         // stationary validation/storage failure. The durable pin stays unchanged.
         if (
@@ -355,26 +535,33 @@ function refreshGeneralSelection() {
           canInstallExtension() &&
           (location.href !== arrival || navigationVersion !== navigation)
         )
-          queueMicrotask(refreshGeneralSelection);
+          queueMicrotask(prepareGeneralReadiness);
       }
     };
     extensionWork = extensionWork.then(flush, flush).catch(() => undefined);
   }
-  if (![4, 6, 8].includes(settings.lanes)) return;
-  const source = externalSource(SONGS[songIndex].id);
-  if (
-    !source ||
-    !isOpusRecord(source.record) ||
-    extensionPending.has(source.song.id) ||
-    extensionDeferred.has(source.song.id) ||
-    extensionFailed.has(source.song.id) ||
-    extensionLibraryPairs.generation(source.song.id) === 'unified'
-  )
-    return;
-  void extendGeneralSource(source.record, {
-    lanes: settings.lanes as 4 | 6 | 8,
-    difficulty: settings.difficulty,
-  }).catch(() => toast(opus468PlayerLabels(settings.language).unavailable));
+  // One all-mode record per selected restored/imported source. This runs at
+  // source readiness/selection boundaries, never from a key/difficulty click.
+  const selected = externalSource(
+    extensionLibraryPairs.base(SONGS[songIndex]?.id ?? ""),
+  );
+  if (!selected || !isOpusRecord(selected.record)) return;
+  const id = selected.song.id;
+  const planned = planGeneralReadiness([
+    {
+      id,
+      generation: extensionLibraryPairs.generation(id),
+      pending: extensionPending.has(id),
+      deferred: extensionDeferred.has(id),
+      failed: extensionFailed.has(id),
+    },
+  ]);
+  if (!planned.includes(id)) return;
+  // Optional chart readiness is not playback; per-row extension retry stays.
+  void extendGeneralSource(
+    selected.record as import("./opus/opus-record").OpusRecord,
+    EXTENSION_READINESS_SELECTION,
+  ).catch(() => undefined);
 }
 
 function makeChart(
@@ -406,6 +593,9 @@ function chartDisplay(
   diff: Difficulty,
   lanes: Lanes,
 ) {
+  if (song.id.startsWith("yt-local-allkeys-")) {
+    return localAllKeysDisplay(song.id, diff, lanes);
+  }
   if (transient468Owns(song.id)) {
     const notes = makeChart(song, diff, lanes);
     return {
@@ -423,9 +613,10 @@ function chartDisplay(
 export async function installPrivateOpus468Frontend(
   frontend: ReturnType<typeof createOpus468Frontend>,
   options: {
+    notifyFailure?: boolean;
     signal?: AbortSignal;
     song?: string;
-    base?: import('./opus/opus-record').OpusRecord;
+    base?: import("./opus/opus-record").OpusRecord;
   } = {},
 ) {
   const href = location.href,
@@ -434,17 +625,25 @@ export async function installPrivateOpus468Frontend(
     return await installPrivateOpus468FrontendInner(frontend, options);
   } catch (error) {
     if (location.href === href && navigationVersion === navigation) {
-      document.documentElement.removeAttribute('data-result-pending');
+      document.documentElement.removeAttribute("data-result-pending");
       if (
         new URLSearchParams(location.search)
-          .get('local')
-          ?.startsWith('yt-opus-')
+          .get("local")
+          ?.startsWith("yt-opus-") &&
+        !isOwnedColdResultRoute({
+          href,
+          navigation,
+          currentHref: () => location.href,
+          currentNavigation: () => navigationVersion,
+          active: () => false,
+          preparing: () => false,
+        })
       ) {
-        history.replaceState(null, '', '/select/');
+        history.replaceState(null, "", "/select/");
         exit();
         readRoute();
       }
-      if (!options.signal?.aborted)
+      if (options.notifyFailure !== false && !options.signal?.aborted)
         toast(opus468PlayerLabels(settings.language).unavailable);
     }
     throw error;
@@ -459,7 +658,7 @@ async function installPrivateOpus468FrontendInner(
   }: {
     signal?: AbortSignal;
     song?: string;
-    base?: import('./opus/opus-record').OpusRecord;
+    base?: import("./opus/opus-record").OpusRecord;
   } = {},
 ) {
   // Gate is the reviewed frontend service's fresh admission, not presence in a UI map.
@@ -475,17 +674,17 @@ async function installPrivateOpus468FrontendInner(
     songs,
     async (song) => {
       const base = private468Bridge.baseRecord(song.id);
-      if (!base) throw Error('extension_presentation_source');
+      if (!base) throw Error("extension_presentation_source");
       const versioned = frontend as typeof frontend & {
-        generationForSong?: (id: string) => 'legacy' | 'unified' | undefined;
+        generationForSong?: (id: string) => "legacy" | "unified" | undefined;
       };
       const generation = versioned.generationForSong?.(song.id);
-      if (generation !== 'legacy' && generation !== 'unified')
-        throw Error('extension_presentation_generation');
+      if (generation !== "legacy" && generation !== "unified")
+        throw Error("extension_presentation_generation");
       await attachOpus468Artwork(song.id, base, { signal });
       return { song, base, generation };
     },
-    () => location.href === arrival && navigationVersion === navigation,
+    () => frontendInstallCurrent(arrival, navigation),
     signal,
   ).catch((error) => {
     private468Bridge.cancel();
@@ -510,20 +709,27 @@ async function installPrivateOpus468FrontendInner(
     const { rows, songs } = await private468Bridge.listSessions();
     for (const song of songs)
       if (!SONGS.some((s) => s.id === song.id)) SONGS.push(song);
-    return rows;
+    return [...rows, ...(await listLocalEntrySessions())];
   });
+  // ORV-78: reconcile again now that extension sessions are included.
+  setTimeout(() => void reconcileReplayMenuCount(), 2000);
   signal?.throwIfAborted();
   for (const song of songs)
     if (!SONGS.some((existing) => existing.id === song.id)) SONGS.push(song);
-  const requested = new URLSearchParams(location.search).get('song');
+  const selection = resolveCurrentSelection();
+  const requested = /^\/select\/?$/.test(location.pathname)
+    ? selection.kind === "selected"
+      ? selection.id
+      : null
+    : new URLSearchParams(location.search).get("song");
   const requestedIndex = SONGS.findIndex((song) => song.id === requested);
   if (requestedIndex >= 0) songIndex = requestedIndex;
   songCards();
   syncSettings();
   selectedSong();
-  if (location.pathname === '/replays/') await showReplays();
-  const local = new URLSearchParams(location.search).get('local');
-  if (local?.startsWith('yt-opus-')) await openLocalSession(local);
+  if (location.pathname === "/replays/") await showReplays();
+  const local = new URLSearchParams(location.search).get("local");
+  if (local?.startsWith("yt-opus-")) await openLocalSession(local, signal);
   return true;
 }
 function entryReplayMatches(
@@ -536,20 +742,35 @@ function entryReplayMatches(
     replay,
     result,
     notes ??
-      (song && ownsOpus468(song.id)
+      (song && (hasLocalAllKeysSource(song.id) || ownsOpus468(song.id))
         ? makeChart(song, replay.difficulty, replay.lanes)
         : undefined),
   );
 }
-async function readEntrySession(id: string) {
-  if (id.startsWith('yt-opus-')) {
-    const loaded = await private468Bridge.readSession(id);
+async function readEntrySession(id: string, signal?: AbortSignal) {
+  if (id.startsWith("local-allkeys-session:")) {
+    signal?.throwIfAborted();
+    const session = await readLocalAllKeysSession(id);
+    signal?.throwIfAborted();
+    if (!SONGS.some((song) => song.id === session.song.id))
+      SONGS.push(session.song);
+    return session;
+  }
+  if (id.startsWith("yt-opus-")) {
+    const loaded = await private468Bridge.readSession(id, signal);
     if (!SONGS.some((s) => s.id === loaded.song.id)) SONGS.push(loaded.song);
     return loaded.session;
   }
-  return id.startsWith('builtin:')
+  return id.startsWith("builtin:")
     ? readBuiltinSession(id)
     : readLocalSession(id);
+}
+async function listLocalEntrySessions() {
+  const sessions = await listLocalAllKeysSessions();
+  for (const session of sessions)
+    if (!SONGS.some((song) => song.id === session.song.id))
+      SONGS.push(session.song);
+  return sessions;
 }
 const $ = <T extends HTMLElement = HTMLElement>(s: string) =>
   document.querySelector<T>(s)!;
@@ -558,12 +779,12 @@ const defaults = Object.fromEntries(
 ) as Record<Lanes, string[]>;
 interface Settings {
   language: Language;
-  languageMode: 'auto' | 'manual';
+  languageMode: "auto" | "manual";
   reducedMotion: boolean;
   feverAuto: boolean;
   lanes: Lanes;
   difficulty: Difficulty;
-  position: 'left' | 'center' | 'right';
+  position: "left" | "center" | "right";
   speed: number;
   fader: Fader;
   shuffle: Shuffle;
@@ -574,7 +795,7 @@ interface Settings {
 function getSettings(): Settings {
   let saved = {};
   try {
-    saved = JSON.parse(localStorage.getItem('orvio.settings.v1') || '{}');
+    saved = JSON.parse(localStorage.getItem("orvio.settings.v1") || "{}");
   } catch {
     /* Optional local storage. */
   }
@@ -586,17 +807,17 @@ function getSettings(): Settings {
   return {
     reducedMotion: false,
     lanes: 5,
-    difficulty: 'low',
-    position: 'left',
+    difficulty: "low",
+    position: "left",
     speed: 1.5,
-    fader: 'off',
-    shuffle: 'off',
+    fader: "off",
+    shuffle: "off",
     volume: 0.7,
     keys: structuredClone(defaults),
     bindingProfile: migrateBindings((automatic as { keys?: unknown }).keys),
     ...automatic,
     language: resolvedLanguage(automatic, navigator.languages),
-    languageMode: automatic.languageMode === 'manual' ? 'manual' : 'auto',
+    languageMode: automatic.languageMode === "manual" ? "manual" : "auto",
     feverAuto: true,
   };
 }
@@ -618,15 +839,15 @@ resolveBindings();
 settings.speed =
   Math.round(Math.max(1, Math.min(9, Number(settings.speed) || 1.5)) * 10) / 10;
 if (!(FADERS as readonly string[]).includes(settings.fader))
-  settings.fader = 'off';
-if (!['off', 'mirror', 'random'].includes(settings.shuffle))
-  settings.shuffle = 'off';
+  settings.fader = "off";
+if (!["off", "mirror", "random"].includes(settings.shuffle))
+  settings.shuffle = "off";
 let shuffleSeed = crypto.getRandomValues(new Uint32Array(1))[0];
-if (!(settings.language in LANGUAGES)) settings.language = 'ko';
+if (!(settings.language in LANGUAGES)) settings.language = "ko";
 const t = (word: Word) => translate(settings.language, word);
 const label = (word: Word) => `<span data-i18n="${word}">${t(word)}</span>`;
 let songIndex = 0;
-let screen: 'home' | 'select' | 'ready' | 'play' | 'replays' = 'select';
+let screen: "home" | "select" | "ready" | "play" | "replays" = "select";
 // A37: a direct /play/ load paints the loading overlay (not the ready
 // screen's start button) and the first Enter/click gesture starts through
 // the normal path; audio activation still requires that gesture.
@@ -649,7 +870,7 @@ let preview: AudioBufferSourceNode | undefined;
 let previewGain: GainNode | undefined;
 let preparing = false;
 let startup: StartupAttempt | undefined;
-type UiResult = Omit<SharedResult, 'song'> & { song: string };
+type UiResult = Omit<SharedResult, "song"> & { song: string };
 let lastResult: UiResult | undefined;
 let localSessionKey: string | undefined;
 /** True only when the current local session was opened from the archive
@@ -661,6 +882,20 @@ const ownResults = new WeakSet<UiResult>();
 let receivedShare:
   | { fragment: string; data: ExternalSharedReplay<PlayableSourceRecord> }
   | undefined;
+let receivedLocalAllKeysShare:
+  { fragment: string; data: LocalAllKeysShareResult } | undefined;
+const directProgressiveProofs = new Map<string, DirectProof>();
+export function directProgressiveProofFor(
+  videoId: string,
+  audioSha256: string,
+): DirectProof | undefined {
+  const proof = directProgressiveProofs.get(videoId);
+  return proof &&
+    proof.pin.videoId === videoId &&
+    proof.pin.audioSha256 === audioSha256
+    ? proof
+    : undefined;
+}
 let shareRouteRequest = 0;
 let navigationVersion = 0;
 let sessionReplay: RuntimeReplay | undefined,
@@ -670,7 +905,7 @@ let lastRecordedSpeed = settings.speed,
   lastRecordedFader = settings.fader;
 let replayCursor = 0,
   sessionWallAt = 0,
-  replayText = '';
+  replayText = "";
 let replayExpected = false,
   replayIssue = false,
   replayExpectedLength = 0;
@@ -692,13 +927,13 @@ function recordInput(lane: number, time: number, down: boolean) {
   engine.input({ lane, time, down, sequence: sequence++ });
 }
 function syncReplayButton() {
-  const b = $('#watch-replay');
+  const b = $("#watch-replay");
   if (!b) return;
-  b.textContent = '▷ ' + REPLAY_LABELS[settings.language][0];
-  b.classList.toggle('hidden', !savedReplay);
-  const status = $('#replay-status');
-  status.textContent = replayIssue ? REPLAY_LABELS[settings.language][2] : '';
-  status.classList.toggle('hidden', !replayIssue);
+  b.textContent = "▷ " + REPLAY_LABELS[settings.language][0];
+  b.classList.toggle("hidden", !savedReplay);
+  const status = $("#replay-status");
+  status.textContent = replayIssue ? REPLAY_LABELS[settings.language][2] : "";
+  status.classList.toggle("hidden", !replayIssue);
 }
 function stopReplay() {
   if (!playReplay) return;
@@ -707,15 +942,15 @@ function stopReplay() {
   clock.stop();
   field.pressed.clear();
   playReplay = undefined;
-  document.body.classList.remove('replay-view');
-  $<HTMLButtonElement>('#play-options').disabled = false;
+  document.body.classList.remove("replay-view");
+  $<HTMLButtonElement>("#play-options").disabled = false;
   if (lastResult) showResult(lastResult);
 }
 
 let optionsDuringPlay = false;
 let originalShuffle: Shuffle = settings.shuffle;
 let originalSeed = shuffleSeed;
-let sessionId = '';
+let sessionId = "";
 let latestMetrics: unknown;
 const cache = new Map<string, Soundtrack>();
 // A37: while a refreshed play route awaits its first gesture, the song
@@ -726,11 +961,43 @@ let armedWallpaperAt = 0;
 // Buffer assembly (createBuffer/copyToChannel) and IndexedDB reads need no
 // activated AudioContext, so the gate hydrates through a throwaway context.
 let preloadContext: OfflineAudioContext | undefined;
+async function localAllKeysAudio(
+  id: string,
+  context: BaseAudioContext,
+  signal?: AbortSignal,
+): Promise<Soundtrack> {
+  signal?.throwIfAborted();
+  const source = localAllKeysSource(id);
+  const videoId = source?.envelope.record.videoId ?? id;
+  const row = await requireLocalAudio(
+    videoId,
+    () => readLocalAllKeys(id, { signal }),
+    signal,
+  );
+  if (row.identity !== id || !source)
+    throw new ClientOnlyLocalAudioError("corrupt", videoId);
+  signal?.throwIfAborted();
+  const cached = cache.get(id);
+  if (cached) return cached;
+  let buffer: AudioBuffer;
+  try {
+    buffer = await context.decodeAudioData(row.bytes.slice(0));
+  } catch (error) {
+    signal?.throwIfAborted();
+    throw new ClientOnlyLocalAudioError("corrupt", videoId);
+  }
+  signal?.throwIfAborted();
+  const track = { buffer, peak: 1 };
+  cache.set(id, track);
+  return track;
+}
 async function preloadTrack(id: string): Promise<Soundtrack | undefined> {
   // Private extensions are freshly prepared by their owned frontend, never procedural preload.
   if (ownsOpus468(id)) return undefined;
   try {
     preloadContext ??= new OfflineAudioContext(1, 1, 44100);
+    if (id.startsWith("yt-local-allkeys-"))
+      return await localAllKeysAudio(id, preloadContext);
     if (externalSource(id)) {
       const item = externalSource(id)!;
       if (item.record.manifestSha256 && !item.bytes) {
@@ -753,84 +1020,100 @@ async function preloadTrack(id: string): Promise<Soundtrack | undefined> {
     return undefined;
   }
 }
+let persistedSettings: string | undefined;
 function persist() {
   try {
-    localStorage.setItem('orvio.settings.v1', JSON.stringify(settings));
+    const serialized = JSON.stringify(settings);
+    if (serialized === persistedSettings) return;
+    localStorage.setItem("orvio.settings.v1", serialized);
+    persistedSettings = serialized;
   } catch {
     /* Private mode works without persistence. */
   }
 }
 
-const app = $('#app');
+const app = $("#app");
 app.innerHTML = `
 <div class="ambient"><div class="ambient-disc"></div><div class="scanlines"></div></div>
-<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> 0.3.4</span><nav><button id="fullscreen" class="quiet">F11 ${label('fullscreen')}</button><button id="open-settings" class="quiet">F2 ${label('options')}</button></nav></header>
-<section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><button id="home-start" class="primary">${label('start')} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label('start')} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label('gameOptions')}</button><p class="mobile-playback-note"></p><a href="/select/">${label('back')}</a></section><main id="lobby"><section class="intro"><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status"></span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label('mobile')}</div></section>
-<section class="library" aria-label="Track selection"><p class="mobile-playback-note"></p><div class="section-title"><strong>${label('select')}</strong></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">NM</button><button data-diff="mid">HD</button><button data-diff="high">MX</button><button data-diff="sc">SC</button></div><div class="segmented compact" id="lanes">${KEY_MODES.map((mode) => `<button data-lanes="${mode}">${mode} KEY</button>`).join('')}</div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label('gameOptions')}</button><button id="start" class="primary">${label('start')} <span>ENTER ↵</span></button></div></section>
-<section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label('patchNotes')}</a><span>${label('selectionHint')}</span><button id="about-button" class="quiet">F1 ${label('about')}</button></section></main>
-<section id="game" class="hidden" aria-label="Rhythm game"><div class="game-top"><button id="exit" class="quiet">ESC ${label('exit')}</button><div class="song-now"><span id="replay-playing" role="status"></span><strong id="now-title"></strong><span id="now-detail"></span></div><span id="fps" hidden></span></div><div id="progress"><div></div></div><div id="arena" data-position="center"><aside class="score-block"><span class="eyebrow">${label('score')}</span><strong id="score">0000000</strong><div><b id="rate">100.00</b><span>% ${label('accuracy')}</span></div><section id="fever-hud" class="hidden" aria-live="off"></section></aside><div id="highway-wrap"><div id="highway"></div><div id="impact" aria-hidden="true"></div><div id="fever-burst" aria-hidden="true"></div><div id="judge" aria-live="off"></div><div id="combo"></div><div id="keycaps"></div><button id="play-options" class="quiet option-readout"></button><div id="countdown"></div></div><aside class="track-block"><div class="orb-mini"></div><span class="eyebrow">ORVIO ORIGINALS</span><h2 id="side-title"></h2><div id="lane-detail"></div></aside></div><div class="game-footer"></div></section>
-<dialog id="pause"><div class="eyebrow">ORVIO / SESSION</div><h2>${label('pause')}</h2><button id="resume" class="primary">${label('resume')} ↵</button><button id="pause-settings" class="quiet">F2 ${label('options')}</button><button id="pause-exit" class="quiet">${label('back')}</button></dialog><dialog id="settings"><form method="dialog"><div class="dialog-title"><div><span class="eyebrow">SYSTEM / OPTIONS</span><h2>${label('options')}</h2></div><button class="close" aria-label="Close">×</button></div></form><div class="settings-tabs" role="tablist"><button data-settings-tab="general" id="settings-general-tab" role="tab" aria-controls="settings-general" aria-selected="true">${label('options')}</button><button data-settings-tab="keys" id="settings-keys-tab" role="tab" aria-controls="settings-keys" aria-selected="false" tabindex="-1">${label('bindings')}</button></div><div class="settings-grid"><section class="settings-general" id="settings-general" role="tabpanel" aria-labelledby="settings-general-tab"><label for="language">${label('language')}</label><select id="language"><option value="auto">${t('browserLanguage')}</option>${Object.entries(
+<header><a class="brand" href="/" aria-label="orvio home"><img class="brand-symbol" src="/favicon.png" alt=""><img src="/wordmark.svg" alt="orvio"></a><span class="edition">RHYTHM SYSTEM <i></i> ${APP_VERSION}</span><nav><button id="fullscreen" class="quiet">F11 ${label("fullscreen")}</button><button id="open-settings" class="quiet">F2 ${label("options")}</button></nav></header>
+<section id="home-screen"><a class="home-patches" data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label("patchNotes")}</a><button id="home-start" class="primary">${label("start")} <span>ENTER ↵</span></button></section><section id="ready-screen" class="hidden"><h1 id="ready-title"></h1><p id="ready-detail"></p><button id="ready-start" class="primary">${label("start")} <span>ENTER ↵</span></button><button id="ready-options" class="quiet">F3 ${label("gameOptions")}</button><p class="mobile-playback-note"></p><a href="/select/">${label("back")}</a></section><main id="lobby"><section class="intro"><div id="selected-art" class="selected-art cover-0"><div class="art-grid"></div><div class="art-orbit"></div><div class="art-orbit second"></div><div class="art-core"></div><span class="art-index">01</span><span class="art-mark">ORVIO / ORIGINALS</span></div><div class="selected-meta"><span id="selected-genre"></span><span id="selected-bpm"></span></div><h1 id="selected-title"></h1><p id="selected-subtitle"></p><div class="preview-status"><i></i><span id="preview-status">${t("nowPlaying")}</span><div class="equalizer"><b></b><b></b><b></b><b></b><b></b></div></div><div class="mobile-note">${label("mobile")}</div></section>
+<section class="library" aria-label="Track selection"><p class="mobile-playback-note"></p><div class="section-title"><strong>${label("select")}</strong></div><div id="songs"></div><div class="selection"><div class="segmented" id="difficulty" aria-label="Difficulty"><button data-diff="low">NM</button><button data-diff="mid">HD</button><button data-diff="high">MX</button><button data-diff="sc">SC</button></div><div class="segmented compact" id="lanes">${KEY_MODES.map((mode) => `<button data-lanes="${mode}">${mode} KEY</button>`).join("")}</div></div><div class="start-row"><button id="open-game-options" class="quiet">F3 ${label("gameOptions")}</button><button id="start" class="primary">${label("start")} <span>ENTER ↵</span></button></div></section>
+<section class="footer-strip"><a data-patch-link target="_blank" rel="noopener noreferrer" href="/patch-notes/">${label("patchNotes")}</a><span>${label("selectionHint")}</span><button id="about-button" class="quiet">F1 ${label("about")}</button></section></main>
+<section id="game" class="hidden" aria-label="Rhythm game"><div class="game-top"><button id="exit" class="quiet">ESC ${label("exit")}</button><div class="song-now"><span id="replay-playing" role="status"></span><strong id="now-title"></strong><span id="now-detail"></span></div><span id="fps" hidden></span></div><div id="progress"><div></div></div><div id="arena" data-position="center"><aside class="score-block"><span class="eyebrow">${label("score")}</span><strong id="score">0000000</strong><div><b id="rate">100.00</b><span>% ${label("accuracy")}</span></div><section id="fever-hud" class="hidden" aria-live="off"></section></aside><div id="highway-wrap"><div id="highway"></div><div id="impact" aria-hidden="true"></div><div id="fever-burst" aria-hidden="true"></div><div id="judge" aria-live="off"></div><div id="combo"></div><div id="keycaps"></div><button id="play-options" class="quiet option-readout"></button><div id="countdown"></div></div><aside class="track-block"><div class="orb-mini"></div><span class="eyebrow">ORVIO ORIGINALS</span><h2 id="side-title"></h2><div id="lane-detail"></div></aside></div><div class="game-footer"></div></section>
+<dialog id="pause"><div class="eyebrow">ORVIO / SESSION</div><h2>${label("pause")}</h2><button id="resume" class="primary">${label("resume")} ↵</button><button id="pause-settings" class="quiet">F2 ${label("options")}</button><button id="pause-exit" class="quiet">${label("back")}</button></dialog><dialog id="settings"><form method="dialog"><div class="dialog-title"><div><span class="eyebrow">SYSTEM / OPTIONS</span><h2>${label("options")}</h2></div><button class="close" aria-label="Close">×</button></div></form><div class="settings-tabs" role="tablist"><button data-settings-tab="general" id="settings-general-tab" role="tab" aria-controls="settings-general" aria-selected="true">${label("options")}</button><button data-settings-tab="keys" id="settings-keys-tab" role="tab" aria-controls="settings-keys" aria-selected="false" tabindex="-1">${label("bindings")}</button></div><div class="settings-grid"><section class="settings-general" id="settings-general" role="tabpanel" aria-labelledby="settings-general-tab"><label for="language">${label("language")}</label><select id="language"><option value="auto">${t("browserLanguage")}</option>${Object.entries(
   LANGUAGES,
 )
   .map(([k, v]) => `<option value="${k}">${v}</option>`)
   .join(
-    '',
-  )}</select><label>${label('position')}</label><div class="segmented" id="position"><button data-pos="left"><span class="position-preview" aria-hidden="true"><i></i><b></b><i></i></span>${label('left')}</button><button data-pos="center"><span class="position-preview" aria-hidden="true"><i></i><b></b><i></i></span>${label('center')}</button><button data-pos="right"><span class="position-preview" aria-hidden="true"><i></i><b></b><i></i></span>${label('right')}</button></div><label for="volume">${label('volume')}</label><input id="volume" type="range" min="0" max="1" step="0.05"></section><section class="settings-keys" id="settings-keys" role="tabpanel" aria-labelledby="settings-keys-tab"><label>${label('bindings')} <span id="binding-mode"></span></label><div id="bindings"></div><p class="hint" id="bind-hint">${label('bindHint')}</p></section></div><label class="toggle"><span>${label('reduced')}</span><input id="reduced-motion" type="checkbox"></label><button id="reset" class="quiet">${label('reset')}</button><p class="local-note">TAB / SHIFT TAB / ESC</p></dialog>
-<div id="song-loading" class="hidden" role="status" aria-live="polite"><img id="loading-wallpaper" alt=""><div class="loading-info"><span>ORVIO ORIGINALS</span><h1 id="loading-title"></h1><p id="loading-detail"></p><strong id="loading-status"></strong><button id="cancel-startup" class="quiet" type="button"></button></div></div><dialog id="game-options"><form method="dialog"><div class="dialog-title"><h2>${label('gameOptions')}</h2><button class="close" aria-label="Close">×</button></div></form><label for="speed">${label('speed')} <output id="speed-value"></output></label><select id="speed"></select><label for="fader">${label('fader')}</label><select id="fader"><option value="off">OFF</option><option value="in">FADE IN</option><option value="in2">FADE IN 2</option><option value="out">FADE OUT</option><option value="out2">FADE OUT 2</option><option value="blink">BLINK</option><option value="blink2">BLINK 2</option><option value="fog">FOG</option><option value="pixel">PIXEL</option><option value="pixel2">PIXEL 2</option><option value="blind">BLIND</option></select><label for="shuffle">${label('shuffle')}</label><select id="shuffle"><option value="off">OFF</option><option value="mirror">MIRROR</option><option value="random">RANDOM</option></select><p class="hint" id="option-hint">${label('optionHint')}</p><button id="options-done" class="primary">${label('close')} ↵</button></dialog><dialog id="restart-options"><h2>${label('shuffleRestart')}</h2><p>${label('shuffleRestartHint')}</p><button id="confirm-shuffle-restart" class="primary">${label('restartApply')}</button><button id="cancel-shuffle-restart" class="quiet">${label('cancelChange')}</button></dialog><dialog id="results" tabindex="-1" aria-labelledby="result-song"><div class="result-system">ORVIO <span>SESSION REPORT</span></div><div class="result-heading"><img id="result-art" alt=""><div class="result-track"><h2 id="result-song"></h2><p id="result-metadata"></p><button id="result-preview" class="quiet" aria-pressed="false"></button></div></div><p id="result-options"></p><div class="result-summary"><div class="result-score-block"><div id="result-badge"></div><div class="result-score-caption">${label('score')}</div><div class="result-score" id="result-score"></div></div><div class="result-rank-block"><span class="result-rank-caption">RANK</span><span id="result-rank"></span></div></div><div class="result-stats"><div><span>${label('accuracy')}</span><strong id="result-rate"></strong></div><div><span>${label('maxCombo')}</span><strong id="result-combo"></strong></div><div><span>BREAK</span><strong id="result-break"></strong></div></div><p id="result-fever" class="hint hidden"></p><div id="judgment-list"></div><div class="result-tools"><button id="watch-replay" class="quiet hidden"></button><button id="share-result" class="quiet"></button></div><p id="share-status" class="hint" role="status"></p><p id="replay-status" class="hint hidden" role="status"></p><p class="mobile-playback-note"></p><div class="result-actions"><button id="back" class="quiet">ESC ${label('back')}</button><button id="retry" class="primary">${label('retry')} ↵</button></div></dialog>
+    "",
+  )}</select><label>${label("position")}</label><div class="segmented" id="position"><button data-pos="left"><span class="position-preview" aria-hidden="true"><i></i><b></b><i></i></span>${label("left")}</button><button data-pos="center"><span class="position-preview" aria-hidden="true"><i></i><b></b><i></i></span>${label("center")}</button><button data-pos="right"><span class="position-preview" aria-hidden="true"><i></i><b></b><i></i></span>${label("right")}</button></div><label for="volume">${label("volume")}</label><input id="volume" type="range" min="0" max="1" step="0.05"></section><section class="settings-keys" id="settings-keys" role="tabpanel" aria-labelledby="settings-keys-tab"><label>${label("bindings")} <span id="binding-mode"></span></label><div id="bindings"></div><p class="hint" id="bind-hint">${label("bindHint")}</p></section></div><label class="toggle"><span>${label("reduced")}</span><input id="reduced-motion" type="checkbox"></label><button id="reset" class="quiet">${label("reset")}</button><footer class="status-footer"><a id="status-link" href="/status/">${STATUS_LABELS[settings.language].statusTitle}</a><p class="local-note">TAB / SHIFT TAB / ESC</p></footer></dialog>
+<div id="song-loading" class="hidden" role="status" aria-live="polite"><img id="loading-wallpaper" alt=""><div class="loading-info"><span>ORVIO ORIGINALS</span><h1 id="loading-title"></h1><p id="loading-detail"></p><strong id="loading-status"></strong><button id="cancel-startup" class="quiet" type="button"></button></div></div><dialog id="game-options"><form method="dialog"><div class="dialog-title"><h2>${label("gameOptions")}</h2><button class="close" aria-label="Close">×</button></div></form><label for="speed">${label("speed")} <output id="speed-value"></output></label><select id="speed"></select><label for="fader">${label("fader")}</label><select id="fader"><option value="off">OFF</option><option value="in">FADE IN</option><option value="in2">FADE IN 2</option><option value="out">FADE OUT</option><option value="out2">FADE OUT 2</option><option value="blink">BLINK</option><option value="blink2">BLINK 2</option><option value="fog">FOG</option><option value="pixel">PIXEL</option><option value="pixel2">PIXEL 2</option><option value="blind">BLIND</option></select><label for="shuffle">${label("shuffle")}</label><select id="shuffle"><option value="off">OFF</option><option value="mirror">MIRROR</option><option value="random">RANDOM</option></select><p class="hint hidden" id="option-hint"></p><button id="options-done" class="primary">${label("close")} ↵</button></dialog><dialog id="restart-options"><h2>${label("shuffleRestart")}</h2><p>${label("shuffleRestartHint")}</p><button id="confirm-shuffle-restart" class="primary">${label("restartApply")}</button><button id="cancel-shuffle-restart" class="quiet">${label("cancelChange")}</button></dialog><dialog id="results" tabindex="-1" aria-labelledby="result-song"><div class="result-system">ORVIO <span>SESSION REPORT</span></div><div class="result-heading"><img id="result-art" alt=""><div class="result-track"><h2 id="result-song"></h2><p id="result-metadata"></p><button id="result-preview" class="quiet" aria-pressed="false"></button></div></div><p id="result-options"></p><div class="result-summary"><div class="result-score-block"><div id="result-badge"></div><div class="result-score-caption">${label("score")}</div><div class="result-score" id="result-score"></div></div><div class="result-rank-block"><span class="result-rank-caption">RANK</span><span id="result-rank"></span></div></div><div class="result-stats"><div><span>${label("accuracy")}</span><strong id="result-rate"></strong></div><div><span>${label("maxCombo")}</span><strong id="result-combo"></strong></div><div><span>BREAK</span><strong id="result-break"></strong></div></div><p id="result-fever" class="hint hidden"></p><div id="judgment-list"></div><div class="result-tools"><button id="watch-replay" class="quiet hidden"></button><button id="share-result" class="quiet"></button></div><p id="share-status" class="hint" role="status"></p><p id="replay-status" class="hint hidden" role="status"></p><p class="mobile-playback-note"></p><div class="result-actions"><button id="back" class="quiet">ESC ${label("back")}</button><button id="retry" class="primary">${label("retry")} ↵</button></div></dialog>
 
-<dialog id="about"><form method="dialog"><div class="dialog-title"><h2>${label('aboutTitle')}</h2><button class="close" aria-label="Close">×</button></div></form><p>${label('aboutBody')}</p><a href="https://github.com/orviohq/orvio" target="_blank" rel="noreferrer">${label('code')} ↗</a></dialog>`;
+<dialog id="about"><form method="dialog"><div class="dialog-title"><h2>${label("aboutTitle")}</h2><button class="close" aria-label="Close">×</button></div></form><p>${label("aboutBody")}</p><a href="https://github.com/orviohq/orvio" target="_blank" rel="noreferrer">${label("code")} ↗</a></dialog>`;
 app.insertAdjacentHTML(
-  'beforeend',
+  "beforeend",
   '<dialog id="youtube-import"><form id="youtube-form"><div class="dialog-title"><h2 id="youtube-heading"></h2><button id="youtube-cancel" type="button" class="close">×</button></div><label for="youtube-url" id="youtube-label"></label><input id="youtube-url" type="url" required autocomplete="off" placeholder="https://www.youtube.com/watch?v=…"><p id="youtube-rights" class="hint"></p><div id="youtube-progress" hidden role="status" aria-live="polite"><span class="youtube-spinner" aria-hidden="true"></span><strong id="youtube-progress-label"></strong><span id="youtube-elapsed"></span><progress aria-label="YouTube"></progress></div><p id="youtube-status" role="status" class="hint"></p><button id="youtube-submit" class="primary"></button></form></dialog>',
 );
-const addYoutube = document.createElement('button');
-addYoutube.id = 'add-youtube';
-addYoutube.className = 'quiet youtube-add-icon';
+const addYoutube = document.createElement("button");
+addYoutube.id = "add-youtube";
+addYoutube.className = "quiet youtube-add-icon";
 addYoutube.innerHTML = youtubeAddIcon;
-const libraryActions = document.createElement('div');
-libraryActions.id = 'library-actions';
-$('#app .library .section-title').append(libraryActions);
+const libraryActions = document.createElement("div");
+libraryActions.id = "library-actions";
+$("#app .library .section-title").append(libraryActions);
 libraryActions.append(addYoutube);
 let sharingSong = false;
 async function shareLibrarySong(id: string) {
+  const local = localAllKeysSource(id);
   const item = externalSource(extensionLibraryPairs.base(id) ?? id);
-  if (!item || sharingSong) return;
+  if ((!local && !item) || sharingSong) return;
   sharingSong = true;
   try {
     await copySongLink(
-      createSongLink(
-        item.record,
-        location.origin,
-        item.song.title,
-        item.song.subtitle,
-      ),
+      local
+        ? Promise.resolve(
+            createYoutubeSongLink(
+              local.envelope.record.videoId,
+              location.origin,
+            ),
+          )
+        : createSongLink(
+            item!.record,
+            location.origin,
+            item!.song.title,
+            item!.song.subtitle,
+          ),
     );
     toast(
-      settings.language === 'ko' ? '곡 링크를 복사했어요' : 'Song link copied',
+      settings.language === "ko" ? "곡 링크를 복사했어요" : "Song link copied",
     );
   } catch {
     toast(
-      settings.language === 'ko'
-        ? '곡 링크를 복사할 수 없습니다. 곡 정보와 연결 또는 클립보드 권한을 확인해 주세요.'
-        : 'Could not copy the song link. Check the source, connection or clipboard permission.',
+      settings.language === "ko"
+        ? "곡 링크를 복사할 수 없습니다. 곡 정보와 연결 또는 클립보드 권한을 확인해 주세요."
+        : "Could not copy the song link. Check the source, connection or clipboard permission.",
     );
   } finally {
     sharingSong = false;
   }
 }
 const hiddenSongs = hiddenLibraryIds();
+// An explicit duplicate Add reveals only its target for this visit; saved
+// library visibility preferences are left intact.
+let revealedLibraryVideo: string | undefined;
 const libraryVideoKey = (id: string) => {
   const video = songVideoId(id);
-  return video ? 'yt:' + video : id;
+  return video ? "yt:" + video : id;
 };
 const isHiddenSong = (id: string) =>
-  hiddenSongs.has(id) || hiddenSongs.has(libraryVideoKey(id));
+  (hiddenSongs.has(id) || hiddenSongs.has(libraryVideoKey(id))) &&
+  (!revealedLibraryVideo || songVideoId(id) !== revealedLibraryVideo);
 let librarySelection = readLibrarySelection(localStorage);
 function rememberLibrarySelection() {
   if (!SONGS[songIndex] || isHiddenSong(SONGS[songIndex].id)) return;
   librarySelection = {
     key: libraryVideoKey(SONGS[songIndex].id),
-    scroll: $('#songs').scrollTop,
+    scroll: $("#songs").scrollTop,
     pageScroll: window.scrollY,
   };
   writeLibrarySelection(localStorage, librarySelection);
@@ -846,12 +1129,12 @@ function restoreLibrarySelection() {
 }
 let restoringLibraryScroll = false;
 function restoreLibraryScroll() {
-  if (!librarySelection || screen !== 'select') return;
+  if (!librarySelection || screen !== "select") return;
   restoringLibraryScroll = true;
-  const list = $('#songs');
+  const list = $("#songs");
   list.scrollTop = librarySelection.scroll;
   window.scrollTo(0, librarySelection.pageScroll);
-  const selected = list.querySelector<HTMLElement>('.song-card.selected');
+  const selected = list.querySelector<HTMLElement>(".song-card.selected");
   if (selected) {
     const row = selected.getBoundingClientRect(),
       box = list.getBoundingClientRect();
@@ -871,34 +1154,67 @@ function restoreLibraryScroll() {
     }
   }
   requestAnimationFrame(() => {
-    const selected = list.querySelector<HTMLElement>('.song-card.selected');
+    const selected = list.querySelector<HTMLElement>(".song-card.selected");
     selected?.scrollIntoView({
-      block: 'nearest',
-      inline: 'nearest',
-      behavior: 'instant',
+      block: "nearest",
+      inline: "nearest",
+      behavior: "instant",
     });
     requestAnimationFrame(() => {
       restoringLibraryScroll = false;
     });
   });
 }
-$('#songs').addEventListener(
-  'scroll',
+$("#songs").addEventListener(
+  "scroll",
   () => {
-    if (screen === 'select' && !active && !preparing && !restoringLibraryScroll)
+    if (screen === "select" && !active && !preparing && !restoringLibraryScroll)
       rememberLibrarySelection();
   },
   { passive: true },
 );
 window.addEventListener(
-  'scroll',
+  "scroll",
   () => {
-    if (screen === 'select' && !active && !preparing && !restoringLibraryScroll)
+    if (screen === "select" && !active && !preparing && !restoringLibraryScroll)
       rememberLibrarySelection();
   },
   { passive: true },
 );
 let libraryHydrated = false;
+let selectionRouteUnresolved = false;
+$("#songs").insertAdjacentHTML(
+  "beforebegin",
+  '<p id="selection-link-status" role="status" hidden></p>',
+);
+function syncSelectionLinkStatus() {
+  const status = $("#selection-link-status");
+  status.textContent =
+    screen === "select" && selectionRouteUnresolved
+      ? selectionLinkStatus(
+          resolveCurrentSelection(),
+          location.search,
+          settings.language,
+        )
+      : "";
+  status.hidden = !status.textContent;
+}
+function resolveCurrentSelection() {
+  return resolveSelectionSong({
+    search: location.search,
+    hydrated: libraryHydrated,
+    installed: SONGS.map((song) => song.id),
+    visible: visibleSongIndices().map((index) => SONGS[index].id),
+    videoId: songVideoId,
+    preferred: (video) => {
+      const base = canonicalPreferred.get(video);
+      return base
+        ? extensionLibraryPairs.resolve(base, settings.lanes)
+        : undefined;
+    },
+    storage: localStorage,
+  });
+}
 let selectedDuringHydration = false;
 // Verified server canonical reference + chart identity, not an audio-ready flag.
 // Audio is independently loaded and hash/WAV-verified by prepare/watchReplay.
@@ -911,6 +1227,9 @@ const visibleSongIndices = () => {
   const seen = new Set<string>();
   return SONGS.flatMap((song, i) => {
     if (transient468Ids.has(song.id) && !private468Bridge.owns(song.id))
+      return [];
+    const localVideoId = localAllKeysVideoId(song.id);
+    if (localVideoId && canonicalPreferred.get(localVideoId) !== song.id)
       return [];
     const source = externalSource(song.id);
     if (source && canonicalPreferred.get(source.record.videoId) !== song.id)
@@ -933,32 +1252,37 @@ const visibleSongIndices = () => {
   );
 };
 app.insertAdjacentHTML(
-  'beforeend',
+  "beforeend",
   '<dialog id="remove-song-dialog" aria-labelledby="remove-song-title"><h2 id="remove-song-title"></h2><p id="remove-song-prompt"></p><strong id="remove-song-name"></strong><div class="remove-song-actions"><button id="remove-song-cancel" class="quiet"></button><button id="remove-song-confirm" class="primary"></button></div></dialog>',
 );
 // A24: dedicated replay collection page; entry lives in the header nav.
+installPrivateReplayList(listLocalEntrySessions);
 initReplayPage({
   getLanguage: () => settings.language,
   getLabels: () => ({
     title: externalLabels(settings.language).replay,
     empty: externalLabels(settings.language).empty,
     readError: REPLAY_READ_ERROR[settings.language],
-    back: t('back'),
+    back: t("back"),
   }),
   onOpen: (key) => void openLocalSession(key),
   onNavigate: () => {
     if (active || preparing) return;
     rememberLibrarySelection();
-    history.pushState(null, '', '/replays/');
+    history.pushState(null, "", "/replays/");
     readRoute();
   },
   onBack: () => {
-    history.pushState(null, '', '/select/');
+    history.pushState(null, "", "/select/");
     readRoute();
   },
 });
+// ORV-78: self-heal the replay menu count from the verified stores after boot
+// and again once the extension session list is installed. Fire-and-forget; a
+// failure keeps the cached count.
+setTimeout(() => void reconcileReplayMenuCount(), 2000);
 let removingSongKey: string | undefined;
-libraryContextMenu($('#songs'), (row) => {
+libraryContextMenu($("#songs"), (row) => {
   if (active || preparing) return null;
   const index =
     row.dataset.song === undefined ? undefined : Number(row.dataset.song);
@@ -973,35 +1297,48 @@ libraryContextMenu($('#songs'), (row) => {
     song?.title ??
     canonicalPending.get(videoId)?.title ??
     backgroundImports.rows.get(videoId)?.title ??
-    row.querySelector('strong')?.textContent ??
+    row.querySelector("strong")?.textContent ??
     videoId;
   return {
     label: removalLabels(settings.language).button,
-    remove: () => openSongRemoval('yt:' + videoId, title),
+    remove: () => openSongRemoval("yt:" + videoId, title),
     share:
-      song && externalSource(song.id)
+      song && (externalSource(song.id) || hasLocalAllKeysSource(song.id))
         ? {
-            label: settings.language === 'ko' ? '곡 공유' : 'Share song',
+            label: settings.language === "ko" ? "곡 공유" : "Share song",
             run: () => void shareLibrarySong(song.id),
           }
         : undefined,
+    source: librarySourceAction(videoId, settings.language) ?? undefined,
   };
 });
 function openSongRemoval(key: string, title: string) {
   if (active || preparing) return;
   removingSongKey = key;
   const labels = removalLabels(settings.language);
-  $('#remove-song-title').textContent = labels.button;
-  $('#remove-song-prompt').textContent = labels.prompt;
-  $('#remove-song-name').textContent = title;
-  $('#remove-song-cancel').textContent = labels.cancel;
-  $('#remove-song-confirm').textContent = labels.confirm;
-  $<HTMLDialogElement>('#remove-song-dialog').showModal();
-  $('#remove-song-cancel').focus();
+  $("#remove-song-title").textContent = labels.button;
+  $("#remove-song-prompt").textContent = labels.prompt;
+  $("#remove-song-name").textContent = title;
+  $("#remove-song-cancel").textContent = labels.cancel;
+  $("#remove-song-confirm").textContent = labels.confirm;
+  $<HTMLDialogElement>("#remove-song-dialog").showModal();
+  $("#remove-song-cancel").focus();
 }
-$('#remove-song-cancel').onclick = () =>
-  $<HTMLDialogElement>('#remove-song-dialog').close();
-$('#remove-song-confirm').onclick = () => {
+$("#remove-song-cancel").onclick = () =>
+  $<HTMLDialogElement>("#remove-song-dialog").close();
+$<HTMLDialogElement>("#remove-song-dialog").onclick = (e) => {
+  const dialog = e.currentTarget as HTMLDialogElement;
+  if (e.target !== dialog) return;
+  const bounds = dialog.getBoundingClientRect();
+  if (
+    e.clientX < bounds.left - 4 ||
+    e.clientX > bounds.right + 4 ||
+    e.clientY < bounds.top - 4 ||
+    e.clientY > bounds.bottom + 4
+  )
+    dialog.close();
+};
+$("#remove-song-confirm").onclick = () => {
   if (!removingSongKey || active || preparing) return;
   const next = new Set(hiddenSongs);
   next.add(removingSongKey);
@@ -1012,16 +1349,17 @@ $('#remove-song-confirm').onclick = () => {
     return;
   }
   hiddenSongs.add(removingSongKey);
-  $<HTMLDialogElement>('#remove-song-dialog').close();
+  revealedLibraryVideo = undefined;
+  $<HTMLDialogElement>("#remove-song-dialog").close();
   stopPreview();
   selectSong(visibleSongIndices()[0], false);
   songCards();
-  history.replaceState(null, '', selectionPath());
+  replaceSelectionPath();
   toast(removalLabels(settings.language).removed);
 };
 function restoreLibraryVideo(videoId: string) {
   const next = new Set(hiddenSongs);
-  next.delete('yt:' + videoId);
+  next.delete("yt:" + videoId);
   for (const song of SONGS)
     if (externalSource(song.id)?.record.videoId === videoId)
       next.delete(song.id);
@@ -1041,7 +1379,11 @@ async function localVideoSessions(videoId: string) {
       /* Keep corrupt archives untouched, never rewrite them. */
     }
   }
-  return sessions;
+  const local = await listLocalAllKeysSessions();
+  return [
+    ...sessions,
+    ...local.filter((session) => session.source.videoId === videoId),
+  ];
 }
 async function openVideoHistory(videoId: string) {
   const sessions = await localVideoSessions(videoId);
@@ -1053,17 +1395,29 @@ async function openVideoHistory(videoId: string) {
     toast(externalLabels(settings.language).failed);
     return;
   }
-  const dialog = document.createElement('dialog');
-  const heading = document.createElement('h2');
+  const dialog = document.createElement("dialog");
+  const heading = document.createElement("h2");
   heading.textContent = externalLabels(settings.language).replay;
+  dialog.onclick = (e) => {
+    const dialog = e.currentTarget as HTMLDialogElement;
+    if (e.target !== dialog) return;
+    const bounds = dialog.getBoundingClientRect();
+    if (
+      e.clientX < bounds.left - 4 ||
+      e.clientX > bounds.right + 4 ||
+      e.clientY < bounds.top - 4 ||
+      e.clientY > bounds.bottom + 4
+    )
+      dialog.close();
+  };
   dialog.append(heading);
   for (const session of sessions) {
-    const button = document.createElement('button');
-    button.className = 'quiet';
-    button.style.display = 'block';
-    button.style.marginBlock = '12px';
+    const button = document.createElement("button");
+    button.className = "quiet";
+    button.style.display = "block";
+    button.style.marginBlock = "12px";
     const key =
-      `${session.replay.lanes}:${session.replay.difficulty}` as keyof typeof session.source.charts;
+      `${session.replay.lanes}:${session.replay.difficulty}` as `${Lanes}:${Difficulty}`;
     const level =
       session.source.chartMetadata?.[key] ??
       difficultyForChart(
@@ -1078,8 +1432,8 @@ async function openVideoHistory(videoId: string) {
     };
     dialog.append(button);
   }
-  const close = document.createElement('button');
-  close.className = 'quiet';
+  const close = document.createElement("button");
+  close.className = "quiet";
   close.textContent = externalLabels(settings.language).cancel;
   close.onclick = () => dialog.close();
   dialog.append(close);
@@ -1087,18 +1441,21 @@ async function openVideoHistory(videoId: string) {
   document.body.append(dialog);
   dialog.showModal();
 }
-async function openLocalSession(id: string) {
+async function openLocalSession(id: string, signal?: AbortSignal) {
   const href = location.href,
     navigation = navigationVersion;
   try {
-    const session = await readEntrySession(id);
+    const session = await readEntrySession(id, signal);
+    signal?.throwIfAborted();
     if (
-      id.startsWith('yt-opus-') &&
+      (id.startsWith("yt-opus-") || id.startsWith("local-allkeys-session:")) &&
       (location.href !== href || navigationVersion !== navigation)
     )
       return;
     localBuiltinNotes =
-      session && 'kind' in session && session.kind === 'builtin'
+      session &&
+      "kind" in session &&
+      (session.kind === "builtin" || session.kind === "local-allkeys")
         ? session.chart
         : undefined;
     if (!session) throw Error();
@@ -1108,7 +1465,7 @@ async function openLocalSession(id: string) {
     lastResult = session.result;
     localSessionKey = session.key;
     localSessionOpened = true;
-    if (id.startsWith('yt-opus-')) {
+    if (id.startsWith("yt-opus-") || id.startsWith("local-allkeys-session:")) {
       songIndex = SONGS.findIndex((s) => s.id === session.replay.song);
       settings.lanes = session.replay.lanes;
       settings.difficulty = session.replay.difficulty;
@@ -1116,13 +1473,19 @@ async function openLocalSession(id: string) {
     ownResults.add(session.result);
     showResult(session.result);
   } catch {
+    if (signal?.aborted) return;
     if (
-      id.startsWith('yt-opus-') &&
+      id.startsWith("local-allkeys-session:") &&
+      (location.href !== href || navigationVersion !== navigation)
+    )
+      return;
+    if (
+      (id.startsWith("yt-opus-") || id.startsWith("local-allkeys-session:")) &&
       location.href === href &&
       navigationVersion === navigation
     ) {
-      document.documentElement.removeAttribute('data-result-pending');
-      history.replaceState(null, '', '/select/');
+      document.documentElement.removeAttribute("data-result-pending");
+      history.replaceState(null, "", "/select/");
       exit();
       readRoute();
     }
@@ -1134,14 +1497,14 @@ let localBuiltinNotes: Note[] | undefined;
 let youtubeInputRevision = 0;
 let submittedYoutubeInput:
   { videoId: string; value: string; revision: number } | undefined;
-$('#youtube-url').addEventListener('input', () => {
+$("#youtube-url").addEventListener("input", () => {
   youtubeInputRevision++;
 });
 export async function completePreparedYoutubeImport(
-  r: Awaited<ReturnType<typeof import('./external-import').importYoutube>>,
+  r: Awaited<ReturnType<typeof import("./external-import").importYoutube>>,
 ) {
-  const title = r.title?.trim() || 'YouTube · ' + r.prepared.record.videoId;
-  await audioAtStage('storage', () =>
+  const title = r.title?.trim() || "YouTube · " + r.prepared.record.videoId;
+  await audioAtStage("storage", () =>
     saveLocalAudio(
       r.prepared.record,
       title,
@@ -1162,177 +1525,298 @@ export async function completePreparedYoutubeImport(
   canonicalPending.delete(r.prepared.record.videoId);
   recoverDisplayMetadata(r.prepared.record);
   if (general468Coordinator && isOpusRecord(r.prepared.record))
-    await extendGeneralSource(r.prepared.record, {
-      lanes: [4, 6, 8].includes(settings.lanes)
-        ? (settings.lanes as 4 | 6 | 8)
-        : 4,
-      difficulty: settings.difficulty,
-    }).catch(() => {
-      // Base import already committed. Keep extension retry separate.
-      toast(opus468PlayerLabels(settings.language).unavailable);
+    await extendGeneralSource(
+      r.prepared.record,
+      EXTENSION_READINESS_SELECTION,
+    ).catch(() => {
+      // Base import already committed; optional chart readiness is not playback.
+      // Per-row extension retry stays.
     });
+  prepareGeneralReadiness();
   if (!active && !preparing) {
     songCards();
     selectedSong();
   }
   const submitted = submittedYoutubeInput;
-  const input = $<HTMLInputElement>('#youtube-url');
+  const input = $<HTMLInputElement>("#youtube-url");
   if (
     submitted?.videoId === r.prepared.record.videoId &&
     submitted.revision === youtubeInputRevision &&
     input.value === submitted.value
   ) {
-    input.value = '';
+    input.value = "";
     submittedYoutubeInput = undefined;
   }
   toast(externalLabels(settings.language).saved);
 }
-const backgroundImports = new BackgroundImports(
+async function completeLocalAllKeysImport(prepared: PreparedDirectAllKeys) {
+  const item = await installLocalAllKeysSource(
+    prepared.envelope,
+    prepared.title,
+    prepared.author,
+  );
+  const videoId = item.envelope.record.videoId;
+  if (!SONGS.some((song) => song.id === item.song.id)) SONGS.push(item.song);
+  canonicalPreferred.set(videoId, item.song.id);
+  canonicalPending.delete(videoId);
+  libraryAddOrder.added(videoId);
+  restoreLibraryVideo(videoId);
+  if (!active && !preparing) {
+    songCards();
+    selectedSong();
+  }
+  const submitted = submittedYoutubeInput;
+  const input = $<HTMLInputElement>("#youtube-url");
+  if (
+    submitted &&
+    submitted.videoId === videoId &&
+    submitted.revision === youtubeInputRevision &&
+    input.value === submitted.value
+  ) {
+    input.value = "";
+    submittedYoutubeInput = undefined;
+  }
+  toast(externalLabels(settings.language).saved);
+}
+const backgroundImports = new BackgroundImports<PreparedDirectAllKeys>(
   () => songCards(),
-  completePreparedYoutubeImport,
+  completeLocalAllKeysImport,
+  localStorage,
+  async (videoId, signal, options) => {
+    const prepared = await prepareDirectAllKeys(videoId, signal, {
+      publicKey: import.meta.env.PUBLIC_YOUTUBE_API_KEY ?? "",
+      onStage: options.onStage,
+      onMetadata: options.onMetadata,
+      onAudioVerified: options.onVerified,
+    });
+    return prepared;
+  },
 );
-addYoutube.onclick = () => {
-  $('#youtube-status').textContent = '';
-  $('#youtube-progress').hidden = true;
-  $<HTMLButtonElement>('#youtube-submit').disabled = false;
-  $<HTMLDialogElement>('#youtube-import').showModal();
-  $('#youtube-url').focus();
+// Pin restored pending order before first paint/resume: retry is not a new add.
+libraryAddOrder.ensurePendingOrder(backgroundImports.rows.keys());
+function clientOnlyLocalAudioMessage(error: ClientOnlyLocalAudioError) {
+  if (error.reason === "missing")
+    return settings.language === "ko"
+      ? "이 곡의 로컬 오디오 파일이 없습니다. 이 기기에 저장된 파일이 필요합니다."
+      : "The local audio file for this song is missing. A file already saved on this device is required.";
+  return settings.language === "ko"
+    ? "저장된 로컬 오디오가 손상되어 재생할 수 없습니다. 다시 내려받지 않습니다."
+    : "The saved local audio is corrupted and cannot be played. It will not be downloaded again.";
+}
+function openYoutubeImport(prefill?: string) {
+  $("#youtube-status").textContent = "";
+  $("#youtube-progress").hidden = true;
+  $<HTMLButtonElement>("#youtube-submit").disabled = false;
+  if (prefill !== undefined)
+    $<HTMLInputElement>("#youtube-url").value = prefill;
+  $<HTMLDialogElement>("#youtube-import").showModal();
+  $("#youtube-url").focus();
+}
+addYoutube.onclick = () => openYoutubeImport();
+function openSongInvitation() {
+  const selection = resolveCurrentSelection();
+  if (
+    selection.kind !== "invitation" ||
+    !/^\/(?:select\/?)?$/.test(location.pathname)
+  )
+    return;
+  if (
+    location.hash.startsWith("#v=") ||
+    new URLSearchParams(location.search).has("s")
+  )
+    return;
+  openYoutubeImport(youtubeWatchUrl(selection.video));
+}
+$("#youtube-cancel").onclick = () =>
+  $<HTMLDialogElement>("#youtube-import").close();
+$<HTMLDialogElement>("#youtube-import").onclick = (e) => {
+  const dialog = e.currentTarget as HTMLDialogElement;
+  if (e.target !== dialog) return;
+  const bounds = dialog.getBoundingClientRect();
+  if (
+    e.clientX < bounds.left - 4 ||
+    e.clientX > bounds.right + 4 ||
+    e.clientY < bounds.top - 4 ||
+    e.clientY > bounds.bottom + 4
+  )
+    dialog.close();
 };
-$('#youtube-cancel').onclick = () =>
-  $<HTMLDialogElement>('#youtube-import').close();
-$('#youtube-form').onsubmit = (e) => {
+function focusExistingYoutube(videoId: string) {
+  // Use verified catalog ownership, never a substring of a built-in/song ID.
+  // The renderer resolves the preferred base into the current key-mode row.
+  const state = youtubeDuplicateState(
+    videoId,
+    canonicalPreferred.get(videoId),
+    SONGS,
+    songVideoId,
+    backgroundImports.rows.get(videoId)?.state === "loading" ||
+      canonicalPending.get(videoId)?.state === "loading",
+  );
+  if (!state) return false;
+  revealedLibraryVideo = videoId;
+  songCards();
+  const row = [
+    ...$("#songs").querySelectorAll<HTMLElement>("[data-library-focus-key]"),
+  ].find((element) => element.dataset.libraryFocusKey === "yt:" + videoId);
+  if (!row) return false;
+  $<HTMLDialogElement>("#youtube-import").close();
+  if (row.dataset.song !== undefined)
+    selectSong(Number(row.dataset.song), false);
+  row.focus({ preventScroll: true });
+  row.scrollIntoView({
+    block: "center",
+    inline: "nearest",
+    behavior: "instant",
+  });
+  rememberLibrarySelection();
+  toast(youtubeDuplicateMessage(settings.language, state === "adding"));
+  return true;
+}
+$("#youtube-form").onsubmit = async (e) => {
   e.preventDefault();
   try {
-    const videoId = backgroundImports.enqueue(
-      $<HTMLInputElement>('#youtube-url').value.trim(),
-    );
+    const input = $<HTMLInputElement>("#youtube-url").value.trim();
+    const videoId = youtubeId(input);
+    if (!videoId) throw new AudioJobError("invalid_url");
+    // A freshly reloaded library must finish local discovery before deciding
+    // that this video needs a new import.
+    if (!libraryHydrated) await libraryInitialization;
+    if (!$<HTMLDialogElement>("#youtube-import").open) return;
+    if (focusExistingYoutube(videoId)) return;
+    backgroundImports.enqueue(input);
     submittedYoutubeInput = {
       videoId,
-      value: $<HTMLInputElement>('#youtube-url').value,
+      value: $<HTMLInputElement>("#youtube-url").value,
       revision: ++youtubeInputRevision,
     };
     restoreLibraryVideo(videoId);
     libraryAddOrder.added(videoId);
     songCards();
-    $<HTMLDialogElement>('#youtube-import').close();
+    $<HTMLDialogElement>("#youtube-import").close();
   } catch (error) {
-    $('#youtube-status').textContent = externalError(error, settings.language);
+    $("#youtube-status").textContent = externalError(error, settings.language);
   }
 };
 guardFullscreenEscape();
-document.addEventListener('orvio:fullscreen-capture', () => {
-  if (fullscreenEscapeStatus() !== 'locked')
+document.addEventListener("orvio:fullscreen-capture", () => {
+  if (fullscreenEscapeStatus() !== "locked")
     toast(FULLSCREEN_WARNING[settings.language]);
 });
-const scoreDisplay = new ScoreDisplay($('#score'));
-const mobileInput = matchMedia('(hover: none) and (pointer: coarse)');
+const scoreDisplay = new ScoreDisplay($("#score"));
+const mobileInput = matchMedia("(hover: none) and (pointer: coarse)");
 function mobilePlaybackOnly() {
   return mobileInput.matches;
 }
 function syncMobilePlayback() {
-  document.body.classList.toggle('mobile-playback-only', mobilePlaybackOnly());
-  for (const id of ['start', 'ready-start', 'retry']) {
-    const button = document.querySelector<HTMLButtonElement>('#' + id);
+  document.body.classList.toggle("mobile-playback-only", mobilePlaybackOnly());
+  for (const id of ["start", "ready-start", "retry"]) {
+    const button = document.querySelector<HTMLButtonElement>("#" + id);
     if (button) {
-      button.disabled = mobilePlaybackOnly() || (id === 'start' && preparing);
-      button.title = mobilePlaybackOnly() ? t('unsupported') : '';
+      button.disabled = mobilePlaybackOnly() || (id === "start" && preparing);
+      button.title = mobilePlaybackOnly() ? t("unsupported") : "";
     }
   }
-  const back = document.querySelector<HTMLElement>('#back');
-  const exitButton = document.querySelector<HTMLElement>('#exit');
-  if (back) back.textContent = (mobilePlaybackOnly() ? '' : 'ESC ') + t('back');
+  const back = document.querySelector<HTMLElement>("#back");
+  const exitButton = document.querySelector<HTMLElement>("#exit");
+  if (back) back.textContent = (mobilePlaybackOnly() ? "" : "ESC ") + t("back");
   if (exitButton)
-    exitButton.textContent = (mobilePlaybackOnly() ? '' : 'ESC ') + t('exit');
+    exitButton.textContent = (mobilePlaybackOnly() ? "" : "ESC ") + t("exit");
   for (const note of document.querySelectorAll<HTMLElement>(
-    '.mobile-playback-note',
+    ".mobile-playback-note",
   ))
-    note.textContent = t('unsupported');
+    note.textContent = t("unsupported");
 }
-mobileInput.addEventListener('change', syncMobilePlayback);
+mobileInput.addEventListener("change", syncMobilePlayback);
 function localize() {
   syncMobilePlayback();
   const external = externalLabels(settings.language);
-  addYoutube.setAttribute('aria-label', external.add);
+  addYoutube.setAttribute("aria-label", external.add);
   addYoutube.title = external.add;
   setReplayNavLabel(external.replay);
-  $('#youtube-heading').textContent = external.add;
-  $('#youtube-label').textContent = external.url;
-  $('#youtube-submit').textContent = external.submit;
-  $('#youtube-rights').textContent = externalError(
-    new AudioJobError('too_long'),
+  $("#youtube-heading").textContent = external.add;
+  $("#youtube-label").textContent = external.url;
+  $("#youtube-submit").textContent = external.submit;
+  $("#youtube-rights").textContent = externalError(
+    new AudioJobError("too_long"),
     settings.language,
   );
-  $('#youtube-cancel').setAttribute('aria-label', external.cancel);
-  queueMicrotask(() => document.dispatchEvent(new Event('orvio:select-sync')));
+  $("#youtube-cancel").setAttribute("aria-label", external.cancel);
+  queueMicrotask(() => document.dispatchEvent(new Event("orvio:select-sync")));
   document.documentElement.lang = settings.language;
-  const shareStatus = document.querySelector<HTMLElement>('#share-status');
+  const shareStatus = document.querySelector<HTMLElement>("#share-status");
   if (shareStatus) {
     const message = shareStatus.dataset.message as
       keyof ReturnType<typeof shareLabels> | undefined;
     if (message)
       shareStatus.textContent = shareLabels(settings.language)[message];
   }
-  document.body.classList.toggle('reduced-motion', settings.reducedMotion);
-  if (settings.reducedMotion && $<HTMLDialogElement>('#results').open)
+  $("#preview-status").textContent = t("nowPlaying");
+  document.body.classList.toggle("reduced-motion", settings.reducedMotion);
+  if (settings.reducedMotion && $<HTMLDialogElement>("#results").open)
     resultMotion.finish();
   document
-    .querySelectorAll<HTMLElement>('[data-i18n]')
+    .querySelectorAll<HTMLElement>("[data-i18n]")
     .forEach((el) => (el.textContent = t(el.dataset.i18n as Word)));
   document
-    .querySelectorAll<HTMLAnchorElement>('[data-patch-link]')
-    .forEach((a) => (a.href = '/patch-notes/?lang=' + settings.language));
-  $<HTMLSelectElement>('#language').value =
-    settings.languageMode === 'manual' ? settings.language : 'auto';
-  $<HTMLOptionElement>('#language option[value=auto]').textContent =
-    t('browserLanguage');
-  $('#share-result').setAttribute('aria-label', t('shareResult'));
-  $('#share-result').title = t('shareResult');
+    .querySelectorAll<HTMLAnchorElement>("[data-patch-link]")
+    .forEach((a) => (a.href = "/patch-notes/?lang=" + settings.language));
+  syncStatusLink();
+  $<HTMLSelectElement>("#language").value =
+    settings.languageMode === "manual" ? settings.language : "auto";
+  $<HTMLOptionElement>("#language option[value=auto]").textContent =
+    t("browserLanguage");
+  $("#share-result").setAttribute("aria-label", t("shareResult"));
+  $("#share-result").title = t("shareResult");
 
-  $('#option-hint').textContent = t(
-    optionsDuringPlay ? 'liveOptionHint' : 'optionHint',
-  );
-  $('#ready-detail').textContent =
+  const optionHint = $("#option-hint");
+  optionHint.textContent = optionsDuringPlay ? t("liveOptionHint") : "";
+  optionHint.classList.toggle("hidden", !optionsDuringPlay);
+  $("#ready-detail").textContent =
     `${settings.lanes} KEY / ${chartLevel(SONGS[songIndex], settings.difficulty, settings.lanes)} / ENTER`;
   if (lastResult) {
     resultOptions(lastResult);
     const counts = lastResult.judgments;
-    $('#result-badge').textContent = counts
+    $("#result-badge").textContent = counts
       ? lastResult.accuracy === 100
-        ? t('perfectPlay')
+        ? t("perfectPlay")
         : counts[11] === 0
-          ? t('maxCombo')
-          : t('session')
-      : t('session');
+          ? t("maxCombo")
+          : t("session")
+      : t("session");
   }
-  $<HTMLInputElement>('#reduced-motion').checked = settings.reducedMotion;
+  $<HTMLInputElement>("#reduced-motion").checked = settings.reducedMotion;
 }
 function selectedSong() {
   const song = SONGS[songIndex];
-  document.documentElement.style.setProperty('--accent', song.color);
-  $('#selected-art').className =
-    'selected-art cover-' +
+  document.documentElement.style.setProperty("--accent", song.color);
+  $("#selected-art").className =
+    "selected-art cover-" +
     songIndex +
-    (songVideoId(song.id) ? ' youtube-art' : '');
-  $('#selected-art').style.backgroundImage =
+    (songVideoId(song.id) ? " youtube-art" : "");
+  $("#selected-art").style.backgroundImage =
     `url("${songArt(song.id)}"), url("${ART_FALLBACK}")`;
-  $('#selected-art .art-index').textContent = '0' + (songIndex + 1);
-  $('#selected-title').textContent = song.title;
-  $('#selected-title').title = song.title;
+  $("#selected-art .art-index").textContent = "0" + (songIndex + 1);
+  $("#selected-title").textContent = song.title;
+  $("#selected-title").title = song.title;
   const originLabel = document.querySelector<HTMLElement>(
-    '#selected-art .art-mark',
+    "#selected-art .art-mark",
   );
   if (originLabel)
     originLabel.textContent =
-      externalSource(song.id) || ownsOpus468(song.id)
-        ? 'YOUTUBE'
-        : 'ORVIO / ORIGINALS';
-  $('#selected-subtitle').textContent =
-    externalSource(song.id) || ownsOpus468(song.id)
+      externalSource(song.id) ||
+      hasLocalAllKeysSource(song.id) ||
+      ownsOpus468(song.id)
+        ? "YOUTUBE"
+        : "ORVIO / ORIGINALS";
+  $("#selected-subtitle").textContent =
+    externalSource(song.id) ||
+    hasLocalAllKeysSource(song.id) ||
+    ownsOpus468(song.id)
       ? song.subtitle
-      : t(('subtitle' + songIndex) as Word);
-  $('#selected-genre').textContent = song.genre;
-  $('#selected-bpm').textContent = song.bpm + ' BPM';
-  if (libraryHydrated && screen === 'select') {
+      : t(("subtitle" + songIndex) as Word);
+  $("#selected-genre").textContent = song.genre;
+  $("#selected-bpm").textContent = song.bpm + " BPM";
+  if (libraryHydrated && screen === "select") {
     rememberLibraryFirstPaint(
       visibleSongIndices().map((i) => SONGS[i].id),
       song.id,
@@ -1342,6 +1826,7 @@ function selectedSong() {
 }
 function selectSong(index: number, audition = true) {
   if (preparing || active) return;
+  selectionRouteUnresolved = false;
   if (!libraryHydrated) selectedDuringHydration = true;
   songIndex = (index + SONGS.length) % SONGS.length;
   if (!visibleSongIndices().includes(songIndex))
@@ -1351,13 +1836,14 @@ function selectSong(index: number, audition = true) {
   // Selection changes no row content or membership. Keep live buttons and
   // focus instead of rebuilding and re-rating every chart in the library.
   for (const row of document.querySelectorAll<HTMLElement>(
-    '#songs [data-song]',
+    "#songs [data-song]",
   ))
-    row.classList.toggle('selected', Number(row.dataset.song) === songIndex);
+    row.classList.toggle("selected", Number(row.dataset.song) === songIndex);
   syncSettings(false);
   selectedSong();
-  const list = $('#songs');
-  const selected = list.querySelector<HTMLElement>('.song-card.selected');
+  queueMicrotask(prepareGeneralReadiness);
+  const list = $("#songs");
+  const selected = list.querySelector<HTMLElement>(".song-card.selected");
   // Keep keyboard selection visible inside the list without scrolling the
   // page or moving the artwork on touch layouts.
   if (selected && list.scrollHeight > list.clientHeight + 1) {
@@ -1367,11 +1853,19 @@ function selectSong(index: number, audition = true) {
     else if (row.bottom > box.bottom) list.scrollTop += row.bottom - box.bottom;
   }
   rememberLibrarySelection();
-  if (audition) void previewSong();
+  if (audition && !document.hidden) {
+    if (!clock) clock = new AudioClock();
+    // Preserve activation in the trusted gesture; prepare only after quiet.
+    void clock.activate().catch(() => {});
+    previewTimer = window.setTimeout(() => {
+      previewTimer = undefined;
+      void previewSong();
+    }, 180);
+  }
 }
 
 function escapeText(text: string) {
-  const span = document.createElement('span');
+  const span = document.createElement("span");
   span.textContent = text;
   return span.innerHTML;
 }
@@ -1383,99 +1877,137 @@ function chartLevel(
   const display = chartDisplay(song, diff, lanes);
   return display.count
     ? difficultyText(display.metadata, settings.language)
-    : 'SC --';
+    : "SC --";
 }
 function songCards() {
   const restoreRowFocus = captureLibraryRowFocus(
-    $('#songs'),
-    screen === 'select',
+    $("#songs"),
+    screen === "select",
   );
-  const listScroll = $('#songs').scrollTop;
+  const listScroll = $("#songs").scrollTop;
   const visible = visibleSongIndices();
-  $('#songs').innerHTML = visible
+  const hidden = new Set(hiddenSongs);
+  if (revealedLibraryVideo) hidden.delete("yt:" + revealedLibraryVideo);
+  const renderedVideoIds = new Set(
+    visible
+      .map((i) => songVideoId(SONGS[i].id))
+      .filter((videoId): videoId is string => !!videoId),
+  );
+  const list = $("#songs");
+  const pendingKey = (row: HTMLElement) =>
+    row.dataset.canonicalVideo
+      ? "canonical:" + row.dataset.canonicalVideo
+      : row.dataset.importVideo
+        ? "background:" + row.dataset.importVideo
+        : undefined;
+  const retained = new Map(
+    [...list.children].flatMap((child) => {
+      const row = child as HTMLElement;
+      const key = pendingKey(row);
+      return key ? [[key, row] as const] : [];
+    }),
+  );
+  // Build the next view off-DOM; never clear the connected loading cards.
+  const next = document.createElement("div");
+  next.innerHTML = visible
     .map((i) => {
       const s = SONGS[i];
-      return `<button class="song-card ${i === songIndex ? 'selected' : ''}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${songVideoId(s.id) ? `<img class="youtube-cover" data-song-art="${s.id}" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small>${s.genre} <i>·</i> ${s.bpm} BPM</small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) || ownsOpus468(s.id) ? escapeText(s.subtitle) : t(('subtitle' + i) as Word)}</span><span class="song-note-count" data-chart-song="${i}">${chartDisplay(s, settings.difficulty, settings.lanes).count || '--'} ${t('notes')}</span></span><span class="song-time"><em class="song-level">${chartLevel(s, settings.difficulty, settings.lanes)}</em>${Math.floor(duration(s) / 60)}:${Math.floor(
+      const display = chartDisplay(s, settings.difficulty, settings.lanes);
+      return `<button class="song-card ${i === songIndex ? "selected" : ""}" data-song="${i}" style="--accent:${s.color}"><span class="cover cover-${i}">${songVideoId(s.id) ? `<img class="youtube-cover" data-song-art="${s.id}" src="${songArt(s.id)}" alt="" referrerpolicy="no-referrer">` : `<span class="orb"></span><span class="cover-number">0${i + 1}</span>`}</span><span class="song-copy"><small><span class="song-meta">${s.genre} <i>·</i> ${s.bpm} BPM</span> <i>·</i> <span class="song-duration">${Math.floor(duration(s) / 60)}:${Math.floor(
         duration(s) % 60,
       )
         .toString()
-        .padStart(2, '0')} <b>↗</b></span></button>`;
+        .padStart(
+          2,
+          "0",
+        )}</span></small><strong>${escapeText(s.title)}</strong><span>${externalSource(s.id) || hasLocalAllKeysSource(s.id) || ownsOpus468(s.id) ? escapeText(s.subtitle) : t(("subtitle" + i) as Word)}</span><span class="song-note-count" data-chart-song="${i}">${display.count || "--"} ${t("notes")}</span></span><em class="song-level" aria-label="${chartLevel(s, settings.difficulty, settings.lanes)}">${display.count ? (display.metadata?.rating?.level ?? "--") : "--"}</em></button>`;
     })
-    .join('');
+    .join("");
   for (const row of canonicalPending.values()) {
     if (
       backgroundImports.rows.has(row.videoId) ||
-      hiddenSongs.has('yt:' + row.videoId)
+      !pendingImportRowVisible(row.videoId, hidden, renderedVideoIds)
     )
       continue;
-    const element = document.createElement('div');
-    element.className = 'song-card import-pending canonical-pending';
+    const element = document.createElement("div");
+    element.className = "song-card import-pending canonical-pending";
     element.dataset.canonicalVideo = row.videoId;
     element.dataset.state = row.state;
-    element.setAttribute('role', 'group');
+    element.setAttribute("role", "group");
     element.tabIndex = 0;
-    const copy = document.createElement('span');
-    copy.className = 'song-copy';
-    const title = document.createElement('strong');
+    const copy = document.createElement("span");
+    copy.className = "song-copy";
+    const title = document.createElement("strong");
     title.textContent = row.title;
-    const status = document.createElement('span');
-    status.setAttribute('role', 'status');
+    const status = document.createElement("span");
+    status.setAttribute("role", "status");
     status.textContent =
-      row.state === 'loading'
+      row.state === "loading"
         ? externalLabels(settings.language).preparing
         : [
-            row.error ? externalError(row.error, settings.language) : '',
+            row.error ? externalError(row.error, settings.language) : "",
             canonicalPendingMessage(settings.language),
           ]
             .filter(Boolean)
-            .join(' ');
+            .join(" ");
     copy.append(title, status);
-    const cover = document.createElement('span');
-    cover.className = 'cover import-cover';
-    const thumbnail = document.createElement('img');
-    thumbnail.className = 'youtube-cover';
-    thumbnail.alt = '';
-    thumbnail.referrerPolicy = 'no-referrer';
-    thumbnail.src = `https://i.ytimg.com/vi/${row.videoId}/mqdefault.jpg`;
+    const cover = document.createElement("span");
+    cover.className = "cover import-cover";
+    const thumbnail = document.createElement("img");
+    thumbnail.className = "youtube-cover";
+    thumbnail.alt = "";
+    thumbnail.referrerPolicy = "no-referrer";
+    thumbnail.dataset.youtubeArt = row.videoId;
+    thumbnail.src = youtubeArtwork(row.videoId);
     thumbnail.onerror = () => {
       thumbnail.onerror = null;
       thumbnail.src = ART_FALLBACK;
     };
     cover.append(thumbnail);
-    const category = document.createElement('small');
-    category.textContent = 'YouTube';
+    const category = document.createElement("small");
+    category.textContent = "YouTube";
     copy.prepend(category);
-    const actions = document.createElement('span');
-    actions.className = 'import-actions';
+    const actions = document.createElement("span");
+    actions.className = "import-actions";
     element.append(cover, copy, actions);
-    if (row.state === 'loading') {
-      element.setAttribute('aria-busy', 'true');
-      const spinner = document.createElement('span');
-      spinner.className = 'youtube-spinner';
-      element.append(spinner);
+    if (row.state === "loading") {
+      element.setAttribute("aria-busy", "true");
+      element.classList.add("import-shine");
     } else {
-      const retry = document.createElement('button');
-      retry.className = 'quiet';
-      retry.dataset.libraryFocusAction = 'retry';
+      const retry = document.createElement("button");
+      retry.className = "quiet";
+      retry.dataset.libraryFocusAction = "retry";
       retry.textContent = importRetryLabel(settings.language);
       retry.onclick = () => void reconcileLibraryRow(row);
       actions.append(retry);
     }
-    const inspect = document.createElement('button');
-    inspect.className = 'quiet';
-    inspect.dataset.libraryFocusAction = 'inspect';
+    const inspect = document.createElement("button");
+    inspect.className = "quiet";
+    inspect.dataset.libraryFocusAction = "inspect";
     inspect.textContent = deviceInspectionButton(settings.language);
     inspect.onclick = async () => {
-      const dialog = document.createElement('dialog');
-      dialog.className = 'device-audio-dialog';
-      const title = document.createElement('h2');
+      const dialog = document.createElement("dialog");
+      dialog.className = "device-audio-dialog";
+      dialog.onclick = (e) => {
+        const dialog = e.currentTarget as HTMLDialogElement;
+        if (e.target !== dialog) return;
+        const bounds = dialog.getBoundingClientRect();
+        if (
+          e.clientX < bounds.left - 4 ||
+          e.clientX > bounds.right + 4 ||
+          e.clientY < bounds.top - 4 ||
+          e.clientY > bounds.bottom + 4
+        )
+          dialog.close();
+      };
+      const title = document.createElement("h2");
       title.textContent = deviceInspectionButton(settings.language);
-      const status = document.createElement('p');
-      status.setAttribute('role', 'status');
+      const status = document.createElement("p");
+      status.setAttribute("role", "status");
       status.textContent = deviceInspectionChecking(settings.language);
-      const close = document.createElement('button');
-      close.className = 'quiet';
-      close.textContent = t('close');
+      const close = document.createElement("button");
+      close.className = "quiet";
+      close.textContent = t("close");
       close.onclick = () => dialog.close();
       dialog.append(title, status, close);
       dialog.onclose = () => dialog.remove();
@@ -1487,20 +2019,20 @@ function songCards() {
       status.dataset.deviceAudio = state;
     };
     actions.append(inspect);
-    const history = document.createElement('button');
-    history.className = 'quiet';
-    history.dataset.libraryFocusAction = 'history';
+    const history = document.createElement("button");
+    history.className = "quiet";
+    history.dataset.libraryFocusAction = "history";
     history.textContent = externalLabels(settings.language).replay;
     history.onclick = () => void openVideoHistory(row.videoId);
     actions.append(history);
-    const remove = document.createElement('button');
-    remove.className = 'quiet';
-    remove.dataset.libraryFocusAction = 'remove';
+    const remove = document.createElement("button");
+    remove.className = "quiet";
+    remove.dataset.libraryFocusAction = "remove";
     remove.textContent = removalLabels(settings.language).button;
-    remove.onclick = () => openSongRemoval('yt:' + row.videoId, row.title);
+    remove.onclick = () => openSongRemoval("yt:" + row.videoId, row.title);
     actions.append(remove);
     disableUnreadySongRow(element);
-    $('#songs').append(element);
+    next.append(element);
     void localVideoSessions(row.videoId)
       .then((sessions) => {
         if (!sessions.length) history.remove();
@@ -1508,11 +2040,12 @@ function songCards() {
       .catch(() => history.remove());
   }
   for (const pending of backgroundImports.rows.values()) {
-    if (hiddenSongs.has('yt:' + pending.videoId)) continue;
-    const row = document.createElement('div');
-    row.className = 'song-card import-pending';
+    if (!pendingImportRowVisible(pending.videoId, hidden, renderedVideoIds))
+      continue;
+    const row = document.createElement("div");
+    row.className = "song-card import-pending";
     row.tabIndex = 0;
-    row.setAttribute('role', 'group');
+    row.setAttribute("role", "group");
     row.dataset.importVideo = pending.videoId;
     row.dataset.pendingVideo = pending.videoId;
     row.dataset.state = pending.state;
@@ -1524,33 +2057,32 @@ function songCards() {
     } else if (pending.error) {
       row.dataset.importError = pending.error;
     }
-    const copy = document.createElement('span');
-    copy.className = 'song-copy';
-    const title = document.createElement('strong');
-    title.textContent = pending.title || 'YouTube · ' + pending.videoId;
-    const state = document.createElement('span');
-    state.setAttribute('role', 'status');
+    const copy = document.createElement("span");
+    copy.className = "song-copy";
+    const title = document.createElement("strong");
+    title.textContent = pending.title || "YouTube · " + pending.videoId;
+    const state = document.createElement("span");
+    state.setAttribute("role", "status");
     state.textContent =
-      pending.state === 'loading'
-        ? importStageLabel(pending.stage ?? 'checking', settings.language)
+      pending.state === "loading"
+        ? importStageLabel(pending.stage ?? "checking", settings.language)
         : externalError(
             pending.failure ??
-              new AudioJobError(pending.error ?? 'unavailable'),
+              new AudioJobError(pending.error ?? "unavailable"),
             settings.language,
           );
-    const category = document.createElement('small');
-    category.textContent = 'YouTube';
+    const category = document.createElement("small");
+    category.textContent = "YouTube";
     copy.append(category);
     copy.append(title, state);
-    const cover = document.createElement('span');
-    cover.className = 'cover import-cover';
-    const thumbnail = document.createElement('img');
-    thumbnail.className = 'youtube-cover';
-    thumbnail.alt = '';
-    thumbnail.referrerPolicy = 'no-referrer';
-    thumbnail.src =
-      pending.thumbnailUrl ??
-      `https://i.ytimg.com/vi/${pending.videoId}/mqdefault.jpg`;
+    const cover = document.createElement("span");
+    cover.className = "cover import-cover";
+    const thumbnail = document.createElement("img");
+    thumbnail.className = "youtube-cover";
+    thumbnail.alt = "";
+    thumbnail.referrerPolicy = "no-referrer";
+    thumbnail.dataset.youtubeArt = pending.videoId;
+    thumbnail.src = youtubeArtwork(pending.videoId);
     thumbnail.onerror = () => {
       thumbnail.onerror = null;
       thumbnail.src = ART_FALLBACK;
@@ -1558,19 +2090,16 @@ function songCards() {
     cover.append(thumbnail);
     row.append(cover, copy);
     if (pending.stage) row.dataset.importStage = pending.stage;
-    if (pending.state === 'loading') {
-      row.setAttribute('aria-disabled', 'true');
-      row.setAttribute('aria-busy', 'true');
-      const spinner = document.createElement('span');
-      spinner.className = 'youtube-spinner';
-      spinner.setAttribute('aria-hidden', 'true');
-      row.append(spinner);
+    if (pending.state === "loading") {
+      row.setAttribute("aria-disabled", "true");
+      row.setAttribute("aria-busy", "true");
+      row.classList.add("import-shine");
       if (backgroundImports.isWaiting(pending.videoId)) {
-        const cancel = document.createElement('button');
-        cancel.className = 'quiet';
-        cancel.dataset.libraryFocusAction = 'dismiss';
-        cancel.textContent = '×';
-        cancel.setAttribute('aria-label', t('close'));
+        const cancel = document.createElement("button");
+        cancel.className = "quiet";
+        cancel.dataset.libraryFocusAction = "dismiss";
+        cancel.textContent = "×";
+        cancel.setAttribute("aria-label", t("close"));
         cancel.onclick = () => {
           try {
             backgroundImports.dismiss(pending.videoId);
@@ -1578,26 +2107,28 @@ function songCards() {
             toast(externalError(error, settings.language));
           }
         };
-        const actions = document.createElement('span');
-        actions.className = 'import-actions';
+        const actions = document.createElement("span");
+        actions.className = "import-actions";
         actions.append(cancel);
         row.append(actions);
       }
     } else {
-      const retry = document.createElement('button');
-      retry.className = 'quiet';
-      retry.dataset.libraryFocusAction = 'retry';
+      const retry = document.createElement("button");
+      retry.className = "quiet";
+      retry.dataset.libraryFocusAction = "retry";
       retry.textContent = importRetryLabel(settings.language);
       retry.onclick = () => {
-        addYoutube.click();
-        $<HTMLInputElement>('#youtube-url').value =
-          'https://www.youtube.com/watch?v=' + pending.videoId;
+        try {
+          backgroundImports.retry(pending.videoId);
+        } catch (error) {
+          toast(externalError(error, settings.language));
+        }
       };
-      const dismiss = document.createElement('button');
-      dismiss.className = 'quiet';
-      dismiss.dataset.libraryFocusAction = 'dismiss';
-      dismiss.textContent = '×';
-      dismiss.setAttribute('aria-label', t('close'));
+      const dismiss = document.createElement("button");
+      dismiss.className = "quiet";
+      dismiss.dataset.libraryFocusAction = "dismiss";
+      dismiss.textContent = "×";
+      dismiss.setAttribute("aria-label", t("close"));
       dismiss.onclick = () => {
         try {
           backgroundImports.dismiss(pending.videoId);
@@ -1605,18 +2136,48 @@ function songCards() {
           toast(externalError(error, settings.language));
         }
       };
-      const actions = document.createElement('span');
-      actions.className = 'import-actions';
-      retry.classList.add('import-retry');
-      dismiss.classList.add('import-dismiss');
+      const actions = document.createElement("span");
+      actions.className = "import-actions";
+      retry.classList.add("import-retry");
+      dismiss.classList.add("import-dismiss");
       actions.append(retry, dismiss);
       row.append(actions);
     }
     disableUnreadySongRow(row);
-    $('#songs').append(row);
+    next.append(row);
   }
   // Order DOM rows together, including loading/error transitions, without changing song IDs or selection indices.
-  const rows = [...$('#songs').children];
+  const rows = [...next.children].map((child) => {
+    const fresh = child as HTMLElement;
+    const key = pendingKey(fresh);
+    const current = key ? retained.get(key) : undefined;
+    if (!current) return fresh;
+    // Preserve the card and animated cover, including across error/retry.
+    for (const attribute of [...current.attributes])
+      if (!fresh.hasAttribute(attribute.name))
+        current.removeAttribute(attribute.name);
+    for (const attribute of [...fresh.attributes])
+      if (current.getAttribute(attribute.name) !== attribute.value)
+        current.setAttribute(attribute.name, attribute.value);
+    for (const selector of [
+      ".song-copy small",
+      ".song-copy strong",
+      '[role="status"]',
+    ]) {
+      const target = current.querySelector(selector);
+      const source = fresh.querySelector(selector);
+      if (target && source && target.textContent !== source.textContent)
+        target.textContent = source.textContent;
+    }
+    // Fresh actions bind the latest row state; async history checks retain
+    // their own button even after it is adopted into the connected card.
+    const actions = current.querySelector(".import-actions");
+    const freshActions = fresh.querySelector(".import-actions");
+    if (actions && freshActions) actions.replaceWith(freshActions);
+    else if (actions) actions.remove();
+    else if (freshActions) current.append(freshActions);
+    return current;
+  });
   rows.sort((a, b) => {
     const video = (el: Element) => {
       const element = el as HTMLElement;
@@ -1630,7 +2191,7 @@ function songCards() {
     };
     return libraryAddOrder.rank(video(a)) - libraryAddOrder.rank(video(b));
   });
-  $('#songs').append(...rows);
+  reconcileImportOrder(list, rows);
   for (const row of rows) {
     const el = row as HTMLElement;
     const song =
@@ -1641,24 +2202,24 @@ function songCards() {
       el.dataset.canonicalVideo ??
       el.dataset.importVideo ??
       (song ? songVideoId(song.id) : undefined);
-    el.dataset.libraryFocusKey = video ? 'yt:' + video : song?.id;
+    el.dataset.libraryFocusKey = video ? "yt:" + video : song?.id;
   }
-  $('#songs').scrollTop = listScroll;
-  restoreRowFocus(screen === 'select');
-  if (libraryHydrated && screen === 'select')
+  $("#songs").scrollTop = listScroll;
+  restoreRowFocus(screen === "select");
+  if (libraryHydrated && screen === "select")
     rememberLibraryFirstPaint(
       visible.map((i) => SONGS[i].id),
       SONGS[songIndex].id,
     );
   document
-    .querySelectorAll<HTMLImageElement>('.youtube-cover')
+    .querySelectorAll<HTMLImageElement>(".youtube-cover")
     .forEach((img) => {
       img.onerror = () => {
         img.onerror = null;
         img.src = ART_FALLBACK;
       };
     });
-  document.querySelectorAll<HTMLButtonElement>('#songs [data-song]').forEach(
+  document.querySelectorAll<HTMLButtonElement>("#songs [data-song]").forEach(
     (b) =>
       (b.onclick = () => {
         if (
@@ -1672,16 +2233,16 @@ function songCards() {
   );
   if ([4, 6, 8].includes(settings.lanes))
     for (const row of document.querySelectorAll<HTMLElement>(
-      '#songs [data-song]',
+      "#songs [data-song]",
     )) {
       const id = SONGS[Number(row.dataset.song)].id;
       if (extensionPending.has(id)) {
         disableUnreadySongRow(row);
-        const label = row.querySelector('.song-note-count');
+        const label = row.querySelector(".song-note-count");
         if (label)
           label.textContent = externalLabels(settings.language).preparing;
       } else if (extensionFailed.has(id)) {
-        const label = row.querySelector('.song-note-count');
+        const label = row.querySelector(".song-note-count");
         if (label)
           label.textContent = opus468PlayerLabels(settings.language).retry;
       }
@@ -1691,15 +2252,28 @@ function updateOptionReadout() {
   const shuffle = optionsDuringPlay ? originalShuffle : settings.shuffle;
   const fader = settings.fader;
   const speedText = `${settings.speed.toFixed(1)}×`;
-  const faderText = fader === 'off' ? 'OFF' : fader.toUpperCase();
-  const description = `${t('gameOptions')} (F3): ${t('speed')} ${speedText}, ${t('shuffle')} ${shuffle.toUpperCase()}, ${t('fader')} ${faderText}`;
-  const button = $('#play-options');
-  button.setAttribute('aria-label', description);
-  button.innerHTML = `<span class="option-chip" data-tip="${t('speed')}" title="${t('speed')}">${optionIcon('speed')}<b>${speedText}</b></span><span class="option-chip ${shuffle !== 'off' ? 'enabled' : ''}" data-tip="${t('shuffle')}" title="${t('shuffle')}">${optionIcon('shuffle', shuffle)}<b>${shuffle.toUpperCase()}</b></span><span class="option-chip ${fader !== 'off' ? 'enabled' : ''}" data-tip="${t('fader')}" title="${t('fader')}">${optionIcon('fader', fader)}<b>${faderText}</b></span><kbd>F3</kbd>`;
+  const faderText = fader === "off" ? "OFF" : fader.toUpperCase();
+  const description = `${t("gameOptions")} (F3): ${t("speed")} ${speedText}, ${t("shuffle")} ${shuffle.toUpperCase()}, ${t("fader")} ${faderText}`;
+  const button = $("#play-options");
+  button.setAttribute("aria-label", description);
+  button.innerHTML = `<span class="option-chip" data-tip="${t("speed")}" title="${t("speed")}">${optionIcon("speed")}<b>${speedText}</b></span><span class="option-chip ${shuffle !== "off" ? "enabled" : ""}" data-tip="${t("shuffle")}" title="${t("shuffle")}">${optionIcon("shuffle", shuffle)}<b>${shuffle.toUpperCase()}</b></span><span class="option-chip ${fader !== "off" ? "enabled" : ""}" data-tip="${t("fader")}" title="${t("fader")}">${optionIcon("fader", fader)}<b>${faderText}</b></span><kbd>F3</kbd>`;
 }
 
+function syncStatusLink() {
+  const link = document.querySelector<HTMLAnchorElement>("#status-link");
+  if (!link) return;
+  link.textContent = STATUS_LABELS[settings.language].statusTitle;
+  link.href = "/status/?lang=" + settings.language;
+  link.classList.toggle("status-unread", hasUnacknowledgedFailure());
+}
+window.addEventListener("orvio-status-change", syncStatusLink);
+window.addEventListener("storage", syncStatusLink);
+window.addEventListener("pageshow", syncStatusLink);
+
+let speedOptionsSignature: string | undefined;
+let bindingsSignature: string | undefined;
 function syncSettings(updateLibrary = true) {
-  queueMicrotask(refreshGeneralSelection);
+  syncSelectionLinkStatus();
   if (!active && !preparing && !playReplay) {
     const paired = extensionLibraryPairs.resolve(
       SONGS[songIndex].id,
@@ -1711,9 +2285,9 @@ function syncSettings(updateLibrary = true) {
       selectedSong();
     }
   }
-  if (updateLibrary && !active && !preparing && screen === 'select') {
+  if (updateLibrary && !active && !preparing && screen === "select") {
     const shown = [
-      ...document.querySelectorAll<HTMLElement>('#songs [data-song]'),
+      ...document.querySelectorAll<HTMLElement>("#songs [data-song]"),
     ].map((row) => Number(row.dataset.song));
     const next = visibleSongIndices();
     if (JSON.stringify(shown) !== JSON.stringify(next)) songCards();
@@ -1722,146 +2296,186 @@ function syncSettings(updateLibrary = true) {
   resolveBindings();
   const selected = SONGS[songIndex];
   if (
-    settings.difficulty === 'sc' &&
-    !chartDisplay(selected, 'sc', settings.lanes).count
+    settings.difficulty === "sc" &&
+    !chartDisplay(selected, "sc", settings.lanes).count
   )
-    settings.difficulty = 'high';
-  $<HTMLButtonElement>('#start').disabled =
+    settings.difficulty = "high";
+  $<HTMLButtonElement>("#start").disabled =
+    (screen === "select" && selectionRouteUnresolved) ||
     mobilePlaybackOnly() ||
     preparing ||
     !chartDisplay(selected, settings.difficulty, settings.lanes).count;
-  document.querySelectorAll<HTMLButtonElement>('[data-diff]').forEach((b) => {
+  document.querySelectorAll<HTMLButtonElement>("[data-diff]").forEach((b) => {
     const diff = b.dataset.diff as Difficulty;
     b.disabled = !chartDisplay(selected, diff, settings.lanes).count;
-    b.textContent = chartLevel(selected, diff, settings.lanes);
-    b.removeAttribute('title');
+    b.textContent = { low: "NM", mid: "HD", high: "MX", sc: "SC" }[diff];
+    b.removeAttribute("title");
   });
   if (updateLibrary || priorDifficulty !== settings.difficulty)
     document
-      .querySelectorAll<HTMLElement>('#songs [data-song]')
+      .querySelectorAll<HTMLElement>("#songs [data-song]")
       .forEach((row) => {
         const song = SONGS[Number(row.dataset.song)];
-        const level = row.querySelector<HTMLElement>('.song-level');
-        if (level)
-          level.textContent = chartLevel(
+        const level = row.querySelector<HTMLElement>(".song-level");
+        if (level) {
+          const display = chartDisplay(
             song,
             settings.difficulty,
             settings.lanes,
           );
-        const count = row.querySelector<HTMLElement>('.song-note-count');
+          level.textContent = String(
+            display.count ? (display.metadata?.rating?.level ?? "--") : "--",
+          );
+          level.setAttribute(
+            "aria-label",
+            chartLevel(song, settings.difficulty, settings.lanes),
+          );
+        }
+        const count = row.querySelector<HTMLElement>(".song-note-count");
         if (count)
-          count.textContent = `${chartDisplay(song, settings.difficulty, settings.lanes).count || '--'} ${t('notes')}`;
+          count.textContent = `${chartDisplay(song, settings.difficulty, settings.lanes).count || "--"} ${t("notes")}`;
       });
   if ([4, 6, 8].includes(settings.lanes))
     for (const row of document.querySelectorAll<HTMLElement>(
-      '#songs [data-song]',
+      "#songs [data-song]",
     )) {
       const id = SONGS[Number(row.dataset.song)].id,
-        label = row.querySelector('.song-note-count');
+        label = row.querySelector(".song-note-count");
       if (label && extensionPending.has(id))
         label.textContent = externalLabels(settings.language).preparing;
       else if (label && extensionFailed.has(id))
         label.textContent = opus468PlayerLabels(settings.language).retry;
     }
-  queueMicrotask(() => document.dispatchEvent(new Event('orvio:select-sync')));
+  queueMicrotask(() => document.dispatchEvent(new Event("orvio:select-sync")));
   updateOptionReadout();
   clock?.setVolume(settings.volume);
   if (previewGain) previewGain.gain.value = settings.volume * 0.5;
   if (field) field.reducedMotion = settings.reducedMotion;
   document
-    .querySelectorAll('[data-diff]')
+    .querySelectorAll("[data-diff]")
     .forEach((b) =>
       b.classList.toggle(
-        'selected',
+        "selected",
         (b as HTMLElement).dataset.diff === settings.difficulty,
       ),
     );
   document
-    .querySelectorAll('[data-lanes]')
+    .querySelectorAll("[data-lanes]")
     .forEach((b) =>
       b.classList.toggle(
-        'selected',
+        "selected",
         Number((b as HTMLElement).dataset.lanes) === settings.lanes,
       ),
     );
-  document.querySelectorAll('[data-pos]').forEach((b) => {
+  document.querySelectorAll("[data-pos]").forEach((b) => {
     const selected = (b as HTMLElement).dataset.pos === settings.position;
-    b.classList.toggle('selected', selected);
-    b.setAttribute('aria-pressed', String(selected));
+    b.classList.toggle("selected", selected);
+    b.setAttribute("aria-pressed", String(selected));
   });
-  const speed = $<HTMLSelectElement>('#speed');
-  speed.innerHTML = Array.from({ length: 17 }, (_, i) => 1 + i / 2)
-    .map((value) => `<option value="${value}">${value.toFixed(1)}×</option>`)
-    .join('');
-  if (!Number.isInteger(settings.speed * 2)) {
-    const legacy = document.createElement('option');
-    legacy.value = String(settings.speed);
-    legacy.textContent = `${settings.speed.toFixed(1)}× · ${t('legacySpeed')}`;
-    speed.prepend(legacy);
+  const speed = $<HTMLSelectElement>("#speed");
+  const nextSpeedSignature = JSON.stringify([
+    settings.language,
+    Number.isInteger(settings.speed * 2) ? null : settings.speed,
+  ]);
+  if (speedOptionsSignature !== nextSpeedSignature) {
+    speed.innerHTML = Array.from({ length: 17 }, (_, i) => 1 + i / 2)
+      .map((value) => `<option value="${value}">${value.toFixed(1)}×</option>`)
+      .join("");
+    if (!Number.isInteger(settings.speed * 2)) {
+      const legacy = document.createElement("option");
+      legacy.value = String(settings.speed);
+      legacy.textContent = `${settings.speed.toFixed(1)}× · ${t("legacySpeed")}`;
+      speed.prepend(legacy);
+    }
+    speedOptionsSignature = nextSpeedSignature;
   }
   speed.value = String(settings.speed);
-  $<HTMLInputElement>('#volume').value = String(settings.volume);
-  $<HTMLSelectElement>('#fader').value = settings.fader;
-  $<HTMLSelectElement>('#shuffle').value = settings.shuffle;
-  $('#speed-value').textContent = settings.speed.toFixed(1) + '×';
-  $('#binding-mode').textContent = '4 - 8 KEY';
-  const hint = $('#bind-hint');
+  $<HTMLInputElement>("#volume").value = String(settings.volume);
+  $<HTMLSelectElement>("#fader").value = settings.fader;
+  $<HTMLSelectElement>("#shuffle").value = settings.shuffle;
+  syncOptionDescriptions($<HTMLDialogElement>("#game-options"), t);
+  $("#speed-value").textContent = settings.speed.toFixed(1) + "×";
+  $("#binding-mode").textContent = "4 - 8 KEY";
+  const hint = $("#bind-hint");
   hint.textContent =
-    binding < 0 ? t('bindHint') : `${t('listening')} · ${binding + 1}/8`;
+    binding < 0 ? t("bindHint") : `${t("listening")} · ${binding + 1}/8`;
   const profile = settings.bindingProfile;
-  const activePositions = modePositions(bindingPreviewLanes);
-  $('#bindings').innerHTML =
-    `<nav class="binding-modes" aria-label="KEY">${KEY_MODES.map((mode) => `<button type="button" data-preview-mode="${mode}" aria-pressed="${mode === bindingPreviewLanes}">${mode} KEY</button>`).join('')}</nav><div class="binding-master">${profile.master.map((key, index) => `<button type="button" data-slot="${index}" class="key-bind ${!profile.overrides[bindingPreviewLanes] && activePositions.includes(index) ? 'mode-active' : ''} ${binding === index ? 'listening' : ''}" aria-label="${index + 1}: ${keyLabel(key)}"><small>${index + 1}</small>${binding === index ? '●' : keyLabel(key)}</button>`).join('')}</div><div class="binding-preview"><strong>${bindingPreviewLanes} KEY</strong>${settings.keys[bindingPreviewLanes].map((key) => `<kbd>${keyLabel(key)}</kbd>`).join('')}</div>${profile.overrides[bindingPreviewLanes] ? `<div class="binding-override"><span>${t('keyboard')} · ${bindingPreviewLanes} KEY</span><div>${settings.keys[bindingPreviewLanes].map((key, i) => `<button type="button" data-legacy-slot="${i}">${keyLabel(key)}</button>`).join('')}</div><button type="button" id="use-common-bindings">${t('reset')}</button></div>` : ''}`;
-  document.querySelectorAll<HTMLButtonElement>('[data-preview-mode]').forEach(
-    (button) =>
-      (button.onclick = () => {
-        binding = -1;
-        bindingPreviewLanes = Number(button.dataset.previewMode) as Lanes;
+  const nextBindingsSignature = JSON.stringify([
+    settings.language,
+    binding,
+    bindingPreviewLanes,
+    bindingLanes,
+    bindingLegacy,
+    profile.master,
+    profile.overrides,
+    settings.keys,
+  ]);
+  if (bindingsSignature !== nextBindingsSignature) {
+    const activePositions = modePositions(bindingPreviewLanes);
+    $("#bindings").innerHTML =
+      `<nav class="binding-modes" aria-label="KEY">${KEY_MODES.map((mode) => `<button type="button" data-preview-mode="${mode}" aria-pressed="${mode === bindingPreviewLanes}">${mode} KEY</button>`).join("")}</nav><div class="binding-master">${profile.master.map((key, index) => `<button type="button" data-slot="${index}" class="key-bind ${!profile.overrides[bindingPreviewLanes] && activePositions.includes(index) ? "mode-active" : ""} ${binding === index ? "listening" : ""}" aria-label="${index + 1}: ${keyLabel(key)}"><small>${index + 1}</small>${binding === index ? "●" : keyLabel(key)}</button>`).join("")}</div><div class="binding-preview"><strong>${bindingPreviewLanes} KEY</strong>${settings.keys[bindingPreviewLanes].map((key) => `<kbd>${keyLabel(key)}</kbd>`).join("")}</div>${profile.overrides[bindingPreviewLanes] ? `<div class="binding-override"><span>${t("keyboard")} · ${bindingPreviewLanes} KEY</span><div>${settings.keys[bindingPreviewLanes].map((key, i) => `<button type="button" data-legacy-slot="${i}">${keyLabel(key)}</button>`).join("")}</div><button type="button" id="use-common-bindings">${t("reset")}</button></div>` : ""}`;
+    document.querySelectorAll<HTMLButtonElement>("[data-preview-mode]").forEach(
+      (button) =>
+        (button.onclick = () => {
+          binding = -1;
+          bindingPreviewLanes = Number(button.dataset.previewMode) as Lanes;
+          syncSettings();
+        }),
+    );
+    document.querySelectorAll<HTMLButtonElement>("[data-slot]").forEach(
+      (button) =>
+        (button.onclick = () => {
+          binding = Number(button.dataset.slot);
+          bindingLanes = bindingPreviewLanes;
+          bindingLegacy = false;
+          syncSettings();
+          $<HTMLButtonElement>(`[data-slot="${binding}"]`).focus();
+        }),
+    );
+    document.querySelectorAll<HTMLButtonElement>("[data-legacy-slot]").forEach(
+      (button) =>
+        (button.onclick = () => {
+          binding = Number(button.dataset.legacySlot);
+          bindingLanes = bindingPreviewLanes;
+          bindingLegacy = true;
+          hint.textContent = t("listening");
+        }),
+    );
+    const common = document.querySelector<HTMLButtonElement>(
+      "#use-common-bindings",
+    );
+    if (common)
+      common.onclick = () => {
+        delete settings.bindingProfile.overrides[bindingPreviewLanes];
         syncSettings();
-      }),
-  );
-  document.querySelectorAll<HTMLButtonElement>('[data-slot]').forEach(
-    (button) =>
-      (button.onclick = () => {
-        binding = Number(button.dataset.slot);
-        bindingLanes = bindingPreviewLanes;
-        bindingLegacy = false;
-        syncSettings();
-        $<HTMLButtonElement>(`[data-slot="${binding}"]`).focus();
-      }),
-  );
-  document.querySelectorAll<HTMLButtonElement>('[data-legacy-slot]').forEach(
-    (button) =>
-      (button.onclick = () => {
-        binding = Number(button.dataset.legacySlot);
-        bindingLanes = bindingPreviewLanes;
-        bindingLegacy = true;
-        hint.textContent = t('listening');
-      }),
-  );
-  const common = document.querySelector<HTMLButtonElement>(
-    '#use-common-bindings',
-  );
-  if (common)
-    common.onclick = () => {
-      delete profile.overrides[bindingPreviewLanes];
-      syncSettings();
-    };
+      };
+    bindingsSignature = nextBindingsSignature;
+  }
   persist();
   if (
     !readingRoute &&
-    screen === 'select' &&
-    !$<HTMLDialogElement>('#results').open
+    screen === "select" &&
+    !$<HTMLDialogElement>("#results").open
   )
-    history.replaceState(null, '', selectionPath());
-  if (libraryHydrated && screen === 'select')
+    replaceSelectionPath();
+  if (libraryHydrated && screen === "select")
     rememberLibraryFirstPaint(
       visibleSongIndices().map((i) => SONGS[i].id),
       SONGS[songIndex].id,
     );
 }
 
+function endPreview(source: AudioBufferSourceNode) {
+  if (preview !== source) return;
+  preview = undefined;
+  previewGain = undefined;
+  syncResultPreview();
+  $("#preview-status").textContent = t("nowPlaying");
+  document.body.classList.remove("previewing");
+}
 function stopPreview() {
+  window.clearTimeout(previewTimer);
+  previewTimer = undefined;
   // Preview owns previewAbort. A dialog-close event must not cancel a new play.
   previewRequest++;
   previewAbort?.abort();
@@ -1873,8 +2487,8 @@ function stopPreview() {
   }
   preview = undefined;
   syncResultPreview();
-  $('#preview-status').textContent = '';
-  document.body.classList.remove('previewing');
+  $("#preview-status").textContent = t("nowPlaying");
+  document.body.classList.remove("previewing");
 }
 async function ensureExternalBytes(id: string, signal?: AbortSignal) {
   const external = externalSource(id);
@@ -1887,6 +2501,28 @@ async function prepare(attempt: StartupAttempt, joinGatePreload = false) {
   const audio = clock;
   await attempt.wait(audio.activate());
   const song = SONGS[songIndex];
+  if (song.id.startsWith("yt-local-allkeys-")) {
+    try {
+      const track = await attempt.wait(
+        localAllKeysAudio(song.id, audio.context, attempt.signal),
+      );
+      attempt.check();
+      rendered = track;
+      return { ...track, warm: true };
+    } catch (e) {
+      if (e instanceof ClientOnlyLocalAudioError && e.reason === "missing") {
+        const source = localAllKeysSource(song.id);
+        const videoId = source?.envelope.record.videoId ?? song.id;
+        const audioSha256 = source?.envelope.record.audioSha256;
+        const proof =
+          typeof audioSha256 === "string"
+            ? directProgressiveProofFor(videoId, audioSha256)
+            : undefined;
+        if (proof) return { directProgressive: proof, warm: false } as const;
+      }
+      throw e;
+    }
+  }
   if (transient468Owns(song.id) && playReplay) {
     const current = shared468!;
     const prepared: any = await attempt.wait(
@@ -1894,7 +2530,7 @@ async function prepare(attempt: StartupAttempt, joinGatePreload = false) {
     );
     attempt.check();
     if (current !== shared468 || prepared.identity.song !== song.id)
-      throw Error('share468_replay_stale');
+      throw Error("share468_replay_stale");
     return {
       buffer: prepared.audio,
       peak: 1,
@@ -1934,13 +2570,26 @@ async function prepare(attempt: StartupAttempt, joinGatePreload = false) {
     external.record.manifestSha256 &&
     !external.bytes
   ) {
-    const local = await attempt.wait(
-      localAudio(external.record, attempt.signal),
-    );
-    if (local) external.bytes = local.bytes;
-    else {
-      rendered = undefined;
-      return { progressive: external, warm: false } as const;
+    if (CLIENT_ONLY_MODE) {
+      // No progressive remote fallback: the persisted local file either
+      // verifies or the client reports an explicit missing/corrupt result.
+      const local = await attempt.wait(
+        requireLocalAudio(
+          external.record.videoId,
+          () => localAudio(external.record, attempt.signal),
+          attempt.signal,
+        ),
+      );
+      external.bytes = local.bytes;
+    } else {
+      const local = await attempt.wait(
+        localAudio(external.record, attempt.signal),
+      );
+      if (local) external.bytes = local.bytes;
+      else {
+        rendered = undefined;
+        return { progressive: external, warm: false } as const;
+      }
     }
   }
   await attempt.wait(ensureExternalBytes(song.id, attempt.signal));
@@ -1961,31 +2610,32 @@ async function prepare(attempt: StartupAttempt, joinGatePreload = false) {
     : await attempt.wait(cachedAudio(song.id, audio.context));
   const warm = !!track;
   if (!track) {
-    $('#start').textContent = t('preparing');
+    $("#start").textContent = t("preparing");
     track = await attempt.wait(renderSong(song));
     void saveAudio(song.id, track);
   }
   attempt.check();
   rendered = track;
   cache.set(song.id, track);
-  $('#start').innerHTML = `${t('start')} <span>ENTER ↵</span>`;
+  $("#start").innerHTML = `${t("start")} <span>ENTER ↵</span>`;
   return { ...track, warm };
 }
-$('#cancel-startup').onclick = () => {
+$("#cancel-startup").onclick = () => {
   if (readyAutostart) {
     readyAutostart = false;
-    history.pushState(null, '', '/select/');
+    history.pushState(null, "", "/select/");
     readRoute();
     return;
   }
   startup?.cancel();
 };
-$('#song-loading').addEventListener('click', (e) => {
+$("#song-loading").addEventListener("click", (e) => {
   if (!readyAutostart || preparing || active) return;
-  if ((e.target as HTMLElement).closest('#cancel-startup')) return;
-  $('#ready-start').click();
+  if ((e.target as HTMLElement).closest("#cancel-startup")) return;
+  $("#ready-start").click();
 });
 async function start() {
+  if (screen === "select" && selectionRouteUnresolved && !playReplay) return;
   if (
     !playReplay &&
     transient468Owns(SONGS[songIndex].id) &&
@@ -2000,7 +2650,7 @@ async function start() {
   )
     return;
   if (!playReplay && mobilePlaybackOnly()) {
-    toast(t('unsupported'));
+    toast(t("unsupported"));
     return;
   }
   if (!playReplay) {
@@ -2008,8 +2658,8 @@ async function start() {
     localSessionKey = undefined;
     localSessionOpened = false;
   }
-  if (screen === 'home') {
-    $('#home-start').click();
+  if (screen === "home") {
+    $("#home-start").click();
     return;
   }
   if (preparing || active) return;
@@ -2032,12 +2682,12 @@ async function start() {
   if (!playReplay) rememberLibrarySelection();
   const fromGate = readyAutostart;
   readyAutostart = false;
-  $('#song-loading').classList.remove('awaiting-start');
+  $("#song-loading").classList.remove("awaiting-start");
   preparing = true;
   const attempt = new StartupAttempt();
   startup = attempt;
   const loadingSong = SONGS[songIndex];
-  const wallpaper = $<HTMLImageElement>('#loading-wallpaper');
+  const wallpaper = $<HTMLImageElement>("#loading-wallpaper");
   // A refreshed play route can already show this song's artwork from the
   // pre-gesture gate; re-decoding it would only re-add the wait it removed.
   const gateShown =
@@ -2048,32 +2698,35 @@ async function start() {
     // Changing src may leave the last decoded image painted until the new decode.
     // Hide it before the overlay can be visible, then reveal only the new image.
     wallpaper.hidden = true;
-    wallpaper.referrerPolicy = 'no-referrer';
+    wallpaper.referrerPolicy = "no-referrer";
     wallpaper.dataset.songArt = loadingSong.id;
     wallpaper.src = songArt(loadingSong.id);
   }
-  $('#loading-title').textContent = loadingSong.title;
-  $('#loading-title').previousElementSibling!.textContent =
-    externalSource(loadingSong.id) || ownsOpus468(loadingSong.id)
-      ? 'YOUTUBE'
-      : 'ORVIO ORIGINALS';
-  $('#loading-detail').textContent =
+  $("#loading-title").textContent = loadingSong.title;
+  $("#loading-title").previousElementSibling!.textContent =
+    externalSource(loadingSong.id) ||
+    hasLocalAllKeysSource(loadingSong.id) ||
+    ownsOpus468(loadingSong.id)
+      ? "YOUTUBE"
+      : "ORVIO ORIGINALS";
+  $("#loading-detail").textContent =
     `${loadingSong.genre} · ${loadingSong.bpm} BPM · ${settings.lanes} KEY`;
-  $('#loading-status').textContent = t('preparing');
-  $('#cancel-startup').textContent =
-    externalLabels(settings.language).cancel + ' · ESC';
-  $('#song-loading').classList.remove('hidden');
+  $("#loading-status").textContent = t("preparing");
+  $("#cancel-startup").textContent =
+    externalLabels(settings.language).cancel + " · ESC";
+  $("#song-loading").classList.remove("hidden");
   if (
     !(playReplay && transient468Owns(SONGS[songIndex].id)) &&
     location.pathname !== playPath()
   )
-    history.pushState(null, '', playPath());
-  screen = 'play';
-  $('#home-screen').classList.add('hidden');
-  $('#ready-screen').classList.add('hidden');
+    history.pushState(null, "", playPath());
+  screen = "play";
+  $("#home-screen").classList.add("hidden");
+  $("#ready-screen").classList.add("hidden");
   stopPreview();
-  document.body.classList.add('playing');
-  $('#start').setAttribute('disabled', '');
+  document.body.classList.add("playing");
+  $("#start").setAttribute("disabled", "");
+  let track: Awaited<ReturnType<typeof prepare>> | undefined;
   try {
     // iOS requires activation in the original click, before artwork awaits.
     if (!clock) clock = new AudioClock();
@@ -2087,7 +2740,7 @@ async function start() {
               wallpaper.decode(),
               new Promise<never>((_, reject) => {
                 imageTimer = setTimeout(
-                  () => reject(new Error('Artwork unavailable')),
+                  () => reject(new Error("Artwork unavailable")),
                   3000,
                 );
               }),
@@ -2105,18 +2758,18 @@ async function start() {
     }
     const wallpaperAt = gateShown ? armedWallpaperAt : performance.now();
     armedWallpaperAt = 0;
-    const track = await prepare(attempt, fromGate);
-    $('#lobby').classList.add('hidden');
-    $('#replays').classList.add('hidden');
-    $('#game').classList.remove('hidden');
+    track = await prepare(attempt, fromGate);
+    $("#lobby").classList.add("hidden");
+    $("#replays").classList.add("hidden");
+    $("#game").classList.remove("hidden");
     // Keep renderer resources local to one play session so a later start
     // cannot reuse stale lane geometry from a previous sprite batch.
     field?.dispose();
     field = new Playfield();
-    await attempt.wait(field.init($('#highway'), attempt.signal));
+    await attempt.wait(field.init($("#highway"), attempt.signal));
     const song = SONGS[songIndex];
     engine =
-      ('extensionEngine' in track ? track.extensionEngine : undefined) ??
+      ("extensionEngine" in track ? track.extensionEngine : undefined) ??
       new Engine(
         transformChart(
           playReplay && localBuiltinNotes
@@ -2131,14 +2784,14 @@ async function start() {
     seenEvents = 0;
     sequence = 0;
     lastFeverActivations = 0;
-    $('#fps').hidden = !perfOverlay;
+    $("#fps").hidden = !perfOverlay;
     if (!playReplay) {
       replayExpected = false;
       replayIssue = false;
       replayExpectedLength = 0;
     }
     savedReplay = playReplay ?? undefined;
-    replayText = playReplay ? replayText : '';
+    replayText = playReplay ? replayText : "";
     sessionReplay = playReplay
       ? undefined
       : {
@@ -2160,48 +2813,50 @@ async function start() {
     lastRecordedSpeed = settings.speed;
     lastRecordedFader = settings.fader;
     replayAudioQueue = Promise.resolve();
-    document.body.classList.toggle('replay-view', !!playReplay);
-    $('#replay-playing').textContent = '▶ ' + REPLAY_PLAYING[settings.language];
-    $<HTMLButtonElement>('#play-options').disabled = !!playReplay;
+    document.body.classList.toggle("replay-view", !!playReplay);
+    $("#replay-playing").textContent = "▶ " + REPLAY_PLAYING[settings.language];
+    $<HTMLButtonElement>("#play-options").disabled = !!playReplay;
     sessionId = crypto.randomUUID();
     document.body.style.setProperty(
-      '--play-wallpaper',
+      "--play-wallpaper",
       `url("${songArt(song.id)}"), url("${ART_FALLBACK}")`,
     );
-    $('#game').dataset.song = song.id;
+    $("#game").dataset.song = song.id;
     field.bpm = song.bpm;
     field.reducedMotion = settings.reducedMotion;
     field.fader = settings.fader;
     field.pressed.clear();
     field.flashes.clear();
-    $('#highway-wrap').classList.remove('danger');
+    $("#highway-wrap").classList.remove("danger");
     field.setup(
       engine,
       settings.lanes,
       Number.parseInt(song.color.slice(1), 16),
     );
-    $('#lobby').classList.add('hidden');
-    $('#game').classList.remove('hidden');
-    $('#arena').dataset.position = settings.position;
-    $('#now-title').textContent = song.title;
-    $('#side-title').textContent = song.title;
-    $('#side-title').previousElementSibling!.textContent =
-      externalSource(song.id) || ownsOpus468(song.id)
-        ? 'YOUTUBE'
-        : 'ORVIO ORIGINALS';
-    $('#now-detail').textContent =
-      `${playReplay ? REPLAY_LABELS[settings.language][1] + ' · ' : ''}${song.genre} · ${song.bpm} BPM`;
-    $('#lane-detail').textContent =
+    $("#lobby").classList.add("hidden");
+    $("#game").classList.remove("hidden");
+    $("#arena").dataset.position = settings.position;
+    $("#now-title").textContent = song.title;
+    $("#side-title").textContent = song.title;
+    $("#side-title").previousElementSibling!.textContent =
+      externalSource(song.id) ||
+      hasLocalAllKeysSource(song.id) ||
+      ownsOpus468(song.id)
+        ? "YOUTUBE"
+        : "ORVIO ORIGINALS";
+    $("#now-detail").textContent =
+      `${playReplay ? REPLAY_LABELS[settings.language][1] + " · " : ""}${song.genre} · ${song.bpm} BPM`;
+    $("#lane-detail").textContent =
       `${settings.lanes} KEY · ${chartLevel(song, settings.difficulty, settings.lanes)}`;
-    $('#keycaps').innerHTML = settings.keys[settings.lanes]
+    $("#keycaps").innerHTML = settings.keys[settings.lanes]
       .map((k) => `<span>${keyLabel(k)}</span>`)
-      .join('');
-    $('#countdown').textContent = '';
+      .join("");
+    $("#countdown").textContent = "";
     hudAt = 0;
     scoreDisplay.reset();
-    $('#rate').textContent = '100.00';
-    $('#judge').textContent = '';
-    $('#combo').textContent = '';
+    $("#rate").textContent = "100.00";
+    $("#judge").textContent = "";
+    $("#combo").textContent = "";
     clock.setVolume(settings.volume);
     await attempt.wait(
       field.warmup(engine, settings.lanes, 2 / settings.speed),
@@ -2218,7 +2873,7 @@ async function start() {
       ),
     );
     attempt.check();
-    $('#song-loading').classList.add('hidden');
+    $("#song-loading").classList.add("hidden");
     // Reserve this field's longest visible travel window (1x), including
     // the note-entry margin. Live speed changes cannot bring a note onto the
     // field before countdown ends. No hidden-note gate or shifted chart times.
@@ -2235,9 +2890,62 @@ async function start() {
     if (sessionReplay) sessionReplay.audioLeadIn = cd.leadIn;
     const leadIn = playReplay ? (playReplay.audioLeadIn ?? 0.15) : cd.leadIn;
     let bufferingAt: number | undefined;
-    if ('progressive' in track && track.progressive) {
+    if ("directProgressive" in track && track.directProgressive) {
+      const proof = track.directProgressive;
+      const playingClock = clock;
+      await attempt.wait(
+        clock.playDirectProgressive(
+          proof,
+          leadIn,
+          attempt.signal,
+          {
+            providerOrigin: YOUTUBE_DIRECT_ORIGIN,
+            publicKey: import.meta.env.PUBLIC_YOUTUBE_API_KEY ?? "",
+            onBuffering: (buffering) => {
+              if (!active) return;
+              if (buffering) {
+                bufferingAt ??= performance.now();
+                if (!playReplay) recordOp([2, 0, clock.now(), 1]);
+              } else if (bufferingAt !== undefined) {
+                if (playReplay) sessionWallAt += performance.now() - bufferingAt;
+                else recordOp([2, 0, clock.now(), 0]);
+                bufferingAt = undefined;
+              }
+            },
+          },
+          async (bytes) => {
+            const item = localAllKeysSource(song.id);
+            await saveLocalAllKeys(
+              {
+                envelope:
+                  item?.envelope ?? (proof.verified.record as any),
+                bytes,
+                title: song.title,
+                author: song.subtitle,
+              },
+              { signal: attempt.signal },
+            );
+          },
+          (error) => {
+            if (clock !== playingClock) return;
+            if (active) {
+              exit();
+              toast(
+                error instanceof DirectIntegrityError
+                  ? t("integrityError")
+                  : error instanceof DirectServiceError
+                    ? t("transportError")
+                    : error instanceof DOMException && error.name === "QuotaExceededError"
+                      ? audioStageMessage("storage", settings.language)
+                      : audioStageMessage(undefined, settings.language),
+              );
+            }
+          },
+        ),
+      );
+    } else if ("progressive" in track && track.progressive) {
       const item = track.progressive;
-      if (isOpusRecord(item.record)) throw Error('opus35_not_progressive');
+      if (isOpusRecord(item.record)) throw Error("opus35_not_progressive");
       const playingClock = clock;
       await attempt.wait(
         clock.playProgressive(
@@ -2288,14 +2996,29 @@ async function start() {
     // A pending browser operation can finish later, but no old continuation
     // can start audio or touch the next attempt's UI/renderer.
     attempt.cancel(
-      attempt.signal.aborted ? String(attempt.signal.reason) : 'error',
+      attempt.signal.aborted ? String(attempt.signal.reason) : "error",
     );
     field?.dispose();
     field = undefined as unknown as Playfield;
     clock?.dispose();
     clock = undefined as unknown as AudioClock;
-    if (attempt.signal.reason !== 'cancel') {
-      toast(t('startError'));
+    if (attempt.signal.reason !== "cancel") {
+      recordFailure("access", e instanceof Error ? e.message : t("startError"));
+      const isDirectProgressiveTrack =
+        typeof track !== "undefined" &&
+        "directProgressive" in track &&
+        track.directProgressive;
+      toast(
+        isDirectProgressiveTrack && e instanceof DirectIntegrityError
+          ? t("integrityError")
+          : isDirectProgressiveTrack && e instanceof DirectServiceError
+            ? t("transportError")
+            : isDirectProgressiveTrack && e instanceof DOMException && e.name === "QuotaExceededError"
+              ? audioStageMessage("storage", settings.language)
+              : e instanceof ClientOnlyLocalAudioError
+                ? clientOnlyLocalAudioMessage(e)
+                : t("startError"),
+      );
       console.error(e);
     }
     exit();
@@ -2303,29 +3026,29 @@ async function start() {
     attempt.finish();
     if (startup === attempt) {
       startup = undefined;
-      $('#song-loading').classList.add('hidden');
+      $("#song-loading").classList.add("hidden");
       preparing = false;
-      $('#start').innerHTML = `${t('start')} <span>ENTER ↵</span>`;
-      $('#start').removeAttribute('disabled');
+      $("#start").innerHTML = `${t("start")} <span>ENTER ↵</span>`;
+      $("#start").removeAttribute("disabled");
       syncMobilePlayback();
     }
   }
 }
 function judgment(e: JudgmentEvent) {
-  const j = $('#judge');
-  j.textContent = e.value ? 'MAX ' + e.value + '%' : 'BREAK';
+  const j = $("#judge");
+  j.textContent = e.value ? "MAX " + e.value + "%" : "BREAK";
   j.className =
     e.value === 0
-      ? 'break'
+      ? "break"
       : e.value === 100
-        ? 'perfect'
+        ? "perfect"
         : e.value >= 80
-          ? 'strong'
+          ? "strong"
           : e.value >= 50
-            ? 'fair'
+            ? "fair"
             : e.value >= 20
-              ? 'weak'
-              : 'barely';
+              ? "weak"
+              : "barely";
   j.dataset.grade = String(e.value);
   if (e.value > 0 && e.value < 100) {
     const hue = 8 + e.value * 1.7;
@@ -2334,54 +3057,54 @@ function judgment(e: JudgmentEvent) {
     j.style.textShadow =
       e.value >= 50
         ? `0 0 ${e.value * 0.18}px hsl(${hue} 95% 60% / .6)`
-        : 'none';
+        : "none";
   } else {
-    j.style.color = '';
-    j.style.fontSize = '';
-    j.style.textShadow = '';
+    j.style.color = "";
+    j.style.fontSize = "";
+    j.style.textShadow = "";
   }
   j.getAnimations().forEach((a) => a.cancel());
-  j.style.animation = 'none';
+  j.style.animation = "none";
   if (!settings.reducedMotion)
     j.animate(
       e.value === 100
         ? [
             {
-              transform: 'scale(1.48) skewX(-8deg)',
+              transform: "scale(1.48) skewX(-8deg)",
               opacity: 1,
             },
             {
-              transform: 'scale(.98) skewX(-3deg)',
+              transform: "scale(.98) skewX(-3deg)",
               offset: 0.35,
             },
-            { transform: 'scale(1)', opacity: 1 },
+            { transform: "scale(1)", opacity: 1 },
           ]
         : e.value === 0
           ? [
-              { transform: 'translateX(-7px) scale(1.3)' },
-              { transform: 'translateX(6px) scale(1.1)', offset: 0.2 },
-              { transform: 'translateX(-3px)', offset: 0.4 },
-              { transform: 'translateX(0)' },
+              { transform: "translateX(-7px) scale(1.3)" },
+              { transform: "translateX(6px) scale(1.1)", offset: 0.2 },
+              { transform: "translateX(-3px)", offset: 0.4 },
+              { transform: "translateX(0)" },
             ]
           : [
-              { transform: 'translateY(-5px) scale(1.15)', opacity: 0.85 },
-              { transform: 'translateY(0) scale(1)', opacity: 1 },
+              { transform: "translateY(-5px) scale(1.15)", opacity: 0.85 },
+              { transform: "translateY(0) scale(1)", opacity: 1 },
             ],
       {
         duration: e.value === 100 ? 420 : e.value === 0 ? 500 : 250,
-        easing: 'ease-out',
+        easing: "ease-out",
       },
     );
-  const impact = $('#impact');
+  const impact = $("#impact");
   impact.getAnimations().forEach((a) => a.cancel());
-  impact.className = e.value === 0 ? 'break-impact' : '';
-  impact.style.animation = 'none';
+  impact.className = e.value === 0 ? "break-impact" : "";
+  impact.style.animation = "none";
   if (e.value === 0 && !settings.reducedMotion)
     impact.animate([{ opacity: 1 }, { opacity: 0 }], {
       duration: 450,
-      easing: 'ease-out',
+      easing: "ease-out",
     });
-  $('#highway-wrap').classList.toggle('danger', e.value === 0);
+  $("#highway-wrap").classList.toggle("danger", e.value === 0);
   field.flashes.set(e.lane, { at: performance.now(), ok: e.value > 0 });
   if (e.value === 100) clock.click();
 }
@@ -2463,22 +3186,22 @@ function loop(now: number) {
       (engine.states[0]?.note.time ?? Infinity) - field.startupTravel,
     );
   }
-  $('#countdown').textContent = countdownLegacy
+  $("#countdown").textContent = countdownLegacy
     ? visualTime < 0
-      ? 'READY'
+      ? "READY"
       : visualTime < 4 * countdownBeat
         ? String(Math.max(1, 4 - Math.floor(visualTime / countdownBeat)))
-        : ''
+        : ""
     : countdownText(visualTime, countdownFallAt, countdownBeat);
   field.draw(engine, settings.lanes, visualTime, 2 / settings.speed, now);
   scoreDisplay.update(engine.score, now, settings.reducedMotion);
   if (now - hudAt > 50) {
     hudAt = now;
 
-    $('#rate').textContent = engine.rate.toFixed(2);
-    $('#combo').textContent =
-      engine.fever.displayCombo > 1 ? String(engine.fever.displayCombo) : '';
-    renderFeverHud($('#fever-hud'), engine.fever, settings.reducedMotion);
+    $("#rate").textContent = engine.rate.toFixed(2);
+    $("#combo").textContent =
+      engine.fever.displayCombo > 1 ? String(engine.fever.displayCombo) : "";
+    renderFeverHud($("#fever-hud"), engine.fever, settings.reducedMotion);
     // A11: activation feedback - original burst sound + visual + combo pop.
     // Rules, score and replay recording are untouched; this only reacts to the
     // existing activations counter.
@@ -2486,31 +3209,31 @@ function loop(now: number) {
       lastFeverActivations = engine.fever.activations;
       clock.feverBurst();
       if (!settings.reducedMotion) {
-        const burst = $('#fever-burst');
-        burst.classList.remove('fever-burst-on');
+        const burst = $("#fever-burst");
+        burst.classList.remove("fever-burst-on");
         void burst.offsetWidth;
-        burst.classList.add('fever-burst-on');
-        const comboEl = $('#combo');
-        comboEl.classList.remove('combo-fever-pop');
+        burst.classList.add("fever-burst-on");
+        const comboEl = $("#combo");
+        comboEl.classList.remove("combo-fever-pop");
         void comboEl.offsetWidth;
-        comboEl.classList.add('combo-fever-pop');
+        comboEl.classList.add("combo-fever-pop");
       }
     }
-    $('#combo').dataset.feverStage =
-      engine.fever.status === 'ready' && engine.fever.stage > 1
+    $("#combo").dataset.feverStage =
+      engine.fever.status === "ready" && engine.fever.stage > 1
         ? String(engine.fever.stage)
-        : '';
-    $('#progress > div').style.width =
+        : "";
+    $("#progress > div").style.width =
       Math.min(100, Math.max(0, (time / duration(SONGS[songIndex])) * 100)) +
-      '%';
+      "%";
     const recent = field.frames.slice(-60);
-    $('#fps').textContent = perfOverlay
+    $("#fps").textContent = perfOverlay
       ? formatPerf(field.recentPerf())
       : recent.length
         ? Math.round(
             1000 / (recent.reduce((a, b) => a + b, 0) / recent.length),
-          ) + ' FPS'
-        : '-- FPS';
+          ) + " FPS"
+        : "-- FPS";
   }
   if (
     !clock.verificationPending &&
@@ -2570,8 +3293,24 @@ function finish() {
   ownResults.add(completed);
   replayExpected = true;
   replayEncoding = (async () => {
-    if (ownsOpus468(completed.song)) {
-      replayText = '';
+    if (hasLocalAllKeysSource(completed.song)) {
+      replayText = "";
+      replayExpected = false;
+      localSessionKey = undefined;
+      try {
+        if (!savedReplay) throw Error("Local all-keys replay missing");
+        const key = await saveLocalAllKeysSession(savedReplay);
+        if (lastResult === completed) localSessionKey = key;
+        noteReplaySessionSaved();
+      } catch {
+        if (lastResult === completed) {
+          savedReplay = undefined;
+          localSessionKey = undefined;
+        }
+        toast(REPLAY_SAVE_ERROR[settings.language]);
+      }
+    } else if (ownsOpus468(completed.song)) {
+      replayText = "";
       replayExpected = false;
       if (savedReplay)
         try {
@@ -2579,19 +3318,21 @@ function finish() {
             savedReplay,
             completed,
           );
+          noteReplaySessionSaved();
         } catch {
           savedReplay = undefined;
           localSessionKey = undefined;
           toast(REPLAY_SAVE_ERROR[settings.language]);
         }
     } else if (externalSource(completed.song)) {
-      replayText = '';
+      replayText = "";
       replayExpected = false;
       if (!savedReplay || !entryReplayMatches(savedReplay, completed))
         savedReplay = undefined;
       if (savedReplay) {
         try {
           localSessionKey = await saveLocalSession(savedReplay, completed);
+          noteReplaySessionSaved();
         } catch {
           toast(REPLAY_SAVE_ERROR[settings.language]);
         }
@@ -2606,27 +3347,28 @@ function finish() {
         replayExpectedLength = replayText.length;
         try {
           localSessionKey = await saveBuiltinSession(savedReplay, completed);
+          noteReplaySessionSaved();
         } catch {
           toast(REPLAY_SAVE_ERROR[settings.language]);
         }
       } catch {
         savedReplay = undefined;
-        replayText = '';
+        replayText = "";
       }
     } else {
       savedReplay = undefined;
-      replayText = '';
+      replayText = "";
     }
     if (lastResult === completed) {
       const link = resultLink(completed);
-      if (localSessionKey?.startsWith('builtin:') && !localSessionOpened) {
+      if (localSessionKey?.startsWith("builtin:") && !localSessionOpened) {
         await rememberBuiltinResultOwner(
           new URL(link).hash.slice(1),
           localSessionKey,
         );
       }
       if (lastResult !== completed) return;
-      history.replaceState(null, '', link);
+      history.replaceState(null, "", link);
       replayIssue = !savedReplay;
       syncReplayButton();
     }
@@ -2639,9 +3381,21 @@ function finish() {
   });
 }
 function resultLink(result: UiResult) {
+  if (receivedLocalAllKeysShare?.data.result === result)
+    return new URL(
+      "/result/#" + receivedLocalAllKeysShare.fragment,
+      location.origin,
+    ).href;
   if (shared468?.view.result === result) return shared468.url;
   if (receivedShare?.data.result === result)
-    return new URL('/result/#' + receivedShare.fragment, location.origin).href;
+    return new URL("/result/#" + receivedShare.fragment, location.origin).href;
+  if (hasLocalAllKeysSource(result.song))
+    return new URL(
+      localSessionKey?.startsWith("local-allkeys-session:")
+        ? "/result/?local=" + encodeURIComponent(localSessionKey)
+        : selectionPath(),
+      location.origin,
+    ).href;
   if (ownsOpus468(result.song)) {
     // Failed local save leaves a usable in-memory result, never a fabricated session URL.
     return privateOpus468ResultUrl(
@@ -2653,112 +3407,114 @@ function resultLink(result: UiResult) {
   }
   if (
     externalSource(result.song) ||
-    (localSessionOpened && localSessionKey?.startsWith('builtin:'))
+    (localSessionOpened && localSessionKey?.startsWith("builtin:"))
   )
     return new URL(
-      '/result/?local=' + encodeURIComponent(localSessionKey ?? result.song),
+      "/result/?local=" + encodeURIComponent(localSessionKey ?? result.song),
       location.origin,
     ).href;
   const p = resultParams(result as SharedResult);
   if (replayExpected) {
-    p.set('rp', '1');
-    p.set('rn', String(replayExpectedLength));
+    p.set("rp", "1");
+    p.set("rn", String(replayExpectedLength));
   }
   if (replayText && savedReplay && entryReplayMatches(savedReplay, result))
-    p.set('r', replayText);
-  return new URL('/result/#' + p, location.origin).href;
+    p.set("r", replayText);
+  return new URL("/result/#" + p, location.origin).href;
 }
 function showResult(result: UiResult) {
-  $('#share-result').hidden = false;
-  $('#share-result').style.display = '';
+  $("#share-result").hidden = false;
+  $("#share-result").style.display = "";
   const arrivalKey = initialArrivalKey ?? resultIdentityKey(location.href);
   const arrivalFragment = initialArrivalFragment;
   initialArrivalKey = null;
   initialArrivalFragment = null;
-  $('#retry').innerHTML =
-    `${label(ownResults.has(result) ? 'retry' : 'start')} ↵`;
-  screen = 'select';
-  delete $('#share-status').dataset.message;
-  $('#share-status').textContent = '';
-  $('#share-status').classList.add('hidden');
+  $("#retry").innerHTML =
+    `${label(ownResults.has(result) ? "retry" : "start")} ↵`;
+  screen = "select";
+  delete $("#share-status").dataset.message;
+  $("#share-status").textContent = "";
+  $("#share-status").classList.add("hidden");
   lastResult = result;
   const sharedURL = resultLink(result);
-  history.replaceState(null, '', sharedURL);
+  history.replaceState(null, "", sharedURL);
   const canonicalKey = resultIdentityKey(location.href);
-  document.body.classList.remove('home-screen', 'ready-screen');
-  document.body.classList.add('results-screen');
-  $('#share-result').innerHTML =
+  document.body.classList.remove("home-screen", "ready-screen");
+  document.body.classList.add("results-screen");
+  $("#share-result").innerHTML =
     '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3m-4 4 4-4 4 4M5 12v8h14v-8"/></svg>' +
-    label('shareResult');
-  $('#share-result').setAttribute('aria-label', t('shareResult'));
-  $('#share-result').title = t('shareResult');
+    label("shareResult");
+  $("#share-result").setAttribute("aria-label", t("shareResult"));
+  $("#share-result").title = t("shareResult");
 
   stopPreview();
-  $('#result-song').textContent =
+  $("#result-song").textContent =
     SONGS.find((s) => s.id === result.song)?.title ?? result.song;
-  $<HTMLButtonElement>('#share-result').hidden = false;
-  document.getElementById('shared468-add')?.remove();
+  $<HTMLButtonElement>("#share-result").hidden = false;
+  document.getElementById("shared468-add")?.remove();
   if (transient468Owns(result.song) && !shared468!.added) {
-    const add = document.createElement('button');
-    add.id = 'shared468-add';
-    add.className = 'quiet';
+    const add = document.createElement("button");
+    add.id = "shared468-add";
+    add.className = "quiet";
     add.textContent = externalLabels(settings.language).submit;
     add.onclick = showShared468Add;
-    document.querySelector('.result-tools')!.append(add);
+    document.querySelector(".result-tools")!.append(add);
   }
   const resultBadgeList = resultOptions(result);
-  $('#result-rank').textContent =
+  $("#result-rank").textContent =
     result.accuracy >= 97
-      ? 'S'
+      ? "S"
       : result.accuracy >= 90
-        ? 'A'
+        ? "A"
         : result.accuracy >= 80
-          ? 'B'
-          : 'C';
+          ? "B"
+          : "C";
   const counts = result.judgments;
-  $('#result-badge').textContent = counts
+  $("#result-badge").textContent = counts
     ? result.accuracy === 100
-      ? t('perfectPlay')
+      ? t("perfectPlay")
       : counts[11] === 0
-        ? t('maxCombo')
-        : t('session')
-    : t('session');
-  $('#result-score').textContent = result.score.toLocaleString('en-US');
-  $('#result-rate').textContent = result.accuracy.toFixed(2) + '%';
-  $('#result-combo').textContent = String(result.combo);
-  const resultFever = $('#result-fever');
-  resultFever.classList.add('hidden');
+        ? t("maxCombo")
+        : t("session")
+    : t("session");
+  $("#result-score").textContent = result.score.toLocaleString("en-US");
+  $("#result-rate").textContent = result.accuracy.toFixed(2) + "%";
+  $("#result-combo").textContent = String(result.combo);
+  const resultFever = $("#result-fever");
+  resultFever.classList.add("hidden");
   if (
     savedReplay?.fever?.auto &&
-    savedReplay.fever.rulesId === 'orvio-auto-v1' &&
+    savedReplay.fever.rulesId === "orvio-auto-v1" &&
     entryReplayMatches(savedReplay, result, localBuiltinNotes)
   ) {
     const extensionSong = SONGS.find((s) => s.id === savedReplay!.song);
     const verified = replayEngine(
       savedReplay,
       localBuiltinNotes ??
-        (extensionSong && ownsOpus468(extensionSong.id)
+        (extensionSong &&
+        (hasLocalAllKeysSource(extensionSong.id) ||
+          ownsOpus468(extensionSong.id))
           ? makeChart(extensionSong, savedReplay.difficulty, savedReplay.lanes)
           : undefined),
     );
     savedReplay.ops.forEach((op, i) => applyReplayOp(verified, op, i));
     verified.update(9999);
     resultFever.textContent = `FEVER MAX ${verified.fever.maxDisplayCombo}`;
-    resultFever.classList.remove('hidden');
+    resultFever.classList.remove("hidden");
   }
 
-  $('#result-break').textContent = counts ? String(counts[11]) : '--';
-  $('#judgment-list').innerHTML = [
+  $("#result-break").textContent = counts ? String(counts[11]) : "--";
+  $("#judgment-list").innerHTML = [
     100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 1, 0,
   ]
     .map(
       (v, i) =>
-        `<div data-grade="${v}" style="--grade-color:${v === 100 ? '#fff4a8' : v === 0 ? '#ff384f' : `hsl(${8 + v * 1.7} 95% ${58 + v * 0.12}%)`}"><span>${v ? 'MAX ' + v + '%' : 'BREAK'}</span><b>${counts ? counts[i] : '--'}</b></div>`,
+        `<div data-grade="${v}" style="--grade-color:${v === 100 ? "#fff4a8" : v === 0 ? "#ff384f" : `hsl(${8 + v * 1.7} 95% ${58 + v * 0.12}%)`}"><span>${v ? "MAX " + v + "%" : "BREAK"}</span><b>${counts ? counts[i] : "--"}</b></div>`,
     )
-    .join('');
-  const resultDialog = $<HTMLDialogElement>('#results');
+    .join("");
+  const resultDialog = $<HTMLDialogElement>("#results");
   resultDialog.showModal();
-  document.documentElement.removeAttribute('data-result-pending');
+  document.documentElement.removeAttribute("data-result-pending");
   resultDialog.focus({ preventScroll: true });
   resultDialog.scrollTop = 0;
   const projected = finishResultFirstPaint(result, [arrivalKey, canonicalKey]);
@@ -2768,7 +3524,7 @@ function showResult(result: UiResult) {
   const shared =
     shared468?.view.result === result
       ? shortCache.get(shared468.fragment)
-      : shortCache.get(sharedURL.slice(sharedURL.indexOf('#') + 1));
+      : shortCache.get(sharedURL.slice(sharedURL.indexOf("#") + 1));
   rememberResultFirstPaint([arrivalKey, canonicalKey], result, {
     ...(shared ? { expiresAt: Date.parse(shared.expiresAt) } : {}),
     badges: resultBadgeList,
@@ -2778,60 +3534,60 @@ function showResult(result: UiResult) {
   resultMotion.play(result.score, settings.reducedMotion || projected);
 }
 
-const resultMotion = new ResultMotion($<HTMLDialogElement>('#results'));
+const resultMotion = new ResultMotion($<HTMLDialogElement>("#results"));
 
 function syncResultPreview() {
-  const b = $('#result-preview');
+  const b = $("#result-preview");
   if (!b) return;
   b.textContent =
-    (preview ? '■ ' : '▶ ') + RESULT_LABELS[settings.language][preview ? 1 : 0];
-  b.setAttribute('aria-pressed', String(!!preview));
+    (preview ? "■ " : "▶ ") + RESULT_LABELS[settings.language][preview ? 1 : 0];
+  b.setAttribute("aria-pressed", String(!!preview));
 }
 function resultOptions(result: UiResult) {
   const song = SONGS.find((s) => s.id === result.song)!;
-  const resultArt = $<HTMLImageElement>('#result-art');
-  resultArt.referrerPolicy = 'no-referrer';
+  const resultArt = $<HTMLImageElement>("#result-art");
+  resultArt.referrerPolicy = "no-referrer";
   resultArt.onerror = () => {
     resultArt.onerror = null;
     resultArt.src = ART_FALLBACK;
   };
   resultArt.dataset.songArt = song.id;
-  resultArt.toggleAttribute('data-external', !!songVideoId(song.id));
+  resultArt.toggleAttribute("data-external", !!songVideoId(song.id));
   resultArt.src = songArt(song.id);
   const count = makeChart(song, result.difficulty, result.lanes).length;
-  $('#result-metadata').textContent =
-    `${song.genre} · ${song.bpm} BPM · ${count} ${t('notes')}`;
-  $('#result-metadata').title = RESULT_LABELS[settings.language][2];
+  $("#result-metadata").textContent =
+    `${song.genre} · ${song.bpm} BPM · ${count} ${t("notes")}`;
+  $("#result-metadata").title = RESULT_LABELS[settings.language][2];
   syncResultPreview();
   syncReplayButton();
   const badgeLabels = {
-    keys: 'KEY',
+    keys: "KEY",
     difficulty: chartLevel(song, result.difficulty, result.lanes),
-    speed: t('speed'),
-    shuffle: t('shuffle'),
-    fader: t('fader'),
+    speed: t("speed"),
+    shuffle: t("shuffle"),
+    fader: t("fader"),
   };
-  $('#result-options').innerHTML = resultBadges(result, badgeLabels);
+  $("#result-options").innerHTML = resultBadges(result, badgeLabels);
   return resultBadgeData(result, badgeLabels);
 }
 function exit() {
   private468Bridge.cancel();
   playReplay = undefined;
   sessionReplay = undefined;
-  document.body.classList.remove('replay-view');
-  $<HTMLButtonElement>('#play-options').disabled = false;
+  document.body.classList.remove("replay-view");
+  $<HTMLButtonElement>("#play-options").disabled = false;
   active = false;
   paused = false;
   cancelAnimationFrame(frame);
   clock?.stop();
   field?.pressed.clear();
-  document.body.classList.remove('playing', 'results-screen');
-  $('#game').classList.add('hidden');
-  $('#lobby').classList.remove('hidden');
-  $('#replays').classList.add('hidden');
-  screen = 'select';
+  document.body.classList.remove("playing", "results-screen");
+  $("#game").classList.add("hidden");
+  $("#lobby").classList.remove("hidden");
+  $("#replays").classList.add("hidden");
+  screen = "select";
   restoreLibrarySelection();
-  if (!readingRoute) history.pushState(null, '', selectionPath());
+  if (!readingRoute) history.pushState(null, "", selectionPath());
   songCards();
   syncSettings();
   selectedSong();
@@ -2842,8 +3598,8 @@ function keyTime(e: KeyboardEvent) {
   if (stamp > 1e12) stamp -= performance.timeOrigin;
   return clock.now(stamp);
 }
-document.addEventListener('pointerdown', (e) => {
-  if (binding >= 0 && !(e.target as HTMLElement).closest('[data-slot]')) {
+document.addEventListener("pointerdown", (e) => {
+  if (binding >= 0 && !(e.target as HTMLElement).closest("[data-slot]")) {
     binding = -1;
     syncSettings();
   }
@@ -2852,14 +3608,14 @@ function editableTarget(target: EventTarget | null) {
   return (
     target instanceof HTMLElement &&
     target.closest(
-      'input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]), textarea, [contenteditable]:not([contenteditable=false])',
+      "input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]), textarea, [contenteditable]:not([contenteditable=false])",
     )
   );
 }
-window.addEventListener('keydown', (e) => {
-  if ($<HTMLDialogElement>('#remove-song-dialog').open) return;
+window.addEventListener("keydown", (e) => {
+  if ($<HTMLDialogElement>("#remove-song-dialog").open) return;
   const editable = editableTarget(e.target);
-  if (editable && e.code !== 'Escape') {
+  if (editable && e.code !== "Escape") {
     // Meta+A has no native select-all mapping in some embedded browser hosts.
     // Select the actual field, never the game page. All other editing stays native.
     if (
@@ -2867,7 +3623,7 @@ window.addEventListener('keydown', (e) => {
       !e.ctrlKey &&
       !e.altKey &&
       !e.isComposing &&
-      e.code === 'KeyA' &&
+      e.code === "KeyA" &&
       (editable instanceof HTMLInputElement ||
         editable instanceof HTMLTextAreaElement)
     ) {
@@ -2876,52 +3632,52 @@ window.addEventListener('keydown', (e) => {
     }
     return;
   }
-  if ($<HTMLDialogElement>('#youtube-import').open) {
-    if (e.code === 'Escape') {
+  if ($<HTMLDialogElement>("#youtube-import").open) {
+    if (e.code === "Escape") {
       e.preventDefault();
-      $<HTMLDialogElement>('#youtube-import').close();
+      $<HTMLDialogElement>("#youtube-import").close();
     }
     return;
   }
   if (playReplay && active) {
     e.preventDefault();
-    if (e.code === 'Escape' && !e.repeat) stopReplay();
+    if (e.code === "Escape" && !e.repeat) stopReplay();
     return;
   }
   if (preparing) {
-    if (e.code === 'Tab') $('#cancel-startup').focus();
+    if (e.code === "Tab") $("#cancel-startup").focus();
     if (
       !e.repeat &&
-      e.target === $('#cancel-startup') &&
-      (e.code === 'Enter' || e.code === 'Space')
+      e.target === $("#cancel-startup") &&
+      (e.code === "Enter" || e.code === "Space")
     )
-      $('#cancel-startup').click();
-    if (e.code === 'Escape' && !e.repeat) startup?.cancel();
+      $("#cancel-startup").click();
+    if (e.code === "Escape" && !e.repeat) startup?.cancel();
     e.preventDefault();
     return;
   }
   if (binding >= 0) {
     e.preventDefault();
     if (e.repeat) return;
-    if (e.code === 'Escape') {
+    if (e.code === "Escape") {
       binding = -1;
       syncSettings();
       return;
     }
     if (
       [
-        'Escape',
-        'Enter',
-        'Tab',
-        'MetaLeft',
-        'MetaRight',
-        'ControlLeft',
-        'ControlRight',
-        'AltLeft',
-        'AltRight',
+        "Escape",
+        "Enter",
+        "Tab",
+        "MetaLeft",
+        "MetaRight",
+        "ControlLeft",
+        "ControlRight",
+        "AltLeft",
+        "AltRight",
       ].includes(e.code)
     ) {
-      toast(t('otherKey'));
+      toast(t("otherKey"));
       return;
     }
     if (
@@ -2930,7 +3686,7 @@ window.addEventListener('keydown', (e) => {
         : settings.bindingProfile.master
       ).some((k, i) => k === e.code && i !== binding)
     ) {
-      toast(t('duplicate'));
+      toast(t("duplicate"));
       return;
     }
     (bindingLegacy
@@ -2940,110 +3696,110 @@ window.addEventListener('keydown', (e) => {
     syncSettings();
     return;
   }
-  if (paused && $<HTMLDialogElement>('#settings').open && e.code === 'Escape') {
+  if (paused && $<HTMLDialogElement>("#settings").open && e.code === "Escape") {
     e.preventDefault();
-    $<HTMLDialogElement>('#settings').close();
+    $<HTMLDialogElement>("#settings").close();
     return;
   }
   if (
-    $<HTMLDialogElement>('#game-options').open ||
-    $<HTMLDialogElement>('#restart-options').open
+    $<HTMLDialogElement>("#game-options").open ||
+    $<HTMLDialogElement>("#restart-options").open
   ) {
-    if (e.code === 'Escape') {
+    if (e.code === "Escape") {
       e.preventDefault();
-      if ($<HTMLDialogElement>('#restart-options').open) {
-        $<HTMLDialogElement>('#restart-options').close();
+      if ($<HTMLDialogElement>("#restart-options").open) {
+        $<HTMLDialogElement>("#restart-options").close();
         cancelShuffleChange();
-      } else $<HTMLDialogElement>('#game-options').close();
+      } else $<HTMLDialogElement>("#game-options").close();
     }
     return;
   }
   if (
-    e.code === 'F3' &&
+    e.code === "F3" &&
     !e.repeat &&
-    screen !== 'home' &&
-    !document.querySelector('#settings[open],#results[open],#about[open]')
+    screen !== "home" &&
+    !document.querySelector("#settings[open],#results[open],#about[open]")
   ) {
     e.preventDefault();
     void openGameOptions();
     return;
   }
-  if (e.code === 'Escape' && active) {
+  if (e.code === "Escape" && active) {
     e.preventDefault();
     if (paused) {
-      if (!$<HTMLDialogElement>('#settings').open) void resumeGame();
+      if (!$<HTMLDialogElement>("#settings").open) void resumeGame();
     } else void pauseGame();
     return;
   }
   if (!active) {
-    if (screen === 'home' || screen === 'ready') {
-      if (readyAutostart && e.code === 'Escape' && !e.repeat) {
+    if (screen === "home" || screen === "ready") {
+      if (readyAutostart && e.code === "Escape" && !e.repeat) {
         e.preventDefault();
-        $('#cancel-startup').click();
+        $("#cancel-startup").click();
         return;
       }
       if (
-        e.code === 'Enter' &&
+        e.code === "Enter" &&
         !e.repeat &&
-        !(e.target as HTMLElement)?.matches('button,a')
+        !(e.target as HTMLElement)?.matches("button,a")
       ) {
         e.preventDefault();
-        screen === 'home'
-          ? $('#home-start').click()
-          : $('#ready-start').click();
+        screen === "home"
+          ? $("#home-start").click()
+          : $("#ready-start").click();
       }
       return;
     }
-    const dialog = document.querySelector<HTMLDialogElement>('dialog[open]');
+    const dialog = document.querySelector<HTMLDialogElement>("dialog[open]");
     if (dialog) {
-      if (e.code === 'Escape') {
+      if (e.code === "Escape") {
         e.preventDefault();
         dialog.close();
-        if (dialog.id === 'results') exit();
+        if (dialog.id === "results") exit();
         return;
       }
       if (
-        dialog.id === 'results' &&
-        e.code === 'Enter' &&
-        !(e.target as HTMLElement)?.matches('button,input,select,a')
+        dialog.id === "results" &&
+        e.code === "Enter" &&
+        !(e.target as HTMLElement)?.matches("button,input,select,a")
       ) {
         e.preventDefault();
-        $('#retry').click();
+        $("#retry").click();
       }
       return;
     }
-    if (screen === 'replays') {
-      if (e.code === 'Escape' && !e.repeat) {
+    if (screen === "replays") {
+      if (e.code === "Escape" && !e.repeat) {
         e.preventDefault();
-        history.pushState(null, '', '/select/');
+        history.pushState(null, "", "/select/");
         readRoute();
       }
       return;
     }
     if (
-      (e.target as HTMLElement)?.matches('button,input,select,a') &&
-      e.code === 'Enter'
+      (e.target as HTMLElement)?.matches("button,input,select,a") &&
+      e.code === "Enter"
     )
       return;
-    if (e.code === 'ArrowDown' || e.code === 'ArrowUp') {
+    if (e.code === "ArrowDown" || e.code === "ArrowUp") {
       e.preventDefault();
       const visible = visibleSongIndices();
       const next =
         (visible.indexOf(songIndex) +
-          (e.code === 'ArrowDown' ? 1 : visible.length - 1)) %
+          (e.code === "ArrowDown" ? 1 : visible.length - 1)) %
         visible.length;
       selectSong(visible[next]);
       return;
     }
-    if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
+    if (e.code === "ArrowRight" || e.code === "ArrowLeft") {
       e.preventDefault();
-      const levels = (['low', 'mid', 'high', 'sc'] as Difficulty[]).filter(
+      const levels = (["low", "mid", "high", "sc"] as Difficulty[]).filter(
         (d) => makeChart(SONGS[songIndex], d, settings.lanes).length,
       );
       settings.difficulty =
         levels[
           (levels.indexOf(settings.difficulty) +
-            (e.code === 'ArrowRight' ? 1 : levels.length - 1)) %
+            (e.code === "ArrowRight" ? 1 : levels.length - 1)) %
             levels.length
         ];
       syncSettings();
@@ -3054,17 +3810,17 @@ window.addEventListener('keydown', (e) => {
       syncSettings();
       return;
     }
-    if (e.code === 'F2') {
+    if (e.code === "F2") {
       e.preventDefault();
-      $('#open-settings').click();
+      $("#open-settings").click();
       return;
     }
-    if (e.code === 'F1') {
+    if (e.code === "F1") {
       e.preventDefault();
-      $('#about-button').click();
+      $("#about-button").click();
       return;
     }
-    if (e.code === 'Enter' && !e.repeat) {
+    if (e.code === "Enter" && !e.repeat) {
       e.preventDefault();
       void start();
       return;
@@ -3073,16 +3829,16 @@ window.addEventListener('keydown', (e) => {
   }
   if (paused) {
     if (
-      e.code === 'Enter' &&
-      $<HTMLDialogElement>('#pause').open &&
-      !(e.target as HTMLElement)?.matches('button,input,select,a')
+      e.code === "Enter" &&
+      $<HTMLDialogElement>("#pause").open &&
+      !(e.target as HTMLElement)?.matches("button,input,select,a")
     ) {
       e.preventDefault();
       void resumeGame();
     }
-    if (e.code === 'F2' && $<HTMLDialogElement>('#pause').open) {
+    if (e.code === "F2" && $<HTMLDialogElement>("#pause").open) {
       e.preventDefault();
-      $('#pause-settings').click();
+      $("#pause-settings").click();
     }
     return;
   }
@@ -3093,7 +3849,7 @@ window.addEventListener('keydown', (e) => {
   field.pressed.add(lane);
   recordInput(lane, keyTime(e), true);
 });
-window.addEventListener('keyup', (e) => {
+window.addEventListener("keyup", (e) => {
   if (editableTarget(e.target)) return;
   if (playReplay) return;
   if (!active || !engine || clock.buffering) return;
@@ -3103,23 +3859,23 @@ window.addEventListener('keyup', (e) => {
   field.pressed.delete(lane);
   recordInput(lane, paused ? clock.now() : keyTime(e), false);
 });
-window.addEventListener('blur', () => {
-  if (screen === 'select' && !active && !preparing) rememberLibrarySelection();
+window.addEventListener("blur", () => {
+  if (screen === "select" && !active && !preparing) rememberLibrarySelection();
   stopPreview();
   if (active && !paused) {
     void pauseGame();
   }
 });
-window.addEventListener('pageshow', () => {
-  if (screen === 'select' && libraryHydrated) restoreLibraryScroll();
+window.addEventListener("pageshow", () => {
+  if (screen === "select" && libraryHydrated) restoreLibraryScroll();
 });
-window.addEventListener('focus', () => {
-  if (screen === 'select' && libraryHydrated) restoreLibraryScroll();
+window.addEventListener("focus", () => {
+  if (screen === "select" && libraryHydrated) restoreLibraryScroll();
 });
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden && screen === 'select' && !active && !preparing)
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && screen === "select" && !active && !preparing)
     rememberLibrarySelection();
-  if (!document.hidden && screen === 'select' && libraryHydrated)
+  if (!document.hidden && screen === "select" && libraryHydrated)
     restoreLibraryScroll();
   if (document.hidden) stopPreview();
   if (document.hidden && active && !paused) {
@@ -3136,71 +3892,108 @@ async function pauseGame() {
   paused = true;
   cancelAnimationFrame(frame);
   await clock.pause();
-  $<HTMLDialogElement>('#pause').showModal();
+  $<HTMLDialogElement>("#pause").showModal();
 }
 async function resumeGame() {
-  $<HTMLDialogElement>('#pause').close();
+  $<HTMLDialogElement>("#pause").close();
   await clock.resume();
   recordOp([2, 0, clock.now(), 0]);
   paused = false;
   frame = requestAnimationFrame(loop);
 }
-$('#resume').onclick = () => void resumeGame();
-$('#pause-settings').onclick = () => {
-  $<HTMLDialogElement>('#pause').close();
-  $<HTMLDialogElement>('#settings').showModal();
+$("#resume").onclick = () => void resumeGame();
+$<HTMLDialogElement>("#pause").onclick = (e) => {
+  const dialog = e.currentTarget as HTMLDialogElement;
+  if (e.target !== dialog) return;
+  const bounds = dialog.getBoundingClientRect();
+  if (
+    e.clientX < bounds.left - 4 ||
+    e.clientX > bounds.right + 4 ||
+    e.clientY < bounds.top - 4 ||
+    e.clientY > bounds.bottom + 4
+  )
+    void resumeGame();
 };
-$('#pause-exit').onclick = () => {
-  $<HTMLDialogElement>('#pause').close();
+$("#pause-settings").onclick = () => {
+  $<HTMLDialogElement>("#pause").close();
+  $<HTMLDialogElement>("#settings").showModal();
+};
+$("#pause-exit").onclick = () => {
+  $<HTMLDialogElement>("#pause").close();
   exit();
   void previewSong();
 };
-$('#pause').addEventListener('cancel', (e) => {
+$("#pause").addEventListener("cancel", (e) => {
   e.preventDefault();
   void resumeGame();
 });
-$('#settings').addEventListener('close', () => {
+$("#settings").addEventListener("close", () => {
   binding = -1;
   syncSettings();
   if (paused) {
-    $('#arena').dataset.position = settings.position;
-    $('#keycaps').innerHTML = settings.keys[settings.lanes]
+    $("#arena").dataset.position = settings.position;
+    $("#keycaps").innerHTML = settings.keys[settings.lanes]
       .map((k) => `<span>${keyLabel(k)}</span>`)
-      .join('');
+      .join("");
   }
   if (paused) {
-    $<HTMLDialogElement>('#pause').showModal();
-    $('#resume').focus();
+    $<HTMLDialogElement>("#pause").showModal();
+    $("#resume").focus();
   }
 });
+$<HTMLDialogElement>("#settings").onclick = (e) => {
+  const dialog = e.currentTarget as HTMLDialogElement;
+  if (e.target !== dialog) return;
+  const bounds = dialog.getBoundingClientRect();
+  if (
+    e.clientX < bounds.left - 4 ||
+    e.clientX > bounds.right + 4 ||
+    e.clientY < bounds.top - 4 ||
+    e.clientY > bounds.bottom + 4
+  )
+    dialog.close();
+};
+installOptionTooltip($<HTMLDialogElement>("#game-options"));
 async function openGameOptions() {
   optionsDuringPlay = active;
   originalShuffle = settings.shuffle;
   originalSeed = shuffleSeed;
   if (active && !paused) await pauseGame();
-  $<HTMLDialogElement>('#pause').close();
+  $<HTMLDialogElement>("#pause").close();
   syncSettings();
-  $('#option-hint').textContent = t(
-    optionsDuringPlay ? 'liveOptionHint' : 'optionHint',
-  );
-  $<HTMLDialogElement>('#game-options').showModal();
+  const optionHint = $("#option-hint");
+  optionHint.textContent = optionsDuringPlay ? t("liveOptionHint") : "";
+  optionHint.classList.toggle("hidden", !optionsDuringPlay);
+  $<HTMLDialogElement>("#game-options").showModal();
 }
-$('#play-options').onclick = () => void openGameOptions();
-$('#game-options').addEventListener('close', () => {
+$("#play-options").onclick = () => void openGameOptions();
+$<HTMLDialogElement>("#game-options").onclick = (e) => {
+  const dialog = e.currentTarget as HTMLDialogElement;
+  if (e.target !== dialog) return;
+  const bounds = dialog.getBoundingClientRect();
+  if (
+    e.clientX < bounds.left - 4 ||
+    e.clientX > bounds.right + 4 ||
+    e.clientY < bounds.top - 4 ||
+    e.clientY > bounds.bottom + 4
+  )
+    dialog.close();
+};
+$("#game-options").addEventListener("close", () => {
   if (!optionsDuringPlay) return;
   field.fader = settings.fader;
   if (
     settings.shuffle !== originalShuffle ||
-    (settings.shuffle === 'random' && shuffleSeed !== originalSeed)
+    (settings.shuffle === "random" && shuffleSeed !== originalSeed)
   ) {
-    $<HTMLDialogElement>('#restart-options').showModal();
+    $<HTMLDialogElement>("#restart-options").showModal();
     return;
   }
   optionsDuringPlay = false;
   syncSettings();
-  history.replaceState(null, '', playPath());
-  $<HTMLDialogElement>('#pause').showModal();
-  $('#resume').focus();
+  history.replaceState(null, "", playPath());
+  $<HTMLDialogElement>("#pause").showModal();
+  $("#resume").focus();
 });
 function cancelShuffleChange() {
   settings.shuffle = originalShuffle;
@@ -3208,38 +4001,51 @@ function cancelShuffleChange() {
   field.fader = settings.fader;
   optionsDuringPlay = false;
   syncSettings();
-  history.replaceState(null, '', playPath());
-  $<HTMLDialogElement>('#pause').showModal();
-  $('#resume').focus();
+  history.replaceState(null, "", playPath());
+  $<HTMLDialogElement>("#pause").showModal();
+  $("#resume").focus();
 }
-$('#cancel-shuffle-restart').onclick = () => {
-  $<HTMLDialogElement>('#restart-options').close();
+$("#cancel-shuffle-restart").onclick = () => {
+  $<HTMLDialogElement>("#restart-options").close();
   cancelShuffleChange();
 };
-$('#restart-options').addEventListener('cancel', (e) => {
+$<HTMLDialogElement>("#restart-options").onclick = (e) => {
+  const dialog = e.currentTarget as HTMLDialogElement;
+  if (e.target !== dialog) return;
+  const bounds = dialog.getBoundingClientRect();
+  if (
+    e.clientX < bounds.left - 4 ||
+    e.clientX > bounds.right + 4 ||
+    e.clientY < bounds.top - 4 ||
+    e.clientY > bounds.bottom + 4
+  ) {
+    dialog.close();
+    cancelShuffleChange();
+  }
+};
+$("#restart-options").addEventListener("cancel", (e) => {
   e.preventDefault();
-  $<HTMLDialogElement>('#restart-options').close();
+  $<HTMLDialogElement>("#restart-options").close();
   cancelShuffleChange();
 });
-$('#confirm-shuffle-restart').onclick = () => {
+$("#confirm-shuffle-restart").onclick = () => {
   const shuffle = settings.shuffle,
     seed = shuffleSeed;
   optionsDuringPlay = false;
   exit();
-  $<HTMLDialogElement>('#restart-options').close();
+  $<HTMLDialogElement>("#restart-options").close();
   settings.shuffle = shuffle;
   shuffleSeed = seed;
   syncSettings();
   void start();
 };
-$('#open-game-options').onclick = openGameOptions;
-$('#ready-options').onclick = openGameOptions;
-$('#options-done').onclick = () =>
-  $<HTMLDialogElement>('#game-options').close();
-for (const id of ['fader', 'shuffle'] as const)
-  $<HTMLSelectElement>('#' + id).onchange = (e) => {
+$("#open-game-options").onclick = openGameOptions;
+$("#ready-options").onclick = openGameOptions;
+$("#options-done").remove();
+for (const id of ["fader", "shuffle"] as const)
+  $<HTMLSelectElement>("#" + id).onchange = (e) => {
     const value = (e.target as HTMLSelectElement).value;
-    if (id === 'fader') settings.fader = value as Fader;
+    if (id === "fader") settings.fader = value as Fader;
     else {
       settings.shuffle = value as Shuffle;
       shuffleSeed = crypto.getRandomValues(new Uint32Array(1))[0];
@@ -3249,33 +4055,56 @@ for (const id of ['fader', 'shuffle'] as const)
 let shareBusy = false;
 let shareController: AbortController | undefined;
 const shortCache = new Map<string, { id: string; expiresAt: string }>();
-$('#share-result').onclick = async () => {
+$("#share-result").onclick = async () => {
   if (!lastResult || shareBusy) return;
   const sharedResult = lastResult,
     shareNavigation = navigationVersion;
   const controller = new AbortController(),
     timer = setTimeout(
-      () => controller.abort(Error('share468_timeout')),
+      () => controller.abort(Error("share468_timeout")),
       95000,
     );
   shareController = controller;
   shareBusy = true;
-  const button = $<HTMLButtonElement>('#share-result');
+  const button = $<HTMLButtonElement>("#share-result");
   button.disabled = true;
-  const status = $('#share-status');
+  const status = $("#share-status");
   delete status.dataset.message;
-  status.textContent = '';
-  status.classList.add('hidden');
-  // Start the clipboard write in the click gesture. The short URL resolves only
-  // after the user's on-demand save, with no preview upload or long-link fallback.
+  status.textContent = "";
+  status.classList.add("hidden");
+  // Start the clipboard write in the click gesture. Client-only mode keeps the
+  // complete encoded result in the fragment; remote mode saves on demand.
   const link = (async () => {
     await replayEncoding;
     if (lastResult !== sharedResult) throw new ShareError(400);
+    const localItem = localAllKeysSource(sharedResult.song);
+    if (localItem) {
+      if (!savedReplay || navigationVersion !== shareNavigation)
+        throw new ShareError(400);
+      const row = await readLocalAllKeys(sharedResult.song, {
+        signal: controller.signal,
+      });
+      // Mirror localAllKeysAudio identity guard: bail as corrupt/400 on mismatch/missing.
+      if (!row || row.identity !== sharedResult.song)
+        throw new ShareError(400);
+      controller.signal.throwIfAborted();
+      if (lastResult !== sharedResult || navigationVersion !== shareNavigation)
+        throw new ShareError(400);
+      const fragment = await encodeProgressiveShare(
+        { record: localItem.envelope, replay: savedReplay },
+        row.bytes,
+        controller.signal,
+      );
+      controller.signal.throwIfAborted();
+      if (lastResult !== sharedResult || navigationVersion !== shareNavigation)
+        throw new ShareError(400);
+      return new URL("/result/#" + fragment, location.origin).href;
+    }
     if (replayExpected && (!savedReplay || !replayText || replayIssue))
       throw new ShareError(400);
     if (
       shared468?.view.result === sharedResult &&
-      new URL(shared468.url).searchParams.has('s')
+      new URL(shared468.url).searchParams.has("s")
     )
       return shared468.url;
     const item = externalSource(lastResult!.song);
@@ -3315,43 +4144,45 @@ $('#share-result').onclick = async () => {
     controller.signal.throwIfAborted();
     if (lastResult !== sharedResult || navigationVersion !== shareNavigation)
       throw new ShareError(400);
+    if (CLIENT_ONLY_MODE)
+      return new URL("/result/#" + fragment, location.origin).href;
     let shared = shortCache.get(fragment);
     if (!shared || Date.parse(shared.expiresAt) <= Date.now())
       shared = await saveSharedReplay(fragment, { signal: controller.signal });
     shortCache.set(fragment, shared);
-    const url = new URL('/result/', location.origin);
-    url.searchParams.set('s', shared.id);
-    if (lastResult === sharedResult && fragment.startsWith('v=7&d=')) {
-      history.replaceState(null, '', url.href);
+    const url = new URL("/result/", location.origin);
+    url.searchParams.set("s", shared.id);
+    if (lastResult === sharedResult && fragment.startsWith("v=7&d=")) {
+      history.replaceState(null, "", url.href);
       if (shared468?.view.result === sharedResult) shared468.url = url.href;
     }
     return url.href;
   })();
   try {
-    if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+    if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
       const clipboardBody = link.then(
-        (url) => new Blob([url], { type: 'text/plain' }),
+        (url) => new Blob([url], { type: "text/plain" }),
       );
       // Some browsers decline clipboard access without consuming this promise.
       // Its rejection is handled by the surrounding share flow, not pageerror.
       void clipboardBody.catch(() => undefined);
       await navigator.clipboard.write([
-        new ClipboardItem({ 'text/plain': clipboardBody }),
+        new ClipboardItem({ "text/plain": clipboardBody }),
       ]);
     } else {
       await navigator.clipboard.writeText(await link);
     }
-    toast(t('resultCopied'));
+    toast(t("resultCopied"));
   } catch (error) {
     // Consume a delayed save rejection even when clipboard access failed first.
     void link.catch(() => undefined);
     toast(shareLabels(settings.language).failed);
     status.dataset.message =
-      error instanceof ShareError && error.status === 429 ? 'quota' : 'failed';
+      error instanceof ShareError && error.status === 429 ? "quota" : "failed";
     status.textContent = shareLabels(settings.language)[
-      status.dataset.message as 'quota' | 'failed'
+      status.dataset.message as "quota" | "failed"
     ];
-    status.classList.remove('hidden');
+    status.classList.remove("hidden");
   } finally {
     clearTimeout(timer);
     if (shareController === controller) shareController = undefined;
@@ -3359,7 +4190,7 @@ $('#share-result').onclick = async () => {
     button.disabled = false;
   }
 };
-$('#watch-replay').onclick = () => void watchReplay();
+$("#watch-replay").onclick = () => void watchReplay();
 async function watchReplay() {
   if (
     !savedReplay ||
@@ -3378,7 +4209,7 @@ async function watchReplay() {
     resultToWatch = lastResult;
   const item = externalSource(savedReplay.song);
   if (item && !item.bytes && !item.record.manifestSha256) {
-    const button = $<HTMLButtonElement>('#watch-replay');
+    const button = $<HTMLButtonElement>("#watch-replay");
     button.disabled = true;
     try {
       await readSharedAudio(item);
@@ -3388,7 +4219,7 @@ async function watchReplay() {
         location.href === watchHref &&
         savedReplay === replayToWatch &&
         lastResult === resultToWatch &&
-        $<HTMLDialogElement>('#results').open
+        $<HTMLDialogElement>("#results").open
       )
         showAudioRecovery(item, error);
       return;
@@ -3401,7 +4232,7 @@ async function watchReplay() {
     location.href !== watchHref ||
     savedReplay !== replayToWatch ||
     lastResult !== resultToWatch ||
-    !$<HTMLDialogElement>('#results').open
+    !$<HTMLDialogElement>("#results").open
   )
     return;
   playReplay = savedReplay;
@@ -3413,25 +4244,25 @@ async function watchReplay() {
   settings.shuffle = playReplay.options.shuffle;
   shuffleSeed = playReplay.options.seed;
   updateOptionReadout();
-  $<HTMLDialogElement>('#results').close();
+  $<HTMLDialogElement>("#results").close();
   document.body.classList.remove(
-    'home-screen',
-    'ready-screen',
-    'results-screen',
+    "home-screen",
+    "ready-screen",
+    "results-screen",
   );
-  screen = 'select';
+  screen = "select";
   void start();
 }
-$('#start').onclick = () => void start();
-$('#exit').onclick = () => void pauseGame();
-$('#retry').onclick = () => {
+$("#start").onclick = () => void start();
+$("#exit").onclick = () => void pauseGame();
+$("#retry").onclick = () => {
   if (mobilePlaybackOnly()) {
-    toast(t('unsupported'));
+    toast(t("unsupported"));
     return;
   }
   playReplay = undefined;
   const result = lastResult;
-  $<HTMLDialogElement>('#results').close();
+  $<HTMLDialogElement>("#results").close();
   exit();
   if (result) {
     songIndex = SONGS.findIndex((s) => s.id === result.song);
@@ -3445,45 +4276,89 @@ $('#retry').onclick = () => {
     }
   }
   document.body.classList.remove(
-    'home-screen',
-    'ready-screen',
-    'results-screen',
+    "home-screen",
+    "ready-screen",
+    "results-screen",
   );
-  screen = 'select';
+  screen = "select";
   void start();
 };
-$('#result-preview').onclick = () => {
+$("#result-preview").onclick = () => {
   if (preview) stopPreview();
   else void previewSong();
 };
-$('#results').addEventListener('close', () => stopPreview());
-$('#results').addEventListener('cancel', () => {
+$("#results").addEventListener("close", () => stopPreview());
+$("#results").addEventListener("cancel", () => {
   exit();
   void previewSong();
 });
-$('#back').onclick = () => {
-  $<HTMLDialogElement>('#results').close();
+$("#back").onclick = () => {
+  $<HTMLDialogElement>("#results").close();
   exit();
   void previewSong();
 };
-$('#open-settings').onclick = () => {
+$<HTMLDialogElement>("#results").onclick = (e) => {
+  const dialog = e.currentTarget as HTMLDialogElement;
+  if (e.target !== dialog) return;
+  const bounds = dialog.getBoundingClientRect();
+  if (
+    e.clientX < bounds.left - 4 ||
+    e.clientX > bounds.right + 4 ||
+    e.clientY < bounds.top - 4 ||
+    e.clientY > bounds.bottom + 4
+  ) {
+    dialog.close();
+    exit();
+    void previewSong();
+  }
+};
+$("#open-settings").onclick = () => {
   if (active) return;
-  $<HTMLDialogElement>('#settings').showModal();
+  $<HTMLDialogElement>("#settings").showModal();
   syncSettings();
 };
-$('#about-button').onclick = () => $<HTMLDialogElement>('#about').showModal();
+$("#about-button").onclick = () => $<HTMLDialogElement>("#about").showModal();
+$<HTMLDialogElement>("#about").onclick = (e) => {
+  const dialog = e.currentTarget as HTMLDialogElement;
+  if (e.target !== dialog) return;
+  const bounds = dialog.getBoundingClientRect();
+  if (
+    e.clientX < bounds.left - 4 ||
+    e.clientX > bounds.right + 4 ||
+    e.clientY < bounds.top - 4 ||
+    e.clientY > bounds.bottom + 4
+  )
+    dialog.close();
+};
 let previewRequest = 0;
 let previewAbort: AbortController | undefined;
+let previewTimer: number | undefined;
 async function previewSong() {
+  if (screen === "select" && selectionRouteUnresolved) {
+    stopPreview();
+    return;
+  }
+  window.clearTimeout(previewTimer);
+  previewTimer = undefined;
   const request = ++previewRequest;
   previewAbort?.abort();
   const controller = new AbortController();
   previewAbort = controller;
   const song = SONGS[songIndex];
+  const current = () =>
+    !controller.signal.aborted &&
+    !(screen === "select" && selectionRouteUnresolved) &&
+    request === previewRequest &&
+    !active &&
+    !preparing &&
+    !document.hidden &&
+    SONGS[songIndex] === song;
+  if (!current()) return;
   if (!clock) clock = new AudioClock();
   try {
-    // resume is called during the selection key/click gesture, before rendering.
+    // Debounced selections already activated audio in their original gesture.
     await clock.activate();
+    if (!current()) return;
     if (ownsOpus468(song.id)) {
       const prepared = transient468Owns(song.id)
         ? await shared468!.service.prepareReplay(clock.context, {
@@ -3496,28 +4371,32 @@ async function previewSong() {
             clock.context,
             controller.signal,
           );
-      controller.signal.throwIfAborted();
-      if (
-        request !== previewRequest ||
-        active ||
-        preparing ||
-        SONGS[songIndex] !== song
-      )
-        return;
-      preview = clock.context.createBufferSource();
-      preview.buffer = prepared.audio;
+      if (!current()) return;
+      const source = clock.context.createBufferSource();
+      preview = source;
+      source.buffer = prepared.audio;
       const gain = clock.context.createGain();
       previewGain = gain;
       gain.gain.value = settings.volume * 0.5;
-      preview.connect(gain);
+      source.connect(gain);
       gain.connect(clock.context.destination);
-      preview.start();
-      document.body.classList.add('previewing');
+      guardPreviewEnd(
+        source,
+        () => preview,
+        () => endPreview(source),
+      );
+      startPreview(source, "native468");
+      document.body.classList.add("previewing");
+      $("#preview-status").textContent = t("nowPlaying");
       syncResultPreview();
       return;
     }
     await ensureExternalBytes(song.id, controller.signal);
-    let track = cache.get(song.id);
+    if (!current()) return;
+    let track = song.id.startsWith("yt-local-allkeys-")
+      ? await localAllKeysAudio(song.id, clock.context, controller.signal)
+      : cache.get(song.id);
+    if (!current()) return;
     if (!track) {
       track = externalSource(song.id)
         ? {
@@ -3528,124 +4407,136 @@ async function previewSong() {
             ),
             peak: 1,
           }
-        : ((await cachedAudio(song.id, clock.context)) ??
-          (await renderSong(song)));
+        : await cachedAudio(song.id, clock.context);
+      if (!current()) return;
+      if (!track) {
+        track = await renderSong(song);
+        if (!current()) return;
+      }
       cache.set(song.id, track);
       if (!externalSource(song.id)) void saveAudio(song.id, track);
     }
-    if (
-      request !== previewRequest ||
-      active ||
-      preparing ||
-      SONGS[songIndex] !== song
-    )
-      return;
+    if (!current()) return;
     try {
       preview?.stop();
     } catch {}
-    preview = clock.context.createBufferSource();
-    preview.buffer = track.buffer;
+    const source = clock.context.createBufferSource();
+    preview = source;
+    source.buffer = track.buffer;
     const gain = clock.context.createGain();
     previewGain = gain;
     gain.gain.value = settings.volume * 0.5;
-    preview.connect(gain);
+    source.connect(gain);
     gain.connect(clock.context.destination);
-    preview.loop = true;
-    preview.loopStart = 8;
-    preview.loopEnd = Math.min(24, track.buffer.duration);
-    preview.start(0, 8);
-    document.body.classList.add('previewing');
-    $('#preview-status').textContent = t('nowPlaying');
+    guardPreviewEnd(
+      source,
+      () => preview,
+      () => endPreview(source),
+    );
+    startPreview(
+      source,
+      externalSource(song.id) || hasLocalAllKeysSource(song.id)
+        ? "external"
+        : "builtin",
+      track.buffer.duration,
+    );
+    document.body.classList.add("previewing");
+    $("#preview-status").textContent = t("nowPlaying");
     syncResultPreview();
-  } catch {
-    if (request === previewRequest) toast(t('previewBlocked'));
+  } catch (error) {
+    if (current())
+      toast(
+        error instanceof ClientOnlyLocalAudioError
+          ? clientOnlyLocalAudioMessage(error)
+          : t("previewBlocked"),
+      );
   }
 }
-document.querySelectorAll<HTMLButtonElement>('[data-settings-tab]').forEach(
+document.querySelectorAll<HTMLButtonElement>("[data-settings-tab]").forEach(
   (button) =>
     (button.onclick = () => {
-      const keys = button.dataset.settingsTab === 'keys';
-      $('#settings').classList.toggle('keys-tab', keys);
+      const keys = button.dataset.settingsTab === "keys";
+      $("#settings").classList.toggle("keys-tab", keys);
       document
-        .querySelectorAll<HTMLElement>('[data-settings-tab]')
+        .querySelectorAll<HTMLElement>("[data-settings-tab]")
         .forEach((b) => {
-          b.setAttribute('aria-selected', String(b === button));
+          b.setAttribute("aria-selected", String(b === button));
           b.tabIndex = b === button ? 0 : -1;
         });
     }),
 );
-document.querySelector('.settings-tabs')!.addEventListener('keydown', (e) => {
+document.querySelector(".settings-tabs")!.addEventListener("keydown", (e) => {
   const key = (e as KeyboardEvent).key;
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(key)) return;
   e.preventDefault();
   const current = document.querySelector<HTMLButtonElement>(
     '[data-settings-tab][aria-selected="true"]',
   )!;
   const next = document.querySelector<HTMLButtonElement>(
-    `[data-settings-tab="${key === 'Home' ? 'general' : key === 'End' ? 'keys' : current.dataset.settingsTab === 'general' ? 'keys' : 'general'}"]`,
+    `[data-settings-tab="${key === "Home" ? "general" : key === "End" ? "keys" : current.dataset.settingsTab === "general" ? "keys" : "general"}"]`,
   )!;
   next.click();
   next.focus();
 });
-$('#language').onchange = (e) => {
+$("#language").onchange = (e) => {
   const choice = (e.target as HTMLSelectElement).value;
-  settings.languageMode = choice === 'auto' ? 'auto' : 'manual';
+  settings.languageMode = choice === "auto" ? "auto" : "manual";
   settings.language =
-    choice === 'auto'
+    choice === "auto"
       ? browserLanguage(navigator.languages)
       : (choice as Language);
   localize();
   songCards();
   selectedSong();
   syncSettings();
-  $('#preview-status').textContent = preview ? t('nowPlaying') : '';
+  $("#preview-status").textContent = t("nowPlaying");
 };
-$('#reduced-motion').onchange = (e) => {
+$("#reduced-motion").onchange = (e) => {
   settings.reducedMotion = (e.target as HTMLInputElement).checked;
   localize();
   persist();
   if (
     !readingRoute &&
-    screen === 'select' &&
-    !$<HTMLDialogElement>('#results').open
+    screen === "select" &&
+    !$<HTMLDialogElement>("#results").open
   )
-    history.replaceState(null, '', selectionPath());
+    replaceSelectionPath();
 };
-$('#fullscreen').onclick = () => {
+$("#fullscreen").onclick = () => {
   if (document.fullscreenElement) void document.exitFullscreen();
   else void requestGameFullscreen();
 };
-document.querySelectorAll<HTMLButtonElement>('[data-diff]').forEach(
+document.querySelectorAll<HTMLButtonElement>("[data-diff]").forEach(
   (b) =>
     (b.onclick = () => {
       settings.difficulty = b.dataset.diff as Difficulty;
       syncSettings();
     }),
 );
-document.querySelectorAll<HTMLButtonElement>('[data-lanes]').forEach(
+document.querySelectorAll<HTMLButtonElement>("[data-lanes]").forEach(
   (b) =>
     (b.onclick = () => {
       settings.lanes = Number(b.dataset.lanes) as Lanes;
       syncSettings();
     }),
 );
-document.querySelectorAll<HTMLButtonElement>('[data-pos]').forEach(
+document.querySelectorAll<HTMLButtonElement>("[data-pos]").forEach(
   (b) =>
     (b.onclick = () => {
-      settings.position = b.dataset.pos as Settings['position'];
+      settings.position = b.dataset.pos as Settings["position"];
       syncSettings();
     }),
 );
-$<HTMLInputElement>('#volume').oninput = (e) => {
+$<HTMLInputElement>("#volume").oninput = (e) => {
   settings.volume = Number((e.target as HTMLInputElement).value);
   syncSettings();
 };
-$<HTMLSelectElement>('#speed').onchange = (e) => {
+$<HTMLSelectElement>("#speed").onchange = (e) => {
   settings.speed = Number((e.target as HTMLSelectElement).value);
   syncSettings();
 };
-window.addEventListener('languagechange', () => {
-  if (settings.languageMode === 'auto') {
+window.addEventListener("languagechange", () => {
+  if (settings.languageMode === "auto") {
     settings.language = browserLanguage(navigator.languages);
     localize();
     songCards();
@@ -3653,7 +4544,7 @@ window.addEventListener('languagechange', () => {
     syncSettings();
   }
 });
-$('#reset').onclick = () => {
+$("#reset").onclick = () => {
   settings = {
     feverAuto: true,
     language: settings.language,
@@ -3661,10 +4552,10 @@ $('#reset').onclick = () => {
     reducedMotion: settings.reducedMotion,
     lanes: settings.lanes,
     difficulty: settings.difficulty,
-    position: 'left',
+    position: "left",
     speed: 1.5,
-    fader: 'off',
-    shuffle: 'off',
+    fader: "off",
+    shuffle: "off",
     volume: 0.7,
     keys: structuredClone(defaults),
     bindingProfile: migrateBindings({}),
@@ -3672,42 +4563,70 @@ $('#reset').onclick = () => {
   syncSettings();
 };
 function playPath() {
-  if (externalSource(SONGS[songIndex].id) || ownsOpus468(SONGS[songIndex].id))
+  if (
+    externalSource(SONGS[songIndex].id) ||
+    hasLocalAllKeysSource(SONGS[songIndex].id) ||
+    ownsOpus468(SONGS[songIndex].id)
+  )
     return selectionPath();
-  return `/play/${SONGS[songIndex].id}/${settings.lanes}/${settings.difficulty}/?speed=${settings.speed.toFixed(1)}&fader=${settings.fader}&shuffle=${settings.shuffle}&seed=${shuffleSeed}${perfOverlay ? '&perf=1' : ''}`;
+  return `/play/${SONGS[songIndex].id}/${settings.lanes}/${settings.difficulty}/?speed=${settings.speed.toFixed(1)}&fader=${settings.fader}&shuffle=${settings.shuffle}&seed=${shuffleSeed}${perfOverlay ? "&perf=1" : ""}`;
+}
+function replaceSelectionPath() {
+  if (
+    selectionRouteUnresolved ||
+    (!libraryHydrated && hasSelectionSong(location.search))
+  )
+    return;
+  const path = selectionPath();
+  if (location.pathname + location.search === path && !location.hash) return;
+  history.replaceState(null, "", path);
 }
 function selectionPath() {
-  return `/select/?song=${SONGS[songIndex].id}&lanes=${settings.lanes}&difficulty=${settings.difficulty}&speed=${settings.speed.toFixed(1)}&fader=${settings.fader}&shuffle=${settings.shuffle}&seed=${shuffleSeed}${perfOverlay ? '&perf=1' : ''}`;
+  const id = SONGS[songIndex].id;
+  return selectionSongPath(id, songVideoId(id), localStorage);
 }
 
 function showAudioRecovery(
   item: NonNullable<ReturnType<typeof externalSource>>,
   error: unknown,
 ) {
+  recordFailure("playback", externalError(error, settings.language));
   const recoveryHref = location.href,
     recoveryNavigation = navigationVersion;
   const recoveryReplay = savedReplay,
     recoveryResult = lastResult;
-  const dialog = document.createElement('dialog');
-  dialog.className = 'share-error';
-  const text = document.createElement('p');
+  const dialog = document.createElement("dialog");
+  dialog.className = "share-error";
+  dialog.onclick = (e) => {
+    const dialog = e.currentTarget as HTMLDialogElement;
+    if (e.target !== dialog) return;
+    const bounds = dialog.getBoundingClientRect();
+    if (
+      e.clientX < bounds.left - 4 ||
+      e.clientX > bounds.right + 4 ||
+      e.clientY < bounds.top - 4 ||
+      e.clientY > bounds.bottom + 4
+    )
+      dialog.close();
+  };
+  const text = document.createElement("p");
   text.textContent =
     externalError(error, settings.language) +
-    ' ' +
+    " " +
     sharedAudioLabels(settings.language).explain;
-  const restore = document.createElement('button');
-  restore.className = 'primary';
+  const restore = document.createElement("button");
+  restore.className = "primary";
   restore.textContent = sharedAudioLabels(settings.language).restore;
-  const close = document.createElement('button');
-  close.textContent = t('close');
+  const close = document.createElement("button");
+  close.textContent = t("close");
   const controller = new AbortController();
   close.onclick = () => {
     controller.abort();
     dialog.close();
     dialog.remove();
   };
-  dialog.addEventListener('cancel', () => controller.abort());
-  dialog.addEventListener('close', () => {
+  dialog.addEventListener("cancel", () => controller.abort());
+  dialog.addEventListener("close", () => {
     controller.abort();
     dialog.remove();
   });
@@ -3724,7 +4643,7 @@ function showAudioRecovery(
         location.href === recoveryHref &&
         savedReplay === recoveryReplay &&
         lastResult === recoveryResult &&
-        $<HTMLDialogElement>('#results').open &&
+        $<HTMLDialogElement>("#results").open &&
         dialog.open;
       dialog.close();
       dialog.remove();
@@ -3733,7 +4652,7 @@ function showAudioRecovery(
       if (!controller.signal.aborted)
         text.textContent =
           externalError(e, settings.language) +
-          ' ' +
+          " " +
           sharedAudioLabels(settings.language).explain;
     } finally {
       restore.disabled = false;
@@ -3760,9 +4679,9 @@ async function openPublic468Share(fragment: string, url: string) {
     operation.check();
     if (
       bootstrap.admitted !== false ||
-      bootstrap.kind !== 'untrusted-share468-bootstrap-candidate'
+      bootstrap.kind !== "untrusted-share468-bootstrap-candidate"
     )
-      throw Error('share468_bootstrap');
+      throw Error("share468_bootstrap");
     const candidate = bootstrap.candidate;
     await recoverPublic468Source(candidate, {
       exchangeProjection: createPrivateOpusV2ProjectionTransport().exchange,
@@ -3783,7 +4702,7 @@ async function openPublic468Share(fragment: string, url: string) {
       view.persistentLibraryAdded !== false ||
       view.persistentSessionSaved !== false
     )
-      throw Error('share468_transient_contract');
+      throw Error("share468_transient_contract");
     transient468Ids.add(view.song.id);
     shared468 = { fragment, url, service, view, candidate, added: false };
     operation.finish(service);
@@ -3794,7 +4713,7 @@ async function openPublic468Share(fragment: string, url: string) {
     lastResult = view.result;
     replayExpected = false;
     replayIssue = false;
-    replayText = '';
+    replayText = "";
     localSessionKey = undefined;
     settings.lanes = view.replay.lanes;
     settings.difficulty = view.replay.difficulty;
@@ -3809,22 +4728,34 @@ let shared468AddBusy = false;
 function showShared468Add() {
   const shared = shared468;
   if (!shared || shared.added || shared468AddBusy) return;
-  const dialog = document.createElement('dialog'),
-    name = document.createElement('h2'),
-    status = document.createElement('p'),
-    add = document.createElement('button'),
-    cancel = document.createElement('button');
-  dialog.id = 'shared468-add-dialog';
+  const dialog = document.createElement("dialog"),
+    name = document.createElement("h2"),
+    status = document.createElement("p"),
+    add = document.createElement("button"),
+    cancel = document.createElement("button");
+  dialog.id = "shared468-add-dialog";
+  dialog.onclick = (e) => {
+    const dialog = e.currentTarget as HTMLDialogElement;
+    if (e.target !== dialog) return;
+    const bounds = dialog.getBoundingClientRect();
+    if (
+      e.clientX < bounds.left - 4 ||
+      e.clientX > bounds.right + 4 ||
+      e.clientY < bounds.top - 4 ||
+      e.clientY > bounds.bottom + 4
+    )
+      dialog.close();
+  };
   name.textContent = shared.view.song.title;
-  add.id = 'shared468-add-confirm';
+  add.id = "shared468-add-confirm";
   add.textContent = externalLabels(settings.language).submit;
-  add.className = 'primary';
+  add.className = "primary";
   cancel.textContent = externalLabels(settings.language).cancel;
-  cancel.className = 'quiet';
+  cancel.className = "quiet";
   const controller = new AbortController();
   cancel.onclick = () => dialog.close();
-  dialog.addEventListener('close', () => {
-    controller.abort(Error('share468_add_closed'));
+  dialog.addEventListener("close", () => {
+    controller.abort(Error("share468_add_closed"));
     dialog.remove();
   });
   add.onclick = async () => {
@@ -3835,7 +4766,7 @@ function showShared468Add() {
     const href = location.href,
       navigation = navigationVersion,
       timer = setTimeout(
-        () => controller.abort(Error('share468_add_timeout')),
+        () => controller.abort(Error("share468_add_timeout")),
         95000,
       ),
       check = () => {
@@ -3845,7 +4776,7 @@ function showShared468Add() {
           href !== location.href ||
           navigation !== navigationVersion
         )
-          throw Error('share468_add_stale');
+          throw Error("share468_add_stale");
       };
     try {
       const wire = await validateRecoveredV7(
@@ -3899,7 +4830,50 @@ function showShared468Add() {
   cancel.focus();
 }
 async function openExternalShare(fragment: string) {
-  if (fragment.startsWith('v=7&d=')) {
+  if (fragment.startsWith(PROGRESSIVE_SHARE_PREFIX)) {
+    const request = ++shareRouteRequest;
+    const href = location.href;
+    const navigation = navigationVersion;
+    const current = () =>
+      request === shareRouteRequest &&
+      location.href === href &&
+      navigationVersion === navigation;
+    const proof = await decodeProgressiveShare(fragment);
+    if (!current()) return;
+    const item = await installLocalAllKeysSource(proof.verified.record);
+    if (!current()) return;
+    if (!SONGS.some((song) => song.id === item.song.id)) SONGS.push(item.song);
+    directProgressiveProofs.set(proof.pin.videoId, proof);
+    receivedLocalAllKeysShare = { fragment, data: proof.verified };
+    savedReplay = proof.verified.replay;
+    lastResult = proof.verified.result;
+    settings.lanes = proof.verified.replay.lanes;
+    settings.difficulty = proof.verified.replay.difficulty;
+    readRoute();
+    return;
+  }
+  if (fragment.startsWith("v=local-allkeys-v1&d=")) {
+    const request = ++shareRouteRequest;
+    const href = location.href;
+    const navigation = navigationVersion;
+    const current = () =>
+      request === shareRouteRequest &&
+      location.href === href &&
+      navigationVersion === navigation;
+    const data = await decodeLocalAllKeysShare(fragment);
+    if (!current()) return;
+    const item = await installLocalAllKeysSource(data.record);
+    if (!current()) return;
+    if (!SONGS.some((song) => song.id === item.song.id)) SONGS.push(item.song);
+    receivedLocalAllKeysShare = { fragment, data };
+    savedReplay = data.replay;
+    lastResult = data.result;
+    settings.lanes = data.replay.lanes;
+    settings.difficulty = data.replay.difficulty;
+    readRoute();
+    return;
+  }
+  if (fragment.startsWith("v=7&d=")) {
     await openPublic468Share(fragment, location.href);
     return;
   }
@@ -3907,7 +4881,7 @@ async function openExternalShare(fragment: string) {
   const request = ++shareRouteRequest;
   const href = location.href;
   const navigation = navigationVersion;
-  const data = fragment.startsWith('v=6&d=')
+  const data = fragment.startsWith("v=6&d=")
     ? await decodeOpus35Share(fragment)
     : await decodeExternalShare(fragment);
   if (
@@ -3935,11 +4909,45 @@ async function openExternalShare(fragment: string) {
   lastResult = data.result;
   replayExpected = false;
   replayIssue = false;
-  replayText = '';
+  replayText = "";
   readRoute();
 }
 
 function readRoute(initial = false) {
+  if (
+    /^\/select\/?$/.test(location.pathname) &&
+    !libraryHydrated &&
+    hasSelectionSong(location.search)
+  )
+    return;
+  if (
+    location.pathname === "/result/" &&
+    receivedLocalAllKeysShare?.fragment === location.hash.slice(1)
+  ) {
+    const { data } = receivedLocalAllKeysShare;
+    readingRoute = true;
+    try {
+      document
+        .querySelectorAll<HTMLDialogElement>("dialog[open]")
+        .forEach((dialog) => dialog.close());
+      if (active || paused) exit();
+      songIndex = SONGS.findIndex((song) => song.id === data.identity);
+      settings.lanes = data.replay.lanes;
+      settings.difficulty = data.replay.difficulty;
+      savedReplay = data.replay;
+      lastResult = data.result;
+      replayExpected = false;
+      replayIssue = false;
+      replayText = "";
+      localSessionKey = undefined;
+      localSessionOpened = false;
+      localBuiltinNotes = structuredClone(data.frozenNotes);
+      showResult(data.result);
+    } finally {
+      readingRoute = false;
+    }
+    return;
+  }
   if (shared468 && location.href === shared468.url) {
     songIndex = SONGS.findIndex((s) => s.id === shared468!.view.song.id);
     savedReplay = shared468.view.replay;
@@ -3951,14 +4959,16 @@ function readRoute(initial = false) {
   }
 
   localBuiltinNotes = undefined;
-  if (location.pathname !== '/result/')
-    document.documentElement.removeAttribute('data-result-pending');
+  if (location.pathname !== "/result/")
+    document.documentElement.removeAttribute("data-result-pending");
   const fragment = location.hash.slice(1);
   if (
-    location.pathname === '/result/' &&
-    (fragment.startsWith('v=5&d=') ||
-      fragment.startsWith('v=6&d=') ||
-      fragment.startsWith('v=7&d=')) &&
+    location.pathname === "/result/" &&
+    (fragment.startsWith(PROGRESSIVE_SHARE_PREFIX) ||
+      fragment.startsWith("v=local-allkeys-v1&d=") ||
+      fragment.startsWith("v=5&d=") ||
+      fragment.startsWith("v=6&d=") ||
+      fragment.startsWith("v=7&d=")) &&
     receivedShare?.fragment !== fragment
   ) {
     const routeHref = location.href,
@@ -3967,43 +4977,43 @@ function readRoute(initial = false) {
       if (location.href !== routeHref || navigationVersion !== routeNavigation)
         return;
       toast(shareLabels(settings.language).invalid);
-      document.documentElement.removeAttribute('data-result-pending');
+      document.documentElement.removeAttribute("data-result-pending");
     });
     return;
   }
   readingRoute = true;
   document
-    .querySelectorAll<HTMLDialogElement>('dialog[open]')
+    .querySelectorAll<HTMLDialogElement>("dialog[open]")
     .forEach((d) => d.close());
   if (active || paused) exit();
-  document.body.classList.remove('results-screen');
-  const parts = location.pathname.split('/').filter(Boolean);
-  const q = new URLSearchParams(location.search);
-  const speed = Number(q.get('speed'));
-  if (q.has('speed') && Number.isFinite(speed) && speed >= 1 && speed <= 9)
+  document.body.classList.remove("results-screen");
+  const parts = location.pathname.split("/").filter(Boolean);
+  const q = selectionRouteOptions(location.pathname, location.search);
+  const speed = Number(q.get("speed"));
+  if (q.has("speed") && Number.isFinite(speed) && speed >= 1 && speed <= 9)
     settings.speed = Math.round(speed * 10) / 10;
-  if ((FADERS as readonly string[]).includes(q.get('fader') || ''))
-    settings.fader = q.get('fader') as Fader;
-  if (q.has('perf')) perfOverlay = q.get('perf') === '1';
-  document.body.classList.toggle('perf-enabled', perfOverlay);
-  $('#fps').hidden = !perfOverlay;
-  if (['off', 'mirror', 'random'].includes(q.get('shuffle') || ''))
-    settings.shuffle = q.get('shuffle') as Shuffle;
-  const seed = Number(q.get('seed'));
+  if ((FADERS as readonly string[]).includes(q.get("fader") || ""))
+    settings.fader = q.get("fader") as Fader;
+  if (q.has("perf")) perfOverlay = q.get("perf") === "1";
+  document.body.classList.toggle("perf-enabled", perfOverlay);
+  $("#fps").hidden = !perfOverlay;
+  if (["off", "mirror", "random"].includes(q.get("shuffle") || ""))
+    settings.shuffle = q.get("shuffle") as Shuffle;
+  const seed = Number(q.get("seed"));
   if (
-    q.has('seed') &&
+    q.has("seed") &&
     Number.isInteger(seed) &&
     seed >= 0 &&
     seed <= 4294967295
   )
     shuffleSeed = seed;
   const externalShared =
-    parts[0] === 'result' && receivedShare?.fragment === fragment
+    parts[0] === "result" && receivedShare?.fragment === fragment
       ? receivedShare.data
       : undefined;
   const shared =
     externalShared?.result ??
-    (parts[0] === 'result'
+    (parts[0] === "result"
       ? readResult(
           location.hash ? new URLSearchParams(location.hash.slice(1)) : q,
         )
@@ -4012,18 +5022,18 @@ function readRoute(initial = false) {
     lastResult = shared;
     if (verifiedOwnFragment === location.hash.slice(1)) ownResults.add(shared);
     const replayParams = new URLSearchParams(location.hash.slice(1));
-    const encoded = replayParams.get('r');
-    replayExpected = replayParams.get('rp') === '1' || !!encoded;
+    const encoded = replayParams.get("r");
+    replayExpected = replayParams.get("rp") === "1" || !!encoded;
     replayExpectedLength = Number(
-      replayParams.get('rn') || encoded?.length || 0,
+      replayParams.get("rn") || encoded?.length || 0,
     );
     replayIssue = replayExpected && !encoded;
     savedReplay = undefined;
-    replayText = '';
+    replayText = "";
     if (encoded) {
       replayEncoding = (async () => {
         const r =
-          replayParams.has('rn') &&
+          replayParams.has("rn") &&
           (replayExpectedLength !== encoded.length ||
             !Number.isInteger(replayExpectedLength))
             ? null
@@ -4031,7 +5041,7 @@ function readRoute(initial = false) {
         if (lastResult === shared && r && entryReplayMatches(r, shared)) {
           savedReplay = r;
           replayText = encoded;
-          history.replaceState(null, '', resultLink(shared));
+          history.replaceState(null, "", resultLink(shared));
           syncReplayButton();
         } else if (lastResult === shared) {
           replayIssue = true;
@@ -4049,63 +5059,81 @@ function readRoute(initial = false) {
     settings.lanes = externalShared.replay.lanes;
     settings.difficulty = externalShared.replay.difficulty;
   }
-  const id = shared
-    ? shared.song
-    : parts[0] === 'play'
-      ? parts[1]
-      : q.get('song');
+  const selection =
+    parts[0] === "select" ? resolveCurrentSelection() : undefined;
+  selectionRouteUnresolved =
+    !!selection && selection.kind !== "selected" && selection.kind !== "none";
+  if (selectionRouteUnresolved) stopPreview();
+  const id =
+    selection?.kind === "selected"
+      ? selection.id
+      : shared
+        ? shared.song
+        : parts[0] === "play"
+          ? parts[1]
+          : q.get("song");
   const idx = SONGS.findIndex((s) => s.id === id);
-  if (idx >= 0 && (shared || !isHiddenSong(SONGS[idx].id))) {
-    songIndex = shared
-      ? idx
-      : (visibleSongIndices().find(
-          (i) =>
-            libraryVideoKey(SONGS[i].id) === libraryVideoKey(SONGS[idx].id),
-        ) ?? idx);
+  if (
+    idx >= 0 &&
+    (shared || selection?.kind === "selected" || !isHiddenSong(SONGS[idx].id))
+  ) {
+    songIndex =
+      shared || selection?.kind === "selected"
+        ? idx
+        : (visibleSongIndices().find(
+            (i) =>
+              libraryVideoKey(SONGS[i].id) === libraryVideoKey(SONGS[idx].id),
+          ) ?? idx);
   } else if (!shared && isHiddenSong(SONGS[songIndex].id))
     songIndex = visibleSongIndices()[0];
-  if (!shared && !externalShared && !visibleSongIndices().includes(songIndex))
+  if (
+    !selection &&
+    !shared &&
+    !externalShared &&
+    !visibleSongIndices().includes(songIndex)
+  )
     songIndex = visibleSongIndices()[0];
-  const lanes = parts[0] === 'play' ? parts[2] : q.get('lanes');
-  const difficulty = parts[0] === 'play' ? parts[3] : q.get('difficulty');
+  const lanes = parts[0] === "play" ? parts[2] : q.get("lanes");
+  const difficulty = parts[0] === "play" ? parts[3] : q.get("difficulty");
   if (isKeyMode(Number(lanes))) settings.lanes = Number(lanes) as Lanes;
   if (
-    difficulty === 'low' ||
-    difficulty === 'mid' ||
-    difficulty === 'high' ||
-    difficulty === 'sc'
+    difficulty === "low" ||
+    difficulty === "mid" ||
+    difficulty === "high" ||
+    difficulty === "sc"
   )
     settings.difficulty = difficulty;
   screen =
-    parts[0] === 'play'
-      ? 'ready'
-      : parts[0] === 'select'
-        ? 'select'
-        : parts[0] === 'replays'
-          ? 'replays'
-          : 'home';
-  if (screen === 'select' && !id) restoreLibrarySelection();
-  readyAutostart = initial && screen === 'ready' && !mobilePlaybackOnly();
-  document.body.classList.toggle('home-screen', screen === 'home');
-  document.body.classList.toggle('ready-screen', screen === 'ready');
-  $('#home-screen').classList.toggle('hidden', screen !== 'home');
-  $('#ready-screen').classList.toggle(
-    'hidden',
-    screen !== 'ready' || readyAutostart,
+    parts[0] === "play"
+      ? "ready"
+      : parts[0] === "select"
+        ? "select"
+        : parts[0] === "replays"
+          ? "replays"
+          : "home";
+  if (screen === "select" && selection?.kind === "none")
+    restoreLibrarySelection();
+  readyAutostart = initial && screen === "ready" && !mobilePlaybackOnly();
+  document.body.classList.toggle("home-screen", screen === "home");
+  document.body.classList.toggle("ready-screen", screen === "ready");
+  $("#home-screen").classList.toggle("hidden", screen !== "home");
+  $("#ready-screen").classList.toggle(
+    "hidden",
+    screen !== "ready" || readyAutostart,
   );
-  $('#lobby').classList.toggle('hidden', screen !== 'select');
-  $('#replays').classList.toggle('hidden', screen !== 'replays');
-  if (screen === 'replays') void showReplays();
-  $('#game').classList.add('hidden');
-  $('#ready-title').textContent = SONGS[songIndex].title;
-  $('#ready-detail').textContent =
+  $("#lobby").classList.toggle("hidden", screen !== "select");
+  $("#replays").classList.toggle("hidden", screen !== "replays");
+  if (screen === "replays") void showReplays();
+  $("#game").classList.add("hidden");
+  $("#ready-title").textContent = SONGS[songIndex].title;
+  $("#ready-detail").textContent =
     `${settings.lanes} KEY / ${chartLevel(SONGS[songIndex], settings.difficulty, settings.lanes)} / ENTER`;
   if (readyAutostart) {
     const loadingSong = SONGS[songIndex];
-    const wallpaper = $<HTMLImageElement>('#loading-wallpaper');
+    const wallpaper = $<HTMLImageElement>("#loading-wallpaper");
     armedWallpaperAt = 0;
     wallpaper.hidden = true;
-    wallpaper.referrerPolicy = 'no-referrer';
+    wallpaper.referrerPolicy = "no-referrer";
     wallpaper.dataset.songArt = loadingSong.id;
     wallpaper.src = songArt(loadingSong.id);
     void wallpaper
@@ -4126,33 +5154,42 @@ function readRoute(initial = false) {
           })
           .finally(() => preloading.delete(loadingSong.id)),
       );
-    $('#loading-title').textContent = loadingSong.title;
-    $('#loading-title').previousElementSibling!.textContent =
-      externalSource(loadingSong.id) || ownsOpus468(loadingSong.id)
-        ? 'YOUTUBE'
-        : 'ORVIO ORIGINALS';
-    $('#loading-detail').textContent =
+    $("#loading-title").textContent = loadingSong.title;
+    $("#loading-title").previousElementSibling!.textContent =
+      externalSource(loadingSong.id) ||
+      hasLocalAllKeysSource(loadingSong.id) ||
+      ownsOpus468(loadingSong.id)
+        ? "YOUTUBE"
+        : "ORVIO ORIGINALS";
+    $("#loading-detail").textContent =
       `${loadingSong.genre} · ${loadingSong.bpm} BPM · ${settings.lanes} KEY`;
-    $('#loading-status').textContent = `${t('start')} · ENTER ↵`;
-    $('#cancel-startup').textContent =
-      externalLabels(settings.language).cancel + ' · ESC';
-    $('#song-loading').classList.remove('hidden');
-    $('#song-loading').classList.add('awaiting-start');
+    $("#loading-status").textContent = `${t("start")} · ENTER ↵`;
+    $("#cancel-startup").textContent =
+      externalLabels(settings.language).cancel + " · ESC";
+    $("#song-loading").classList.remove("hidden");
+    $("#song-loading").classList.add("awaiting-start");
   } else if (!preparing) {
     armedWallpaperAt = 0;
-    $('#song-loading').classList.add('hidden');
-    $('#song-loading').classList.remove('awaiting-start');
+    $("#song-loading").classList.add("hidden");
+    $("#song-loading").classList.remove("awaiting-start");
   }
   localize();
   songCards();
   selectedSong();
   syncSettings();
   restoreLibraryScroll();
+  if (screen === "select") queueMicrotask(prepareGeneralReadiness);
   readingRoute = false;
+  if (screen === "select") {
+    if (selection?.kind === "selected") replaceSelectionPath();
+    if (selection?.kind === "missing")
+      toast(shareLabels(settings.language).missing);
+    openSongInvitation();
+  }
   if (shared) {
     // A verified replay owns its FEVER summary. Do not paint an incomplete
     // result while decoding and then leave that row missing after reload.
-    const encoded = new URLSearchParams(location.hash.slice(1)).get('r');
+    const encoded = new URLSearchParams(location.hash.slice(1)).get("r");
     if (encoded)
       void replayEncoding.then(() => {
         if (lastResult === shared) showResult(shared);
@@ -4160,26 +5197,26 @@ function readRoute(initial = false) {
     else showResult(shared);
   }
 }
-$('#home-start').onclick = () => {
+$("#home-start").onclick = () => {
   // Keep the document alive so the gesture's fullscreen survives routing.
   // Permission denial never blocks starting the game.
   if (!document.fullscreenElement) void requestGameFullscreen();
-  history.pushState(null, '', '/select/');
+  history.pushState(null, "", "/select/");
   readRoute();
-  $('#start').focus();
+  $("#start").focus();
   void previewSong();
 };
-$('#ready-start').onclick = () => {
+$("#ready-start").onclick = () => {
   if (mobilePlaybackOnly()) {
-    toast(t('unsupported'));
+    toast(t("unsupported"));
     return;
   }
-  document.body.classList.remove('ready-screen');
+  document.body.classList.remove("ready-screen");
   void start();
 };
-window.addEventListener('popstate', () => {
+window.addEventListener("popstate", () => {
   navigationVersion++;
-  shareController?.abort(Error('share_route_changed'));
+  shareController?.abort(Error("share_route_changed"));
   shared468Route.close();
   shared468 = undefined;
   if (startup) {
@@ -4187,8 +5224,8 @@ window.addEventListener('popstate', () => {
     return;
   }
   if (
-    location.pathname === '/result/' &&
-    new URLSearchParams(location.search).has('s')
+    location.pathname === "/result/" &&
+    new URLSearchParams(location.search).has("s")
   )
     void readInitialRoute();
   else readRoute();
@@ -4223,12 +5260,14 @@ async function readInitialRoute() {
   const initialNavigation = navigationVersion;
   const stillInitial = () =>
     navigationVersion === initialNavigation && location.href === expectedHref;
-  const id = new URLSearchParams(location.search).get('s');
+  const id = new URLSearchParams(location.search).get("s");
   if (!id) {
     if (
-      location.hash.startsWith('#v=5&d=') ||
-      location.hash.startsWith('#v=6&d=') ||
-      location.hash.startsWith('#v=7&d=')
+      location.hash.startsWith("#v=local-allkeys-v1&d=") ||
+      location.hash.startsWith("#v=5&d=") ||
+      location.hash.startsWith("#v=6&d=") ||
+      location.hash.startsWith("#v=7&d=") ||
+      location.hash.startsWith("#" + PROGRESSIVE_SHARE_PREFIX)
     ) {
       try {
         await openExternalShare(location.hash.slice(1));
@@ -4236,7 +5275,7 @@ async function readInitialRoute() {
         if (!stillInitial()) return;
         finishResultFirstPaint(null);
         toast(shareLabels(settings.language).invalid);
-        document.documentElement.removeAttribute('data-result-pending');
+        document.documentElement.removeAttribute("data-result-pending");
       }
       return;
     }
@@ -4244,18 +5283,18 @@ async function readInitialRoute() {
     // no longer holds; recover honestly instead of readying another song.
     const playId = location.pathname.match(/^\/play\/([^/]+)\//)?.[1];
     if (playId && !SONGS.some((s) => s.id === playId)) {
-      history.replaceState(null, '', '/select/');
+      history.replaceState(null, "", "/select/");
       toast(shareLabels(settings.language).missing);
     }
     const fragment = location.hash.slice(1);
-    if (location.pathname === '/result/' && fragment.startsWith('v=4&')) {
+    if (location.pathname === "/result/" && fragment.startsWith("v=4&")) {
       const own = await isArchivedBuiltinResult(fragment);
       if (!stillInitial()) return;
       verifiedOwnFragment = own ? fragment : null;
     }
     readRoute(true);
     await replayEncoding;
-    document.documentElement.removeAttribute('data-result-pending');
+    document.documentElement.removeAttribute("data-result-pending");
     return;
   }
   const labels = shareLabels(settings.language);
@@ -4266,24 +5305,24 @@ async function readInitialRoute() {
     const loaded = await resolveSharedReplay(id);
     if (!stillInitial()) return;
     const params = new URLSearchParams(loaded.fragment);
-    if (params.get('v') === '7') {
+    if (params.get("v") === "7") {
       shortCache.set(loaded.fragment, { id, expiresAt: loaded.expiresAt });
       await openPublic468Share(loaded.fragment, location.href);
       return;
     }
-    if (['5', '6'].includes(params.get('v') || '')) {
+    if (["5", "6"].includes(params.get("v") || "")) {
       shortCache.set(loaded.fragment, { id, expiresAt: loaded.expiresAt });
-      history.replaceState(null, '', '/result/#' + loaded.fragment);
+      history.replaceState(null, "", "/result/#" + loaded.fragment);
       expectedHref = location.href;
       await openExternalShare(loaded.fragment);
       return;
     }
     if (!readResult(params)) throw new ShareError(400);
-    const encoded = params.get('r');
+    const encoded = params.get("r");
     if (
       encoded &&
-      params.has('rn') &&
-      Number(params.get('rn')) !== encoded.length
+      params.has("rn") &&
+      Number(params.get("rn")) !== encoded.length
     )
       throw new ShareError(400);
     if (encoded) {
@@ -4292,9 +5331,9 @@ async function readInitialRoute() {
       if (!replay || !entryReplayMatches(replay, readResult(params)!))
         throw new ShareError(400);
     }
-    if (params.get('rp') === '1' && !encoded) throw new ShareError(400);
+    if (params.get("rp") === "1" && !encoded) throw new ShareError(400);
     shortCache.set(loaded.fragment, { id, expiresAt: loaded.expiresAt });
-    history.replaceState(null, '', '/result/#' + loaded.fragment);
+    history.replaceState(null, "", "/result/#" + loaded.fragment);
     expectedHref = location.href;
     const own = await isArchivedBuiltinResult(loaded.fragment);
     if (!stillInitial()) return;
@@ -4304,51 +5343,76 @@ async function readInitialRoute() {
     if (!stillInitial()) return;
     finishResultFirstPaint(null);
     readRoute();
-    const dialog = document.createElement('dialog');
-    dialog.className = 'share-error';
-    const text = document.createElement('p');
+    const dialog = document.createElement("dialog");
+    dialog.className = "share-error";
+    dialog.onclick = (e) => {
+      const dialog = e.currentTarget as HTMLDialogElement;
+      if (e.target !== dialog) return;
+      const bounds = dialog.getBoundingClientRect();
+      if (
+        e.clientX < bounds.left - 4 ||
+        e.clientX > bounds.right + 4 ||
+        e.clientY < bounds.top - 4 ||
+        e.clientY > bounds.bottom + 4
+      ) {
+        dialog.close();
+        history.replaceState(null, "", "/select/");
+        readRoute();
+      }
+    };
+    const text = document.createElement("p");
     text.textContent =
       error instanceof ShareError && error.status === 404
         ? labels.missing
         : error instanceof ShareError && error.status === 400
           ? labels.invalid
           : labels.failed;
-    const close = document.createElement('button');
-    close.textContent = t('close');
+    const close = document.createElement("button");
+    close.textContent = t("close");
     close.onclick = () => {
       dialog.close();
-      history.replaceState(null, '', '/select/');
+      history.replaceState(null, "", "/select/");
       readRoute();
     };
     dialog.append(text, close);
     document.body.append(dialog);
     dialog.showModal();
-    document.documentElement.removeAttribute('data-result-pending');
+    document.documentElement.removeAttribute("data-result-pending");
   }
 }
 const initialQuery = new URLSearchParams(location.search);
 const deferredLibraryRoute =
-  location.pathname.includes('/yt-') ||
-  initialQuery.get('song')?.startsWith('yt-') ||
-  initialQuery.has('local') ||
-  initialQuery.has('s') ||
-  location.hash.startsWith('#v=5&d=') ||
-  location.hash.startsWith('#v=6&d=') ||
-  location.hash.startsWith('#v=7&d=') ||
-  location.hash.startsWith('#v=4&');
+  (/^\/select\/?$/.test(location.pathname) &&
+    hasSelectionSong(location.search)) ||
+  location.pathname.includes("/yt-") ||
+  initialQuery.get("song")?.startsWith("yt-") ||
+  initialQuery.has("local") ||
+  initialQuery.has("s") ||
+  location.hash.startsWith("#v=local-allkeys-v1&d=") ||
+  location.hash.startsWith("#v=5&d=") ||
+  location.hash.startsWith("#v=6&d=") ||
+  location.hash.startsWith("#v=7&d=") ||
+  location.hash.startsWith("#v=4&");
 // A37: until the library hydrate finishes and the initial route is read, no
 // screen owns this route; the default markup would paint the home screen's
 // start button under the user's refresh.
 if (deferredLibraryRoute) {
-  $('#home-screen').classList.add('hidden');
-  $('#lobby').classList.add('hidden');
+  $("#home-screen").classList.add("hidden");
+  $("#lobby").classList.add("hidden");
 }
 if (!deferredLibraryRoute) void readInitialRoute();
 async function reconcileLibraryRow(row: CanonicalLibraryRow) {
+  // Client-only mode has no canonical reconcile service. Leave the pinned
+  // local record untouched and report the remote reconcile as unavailable.
+  if (CLIENT_ONLY_MODE) {
+    row.state = "error";
+    row.error = new AudioJobError("unavailable");
+    return;
+  }
   if ((row as CanonicalLibraryRow & { active?: boolean }).active) return;
   const activeRow = row as CanonicalLibraryRow & { active?: boolean };
   activeRow.active = true;
-  row.state = 'loading';
+  row.state = "loading";
   songCards();
   try {
     const result = await reconcileCanonical(row, AbortSignal.timeout(90000));
@@ -4371,13 +5435,13 @@ async function reconcileLibraryRow(row: CanonicalLibraryRow) {
     canonicalPending.delete(row.videoId);
     recoverDisplayMetadata(result.record);
   } catch (error) {
-    row.state = 'error';
+    row.state = "error";
     row.error =
-      error instanceof AudioJobError ? error : new AudioJobError('unavailable');
+      error instanceof AudioJobError ? error : new AudioJobError("unavailable");
   } finally {
     activeRow.active = false;
     songCards();
-    if (!active && !preparing && screen === 'select') {
+    if (!active && !preparing && screen === "select") {
       if (!visibleSongIndices().includes(songIndex))
         songIndex = visibleSongIndices()[0];
       selectedSong();
@@ -4386,17 +5450,30 @@ async function reconcileLibraryRow(row: CanonicalLibraryRow) {
 }
 const displayMetadataRequests = new Set<string>();
 function recoverDisplayMetadata(record: PlayableSourceRecord) {
-  if (isOpusRecord(record)) return;
+  // Display metadata recovery is network-only. Pure local titles/labels stay.
+  if (CLIENT_ONLY_MODE) return;
   const key =
-    record.videoId + ':' + record.audioSha256 + ':' + record.chartSetSha256;
+    record.videoId + ":" + record.audioSha256 + ":" + record.chartSetSha256;
   if (displayMetadataRequests.has(key)) return;
   displayMetadataRequests.add(key);
   void (async () => {
     try {
-      const metadata = await readCanonicalMetadata(record);
-      if (!metadata) return;
-      await updateLocalDisplayMetadata(record, metadata.title, metadata.author);
-      updateExternalDisplayMetadata(record, metadata.title, metadata.author);
+      // Opus v2 records have no canonical manifest entry; their channel name
+      // comes from the oembed read. Legacy records keep the canonical title.
+      // A failed canonical read falls through to the oembed author.
+      const canonical = isOpusRecord(record)
+        ? null
+        : await readCanonicalMetadata(record).catch(() => null);
+      const author = await resolveYoutubeChannel(record, {
+        canonical: async () => canonical,
+        oembed: earlyYoutubeMetadata,
+      });
+      if (!canonical && author === null) return;
+      const source = externalSource(sourceId(record));
+      const title = canonical?.title ?? source?.song.title;
+      if (!title) return;
+      await updateLocalDisplayMetadata(record, title, author);
+      updateExternalDisplayMetadata(record, title, author);
       for (const song of SONGS) {
         const item = externalSource(song.id);
         if (
@@ -4404,26 +5481,28 @@ function recoverDisplayMetadata(record: PlayableSourceRecord) {
           item.record.audioSha256 === record.audioSha256 &&
           item.record.chartSetSha256 === record.chartSetSha256
         ) {
-          song.title = metadata.title;
-          if (metadata.author !== null)
-            song.subtitle = metadata.author || song.subtitle;
+          if (canonical) song.title = canonical.title;
+          if (author !== null) song.subtitle = author;
         }
       }
-      const pending = canonicalPending.get(record.videoId);
-      if (pending) pending.title = metadata.title;
+      if (canonical) {
+        const pending = canonicalPending.get(record.videoId);
+        if (pending) pending.title = canonical.title;
+      }
       const resultSource = lastResult && externalSource(lastResult.song);
       if (
+        canonical &&
         resultSource?.record.videoId === record.videoId &&
         resultSource.record.audioSha256 === record.audioSha256 &&
         resultSource.record.chartSetSha256 === record.chartSetSha256 &&
-        $<HTMLDialogElement>('#results').open
+        $<HTMLDialogElement>("#results").open
       ) {
-        $('#result-song').textContent = metadata.title;
+        $("#result-song").textContent = canonical.title;
       }
       // Display-only responses must not replace live click/focus targets.
       // Rows keep their chart/source identity and handlers during refresh.
       for (const element of document.querySelectorAll<HTMLElement>(
-        '#songs [data-song]',
+        "#songs [data-song]",
       )) {
         const song = SONGS[Number(element.dataset.song)];
         const item = song && externalSource(song.id);
@@ -4433,9 +5512,9 @@ function recoverDisplayMetadata(record: PlayableSourceRecord) {
           item.record.chartSetSha256 !== record.chartSetSha256
         )
           continue;
-        const title = element.querySelector<HTMLElement>('.song-copy > strong');
+        const title = element.querySelector<HTMLElement>(".song-copy > strong");
         const subtitle = element.querySelector<HTMLElement>(
-          '.song-copy > span:not(.song-note-count)',
+          ".song-copy > span:not(.song-note-count)",
         );
         if (title && title.textContent !== song.title)
           title.textContent = song.title;
@@ -4445,18 +5524,113 @@ function recoverDisplayMetadata(record: PlayableSourceRecord) {
       if (
         !active &&
         !preparing &&
-        screen === 'select' &&
+        screen === "select" &&
         externalSource(SONGS[songIndex].id)?.record.videoId === record.videoId
       )
         selectedSong();
-      else if (screen === 'replays') void showReplays();
+      else if (screen === "replays") void showReplays();
     } catch {
       /* Optional display recovery never blocks or replaces a playable source. */
     }
   })();
 }
+function attachRegisteredLegacyMetadata(row: any) {
+  const base = structuredClone(row?.record),
+    key = legacyMetadataKey(base);
+  if (!base || registeredLegacyMetadataPending.has(key)) return;
+  const href = location.href,
+    navigation = navigationVersion;
+  if (!legacyMetadataAttempt.shouldAttempt(key, navigation, href)) return;
+  registeredLegacyMetadataPending.add(key);
+  const run = async () => {
+    const c = new AbortController(),
+      timer = setTimeout(
+        () => c.abort(Error("extension_operation_timeout")),
+        95000,
+      );
+    try {
+      await waitAcquired(general468Ready, c.signal);
+      if (!general468Runtime) throw Error("extension_runtime_unavailable");
+      const signal = c.signal;
+      if (!(await readVerifiedOpusByRoots(base, { signal })))
+        await general468Runtime.restoreSourceRecord(base, { signal });
+      signal.throwIfAborted();
+      const local = new URL(href).searchParams.get("local");
+      const cold =
+        local?.startsWith("yt-opus-") &&
+        isOwnedColdResultRoute({
+          href,
+          navigation,
+          currentHref: () => location.href,
+          currentNavigation: () => navigationVersion,
+          active: () => active,
+          preparing: () => preparing,
+        });
+      let installed = false;
+      if (cold && local) {
+        const restored = await coldResultRestore.restore({
+          href,
+          navigation,
+          currentHref: () => location.href,
+          currentNavigation: () => navigationVersion,
+          active: () => active,
+          preparing: () => preparing,
+          local,
+          expectedBase: base,
+          signal,
+          restoreSession: (key, restoreSignal) =>
+            general468Runtime.frontend.restoreSession(key, {
+              signal: restoreSignal,
+            }),
+          sessionSong: (session: any) => session.song,
+          catalogView: (song: string, options: any) =>
+            general468Runtime.frontend.catalogView(song, options),
+          viewBase: (view: any) => view.baseRecord,
+          install: async (song: string, installSignal: AbortSignal) => {
+            if (
+              (await installPrivateOpus468Frontend(general468Runtime.frontend, {
+                song,
+                signal: installSignal,
+              })) !== true
+            )
+              throw Error("extension_install_missing");
+          },
+        });
+        installed = "matched" in restored && restored.matched === true;
+      } else {
+        if (
+          location.href !== href ||
+          navigationVersion !== navigation ||
+          !canInstallExtension()
+        )
+          throw Error("extension_add_stale");
+        installed =
+          (await installPrivateOpus468Frontend(general468Runtime.frontend, {
+            base,
+            signal,
+          })) === true;
+      }
+      if (installed === true) {
+        registeredLegacyMetadataRows.delete(key);
+        legacyMetadataAttempt.clear(key);
+      }
+    } catch {
+      // Keep the metadata row for bounded retry. Metadata alone never admits.
+    } finally {
+      clearTimeout(timer);
+      registeredLegacyMetadataPending.delete(key);
+      if (canInstallExtension()) {
+        songCards();
+        syncSettings();
+        queueMicrotask(prepareGeneralReadiness);
+      }
+    }
+  };
+  const result = extensionWork.then(run, run);
+  extensionWork = result.catch(() => undefined);
+}
 async function initializeLibrary() {
-  document.documentElement.dataset.libraryHydrating = 'true';
+  document.documentElement.dataset.libraryHydrating = "true";
   let progressiveRouteRead = false;
   let progressiveVisible = false;
   let progressiveFrame = 0;
@@ -4464,7 +5638,8 @@ async function initializeLibrary() {
     progressiveFrame = 0;
     if (progressiveVisible) return;
     if (!/^\/select\/?$/.test(location.pathname) || active || preparing) return;
-    const requested = new URLSearchParams(location.search).get('song');
+    if (hasSelectionSong(location.search)) return;
+    const requested = new URLSearchParams(location.search).get("song");
     if (requested && !SONGS.some((song) => song.id === requested)) return;
     if (!progressiveRouteRead && deferredLibraryRoute) {
       progressiveRouteRead = true;
@@ -4480,7 +5655,17 @@ async function initializeLibrary() {
     progressiveVisible = true;
   };
   try {
+    const registeredLegacyRows: any[] = [];
     const opusRows = await listOpus35Metadata((row) => {
+      if (registeredLegacyRecord(row.record)) {
+        const saved = structuredClone(row);
+        registeredLegacyRows.push(saved);
+        registeredLegacyMetadataRows.set(
+          legacyMetadataKey(saved.record),
+          saved,
+        );
+        return;
+      }
       const item = installExternalSource(
         row.record,
         row.title,
@@ -4510,7 +5695,7 @@ async function initializeLibrary() {
           title: saved?.title ?? record.videoId,
           archiveId: item.song.id,
           jobId: saved?.jobId,
-          state: 'loading',
+          state: "loading",
         });
     }
     for (const row of [...canonicalPending.values()]) {
@@ -4537,13 +5722,37 @@ async function initializeLibrary() {
       }
     }
     for (const row of opusRows) {
+      if (registeredLegacyRecord(row.record)) continue;
       const id = sourceId(row.record);
       canonicalPreferred.set(row.record.videoId, id);
       canonicalPending.delete(row.record.videoId);
     }
+    for (const row of registeredLegacyRows)
+      void attachRegisteredLegacyMetadata(row);
   } catch {
-    if (location.pathname !== '/replays/' && location.pathname !== '/replays')
+    if (location.pathname !== "/replays/" && location.pathname !== "/replays")
       toast(REPLAY_READ_ERROR[settings.language]);
+  }
+  try {
+    for (const metadata of await listLocalAllKeys()) {
+      try {
+        const row = await readLocalAllKeys(metadata.identity);
+        if (!row) throw Error("Local all-keys source missing");
+        const item = await installLocalAllKeysSource(
+          row.envelope,
+          row.title,
+          row.author,
+        );
+        if (!SONGS.some((song) => song.id === item.song.id))
+          SONGS.push(item.song);
+        canonicalPreferred.set(row.envelope.record.videoId, item.song.id);
+        canonicalPending.delete(row.envelope.record.videoId);
+      } catch {
+        toast(REPLAY_READ_ERROR[settings.language]);
+      }
+    }
+  } catch {
+    toast(REPLAY_READ_ERROR[settings.language]);
   }
   if (progressiveFrame) cancelAnimationFrame(progressiveFrame);
   libraryHydrated = true;
@@ -4555,11 +5764,8 @@ async function initializeLibrary() {
   for (const row of canonicalPending.values()) void reconcileLibraryRow(row);
   backgroundImports.resume();
   if (deferredLibraryRoute && !progressiveRouteRead) await readInitialRoute();
-  else if (screen === 'select' && !active) {
-    if (
-      !selectedDuringHydration &&
-      !new URLSearchParams(location.search).has('song')
-    )
+  else if (screen === "select" && !active) {
+    if (!selectedDuringHydration && !hasSelectionSong(location.search))
       restoreLibrarySelection();
     songIndex = visibleLibrarySelection(
       songIndex,
@@ -4570,14 +5776,17 @@ async function initializeLibrary() {
     selectedSong();
     syncSettings();
     restoreLibraryScroll();
-  } else if (screen === 'replays') void showReplays();
+  } else if (screen === "replays") void showReplays();
   finishLibraryFirstPaint();
-  const local = new URLSearchParams(location.search).get('local');
-  if (local && !local.startsWith('yt-opus-')) {
+  queueMicrotask(prepareGeneralReadiness);
+  const local = new URLSearchParams(location.search).get("local");
+  if (local && !local.startsWith("yt-opus-")) {
     try {
       const session = await readEntrySession(local);
       localBuiltinNotes =
-        session && 'kind' in session && session.kind === 'builtin'
+        session &&
+        "kind" in session &&
+        (session.kind === "builtin" || session.kind === "local-allkeys")
           ? session.chart
           : undefined;
       if (!session) throw Error();
@@ -4595,16 +5804,18 @@ async function initializeLibrary() {
     } catch {
       finishResultFirstPaint(null);
       toast(REPLAY_READ_ERROR[settings.language]);
-      document.documentElement.removeAttribute('data-result-pending');
+      document.documentElement.removeAttribute("data-result-pending");
     }
   }
+  legacyMetadataReadyResolve();
+  openSongInvitation();
 }
-void initializeLibrary();
+const libraryInitialization = initializeLibrary();
 
 // Read-only diagnostics. Never includes credentials, account identifiers, or private source paths.
-Object.defineProperty(window, 'orvioDiagnostics', {
+Object.defineProperty(window, "orvioDiagnostics", {
   get: () => ({
-    version: '0.3.4',
+    version: APP_VERSION,
     active,
     paused,
     fever: engine
@@ -4651,14 +5862,14 @@ Object.defineProperty(window, 'orvioDiagnostics', {
 
 // Prevent page text/image dragging, while preserving ranges and real controls.
 document.addEventListener(
-  'dragstart',
+  "dragstart",
   (e) => {
     if (!editableTarget(e.target)) e.preventDefault();
   },
   true,
 );
 document.addEventListener(
-  'selectstart',
+  "selectstart",
   (e) => {
     if (!editableTarget(e.target)) e.preventDefault();
   },
@@ -4667,41 +5878,50 @@ document.addEventListener(
 
 // Lightweight read-only timing sample for input path diagnostics. Avoid copying
 // the whole chart each millisecond in real-time integration checks.
-Object.defineProperty(window, 'orvioAudioTime', { get: () => clock?.now() });
+Object.defineProperty(window, "orvioAudioTime", { get: () => clock?.now() });
 
 enhanceSelects();
+syncOptionDescriptions($<HTMLDialogElement>("#game-options"), t);
 
+document.addEventListener("orvio:youtube-art-ready", (event) => {
+  const id = (event as CustomEvent<string>).detail;
+  document
+    .querySelectorAll<HTMLImageElement>("[data-youtube-art]")
+    .forEach((image) => {
+      if (image.dataset.youtubeArt === id) image.src = youtubeArtwork(id);
+    });
+});
 // One verified thumbnail choice is used by every view, including later image loads.
-document.addEventListener('orvio:art-ready', (event) => {
+document.addEventListener("orvio:art-ready", (event) => {
   const id = (event as CustomEvent<string>).detail;
   if (!songVideoId(id)) return;
   const url = songArt(id);
   document
-    .querySelectorAll<HTMLImageElement>('[data-song-art]')
+    .querySelectorAll<HTMLImageElement>("[data-song-art]")
     .forEach((img) => {
       if (img.dataset.songArt === id) {
-        if (img.classList.contains('replay-art'))
+        if (img.classList.contains("replay-art"))
           img.hidden = url === ART_FALLBACK;
         img.src = url;
       }
     });
   if (SONGS[songIndex]?.id === id)
-    $('#selected-art').style.backgroundImage =
+    $("#selected-art").style.backgroundImage =
       `url("${url}"), url("${ART_FALLBACK}")`;
-  if (libraryHydrated && screen === 'select')
+  if (libraryHydrated && screen === "select")
     rememberLibraryFirstPaint(
       visibleSongIndices().map((i) => SONGS[i].id),
       SONGS[songIndex].id,
     );
-  if ($('#game').dataset.song === id)
+  if ($("#game").dataset.song === id)
     document.body.style.setProperty(
-      '--play-wallpaper',
+      "--play-wallpaper",
       `url("${url}"), url("${ART_FALLBACK}")`,
     );
 });
 
 async function encodeCodecShare(
-  data: import('./external-share').ExternalSharedReplay<PlayableSourceRecord>,
+  data: import("./external-share").ExternalSharedReplay<PlayableSourceRecord>,
 ) {
   if (!isOpusRecord(data.record))
     return encodeExternalShare({ ...data, record: data.record });
@@ -4710,10 +5930,10 @@ async function encodeCodecShare(
     received &&
     isOpusRecord(received.record) &&
     sourceId(received.record) === sourceId(data.record) &&
-    'descriptorBytes' in received
+    "descriptorBytes" in received
       ? (received.descriptorBytes as Uint8Array)
       : (await readVerifiedOpusByRoots(data.record))?.descriptorBytes;
-  if (!descriptorBytes) throw Error('opus35_share_descriptor_unavailable');
+  if (!descriptorBytes) throw Error("opus35_share_descriptor_unavailable");
   return encodeOpus35Share({
     ...data,
     record: data.record,

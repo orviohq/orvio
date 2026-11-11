@@ -12,6 +12,16 @@ import { inspectWav } from './canonical-pcm.mjs';
 import type { PlayableSourceRecord } from './playable-source';
 import { restoreOpus35Record } from './opus/opus35-api';
 import type { ExternalSong } from './external-catalog';
+import {
+  CLIENT_ONLY_MODE,
+  rejectRemoteOnly,
+  requireLocalAudio,
+} from './client-only-runtime';
+
+export interface SharedAudioDeps {
+  /** Replace only for focused tests; production uses the persisted reader. */
+  localAudio?: typeof localAudio;
+}
 function wait(ms: number, signal: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
     if (signal.aborted) {
@@ -60,8 +70,22 @@ async function attach(
 export async function readSharedAudio(
   item: ExternalSong<PlayableSourceRecord>,
   signal = AbortSignal.timeout(90000),
+  deps: SharedAudioDeps = {},
 ) {
   if (item.bytes) return item.bytes;
+  if (CLIENT_ONLY_MODE) {
+    // Client-only playback has exactly one source: verified local bytes.
+    // Missing or corrupt local audio is explicit and never falls through to
+    // the canonical/retained audio GETs or the opus descriptor fetch below.
+    const local = await requireLocalAudio(
+      item.record.videoId,
+      () => (deps.localAudio ?? localAudio)(item.record, signal),
+      signal,
+    );
+    item.bytes = local.bytes;
+    item.jobId = local.jobId;
+    return local.bytes;
+  }
   const local = await localAudio(item.record, signal);
   if (local) {
     item.bytes = local.bytes;
@@ -96,6 +120,10 @@ export async function recoverSharedAudio(
   item: ExternalSong<PlayableSourceRecord>,
   signal = AbortSignal.timeout(90000),
 ) {
+  if (CLIENT_ONLY_MODE)
+    rejectRemoteOnly(
+      isOpusRecord(item.record) ? 'opus-bridge' : 'audio-job-read',
+    );
   if (isOpusRecord(item.record)) return readSharedAudio(item, signal);
   let job = await createAudioJob(
     'https://www.youtube.com/watch?v=' + item.record.videoId,

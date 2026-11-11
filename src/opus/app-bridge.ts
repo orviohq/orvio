@@ -4,6 +4,7 @@ import { prepareOpusSource } from './prepare-opus.mjs';
 import { readVerifiedOpus } from './opus-cache.mjs';
 import { parseVerifiedDescriptor } from './opus-descriptor.mjs';
 import { AUDIO_BASE } from '../external-audio-api';
+import { assertRuntimeFetch } from '../client-only-runtime';
 import type { OpusRecord } from './opus-record';
 export interface PreparedOpus {
   kind: 'orvio-opus-v1';
@@ -172,10 +173,9 @@ export async function restoreOpusRecord(
   );
   let d = row?.descriptor;
   if (!d) {
-    const descriptorResponse = await fetch(
-      `${AUDIO_BASE}/v1/opus-sources/${record.videoId}/${record.encodedAudioSha256}/descriptor`,
-      { signal },
-    );
+    const descriptorUrl = `${AUDIO_BASE}/v1/opus-sources/${record.videoId}/${record.encodedAudioSha256}/descriptor`;
+    assertRuntimeFetch(descriptorUrl);
+    const descriptorResponse = await fetch(descriptorUrl, { signal });
     if (descriptorResponse.status !== 200)
       throw Error('opus_descriptor_missing');
     const descriptorBytes = new Uint8Array(

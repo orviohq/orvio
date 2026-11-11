@@ -1,10 +1,12 @@
 import { AudioJobError } from './external-audio-api';
 import type { ImportStage } from './import-progress';
 
-/** Only a durably saved, verified v2 receipt earns completion budgets.
- * Acquisition remains capped at 90s. Repeated/out-of-order progress cannot
- * renew a budget. No retry or network operation is performed here. */
-export function createImportBudget() {
+/**
+ * Uses a bounded acquisition window (90 seconds by default, optionally 195),
+ * followed by independent 30-, 60-, and 15-second completion windows.
+ * The total budget is 195 seconds by default or 300 seconds when requested.
+ */
+export function createImportBudget(acquisitionMs: 90000 | 195000 = 90000) {
   const controller = new AbortController();
   let phase = 0;
   let timer: ReturnType<typeof setTimeout>;
@@ -28,9 +30,9 @@ export function createImportBudget() {
     clearTimeout(timer);
     timer = setTimeout(expire, ms);
   };
-  arm(90000);
+  arm(acquisitionMs);
   // Defense against callback bugs: even valid forward phases cannot run forever.
-  const total = setTimeout(expire, 195000);
+  const total = setTimeout(expire, acquisitionMs + 30000 + 60000 + 15000);
   return {
     signal: controller.signal,
     verified() {

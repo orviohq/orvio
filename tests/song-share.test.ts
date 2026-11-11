@@ -7,16 +7,23 @@ vi.mock('../src/canonical-metadata-api', () => ({
 }));
 vi.mock('../src/canonical-library', () => ({ rememberCanonical: vi.fn() }));
 vi.mock('../src/external-local', () => ({ saveSongMetadata: vi.fn() }));
+vi.mock('../src/opus/opus35-song', () => ({
+  encodeOpus35Song: vi.fn(),
+  decodeOpus35Song: vi.fn(),
+}));
 import { readCanonicalSource } from '../src/canonical-source-api';
 import { readCanonicalMetadata } from '../src/canonical-metadata-api';
 import { rememberCanonical } from '../src/canonical-library';
+import { encodeOpus35Song } from '../src/opus/opus35-song';
 import {
   songShareFragment,
   parseSongShare,
   createSongLink,
+  createExactSongLink,
   inspectSongLink,
 } from '../src/song-share';
 import type { SourceRecord } from '../src/external-source';
+import type { PlayableSourceRecord } from '../src/playable-source';
 const identity = {
   videoId: 'ekr2nIex040',
   audioSha256: 'a'.repeat(64),
@@ -45,14 +52,46 @@ it('roundtrips only public song identities, with no user/replay/title/job data',
   ])
     expect(() => parseSongShare(bad)).toThrow();
 });
-it('sender only reads canonical and refuses changing archive identities', async () => {
+it('ordinary song links carry only the video id without reading canonical', async () => {
+  const url = await createSongLink(record, 'https://example.test');
+  expect(url).toBe('https://example.test/select/?youtube=' + identity.videoId);
+  expect(readCanonicalSource).not.toHaveBeenCalled();
+  expect(rememberCanonical).not.toHaveBeenCalled();
+});
+it('opus YouTube imports share only the video id without payload encoding', async () => {
+  const opusRecord = {
+    version: 2,
+    videoId: identity.videoId,
+  } as unknown as PlayableSourceRecord;
+  const url = await createSongLink(opusRecord, 'https://example.test');
+  expect(url).toBe('https://example.test/select/?youtube=' + identity.videoId);
+  expect(readCanonicalSource).not.toHaveBeenCalled();
+  expect(encodeOpus35Song).not.toHaveBeenCalled();
+});
+it('local opus audio without a YouTube id keeps the exact payload link', async () => {
+  const localOpusRecord = {
+    version: 2,
+    videoId: 'local-audio-file',
+  } as unknown as PlayableSourceRecord;
+  vi.mocked(encodeOpus35Song).mockResolvedValue('#v=2&d=payload');
+  const url = await createSongLink(localOpusRecord, 'https://example.test');
+  expect(url).toBe('https://example.test/song/#v=2&d=payload');
+  expect(encodeOpus35Song).toHaveBeenCalledTimes(1);
+  expect(encodeOpus35Song).toHaveBeenCalledWith(
+    localOpusRecord,
+    'YouTube',
+    null,
+  );
+  expect(readCanonicalSource).not.toHaveBeenCalled();
+});
+it('exact sender links still read canonical and refuse changing archive identities', async () => {
   vi.mocked(readCanonicalSource).mockResolvedValue({
     state: 'ready',
     record,
     recordSha256: identity.recordSha256,
     audioCached: true,
   });
-  const url = await createSongLink(record, 'https://example.test');
+  const url = await createExactSongLink(record, 'https://example.test');
   expect(new URL(url).pathname).toBe('/song/');
   expect(parseSongShare(new URL(url).hash)).toEqual(identity);
   expect(rememberCanonical).not.toHaveBeenCalled();
@@ -63,7 +102,7 @@ it('sender only reads canonical and refuses changing archive identities', async 
     audioCached: true,
   });
   await expect(
-    createSongLink(record, 'https://example.test'),
+    createExactSongLink(record, 'https://example.test'),
   ).rejects.toThrow();
 });
 it('recipient inspection never pins; pending/missing/hash mismatch fail closed', async () => {

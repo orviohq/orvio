@@ -34,4 +34,4 @@ http
     });
     fs.createReadStream(file).pipe(res);
   })
-  .listen(4198, '127.0.0.1');
+  .listen(Number(process.env.PORT) || 4198, '127.0.0.1');

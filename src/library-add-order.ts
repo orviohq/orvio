@@ -20,6 +20,24 @@ export class LibraryAddOrder {
   private index() {
     this.ranks = new Map(this.ids.map((id, index) => [id, index]));
   }
+  /** Migrate restored pending order without inventing a new explicit add. */
+  ensurePendingOrder(videoIds: Iterable<string>) {
+    const known = new Set(this.ids);
+    const missing: string[] = [];
+    for (const id of videoIds)
+      if (typeof id === 'string' && VIDEO.test(id) && !known.has(id)) {
+        known.add(id);
+        missing.push(id);
+      }
+    if (!missing.length) return;
+    this.ids.push(...missing);
+    this.index();
+    try {
+      this.storage.setItem(KEY, JSON.stringify(this.ids));
+    } catch {
+      /* Retain this visit's fallback order if optional persistence is blocked. */
+    }
+  }
   added(videoId: string) {
     if (!VIDEO.test(videoId) || this.ranks.has(videoId)) return;
     this.ids.unshift(videoId);

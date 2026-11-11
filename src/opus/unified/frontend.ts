@@ -15,6 +15,7 @@ import type { OpusRecord } from '../opus-record';
 import { verifyOpusRecord } from '../opus-record';
 import { opusPcmToAudioBuffer } from '../opus-chart-worker-client.mjs';
 import { sha256 } from '@noble/hashes/sha2.js';
+import { createDecodedBufferCache } from '../memory-cache';
 const copy = <T>(x: T): T => structuredClone(x);
 const digest = (b: Uint8Array) =>
   Array.from(sha256(b), (b) => b.toString(16).padStart(2, '0')).join('');
@@ -88,6 +89,19 @@ interface SessionRow {
 }
 const songIdentity = (r: Request) =>
   `yt-opus-${r.extension.videoId}-${r.extension.audioSha256}-c${r.extension.baseChartSetSha256}-x${r.extension.extensionSha256}`;
+function decodedBufferKey(row: PinRow) {
+  return [
+    row.key,
+    row.request.encodedAudioSha256,
+    row.request.extension.audioSha256,
+    row.request.extension.baseChartSetSha256,
+    row.request.extension.extensionSha256,
+    row.request.extension.baseSourceRecordSha256,
+    row.request.extension.audioDescriptorSha256,
+    hashText(row.request.baseSourceRecordJson),
+    digest(row.descriptorBytes),
+  ].join(':');
+}
 /** Separate database. A local write never claims owner authority or atomicity
  * with fresh-store's database. No mutation of old source/session/5/7 records. */
 function database(name: string) {
@@ -207,6 +221,7 @@ export function createOpus468FrontendSharing1935({
     newPlayFever === undefined ? undefined : Object.freeze(copy(newPlayFever));
   const db = database(databaseName),
     catalog = new Map<string, PinRow>();
+  const decodedBuffers = createDecodedBufferCache();
   let restoreGeneration = 0;
   function bind(row: PinRow, chart: FreshChart) {
     if (
@@ -565,12 +580,23 @@ export function createOpus468FrontendSharing1935({
       const choice = copy(selection),
         settings = copy(options),
         { row, chart } = await current(song, choice, signal),
-        decoded = await audio(row, signal);
-      // Revalidate after asynchronous decode; a cached catalog/audio buffer is
-      // never an owner verdict. The actual Engine uses only these fresh notes.
+        bufferKey = decodedBufferKey(row);
+      let decoded: Awaited<ReturnType<typeof audio>> | undefined,
+        buffer: AudioBuffer | undefined;
+      if (decodedBuffers.has(bufferKey))
+        buffer = decodedBuffers.acquire(bufferKey, () =>
+          fail('extension_audio_cache_miss'),
+        ).buffer;
+      else decoded = await audio(row, signal);
+      // Revalidate after asynchronous decode/cache hit; cached audio is never
+      // an owner verdict. The actual Engine uses only these fresh notes.
       const fresh = await current(song, choice, signal);
       if (JSON.stringify(fresh.chart) !== JSON.stringify(chart))
         fail('extension_chart_changed_during_audio');
+      buffer ??= decodedBuffers.acquire(bufferKey, () => {
+        const value = decoded!;
+        return opusPcmToAudioBuffer(context, value.pcm, value.frames);
+      }).buffer;
       return {
         song: display(row),
         engine: new Engine(
@@ -582,7 +608,7 @@ export function createOpus468FrontendSharing1935({
           ),
           capturedFever === undefined ? undefined : copy(capturedFever),
         ),
-        audio: opusPcmToAudioBuffer(context, decoded.pcm, decoded.frames),
+        audio: buffer,
         identity: {
           song,
           extensionSha256: chart.extensionSha256,

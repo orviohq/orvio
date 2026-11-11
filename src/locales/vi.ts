@@ -18,7 +18,21 @@ export const vi = {
   gameOptions: 'TÙY CHỌN TRÒ CHƠI',
   fader: 'Hiệu ứng nốt',
   shuffle: 'Thứ tự làn',
-  optionHint: 'Áp dụng cho lượt chơi tiếp theo.',
+  faderOffTooltip: 'Nốt luôn hiển thị trên toàn bộ đường di chuyển.',
+  faderInTooltip: 'Nốt hiện dần ở nửa đường di chuyển.',
+  faderIn2Tooltip: 'Nốt hiện muộn hơn, gần vạch phán định.',
+  faderOutTooltip: 'Nốt mờ dần rồi biến mất trước vạch phán định.',
+  faderOut2Tooltip: 'Nốt biến mất sớm hơn, ở nửa đường di chuyển.',
+  faderBlinkTooltip: 'Nốt nhấp nháy theo nhịp nhạc.',
+  faderBlink2Tooltip: 'Toàn bộ vùng chơi nhấp nháy theo nhịp nhạc.',
+  faderFogTooltip: 'Sương mù che nửa dưới của vùng chơi.',
+  faderPixelTooltip: 'Combo càng cao, vùng chơi càng bị vỡ hạt.',
+  faderPixel2Tooltip: 'Combo càng cao, vùng chơi có thể bị vỡ hạt mạnh hơn nữa.',
+  faderBlindTooltip: 'Tất cả nốt đều vô hình.',
+  shuffleOffTooltip: 'Giữ nguyên thứ tự làn ban đầu.',
+  shuffleMirrorTooltip: 'Đảo thứ tự làn từ trái sang phải.',
+  shuffleRandomTooltip:
+    'Xáo trộn làn mỗi lượt chơi và giữ nguyên thứ tự đó trong suốt bài hát.',
   pause: 'TẠM DỪNG',
   resume: 'TIẾP TỤC',
   select: 'CHỌN BÀI HÁT',
@@ -70,6 +84,10 @@ export const vi = {
   unsupported: 'Chơi trên máy tính có bàn phím.',
   startError:
     'Không thể bắt đầu âm thanh. Kiểm tra quyền trình duyệt rồi thử lại.',
+  integrityError:
+    'Không thể xác minh dữ liệu âm thanh. Dữ liệu có thể đã bị thay đổi hoặc hư hỏng. Hãy yêu cầu người gửi một liên kết mới.',
+  transportError:
+    'Không thể tải âm thanh. Hãy kiểm tra kết nối mạng và thử lại.',
   aborted: 'Đã dừng lượt chơi. Bắt đầu lại để có điểm mới.',
   focus: 'Đã đổi tiêu điểm. Lượt chơi được dừng an toàn.',
   otherKey: 'Chọn phím khác.',

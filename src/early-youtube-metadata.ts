@@ -1,4 +1,5 @@
 import { AUDIO_BASE } from './external-audio-api';
+import { assertRuntimeFetch } from './client-only-runtime';
 import { queryClient, queryKeys } from './query-client';
 /** Internal sentinel: a failed/missing read never becomes cached data;
  * it surfaces as the original null at the call site. */
@@ -61,7 +62,9 @@ async function fetchEarlyMetadata(
   signal?: AbortSignal,
 ): Promise<EarlyYoutubeMetadata | null> {
   try {
-    const r = await fetch(`${AUDIO_BASE}/v1/youtube-metadata/${id}`, {
+    const url = `${AUDIO_BASE}/v1/youtube-metadata/${id}`;
+    assertRuntimeFetch(url);
+    const r = await fetch(url, {
       signal: signal ?? AbortSignal.timeout(4000),
       cache: 'no-store',
       credentials: 'omit',

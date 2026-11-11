@@ -1,4 +1,5 @@
 import { externalNotes, externalDuration } from './external-catalog';
+import { localAllKeysNotes, localAllKeysDuration } from './local-allkeys-catalog';
 export type Difficulty = 'low' | 'mid' | 'high' | 'sc';
 /** A4 additive: SC family key for the procedural generator. Existing IDs unchanged. */
 export type FamilyDifficulty = Difficulty | 'sc';
@@ -72,6 +73,8 @@ export function makeChart(
   difficulty: Difficulty,
   lanes: Lanes,
 ): Note[] {
+  if (song.id.startsWith('yt-local-allkeys-'))
+    return localAllKeysNotes(song.id, difficulty, lanes) ?? [];
   const saved = externalNotes(song.id, difficulty, lanes);
   if (saved) return saved;
   if (difficulty === 'sc') return makeScChart(song, lanes);
@@ -115,6 +118,8 @@ export function makeChart(
     .map((n, id) => ({ ...n, id }));
 }
 export function duration(song: Song) {
+  if (song.id.startsWith('yt-local-allkeys-'))
+    return localAllKeysDuration(song.id) ?? 0;
   return externalDuration(song.id) ?? (song.bars * 4 * 60) / song.bpm + 2;
 }
 

@@ -7,6 +7,7 @@ import {
   validAudioErrorCode,
 } from '../external-audio-api';
 import { audioAtStage } from '../audio-error-stage';
+import { assertRuntimeFetch } from '../client-only-runtime';
 import { captureAcquiredOpusV2 } from './opus-acquired-v2-artifacts.mjs';
 import { createAcquiredOpusV2Preparer } from './opus-acquired-v2-prepare';
 import { prepareOpusOwned } from './opus-chart-worker-client.mjs';
@@ -15,6 +16,11 @@ import { verifyOpusRecord, type OpusRecord } from './opus-record';
 import DecoderUrl from '../opus-codec/opus-decoder.wasm?url';
 import ChartWorkerUrl from './opus-chart.worker.mjs?worker&url';
 import { DECODER, sha256 } from './opus-descriptor.mjs';
+import {
+  songShareBodyAtStage,
+  songShareFetchAtStage,
+  songShareSaveAtStage,
+} from '../song-share-save-diagnostic';
 const VIDEO = /^[A-Za-z0-9_-]{11}$/,
   SHA = /^[a-f0-9]{64}$/,
   UUID =
@@ -50,7 +56,9 @@ export async function readOpus35Artifact(
   )
     throw Error('opus35_artifact_request');
   const root = `${AUDIO_BASE}/v2/audio-sources/${input.videoId}/${input.encodedAudioSha256}/${input.audioDescriptorSha256}`;
-  return fetch(`${root}/${input.kind}`, { signal, redirect: 'error' });
+  const url = `${root}/${input.kind}`;
+  assertRuntimeFetch(url, 'GET');
+  return fetch(url, { signal, redirect: 'error' });
 }
 function exact(o: any, keys: string[]) {
   return (
@@ -139,6 +147,7 @@ async function requestState(
   jobId?: string,
   trace?: ImportTrace | null,
 ) {
+  assertRuntimeFetch(url, init.method);
   let response: Response;
   try {
     response = await fetch(url, { ...init, redirect: 'error' });
@@ -231,13 +240,19 @@ export async function restoreOpus35Record(
   record: OpusRecord,
   signal: AbortSignal,
 ) {
-  if (!(await verifyOpusRecord(record))) throw Error('opus35_record');
+  await songShareSaveAtStage('artifact_verify', async () => {
+    if (!(await verifyOpusRecord(record))) throw Error('opus35_record');
+  });
 
   // Stable restore is not an acquired job: bind a supplied verified descriptor
   // rather than invent an acquisition receipt or UUID.
-  const descriptorResponse = await readOpus35Artifact(
-    { ...record, kind: 'descriptor' },
-    { method: 'GET', signal },
+  const descriptorResponse = await songShareFetchAtStage(
+    'descriptor_fetch',
+    () =>
+      readOpus35Artifact(
+        { ...record, kind: 'descriptor' },
+        { method: 'GET', signal },
+      ),
   );
   return restoreOpus35FromDescriptor(record, descriptorResponse, signal);
 }
@@ -250,29 +265,39 @@ async function restoreOpus35FromDescriptor(
   // the descriptor once with its own strict, bounded stable-response adapter.
   const { readStableOpus35Artifacts } = await import('./opus35-stable');
   const artifact = await readStableOpus35Artifacts(record, response, signal);
-  const wasmResponse = await fetch(DecoderUrl, { signal });
-  if (!wasmResponse.ok) throw Error('opus35_decoder_unavailable');
-  const wasm = await wasmResponse.arrayBuffer();
-  if ((await sha256(new Uint8Array(wasm))) !== DECODER)
-    throw Error('opus35_decoder_identity');
-  const decoded = await prepareOpusOwned({
-    workerUrl: ChartWorkerUrl,
-    bytes: artifact.bytes.slice().buffer,
-    wasmBytes: wasm,
-    descriptorBytes: artifact.descriptorBytes.slice().buffer,
-    descriptorSha256: record.audioDescriptorSha256,
-    signal,
-    frozenRecord: record,
+  const wasmResponse = await songShareFetchAtStage('decoder_fetch', () =>
+    fetch(DecoderUrl, { signal }),
+  );
+  const wasm = await songShareBodyAtStage('decoder_verify', async () => {
+    const bytes = await wasmResponse.arrayBuffer();
+    if ((await sha256(new Uint8Array(bytes))) !== DECODER)
+      throw Error('opus35_decoder_identity');
+    return bytes;
   });
-  if (
-    JSON.stringify(decoded.record) !== JSON.stringify(record) ||
-    !(await verifyOpusRecord(
-      decoded.record,
-      decoded.descriptor,
-      record.audioDescriptorSha256,
-    ))
-  )
-    throw Error('opus35_frozen_restore');
-  await saveVerifiedOpus({ ...artifact, record }, signal);
+  const decoded = await songShareSaveAtStage('worker_decode', () =>
+    prepareOpusOwned({
+      workerUrl: ChartWorkerUrl,
+      bytes: artifact.bytes.slice().buffer,
+      wasmBytes: wasm,
+      descriptorBytes: artifact.descriptorBytes.slice().buffer,
+      descriptorSha256: record.audioDescriptorSha256,
+      signal,
+      frozenRecord: record,
+    }),
+  );
+  await songShareSaveAtStage('worker_decode', async () => {
+    if (
+      JSON.stringify(decoded.record) !== JSON.stringify(record) ||
+      !(await verifyOpusRecord(
+        decoded.record,
+        decoded.descriptor,
+        record.audioDescriptorSha256,
+      ))
+    )
+      throw Error('opus35_frozen_restore');
+  });
+  await songShareSaveAtStage('cache_write', () =>
+    saveVerifiedOpus({ ...artifact, record }, signal),
+  );
   return decoded.pcm16;
 }

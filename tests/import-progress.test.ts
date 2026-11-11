@@ -48,3 +48,13 @@ it('every supported language has all actual stages and no invented percentage', 
       expect(text).not.toContain('%');
     }
 });
+
+it('ORV-75: no turn-waiting phrase remains; queued shows preparation copy', () => {
+  for (const language of Object.keys(LANGUAGES) as (keyof typeof LANGUAGES)[]) {
+    expect(importStageLabel('queued', language)).toBe(
+      importStageLabel('extracting', language),
+    );
+  }
+  expect(importStageLabel('queued', 'ko')).not.toContain('순서');
+  expect(importStageLabel('queued', 'en')).not.toContain('Waiting');
+});
