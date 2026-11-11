@@ -1,0 +1,109 @@
+# Publishes the sanitized public status artifact.
+# History is sanitized; producer fields are CI metadata, not a signature.
+name: status
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write # needed to push the status branch
+  actions: read # needed to read the latest completed production run
+
+concurrency:
+  group: status-monitor
+  cancel-in-progress: false
+
+jobs:
+  publish-status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.4'
+
+      - name: Load previous published status
+        run: |
+          set -euo pipefail
+
+          if git ls-remote --exit-code origin refs/heads/status > /dev/null; then
+            echo "ERROR: origin/status already exists; bootstrap publish refuses to touch any existing lineage." >&2
+            exit 1
+          else
+            remote_exit=$?
+            if [[ "$remote_exit" -eq 2 ]]; then
+              : > status-prev.json
+            else
+              echo "ERROR: Cannot determine whether origin/status exists (ls-remote exit $remote_exit)." >&2
+              exit 1
+            fi
+          fi
+
+      - name: Run status probe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATUS_PREV_PATH: status-prev.json
+          STATUS_JSON_PATH: status.json
+        run: node scripts/status-check.mjs
+
+      - name: Publish status artifact
+        run: |
+          set -euo pipefail
+
+          if git ls-remote --exit-code origin refs/heads/status > /dev/null; then
+            echo "ERROR: origin/status already exists; bootstrap publish refuses to touch any existing lineage." >&2
+            exit 1
+          else
+            remote_exit=$?
+            if [[ "$remote_exit" -eq 2 ]]; then
+              : # Genuine absence: bootstrap may create a fresh orphan.
+            else
+              echo "ERROR: Cannot determine whether origin/status exists (ls-remote exit $remote_exit)." >&2
+              exit 1
+            fi
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          cp status.json "$RUNNER_TEMP/status.json"
+
+          git checkout --orphan status > /dev/null 2>&1
+
+          git ls-files -z | while IFS= read -r -d '' path; do
+            if [[ "$path" != public/status.json ]]; then
+              git --literal-pathspecs rm -f --quiet -- "$path" 2> /dev/null
+            fi
+          done
+
+          mkdir -p public
+          cp --remove-destination "$RUNNER_TEMP/status.json" public/status.json
+
+          git add public/status.json
+          if git diff --cached --quiet; then
+            echo "No status changes to commit."
+            exit 0
+          fi
+
+          checked_at="$(node -p "require('./public/status.json').checkedAt || new Date().toISOString()")"
+          git commit --quiet -m "status ${checked_at}"
+
+          if git ls-remote --exit-code origin refs/heads/status > /dev/null; then
+            echo "ERROR: origin/status already exists; bootstrap publish refuses to touch any existing lineage." >&2
+            exit 1
+          else
+            remote_exit=$?
+            if [[ "$remote_exit" -eq 2 ]]; then
+              : # Still absent: attempt a plain non-force push.
+            else
+              echo "ERROR: Cannot determine whether origin/status exists (ls-remote exit $remote_exit)." >&2
+              exit 1
+            fi
+          fi
+          git push origin status
