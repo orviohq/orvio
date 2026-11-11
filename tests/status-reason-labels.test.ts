@@ -223,27 +223,17 @@ describe('localized status reasons', () => {
     });
   });
 
-  it('uses the helper for detail and failure rendering without raw rendering paths', () => {
+  it('service status page renders details as plain text only', () => {
     const source = readFileSync(
       new URL('../src/status-page.ts', import.meta.url),
       'utf8',
     );
-    expect(source).toMatch(
-      /import\s*\{[^}]*statusReasonText[^}]*\}\s*from\s*['"]\.\/status-labels['"]/,
-    );
-    expect(source).toMatch(
-      /querySelector\(['"]\[data-detail\]['"]\)!\.textContent\s*=\s*statusReasonText\(\s*language,\s*snapshot\?\.detail,?\s*\)/,
-    );
-    expect(source).toMatch(
-      /querySelector\(['"]\[data-failure\]['"]\)!\.textContent\s*=\s*failure\s*\?\s*`[^`]*\$\{statusReasonText\(\s*language,\s*failure\.message,?\s*\)\}/,
-    );
-    const withoutSafeCalls = source.replace(
-      /statusReasonText\(\s*language,\s*(?:snapshot\?\.detail|failure\.message),?\s*\)/g,
-      'localizedReason',
-    );
-    expect(withoutSafeCalls).not.toMatch(
-      /snapshot\??\.detail|failure\.message/,
-    );
     expect(source).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML/);
+    expect(source).toMatch(/querySelector(?:<[^>]+>)?\(['"]\[data-detail\]['"]\)/);
+    expect(source).toMatch(
+      /detailEl\.textContent\s*=\s*detail|querySelector(?:<[^>]+>)?\(['"]\[data-detail\]['"]\)[\s\S]*?\.textContent\s*=/,
+    );
+    expect(source).not.toMatch(/\[data-detail\][\s\S]{0,120}innerHTML/);
+    expect(source).not.toContain('[data-failure]');
   });
 });

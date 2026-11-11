@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import * as health from '../src/status-health';
 import {
@@ -279,15 +280,42 @@ it('treats malformed history as empty and tolerates storage denial or quota erro
   expect(hasUnacknowledgedFailure()).toBe(false);
 });
 
-it('preserves the eleven static label keys and adds reasons for all thirteen locales', () => {
+it('describes the service-status contract for all thirteen locales', () => {
   expect(Object.keys(STATUS_LABELS).sort()).toEqual(
     Object.keys(LANGUAGES).sort(),
   );
   const { reasons: englishReasons, ...englishStatic } = STATUS_LABELS.en;
-  expect(Object.keys(englishStatic)).toHaveLength(11);
+  expect(Object.keys(englishStatic)).toHaveLength(27);
+  const addedKeys = [
+    'statusOverall',
+    'statusAllOperational',
+    'statusIssueDetected',
+    'statusWebsite',
+    'statusApi',
+    'statusProvider',
+    'statusNotMonitored',
+    'statusWebsiteDetail',
+    'statusApiDetail',
+    'statusApiUnreachable',
+    'statusProviderDetail',
+    'statusVersion',
+    'statusPartiallyVerified',
+    'statusProbeNote',
+    'statusReachable',
+    'statusMonitorPrefix',
+    'statusBrowserPrefix',
+    'statusStale',
+    'statusMonitorNote',
+  ];
+  const removedKeys = ['statusAccess', 'statusPlayback', 'statusYouTubeAdd'];
+  addedKeys.forEach((key) => expect(englishStatic).toHaveProperty(key));
+  removedKeys.forEach((key) => expect(englishStatic).not.toHaveProperty(key));
   Object.values(STATUS_LABELS).forEach((labels) => {
     expect(Object.keys(labels)).toEqual(Object.keys(STATUS_LABELS.en));
     const { reasons, ...staticLabels } = labels;
+    expect(Object.keys(staticLabels)).toHaveLength(27);
+    addedKeys.forEach((key) => expect(staticLabels).toHaveProperty(key));
+    removedKeys.forEach((key) => expect(staticLabels).not.toHaveProperty(key));
     expect(Object.keys(reasons)).toEqual(Object.keys(englishReasons));
     expect(
       Object.values(staticLabels).every((label) => label.trim().length > 0),
@@ -295,8 +323,31 @@ it('preserves the eleven static label keys and adds reasons for all thirteen loc
   });
 });
 
+it('announces each monitor card in exactly one polite, atomic live region', () => {
+  const source = readFileSync(new URL('../src/pages/status.astro', import.meta.url), 'utf8');
+  for (const area of ['website', 'api', 'provider']) {
+    const card = source.match(
+      new RegExp(`<section\\b[^>]*\\bdata-area\\s*=\\s*"${area}"[^>]*>([\\s\\S]*?)</section\\s*>`),
+    )?.[1];
+    expect(card).toBeDefined();
+    expect(card!.match(/\baria-live\s*=\s*"polite"/g)).toHaveLength(1);
+    expect(card!.match(/\baria-atomic\s*=\s*"true"/g)).toHaveLength(1);
+    const liveRegion = card!.match(
+      /<div\b(?=[^>]*\baria-live\s*=\s*"polite")(?=[^>]*\baria-atomic\s*=\s*"true")[^>]*>([\s\S]*?)<\/div\s*>/,
+    )?.[1];
+    expect(liveRegion).toBeDefined();
+    expect(liveRegion).toMatch(/<p\b[^>]*\bclass\s*=\s*"state"[^>]*\bdata-state\s*=/);
+    expect(liveRegion).toMatch(/<p\b[^>]*\bclass\s*=\s*"checked"/);
+    expect(liveRegion).toMatch(/<p\b[^>]*\bdata-detail(?=\s|>)/);
+    expect(liveRegion!.match(/<p\b/g)).toHaveLength(3);
+    expect(liveRegion).not.toMatch(/<h2\b/);
+  }
+  expect(source.match(/\baria-live\b/g)).toHaveLength(3);
+});
+
 it('renders honest empty states before checks resolve, checks once, and refreshes only on demand', async () => {
   vi.useFakeTimers();
+  vi.resetModules();
   // Small DOM adapter: exercise the real module's rendering and event handlers.
   class Element {
     textContent = '';
@@ -322,43 +373,275 @@ it('renders honest empty states before checks resolve, checks once, and refreshe
   vi.stubGlobal('location', { search: '?lang=en' });
   vi.stubGlobal('navigator', { languages: ['en'] });
   vi.stubGlobal('history', { replaceState: vi.fn() });
-  const complete: Array<(result: health.HealthResult) => void> = [];
-  const check = vi
-    .spyOn(health, 'checkArea')
+  // Monitor JSON fetch on load should fail so fallback browser-probe path runs.
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('monitor unavailable')));
+
+  const statusService = await import('../src/status-service');
+  const { APP_VERSION } = statusService;
+  const complete: Array<(result: import('../src/status-service').ServiceResult) => void> = [];
+  const probeWebsite = vi
+    .spyOn(statusService, 'probeWebsite')
     .mockImplementation(() => new Promise((resolve) => complete.push(resolve)));
+  const probeApi = vi
+    .spyOn(statusService, 'probeApi')
+    .mockImplementation(() => new Promise((resolve) => complete.push(resolve)));
+
   await import('../src/status-page');
-  expect(check.mock.calls.map(([area]) => area)).toEqual([
-    'access',
-    'playback',
-    'youtube-add',
-  ]);
-  const card = dom.querySelector('[data-area="access"]');
-  expect(card.querySelector('[data-state]').textContent).toBe(
+
+  expect(probeWebsite).toHaveBeenCalledTimes(1);
+  expect(probeApi).toHaveBeenCalledTimes(1);
+
+  const websiteCard = dom.querySelector('[data-area="website"]');
+  expect(websiteCard.querySelector('.state[data-state]').textContent).toBe(
     STATUS_LABELS.en.statusUnknown,
   );
-  expect(card.querySelector('[data-checked-at]').textContent).toBe('—');
-  expect(card.querySelector('[data-failure]').textContent).toBe(
-    STATUS_LABELS.en.statusNoFailure,
+  expect(websiteCard.querySelector('[data-checked-at]').textContent).toBe('—');
+
+  const providerCard = dom.querySelector('[data-area="provider"]');
+  expect(providerCard.querySelector('[data-detail]').textContent).toBe(
+    (STATUS_LABELS.en as any).statusProviderDetail,
   );
+  expect(providerCard.querySelector('.state[data-state]').textContent).toBe(
+    (STATUS_LABELS.en as any).statusNotMonitored,
+  );
+
+  const overall = dom.querySelector('#overall');
+  expect(overall.querySelector('[data-version]').textContent).toBe(
+    (STATUS_LABELS.en as any).statusVersion + ' ' + APP_VERSION,
+  );
+
   const refresh = dom.querySelector('#status-refresh');
   expect(refresh.disabled).toBe(true);
   complete.forEach((resolve) =>
-    resolve({ state: 'healthy', checkedAt: '2026-11-11T10:00:00Z' }),
+    resolve({
+      state: 'reachable',
+      checkedAt: new Date().toISOString(),
+      detail: 'HTTP 200',
+    }),
   );
-  await vi.advanceTimersByTimeAsync(60000);
+  await vi.advanceTimersByTimeAsync(0);
+  await Promise.resolve();
+  await Promise.resolve();
+
+  const websiteState = websiteCard.querySelector('.state[data-state]');
+  expect(websiteState.textContent).toBe(
+    (STATUS_LABELS.en as any).statusReachable,
+  );
+  expect(websiteState.dataset.state).toBe('unknown');
+  const apiState = dom
+    .querySelector('[data-area="api"]')
+    .querySelector('.state[data-state]');
+  expect(apiState.textContent).toBe(
+    (STATUS_LABELS.en as any).statusReachable,
+  );
+  expect(apiState.dataset.state).toBe('unknown');
+  expect(overall.querySelector('[data-overall-text]').textContent).toBe(
+    STATUS_LABELS.en.statusPartiallyVerified,
+  );
+  expect(overall.querySelector('[data-probe-note]').textContent).toBe(
+    STATUS_LABELS.en.statusProbeNote,
+  );
   expect(refresh.disabled).toBe(false);
-  expect(check).toHaveBeenCalledTimes(3);
-  recordFailure('access', '<b>literal failure</b>');
-  const language = dom.querySelector('#status-language');
-  language.value = 'ko';
-  language.events.get('change')!();
-  expect(card.querySelector('[data-failure]').textContent).toContain(
-    STATUS_LABELS.ko.reasons.check_unavailable,
-  );
-  expect(card.querySelector('[data-failure]').textContent).not.toContain(
-    '<b>literal failure</b>',
-  );
-  expect(check).toHaveBeenCalledTimes(3);
+
   refresh.events.get('click')!();
-  expect(check).toHaveBeenCalledTimes(6);
+  expect(refresh.disabled).toBe(true);
+  await Promise.resolve();
+  expect(probeWebsite).toHaveBeenCalledTimes(2);
+  expect(probeApi).toHaveBeenCalledTimes(2);
+  refresh.events.get('click')!();
+  await Promise.resolve();
+  expect(probeWebsite).toHaveBeenCalledTimes(2);
+  expect(probeApi).toHaveBeenCalledTimes(2);
+
+  const reachable = {
+    state: 'reachable' as const,
+    checkedAt: new Date().toISOString(),
+    detail: 'HTTP 200',
+  };
+  complete.slice(2).forEach((resolve) => resolve(reachable));
+  await vi.advanceTimersByTimeAsync(0);
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(refresh.disabled).toBe(false);
+  expect(probeWebsite).toHaveBeenCalledTimes(2);
+  expect(probeApi).toHaveBeenCalledTimes(2);
+
+  const fetchCount = vi.mocked(fetch).mock.calls.length;
+  await vi.advanceTimersByTimeAsync(60000);
+  expect(probeWebsite).toHaveBeenCalledTimes(2);
+  expect(probeApi).toHaveBeenCalledTimes(2);
+  expect(fetch).toHaveBeenCalledTimes(fetchCount);
+
+  let rejectWebsite!: (error: Error) => void;
+  probeWebsite.mockImplementationOnce(() => new Promise((_, reject) => {
+    rejectWebsite = reject;
+  }));
+  refresh.events.get('click')!();
+  expect(refresh.disabled).toBe(true);
+  rejectWebsite(new Error('probe failed'));
+  complete.slice(4).forEach((resolve) => resolve(reachable));
+  await vi.advanceTimersByTimeAsync(0);
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(refresh.disabled).toBe(false);
+});
+
+function freshMonitorReport() {
+  return {
+    version: 1,
+    checkedAt: new Date().toISOString(),
+    overall: 'operational',
+    components: {
+      websiteStatic: { state: 'operational', detail: 'static asset served', latencyMs: 10 },
+      websiteFunctional: { state: 'operational', detail: 'hourly E2E passed' },
+      shareApiRead: { state: 'reachable', detail: 'read path answered unknown id', latencyMs: 20 },
+      transcription: { state: 'not_monitored', detail: '' },
+    },
+    history: [],
+  };
+}
+
+async function renderMonitorReport(
+  monitorReport: unknown,
+  browserState: 'reachable' | 'degraded' = 'reachable',
+) {
+  vi.useFakeTimers();
+  vi.resetModules();
+  class Element {
+    textContent = '';
+    value = '';
+    disabled = false;
+    dataset: Record<string, string> = {};
+    children = new Map<string, Element>();
+    events = new Map<string, () => void>();
+    querySelector(key: string): Element {
+      if (!this.children.has(key)) this.children.set(key, new Element());
+      return this.children.get(key)!;
+    }
+    setAttribute() {}
+    addEventListener(key: string, handler: () => void) {
+      this.events.set(key, handler);
+    }
+  }
+  const dom = new Element();
+  vi.stubGlobal(
+    'document',
+    Object.assign(dom, { documentElement: { lang: '' }, title: '' }),
+  );
+  vi.stubGlobal('location', { search: '?lang=en' });
+  vi.stubGlobal('navigator', { languages: ['en'] });
+  vi.stubGlobal('history', { replaceState: vi.fn() });
+
+  const checkedAt = new Date().toISOString();
+  const monitorFetch = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => monitorReport,
+  });
+  vi.stubGlobal('fetch', monitorFetch);
+
+  const statusService = await import('../src/status-service');
+  vi.spyOn(statusService, 'probeWebsite').mockResolvedValue({
+    state: browserState,
+    checkedAt,
+    detail: 'HTTP 200',
+  });
+  vi.spyOn(statusService, 'probeApi').mockResolvedValue({
+    state: 'reachable',
+    checkedAt,
+    detail: 'HTTP 404',
+  });
+
+  await import('../src/status-page');
+  await vi.advanceTimersByTimeAsync(0);
+  await Promise.resolve();
+  await Promise.resolve();
+
+  return dom;
+}
+
+it('renders a fresh monitor as partially verified with a healthy website and monitor checked-at', async () => {
+  const dom = await renderMonitorReport(freshMonitorReport());
+  const overall = dom.querySelector('#overall');
+  expect(overall.querySelector('[data-overall-text]').textContent).toBe(
+    STATUS_LABELS.en.statusPartiallyVerified,
+  );
+  expect(overall.querySelector('[data-overall-text]').dataset.state).toBe('unknown');
+  const websiteState = dom
+    .querySelector('[data-area="website"]')
+    .querySelector('.state[data-state]');
+  expect(websiteState.textContent).toBe(STATUS_LABELS.en.statusHealthy);
+  expect(websiteState.dataset.state).toBe('healthy');
+  const apiState = dom.querySelector('[data-area="api"]').querySelector('.state[data-state]');
+  expect(apiState.textContent).toBe(STATUS_LABELS.en.statusReachable);
+  expect(apiState.dataset.state).toBe('unknown');
+  const websiteChecked = dom
+    .querySelector('[data-area="website"]')
+    .querySelector('[data-checked-at]').textContent;
+  expect(websiteChecked).toContain('(monitor)');
+});
+
+it.each(['websiteStatic', 'websiteFunctional', 'shareApiRead', 'transcription'] as const)(
+  'derives a degraded banner from %s despite an operational report.overall',
+  async (component) => {
+    const report = freshMonitorReport();
+    report.components[component].state = 'degraded';
+    const dom = await renderMonitorReport(report);
+    const overallState = dom.querySelector('#overall').querySelector('[data-overall-text]');
+    expect(overallState.textContent).toBe(STATUS_LABELS.en.statusIssueDetected);
+    expect(overallState.dataset.state).toBe('degraded');
+    const area = component === 'shareApiRead'
+      ? 'api'
+      : component === 'transcription' ? 'provider' : 'website';
+    const cardState = dom.querySelector(`[data-area="${area}"]`).querySelector('.state[data-state]');
+    expect(cardState.textContent).toBe(STATUS_LABELS.en.statusDegraded);
+    expect(cardState.dataset.state).toBe('degraded');
+  },
+);
+
+it.each(['operational', 'degraded'])(
+  'renders a two-hour-old %s monitor as unknown with stale markers',
+  async (state) => {
+    const report = freshMonitorReport();
+    report.checkedAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    report.overall = state;
+    report.components.websiteFunctional.state = state;
+    const dom = await renderMonitorReport(report);
+    const overall = dom.querySelector('#overall');
+    expect(overall.querySelector('[data-overall-text]').textContent).toBe(
+      STATUS_LABELS.en.statusPartiallyVerified,
+    );
+    expect(overall.querySelector('[data-overall-text]').dataset.state).toBe('unknown');
+    expect(overall.querySelector('[data-overall-at]').textContent).toContain('(stale)');
+    expect(overall.querySelector('[data-probe-note]').textContent).toBe(STATUS_LABELS.en.statusMonitorNote);
+    for (const area of ['website', 'api', 'provider']) {
+      const card = dom.querySelector(`[data-area="${area}"]`);
+      const cardState = card.querySelector('.state[data-state]');
+      expect(cardState.textContent).toBe(STATUS_LABELS.en.statusUnknown);
+      expect(cardState.dataset.state).toBe('unknown');
+      expect(card.querySelector('[data-detail]').textContent).toContain('(stale)');
+      expect(card.querySelector('[data-checked-at]').textContent).toContain('(monitor)');
+    }
+  },
+);
+
+it.each([
+  ['future timestamp', () => ({ checkedAt: new Date(Date.now() + 6 * 60 * 1000).toISOString() })],
+  ['expired timestamp', () => ({ checkedAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() })],
+  ['invalid timestamp', () => ({ checkedAt: 'not a date' })],
+  ['bad version', () => ({ version: 2 })],
+  ['array components', () => ({ components: [] })],
+  ['missing component', () => ({ components: { ...freshMonitorReport().components, websiteFunctional: undefined } })],
+  ['invalid state', () => ({ components: { ...freshMonitorReport().components, shareApiRead: { state: 'healthy', detail: '' } } })],
+  ['invalid detail', () => ({ components: { ...freshMonitorReport().components, transcription: { state: 'not_monitored', detail: null } } })],
+] as const)('falls back to browser probes for a monitor with %s', async (_name, invalidFields) => {
+  const report = { ...freshMonitorReport(), ...invalidFields() };
+  const dom = await renderMonitorReport(report, 'degraded');
+  const overall = dom.querySelector('#overall');
+  expect(overall.querySelector('[data-overall-text]').textContent).toBe(STATUS_LABELS.en.statusIssueDetected);
+  expect(overall.querySelector('[data-overall-text]').dataset.state).toBe('degraded');
+  expect(overall.querySelector('[data-probe-note]').textContent).toBe(STATUS_LABELS.en.statusProbeNote);
+  const website = dom.querySelector('[data-area="website"]');
+  expect(website.querySelector('.state[data-state]').dataset.state).toBe('degraded');
+  expect(website.querySelector('[data-checked-at]').textContent).not.toContain('(monitor)');
+  expect(website.querySelector('[data-detail]').textContent).not.toContain(STATUS_LABELS.en.statusMonitorPrefix);
 });
