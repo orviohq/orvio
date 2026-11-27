@@ -4913,7 +4913,7 @@ async function openExternalShare(fragment: string) {
   readRoute();
 }
 
-function readRoute(initial = false) {
+function readRoute(initial = false, preserveDialogs = false) {
   if (
     /^\/select\/?$/.test(location.pathname) &&
     !libraryHydrated &&
@@ -4982,9 +4982,12 @@ function readRoute(initial = false) {
     return;
   }
   readingRoute = true;
-  document
-    .querySelectorAll<HTMLDialogElement>("dialog[open]")
-    .forEach((d) => d.close());
+  // The deferred boot read can finish after the user already opened a dialog
+  // (for example F2 while the library hydrates). It is not a route change.
+  if (!preserveDialogs)
+    document
+      .querySelectorAll<HTMLDialogElement>("dialog[open]")
+      .forEach((d) => d.close());
   if (active || paused) exit();
   document.body.classList.remove("results-screen");
   const parts = location.pathname.split("/").filter(Boolean);
@@ -5250,7 +5253,7 @@ async function resolveSharedReplay(
 let verifiedOwnFragment: string | null = null;
 let initialArrivalKey: string | null = null;
 let initialArrivalFragment: string | null = null;
-async function readInitialRoute() {
+async function readInitialRoute(preserveDialogs = false) {
   // The ?s= flow replaceStates to the fragment form before rendering; keep
   // the arrival identity so the projection is written under both.
   initialArrivalKey = resultIdentityKey(location.href);
@@ -5292,7 +5295,7 @@ async function readInitialRoute() {
       if (!stillInitial()) return;
       verifiedOwnFragment = own ? fragment : null;
     }
-    readRoute(true);
+    readRoute(true, preserveDialogs);
     await replayEncoding;
     document.documentElement.removeAttribute("data-result-pending");
     return;
@@ -5643,7 +5646,7 @@ async function initializeLibrary() {
     if (requested && !SONGS.some((song) => song.id === requested)) return;
     if (!progressiveRouteRead && deferredLibraryRoute) {
       progressiveRouteRead = true;
-      void readInitialRoute();
+      void readInitialRoute(true);
     } else {
       songCards();
       syncSettings();
@@ -5763,7 +5766,8 @@ async function initializeLibrary() {
   }
   for (const row of canonicalPending.values()) void reconcileLibraryRow(row);
   backgroundImports.resume();
-  if (deferredLibraryRoute && !progressiveRouteRead) await readInitialRoute();
+  if (deferredLibraryRoute && !progressiveRouteRead)
+    await readInitialRoute(true);
   else if (screen === "select" && !active) {
     if (!selectedDuringHydration && !hasSelectionSong(location.search))
       restoreLibrarySelection();
