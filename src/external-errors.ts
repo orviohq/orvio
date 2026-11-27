@@ -5,7 +5,26 @@ import { audioStageMessage } from './audio-stage-message';
 import { audioFailureMessage } from './audio-failure-message';
 import { audioLimitMessage } from './audio-limit-message';
 import { AudioJobError } from './external-audio-api';
+import {
+  ClientOnlyNetworkError,
+  ClientOnlyUnavailableError,
+} from './client-only-runtime';
 import type { Language } from './i18n';
+const CLIENT_ONLY_ERRORS: Record<Language, string> = {
+  en: 'This local build cannot use the remote service. The request was not sent.',
+  ko: '이 로컬 빌드는 원격 서비스를 사용할 수 없습니다. 요청을 보내지 않았습니다.',
+  zh: '此本地版本无法使用远程服务。未发送请求。',
+  ja: 'このローカル版ではリモートサービスを利用できません。リクエストは送信されていません。',
+  es: 'Esta versión local no puede usar el servicio remoto. No se envió la solicitud.',
+  fr: 'Cette version locale ne peut pas utiliser le service distant. La demande n’a pas été envoyée.',
+  de: 'Diese lokale Version kann den externen Dienst nicht nutzen. Die Anfrage wurde nicht gesendet.',
+  pt: 'Esta versão local não pode usar o serviço remoto. O pedido não foi enviado.',
+  it: 'Questa versione locale non può usare il servizio remoto. La richiesta non è stata inviata.',
+  ru: 'Эта локальная сборка не может использовать удалённый сервис. Запрос не отправлен.',
+  id: 'Build lokal ini tidak dapat memakai layanan jarak jauh. Permintaan tidak dikirim.',
+  tr: 'Bu yerel sürüm uzak hizmeti kullanamaz. İstek gönderilmedi.',
+  vi: 'Bản dựng cục bộ này không thể dùng dịch vụ từ xa. Yêu cầu chưa được gửi.',
+};
 const errors: Record<Language, string[]> = {
   en: [
     'Enter a valid YouTube link.',
@@ -139,6 +158,11 @@ const errors: Record<Language, string[]> = {
   ],
 };
 export function externalError(error: unknown, language: Language) {
+  if (
+    error instanceof ClientOnlyNetworkError ||
+    error instanceof ClientOnlyUnavailableError
+  )
+    return CLIENT_ONLY_ERRORS[language];
   if (
     error instanceof AudioJobError &&
     error.code === 'request_timeout'

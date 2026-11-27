@@ -1,3 +1,9 @@
+## [0.3.28] - 2026-11-27
+
+- Fix a cold open of a short result-share link that did not show the result.
+- Keep settings and share dialogs open while a shared link resolves.
+- Show the accurate network-error message when a shared link cannot be loaded.
+
 ## [0.3.4] - 2026-11-10
 
 - Use one chart engine for automatic YouTube charts across 4, 5, 6, 7 and 8 keys.

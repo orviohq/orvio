@@ -14,6 +14,27 @@ export class ShareError extends Error {
     super('Share request failed: ' + status);
   }
 }
+/**
+ * Opening a result short link is the one explicit server read admitted by the
+ * client-only build (see share-labels). Keep it scoped to the immutable replay
+ * record endpoint: any other URL still goes through the normal client-only
+ * admission and fails before fetch.
+ */
+function assertExplicitShortLinkRead(url: string) {
+  let target: URL;
+  try {
+    target = new URL(url);
+  } catch {
+    return assertRuntimeFetch(url);
+  }
+  if (
+    target.origin !== new URL(SHARE_API).origin ||
+    !/^\/v1\/replays\/[A-Za-z0-9_-]{20,100}$/.test(target.pathname) ||
+    target.search ||
+    target.hash
+  )
+    return assertRuntimeFetch(url);
+}
 export async function saveSharedReplay(
   fragment: string,
   { signal }: { signal?: AbortSignal } = {},
@@ -47,9 +68,11 @@ export async function saveSharedReplay(
 async function fetchSharedReplay(
   id: string,
   signal: AbortSignal,
+  explicitShortLink = false,
 ): Promise<{ fragment: string; expiresAt: string }> {
   const url = SHARE_API + '/v1/replays/' + encodeURIComponent(id);
-  assertRuntimeFetch(url);
+  if (explicitShortLink) assertExplicitShortLinkRead(url);
+  else assertRuntimeFetch(url);
   const response = await fetch(url, { signal, cache: 'no-store' });
   if (!response.ok) throw new ShareError(response.status);
   const data = await response.json();
@@ -69,7 +92,14 @@ async function fetchSharedReplay(
  * IndexedDB for instant reloads. Callers must still enforce expiresAt on
  * cached hits (see readInitialRoute) because a warm entry never refetches.
  */
-export async function loadSharedReplay(id: string) {
+export interface SharedReplayLoadOptions {
+  /** True only for an explicit result short-link arrival. */
+  explicitShortLink?: boolean;
+}
+export async function loadSharedReplay(
+  id: string,
+  options: SharedReplayLoadOptions = {},
+) {
   if (!/^[A-Za-z0-9_-]{20,100}$/.test(id)) throw new ShareError(400);
   return queryClient.fetchQuery({
     queryKey: queryKeys.sharedReplay(id),
@@ -77,6 +107,7 @@ export async function loadSharedReplay(id: string) {
       fetchSharedReplay(
         id,
         AbortSignal.any([signal, AbortSignal.timeout(12000)]),
+        options.explicitShortLink === true,
       ),
     staleTime: Infinity,
     gcTime: Infinity,

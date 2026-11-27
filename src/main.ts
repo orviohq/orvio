@@ -70,6 +70,8 @@ import { savedCanonical } from "./canonical-library";
 import {
   CLIENT_ONLY_MODE,
   ClientOnlyLocalAudioError,
+  ClientOnlyNetworkError,
+  ClientOnlyUnavailableError,
   requireLocalAudio,
 } from "./client-only-runtime";
 import { importStageLabel } from "./import-progress";
@@ -2455,6 +2457,7 @@ function syncSettings(updateLibrary = true) {
   if (
     !readingRoute &&
     screen === "select" &&
+    !document.documentElement.hasAttribute("data-result-pending") &&
     !$<HTMLDialogElement>("#results").open
   )
     replaceSelectionPath();
@@ -4498,6 +4501,7 @@ $("#reduced-motion").onchange = (e) => {
   if (
     !readingRoute &&
     screen === "select" &&
+    !document.documentElement.hasAttribute("data-result-pending") &&
     !$<HTMLDialogElement>("#results").open
   )
     replaceSelectionPath();
@@ -4829,7 +4833,7 @@ function showShared468Add() {
   dialog.showModal();
   cancel.focus();
 }
-async function openExternalShare(fragment: string) {
+async function openExternalShare(fragment: string, preserveDialogs = false) {
   if (fragment.startsWith(PROGRESSIVE_SHARE_PREFIX)) {
     const request = ++shareRouteRequest;
     const href = location.href;
@@ -4910,7 +4914,7 @@ async function openExternalShare(fragment: string) {
   replayExpected = false;
   replayIssue = false;
   replayText = "";
-  readRoute();
+  readRoute(false, preserveDialogs);
 }
 
 function readRoute(initial = false, preserveDialogs = false) {
@@ -5237,6 +5241,7 @@ window.addEventListener("popstate", () => {
  * expiry enforced locally exactly as the network path does. */
 async function resolveSharedReplay(
   id: string,
+  explicitShortLink = false,
 ): Promise<{ fragment: string; expiresAt: string }> {
   await queryReady;
   const key = queryKeys.sharedReplay(id);
@@ -5248,7 +5253,7 @@ async function resolveSharedReplay(
     if (Date.parse(cached.expiresAt) > Date.now()) return cached;
     queryClient.removeQueries({ queryKey: key });
   }
-  return loadSharedReplay(id);
+  return loadSharedReplay(id, { explicitShortLink });
 }
 let verifiedOwnFragment: string | null = null;
 let initialArrivalKey: string | null = null;
@@ -5273,7 +5278,7 @@ async function readInitialRoute(preserveDialogs = false) {
       location.hash.startsWith("#" + PROGRESSIVE_SHARE_PREFIX)
     ) {
       try {
-        await openExternalShare(location.hash.slice(1));
+        await openExternalShare(location.hash.slice(1), preserveDialogs);
       } catch {
         if (!stillInitial()) return;
         finishResultFirstPaint(null);
@@ -5305,7 +5310,7 @@ async function readInitialRoute(preserveDialogs = false) {
     // ORV-62: the restored IndexedDB query cache is awaited (fast local
     // read) so a previously fetched result renders instantly with no
     // network wait. Only a cold or expired cache reaches the network.
-    const loaded = await resolveSharedReplay(id);
+    const loaded = await resolveSharedReplay(id, true);
     if (!stillInitial()) return;
     const params = new URLSearchParams(loaded.fragment);
     if (params.get("v") === "7") {
@@ -5317,7 +5322,7 @@ async function readInitialRoute(preserveDialogs = false) {
       shortCache.set(loaded.fragment, { id, expiresAt: loaded.expiresAt });
       history.replaceState(null, "", "/result/#" + loaded.fragment);
       expectedHref = location.href;
-      await openExternalShare(loaded.fragment);
+      await openExternalShare(loaded.fragment, preserveDialogs);
       return;
     }
     if (!readResult(params)) throw new ShareError(400);
@@ -5341,11 +5346,11 @@ async function readInitialRoute(preserveDialogs = false) {
     const own = await isArchivedBuiltinResult(loaded.fragment);
     if (!stillInitial()) return;
     verifiedOwnFragment = own ? loaded.fragment : null;
-    readRoute();
+    readRoute(false, preserveDialogs);
   } catch (error) {
     if (!stillInitial()) return;
     finishResultFirstPaint(null);
-    readRoute();
+    readRoute(false, preserveDialogs);
     const dialog = document.createElement("dialog");
     dialog.className = "share-error";
     dialog.onclick = (e) => {
@@ -5369,7 +5374,15 @@ async function readInitialRoute(preserveDialogs = false) {
         ? labels.missing
         : error instanceof ShareError && error.status === 400
           ? labels.invalid
-          : labels.failed;
+          : error instanceof ShareError && error.status === 429
+            ? labels.quota
+            : error instanceof ClientOnlyNetworkError ||
+                error instanceof ClientOnlyUnavailableError
+              ? labels.clientOnly
+              : error instanceof TypeError ||
+                  (error instanceof DOMException && error.name !== "AbortError")
+                ? labels.network
+                : labels.failed;
     const close = document.createElement("button");
     close.textContent = t("close");
     close.onclick = () => {
