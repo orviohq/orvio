@@ -1,27 +1,27 @@
 {
   "version": 1,
-  "checkedAt": "2026-11-28T02:09:53.426Z",
+  "checkedAt": "2026-11-28T10:51:55.184Z",
   "overall": "unknown",
   "producer": {
     "repo": "orviohq/orvio",
     "revision": "2ea7edb706702b554007e2a345075f5ff688deb7",
-    "runId": "46096680974",
+    "runId": "46137156782",
     "workflow": "status"
   },
   "components": {
     "websiteStatic": {
       "state": "operational",
       "detail": "static asset served",
-      "latencyMs": 212
+      "latencyMs": 83
     },
     "websiteFunctional": {
       "state": "unknown",
-      "detail": "CI main@2ea7edb success 2026-11-28T02:01:22Z (historical; current live release unverified)"
+      "detail": "CI main@2ea7edb success 2026-11-28T10:26:37Z (historical; current live release unverified)"
     },
     "shareApiRead": {
       "state": "reachable",
       "detail": "request validation answered (404); storage not probed",
-      "latencyMs": 170
+      "latencyMs": 212
     },
     "transcription": {
       "state": "not_monitored",
@@ -459,6 +459,14 @@
       "latencyMs": {
         "websiteStatic": 212,
         "shareApiRead": 170
+      }
+    },
+    {
+      "checkedAt": "2026-11-28T10:51:55.184Z",
+      "overall": "unknown",
+      "latencyMs": {
+        "websiteStatic": 83,
+        "shareApiRead": 212
       }
     }
   ]
